@@ -483,6 +483,16 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   artifacts with ordinary generic graph primitives while retaining editability;
   anatomy, layered armor, surface wear, and richer animation remain open.
 
+  Layered-character checkpoint, 2026-08-26: the main consumer now uses 84
+  reachable nodes, with mirrored shoulder shells and knee cops, arrayed
+  abdominal and full-width chest lames, and a capsule/torus helmet crest and
+  brow. Native review rejected a paired short-capsule chest variant before
+  acceptance. The authored and module-driven camera was tightened to a
+  14.5-unit height, 15-unit follow offset, 40-degree pitch, and 38-degree FOV so
+  these forms remain readable during actual play. This closes the immediate
+  blocky-silhouette/framing pass; richer materials, multi-joint deformation,
+  locomotion/combat animation, and final character proportions remain open.
+
 - [ ] **Step 3: Bake, publish, catalog, and place**
 
   Publish immutable models, preserve material slots/UVs/tangents, place coherent

@@ -280,11 +280,11 @@ public sealed class AetherfallCitadelAcceptanceTests
         var guardianHud = world.Entities.Single(entity => entity.Name == "HudGuardian");
         var dormantEnemy = world.Entities.Single(entity => entity.Name == "CourtLancer");
 
-        Assert.True(camera.Transform.Position3D.Z > -27);
-        Assert.Equal(17.5, camera.Transform.Position3D.Y, precision: 3);
-        Assert.Equal(42, camera.Transform.Rotation3D.X, precision: 3);
+        Assert.True(camera.Transform.Position3D.Z > -24);
+        Assert.Equal(14.5, camera.Transform.Position3D.Y, precision: 3);
+        Assert.Equal(40, camera.Transform.Rotation3D.X, precision: 3);
         Assert.Equal(
-            40,
+            38,
             camera.Components.Single(component => component.Type == "Rekall.Camera3D")
                 .Properties["fieldOfView"]!.GetValue<double>(),
             precision: 3);

@@ -5694,6 +5694,32 @@ environmental-gate chronology, raw artifact hashes, and residue audit:
   anatomy, armor layering, material variation/wear, and animation at a more
   revealing gameplay composition—not further edge-case hardening of this pass.
 
+## Layered Warden and isometric framing checkpoint
+
+- The editable Warden consumer expands from 71 to 84 reachable graph nodes
+  using only generic AGE construction: mirrored shoulder shells and knee cops,
+  arrayed abdominal/chest lames, plus a capsule crest and torus brow. The first
+  short paired-chest experiment was rejected by native image review; the
+  accepted form uses two overlapping full-width rounded plates. An invalid
+  intermediate capsule was diagnosed through the evaluator's exact
+  `depth >= diameter` contract and never replaced the last-good mesh.
+- The authored camera and agent-authored presentation system now use a closer
+  14.5-unit height, 15-unit follow offset, 40-degree pitch, and 38-degree FOV.
+  A deterministic runtime acceptance proves the FOV and relative Warden-camera
+  offset after module execution, while the existing input/HUD presentation
+  acceptance remains green. The left pauldron is also reduced and seated more
+  tightly against the shoulder.
+- Native High proof is
+  `Examples/AetherfallCitadel/Proof/Captures/LayeredWardenLames/vulkan-scene-1280x720-20260826112335288.png`:
+  11,760 distinct colors, 305 render-work draws, four dispatches, zero
+  observations, and zero asset fallbacks. This is a visible composition and
+  construction gain, not a claim of final photoreal character quality.
+- Relevant gameplay plus high-fidelity acceptance passes 44/44, the solution
+  builds with zero warnings/errors, project and scene validation have zero
+  issues, and both modules are restricted-host ready. High 2560x1440
+  `desktop60` passes at 8.642528 ms GPU time, 203,638 triangles, 873,116
+  vertices, 97 scene draws, and nine textures.
+
 ## Evidence index
 
 - `docs/production/2026-08-17-engine-maturity-audit.md`

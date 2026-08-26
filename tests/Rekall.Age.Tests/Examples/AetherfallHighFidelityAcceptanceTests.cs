@@ -703,8 +703,8 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         var modelingGraph = JsonNode.Parse(File.ReadAllText(Path.Combine(
             projectRoot, "Modeling", "Graphs", "aetherfall.warden.graph.age.modeling-graph.json")))!.AsObject();
         var modelingNodes = modelingGraph["nodes"]!.AsArray();
-        Assert.True(modelingNodes.Count >= 70,
-            $"Expected the Warden graph to retain its compact detailed authored construction, found {modelingNodes.Count} nodes.");
+        Assert.True(modelingNodes.Count >= 83,
+            $"Expected the Warden graph to retain its layered detailed authored construction, found {modelingNodes.Count} nodes.");
         Assert.Contains(modelingNodes, node =>
             node?["typeId"]?.GetValue<string>() == "rekall.modeling.primitive.capsule");
         Assert.Contains(modelingNodes, node =>
@@ -713,7 +713,8 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             node?["nodeId"]?.GetValue<string>() == "cloth-bevel");
         foreach (var nodeId in new[]
         {
-            "thigh-guards", "bracers", "gauntlets", "eye-slit-x", "aether-material", "coat-tail", "coat-tails"
+            "thigh-guards", "bracers", "gauntlets", "eye-slit-x", "aether-material", "coat-tail", "coat-tails",
+            "shoulder-shells", "abdomen-plates", "knee-cops", "helmet-crest-x", "breastplates"
         })
         {
             Assert.Contains(modelingNodes, node => node?["nodeId"]?.GetValue<string>() == nodeId);
@@ -735,6 +736,21 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         Assert.Contains(modelingNodes, node =>
             node?["nodeId"]?.GetValue<string>() == "faceplate"
             && node?["typeId"]?.GetValue<string>() == "rekall.modeling.primitive.capsule");
+        Assert.Contains(modelingNodes, node =>
+            node?["nodeId"]?.GetValue<string>() == "abdomen-plates"
+            && node?["typeId"]?.GetValue<string>() == "rekall.modeling.array");
+        Assert.Contains(modelingNodes, node =>
+            node?["nodeId"]?.GetValue<string>() == "knee-cops"
+            && node?["typeId"]?.GetValue<string>() == "rekall.modeling.mirror");
+        Assert.Contains(modelingNodes, node =>
+            node?["nodeId"]?.GetValue<string>() == "shoulder-shells"
+            && node?["typeId"]?.GetValue<string>() == "rekall.modeling.mirror");
+        Assert.Contains(modelingNodes, node =>
+            node?["nodeId"]?.GetValue<string>() == "breastplate"
+            && node?["typeId"]?.GetValue<string>() == "rekall.modeling.primitive.capsule");
+        Assert.Contains(modelingNodes, node =>
+            node?["nodeId"]?.GetValue<string>() == "breastplates"
+            && node?["typeId"]?.GetValue<string>() == "rekall.modeling.array");
         Assert.DoesNotContain(modelingNodes, node =>
             node?["nodeId"]?.GetValue<string>() == "faceplate-inset");
         Assert.Equal(3, authoredSurfaces.Count);
@@ -752,6 +768,26 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             node?["typeId"]?.GetValue<string>() == "rekall.material.surface.emissive")!.AsObject();
         Assert.Equal("#d18a42", emissiveNode["parameters"]!["color"]!.GetValue<string>());
         Assert.Equal(3.2, emissiveNode["parameters"]!["strength"]!.GetValue<double>());
+    }
+
+    [Fact]
+    public async Task GameplayCameraUsesCloserIsometricCompositionAroundTheWarden()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var world = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(
+            projectRoot, "Main", 3, CancellationToken.None);
+        var warden = Assert.Single(world.Entities, entity => entity.Name == "AetherWarden");
+        var camera = Assert.Single(world.Entities, entity => entity.Name == "CitadelCamera");
+
+        Assert.Equal(
+            38,
+            camera.Components.Single(component => component.Type == "Rekall.Camera3D")
+                .Properties["fieldOfView"]!.GetValue<double>());
+        Assert.InRange(camera.Transform.Position3D.Y, 14.4, 14.6);
+        Assert.InRange(
+            camera.Transform.Position3D.Z - warden.Transform.Position3D.Z,
+            -15.1,
+            -14.9);
     }
 
     private static JsonObject LoadMainScene() => JsonNode.Parse(File.ReadAllText(Path.Combine(

@@ -2042,7 +2042,7 @@
           "properties": {
             "active": true,
             "projectionMode": "perspective",
-            "fieldOfView": 40,
+            "fieldOfView": 38,
             "clearColor": "#080b0b"
           }
         },
@@ -2050,9 +2050,9 @@
           "type": "Rekall.Transform3D",
           "properties": {
             "x": 0,
-            "y": 17.5,
-            "z": -30,
-            "pitch": 42
+            "y": 14.5,
+            "z": -27,
+            "pitch": 40
           }
         }
       ],
@@ -10341,11 +10341,11 @@
           "type": "Rekall.Transform3D",
           "properties": {
             "pitch": 0,
-            "scaleX": 0.82,
-            "x": -0.95,
-            "scaleY": 0.82,
-            "scaleZ": 0.82,
-            "y": 2.62,
+            "scaleX": 0.62,
+            "x": -0.84,
+            "scaleY": 0.62,
+            "scaleZ": 0.62,
+            "y": 2.52,
             "yaw": -3,
             "z": 0.02,
             "roll": -4

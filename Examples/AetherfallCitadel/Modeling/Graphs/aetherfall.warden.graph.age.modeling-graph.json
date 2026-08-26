@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.warden.graph",
   "name": "Aetherfall Warden Silhouette",
-  "revision": 17,
+  "revision": 20,
   "nodes": [
     {
       "nodeId": "torso",
@@ -137,24 +137,20 @@
     },
     {
       "nodeId": "breastplate",
-      "typeId": "rekall.modeling.primitive.box",
+      "typeId": "rekall.modeling.primitive.capsule",
       "typeVersion": 1,
       "parameters": {
-        "sizeX": 1.34,
-        "sizeY": 1.05,
-        "sizeZ": 0.22
+        "radius": 0.22,
+        "depth": 1.2,
+        "segments": 28,
+        "hemisphereRings": 7
       }
     },
     {
-      "nodeId": "breastplate-inset",
-      "typeId": "rekall.modeling.inset",
+      "nodeId": "breastplates",
+      "typeId": "rekall.modeling.array",
       "typeVersion": 1,
-      "parameters": {
-        "thickness": 0.075,
-        "depth": -0.035,
-        "individual": true,
-        "boundary": true
-      }
+      "parameters": { "count": 2, "offset": [0, -0.3, 0.035], "relativeOffset": false, "instanceMode": false }
     },
     {
       "nodeId": "breastplate-x",
@@ -163,14 +159,15 @@
       "parameters": {
         "translation": [
           0,
-          2.08,
-          -0.48
+          2.3,
+          -0.5
         ],
         "rotation": [
           -8,
           0,
-          0
-        ]
+          90
+        ],
+        "scale": [1, 0.82, 0.5]
       }
     },
     {
@@ -1065,6 +1062,104 @@
       }
     },
     {
+      "nodeId": "shoulder-shell",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.46, "segments": 32, "rings": 18 }
+    },
+    {
+      "nodeId": "shoulder-shell-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.86, 2.48, 0.0],
+        "rotation": [0, 0, -5],
+        "scale": [1.05, 0.52, 0.88]
+      }
+    },
+    {
+      "nodeId": "shoulder-shells",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
+      "nodeId": "abdomen-plate",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": { "sizeX": 1.08, "sizeY": 0.2, "sizeZ": 0.18 }
+    },
+    {
+      "nodeId": "abdomen-plate-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [0, 1.76, -0.53],
+        "rotation": [-10, 0, 0],
+        "scale": [1, 1, 1]
+      }
+    },
+    {
+      "nodeId": "abdomen-plates",
+      "typeId": "rekall.modeling.array",
+      "typeVersion": 1,
+      "parameters": { "count": 4, "offset": [0, -0.23, 0.035], "relativeOffset": false, "instanceMode": false }
+    },
+    {
+      "nodeId": "knee-cop",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.3, "segments": 28, "rings": 16 }
+    },
+    {
+      "nodeId": "knee-cop-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.42, -0.16, -0.27],
+        "rotation": [-8, 0, -2],
+        "scale": [0.9, 0.72, 0.45]
+      }
+    },
+    {
+      "nodeId": "knee-cops",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
+      "nodeId": "helmet-crest",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.09, "depth": 0.44, "segments": 24, "hemisphereRings": 6 }
+    },
+    {
+      "nodeId": "helmet-crest-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [0, 3.65, 0.02],
+        "rotation": [0, 0, 0],
+        "scale": [0.65, 1, 0.8]
+      }
+    },
+    {
+      "nodeId": "helmet-brow",
+      "typeId": "rekall.modeling.primitive.torus",
+      "typeVersion": 1,
+      "parameters": { "majorRadius": 0.32, "minorRadius": 0.045, "majorSegments": 36, "minorSegments": 8 }
+    },
+    {
+      "nodeId": "helmet-brow-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [0, 3.42, -0.37],
+        "rotation": [90, 0, 0],
+        "scale": [1.12, 0.58, 0.72]
+      }
+    },
+    {
       "nodeId": "eye-slit",
       "typeId": "rekall.modeling.primitive.box",
       "typeVersion": 1,
@@ -1143,17 +1238,17 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "plate-inset",
+      "linkId": "plate-x",
       "fromNodeId": "breastplate",
       "fromPortId": "geometry",
-      "toNodeId": "breastplate-inset",
+      "toNodeId": "breastplate-x",
       "toPortId": "geometry"
     },
     {
-      "linkId": "tx10",
-      "fromNodeId": "breastplate-inset",
+      "linkId": "plate-mirror",
+      "fromNodeId": "breastplate-x",
       "fromPortId": "geometry",
-      "toNodeId": "breastplate-x",
+      "toNodeId": "breastplates",
       "toPortId": "geometry"
     },
     {
@@ -1263,9 +1358,9 @@
     },
     {
       "linkId": "armor-breastplate",
-      "fromNodeId": "breastplate-x",
+      "fromNodeId": "breastplates",
       "fromPortId": "geometry",
-      "toNodeId": "armor-join",
+      "toNodeId": "armor-smooth-join",
       "toPortId": "geometry"
     },
     {
@@ -1565,6 +1660,97 @@
     {
       "linkId": "gauntlet-smooth",
       "fromNodeId": "gauntlets",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shoulder-shell-x",
+      "fromNodeId": "shoulder-shell",
+      "fromPortId": "geometry",
+      "toNodeId": "shoulder-shell-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shoulder-shell-mirror",
+      "fromNodeId": "shoulder-shell-x",
+      "fromPortId": "geometry",
+      "toNodeId": "shoulder-shells",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shoulder-shell-smooth",
+      "fromNodeId": "shoulder-shells",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "abdomen-plate-x",
+      "fromNodeId": "abdomen-plate",
+      "fromPortId": "geometry",
+      "toNodeId": "abdomen-plate-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "abdomen-plate-array",
+      "fromNodeId": "abdomen-plate-x",
+      "fromPortId": "geometry",
+      "toNodeId": "abdomen-plates",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "abdomen-plate-hard",
+      "fromNodeId": "abdomen-plates",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "knee-cop-x",
+      "fromNodeId": "knee-cop",
+      "fromPortId": "geometry",
+      "toNodeId": "knee-cop-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "knee-cop-mirror",
+      "fromNodeId": "knee-cop-x",
+      "fromPortId": "geometry",
+      "toNodeId": "knee-cops",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "knee-cop-smooth",
+      "fromNodeId": "knee-cops",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-crest-x",
+      "fromNodeId": "helmet-crest",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-crest-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-crest-smooth",
+      "fromNodeId": "helmet-crest-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-brow-x",
+      "fromNodeId": "helmet-brow",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-brow-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-brow-smooth",
+      "fromNodeId": "helmet-brow-x",
       "fromPortId": "geometry",
       "toNodeId": "armor-smooth-join",
       "toPortId": "geometry"

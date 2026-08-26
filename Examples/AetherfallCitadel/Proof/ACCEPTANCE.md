@@ -755,3 +755,32 @@ the new background is an explicit fallback, not a claim that sky assets render.
   `windows-appcontainer-restricted` posture, and the 2560x1440 High
   `desktop60` budget passes at 6.335008 ms measured GPU time, 97 scene draws,
   197,410 triangles, 835,052 vertices, and nine textures.
+
+## Layered armor and closer gameplay-composition checkpoint
+
+- The Warden graph now contains 84 reachable nodes. Generic mirror and array
+  construction adds paired shoulder shells, shaped knee cops, a helmet crest
+  and brow, four overlapping abdominal lames, and two full-width rounded chest
+  lames. The initial paired short-capsule chest experiment was rejected from
+  the native image because it read anatomically rather than as forged armor;
+  the accepted full-width repetition is recorded in executable graph
+  acceptance.
+- The left layered pauldron is reduced from 0.82 to 0.62 scale and repositioned
+  against the shoulder instead of dominating the silhouette. The authored and
+  module-driven camera changes from 17.5-height/18-unit offset/40-degree FOV to
+  14.5-height/15-unit offset/38-degree FOV, retaining smooth delta-time follow
+  while presenting the player and nearby terrain at a more readable dark
+  isometric action-game scale.
+- Native proof is
+  `Proof/Captures/LayeredWardenLames/vulkan-scene-1280x720-20260826112335288.png`:
+  RTX 5090 High Vulkan, 11,760 distinct colors, 305 render-work draws, four
+  dispatches, and zero observations, missing assets, or fallbacks. The player
+  is materially larger in frame and its armor layers are visible during play.
+  It remains procedural intermediate art rather than final photoreal character
+  acceptance; proportion, materials, rig complexity, locomotion, and combat
+  animation remain open.
+- The combined Aetherfall gameplay and high-fidelity selection passes 44/44.
+  Project and scene validation report zero issues, both gameplay modules pass
+  restricted-host trust, and 2560x1440 High `desktop60` passes without blockers
+  or warnings at 8.642528 ms measured GPU time, 97 scene draws, 203,638
+  triangles, 873,116 vertices, and nine textures.

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall-warden-dark-model",
   "displayName": "Aetherfall Dark Warden",
-  "revision": 9,
+  "revision": 11,
   "source": {
     "kind": "Mesh",
     "assetId": "aetherfall-warden-dark-mesh",
@@ -10,12 +10,12 @@
   },
   "buildState": 0,
   "lastSuccessfulBuild": {
-    "sourceFileRevision": "3b852ed0a24b61f3e07c6bdeb3ddbae572e3d80d0ea825c6b59aabe3d411e0fb",
-    "sourceLogicalRevision": 10,
-    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-warden-dark-model/f05b925396e09ab366b57698742516c7ee0f00e149a9a6bc72e47f0ce3d59841.age.compiled-mesh.json",
-    "compiledContentHash": "f05b925396e09ab366b57698742516c7ee0f00e149a9a6bc72e47f0ce3d59841",
+    "sourceFileRevision": "371279c3d3443446af9c1e31badb660313736828dd74f05bc7dbde95d20fdfa8",
+    "sourceLogicalRevision": 12,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-warden-dark-model/090c03556b8f03c4416078d4b62a20914b8ddccaad13d2c082d510d4035c9655.age.compiled-mesh.json",
+    "compiledContentHash": "090c03556b8f03c4416078d4b62a20914b8ddccaad13d2c082d510d4035c9655",
     "compilerVersion": "rekall-age-model-compiler-v1",
-    "builtAtUtc": "2026-08-26T00:54:29.0224896+00:00",
+    "builtAtUtc": "2026-08-26T01:46:43.2925681+00:00",
     "diagnostics": []
   },
   "frozen": false

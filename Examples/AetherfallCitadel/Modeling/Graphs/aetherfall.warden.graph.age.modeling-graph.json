@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.warden.graph",
   "name": "Aetherfall Warden Silhouette",
-  "revision": 2,
+  "revision": 5,
   "nodes": [
     {
       "nodeId": "torso",
@@ -12,7 +12,7 @@
         "radiusBottom": 0.78,
         "radiusTop": 0.52,
         "depth": 2.5,
-        "segments": 8,
+        "segments": 20,
         "capBottom": true,
         "capTop": true
       }
@@ -28,7 +28,7 @@
           0
         ],
         "rotation": [
-          90,
+          0,
           0,
           0
         ],
@@ -45,8 +45,8 @@
       "typeVersion": 1,
       "parameters": {
         "radius": 0.48,
-        "segments": 20,
-        "rings": 12
+        "segments": 32,
+        "rings": 20
       }
     },
     {
@@ -74,7 +74,7 @@
         "radiusBottom": 0.72,
         "radiusTop": 0.18,
         "depth": 1.2,
-        "segments": 8,
+        "segments": 20,
         "capBottom": true,
         "capTop": true
       }
@@ -90,7 +90,7 @@
           0.12
         ],
         "rotation": [
-          90,
+          0,
           0,
           0
         ]
@@ -173,19 +173,6 @@
       }
     },
     {
-      "nodeId": "arm-l",
-      "typeId": "rekall.modeling.primitive.frustum",
-      "typeVersion": 1,
-      "parameters": {
-        "radiusBottom": 0.2,
-        "radiusTop": 0.3,
-        "depth": 1.65,
-        "segments": 8,
-        "capBottom": true,
-        "capTop": true
-      }
-    },
-    {
       "nodeId": "arm-l-x",
       "typeId": "rekall.modeling.transform",
       "typeVersion": 1,
@@ -196,23 +183,10 @@
           0
         ],
         "rotation": [
-          72,
+          6,
           8,
-          -16
+          16
         ]
-      }
-    },
-    {
-      "nodeId": "arm-r",
-      "typeId": "rekall.modeling.primitive.frustum",
-      "typeVersion": 1,
-      "parameters": {
-        "radiusBottom": 0.2,
-        "radiusTop": 0.3,
-        "depth": 1.65,
-        "segments": 8,
-        "capBottom": true,
-        "capTop": true
       }
     },
     {
@@ -226,9 +200,9 @@
           0
         ],
         "rotation": [
-          72,
+          6,
           -8,
-          16
+          -16
         ]
       }
     },
@@ -325,8 +299,8 @@
       "typeVersion": 1,
       "parameters": {
         "radius": 0.52,
-        "segments": 18,
-        "rings": 10
+        "segments": 28,
+        "rings": 16
       }
     },
     {
@@ -364,8 +338,8 @@
       "parameters": {
         "majorRadius": 0.48,
         "minorRadius": 0.09,
-        "majorSegments": 24,
-        "minorSegments": 8
+        "majorSegments": 36,
+        "minorSegments": 12
       }
     },
     {
@@ -539,7 +513,7 @@
         "radiusBottom": 0.17,
         "radiusTop": 0.035,
         "depth": 0.72,
-        "segments": 8,
+        "segments": 18,
         "capBottom": true,
         "capTop": true
       }
@@ -555,7 +529,7 @@
           0.06
         ],
         "rotation": [
-          90,
+          0,
           0,
           0
         ],
@@ -574,7 +548,7 @@
         "radiusBottom": 0.2,
         "radiusTop": 0.025,
         "depth": 0.72,
-        "segments": 8,
+        "segments": 18,
         "capBottom": true,
         "capTop": true
       }
@@ -653,7 +627,7 @@
         "radiusBottom": 0.24,
         "radiusTop": 0.31,
         "depth": 1.18,
-        "segments": 10,
+        "segments": 20,
         "capBottom": true,
         "capTop": true
       }
@@ -669,9 +643,9 @@
           0
         ],
         "rotation": [
-          90,
           0,
-          0
+          0,
+          -2
         ],
         "scale": [
           0.78,
@@ -737,7 +711,7 @@
         "radiusBottom": 0.105,
         "radiusTop": 0.105,
         "depth": 0.68,
-        "segments": 12,
+        "segments": 20,
         "capBottom": true,
         "capTop": true
       }
@@ -753,7 +727,7 @@
           0
         ],
         "rotation": [
-          77,
+          0,
           0,
           -13
         ]
@@ -860,8 +834,8 @@
       "typeId": "rekall.modeling.bevel",
       "typeVersion": 1,
       "parameters": {
-        "width": 0.055,
-        "segments": 2,
+        "width": 0.04,
+        "segments": 3,
         "profile": 0.5,
         "clampOverlap": true,
         "hardenNormals": true
@@ -872,7 +846,7 @@
       "typeId": "rekall.modeling.deform.noise",
       "typeVersion": 1,
       "parameters": {
-        "amplitude": 0.055,
+        "amplitude": 0.025,
         "frequency": 3.1,
         "seed": 901,
         "axis": "z"
@@ -901,6 +875,210 @@
     {
       "nodeId": "output",
       "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "arm-l",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.27,
+        "hemisphereRings": 6,
+        "segments": 24,
+        "depth": 1.72
+      }
+    },
+    {
+      "nodeId": "arm-r",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.27,
+        "hemisphereRings": 6,
+        "segments": 24,
+        "depth": 1.72
+      }
+    },
+    {
+      "nodeId": "elbow-guard",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.34,
+        "segments": 24,
+        "rings": 14
+      }
+    },
+    {
+      "nodeId": "elbow-guard-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "scale": [
+          0.7,
+          0.38,
+          0.92
+        ],
+        "rotation": [
+          0,
+          0,
+          -14
+        ],
+        "translation": [
+          -1.12,
+          1.72,
+          -0.18
+        ]
+      }
+    },
+    {
+      "nodeId": "elbow-guards",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "bisect": false,
+        "origin": 0,
+        "axis": "x",
+        "mergeDistance": 0
+      }
+    },
+    {
+      "nodeId": "knee-guard",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.34,
+        "segments": 24,
+        "rings": 14
+      }
+    },
+    {
+      "nodeId": "knee-guard-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "scale": [
+          0.82,
+          0.68,
+          0.35
+        ],
+        "rotation": [
+          -12,
+          0,
+          0
+        ],
+        "translation": [
+          -0.42,
+          -0.62,
+          -0.3
+        ]
+      }
+    },
+    {
+      "nodeId": "knee-guards",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "bisect": false,
+        "origin": 0,
+        "axis": "x",
+        "mergeDistance": 0
+      }
+    },
+    {
+      "nodeId": "back-ridge",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeZ": 0.18,
+        "sizeY": 1.55,
+        "sizeX": 0.22
+      }
+    },
+    {
+      "nodeId": "back-ridge-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "rotation": [
+          6,
+          0,
+          0
+        ],
+        "translation": [
+          0,
+          2.0,
+          0.62
+        ]
+      }
+    },
+    {
+      "nodeId": "cloak-clasp",
+      "typeId": "rekall.modeling.primitive.torus",
+      "typeVersion": 1,
+      "parameters": {
+        "minorSegments": 10,
+        "minorRadius": 0.065,
+        "majorSegments": 32,
+        "majorRadius": 0.31
+      }
+    },
+    {
+      "nodeId": "cloak-clasp-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "scale": [
+          1.0,
+          1.0,
+          0.72
+        ],
+        "rotation": [
+          90,
+          0,
+          0
+        ],
+        "translation": [
+          0,
+          2.63,
+          0.55
+        ]
+      }
+    },
+    {
+      "nodeId": "cloth-smooth-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "cloth-bevel",
+      "typeId": "rekall.modeling.bevel",
+      "typeVersion": 1,
+      "parameters": {
+        "clampOverlap": true,
+        "profile": 0.5,
+        "hardenNormals": true,
+        "width": 0.04,
+        "segments": 3
+      }
+    },
+    {
+      "nodeId": "cloth-post-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "armor-smooth-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "armor-post-join",
+      "typeId": "rekall.modeling.join",
       "typeVersion": 1,
       "parameters": {}
     }
@@ -946,20 +1124,6 @@
       "fromNodeId": "shoulders",
       "fromPortId": "geometry",
       "toNodeId": "shoulders-x",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "tx7",
-      "fromNodeId": "arm-l",
-      "fromPortId": "geometry",
-      "toNodeId": "arm-l-x",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "tx8",
-      "fromNodeId": "arm-r",
-      "fromPortId": "geometry",
-      "toNodeId": "arm-r-x",
       "toPortId": "geometry"
     },
     {
@@ -1159,13 +1323,6 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "cloth-head",
-      "fromNodeId": "head-x",
-      "fromPortId": "geometry",
-      "toNodeId": "cloth-join",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "cloth-hood",
       "fromNodeId": "hood-x",
       "fromPortId": "geometry",
@@ -1187,31 +1344,10 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "cloth-arm-l",
-      "fromNodeId": "arm-l-x",
-      "fromPortId": "geometry",
-      "toNodeId": "cloth-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "cloth-arm-r",
-      "fromNodeId": "arm-r-x",
-      "fromPortId": "geometry",
-      "toNodeId": "cloth-join",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "cloth-cloak",
       "fromNodeId": "cloak-x",
       "fromPortId": "geometry",
       "toNodeId": "cloth-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "cloth-assign",
-      "fromNodeId": "cloth-join",
-      "fromPortId": "geometry",
-      "toNodeId": "cloth-material",
       "toPortId": "geometry"
     },
     {
@@ -1243,29 +1379,8 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "armor-pauldrons",
-      "fromNodeId": "pauldron-pair",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "armor-gorget",
-      "fromNodeId": "gorget-x",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-join",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "armor-guard",
       "fromNodeId": "blade-guard-x",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "armor-rivets",
-      "fromNodeId": "rivet-array",
       "fromPortId": "geometry",
       "toNodeId": "armor-join",
       "toPortId": "geometry"
@@ -1313,31 +1428,10 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "armor-grip",
-      "fromNodeId": "blade-grip-x",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "armor-pommel",
-      "fromNodeId": "blade-pommel-x",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-join",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "armor-buckle",
       "fromNodeId": "belt-buckle-x",
       "fromPortId": "geometry",
       "toNodeId": "armor-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "armor-assign",
-      "fromNodeId": "armor-join",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-material",
       "toPortId": "geometry"
     },
     {
@@ -1352,20 +1446,6 @@
       "fromNodeId": "armor-material",
       "fromPortId": "geometry",
       "toNodeId": "join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "join-soften",
-      "fromNodeId": "join",
-      "fromPortId": "geometry",
-      "toNodeId": "soften",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "weather",
-      "fromNodeId": "soften",
-      "fromPortId": "geometry",
-      "toNodeId": "weather",
       "toPortId": "geometry"
     },
     {
@@ -1388,6 +1468,209 @@
       "fromPortId": "geometry",
       "toNodeId": "output",
       "toPortId": "input"
+    },
+    {
+      "linkId": "tx7",
+      "fromNodeId": "arm-l",
+      "fromPortId": "geometry",
+      "toNodeId": "arm-l-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "tx8",
+      "fromNodeId": "arm-r",
+      "fromPortId": "geometry",
+      "toNodeId": "arm-r-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "elbow-guard-x",
+      "fromNodeId": "elbow-guard",
+      "fromPortId": "geometry",
+      "toNodeId": "elbow-guard-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "elbow-guards",
+      "fromNodeId": "elbow-guard-x",
+      "fromPortId": "geometry",
+      "toNodeId": "elbow-guards",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "knee-guard-x",
+      "fromNodeId": "knee-guard",
+      "fromPortId": "geometry",
+      "toNodeId": "knee-guard-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "knee-guards",
+      "fromNodeId": "knee-guard-x",
+      "fromPortId": "geometry",
+      "toNodeId": "knee-guards",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "back-ridge-x",
+      "fromNodeId": "back-ridge",
+      "fromPortId": "geometry",
+      "toNodeId": "back-ridge-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-back-ridge",
+      "fromNodeId": "back-ridge-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloak-clasp-x",
+      "fromNodeId": "cloak-clasp",
+      "fromPortId": "geometry",
+      "toNodeId": "cloak-clasp-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-head-smooth",
+      "fromNodeId": "head-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-arm-l-smooth",
+      "fromNodeId": "arm-l-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-arm-r-smooth",
+      "fromNodeId": "arm-r-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-hard-bevel",
+      "fromNodeId": "cloth-join",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-bevel",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-hard-post",
+      "fromNodeId": "cloth-bevel",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-smooth-post",
+      "fromNodeId": "cloth-smooth-join",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-assign-v2",
+      "fromNodeId": "cloth-post-join",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-pauldrons-smooth",
+      "fromNodeId": "pauldron-pair",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-gorget-smooth",
+      "fromNodeId": "gorget-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-rivets-smooth",
+      "fromNodeId": "rivet-array",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-grip-smooth",
+      "fromNodeId": "blade-grip-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-pommel-smooth",
+      "fromNodeId": "blade-pommel-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-elbows-smooth",
+      "fromNodeId": "elbow-guards",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-knees-smooth",
+      "fromNodeId": "knee-guards",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-clasp-smooth",
+      "fromNodeId": "cloak-clasp-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-hard-bevel",
+      "fromNodeId": "armor-join",
+      "fromPortId": "geometry",
+      "toNodeId": "soften",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-hard-post",
+      "fromNodeId": "soften",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-smooth-post",
+      "fromNodeId": "armor-smooth-join",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-assign-v2",
+      "fromNodeId": "armor-post-join",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "join-weather-v2",
+      "fromNodeId": "join",
+      "fromPortId": "geometry",
+      "toNodeId": "weather",
+      "toPortId": "geometry"
     }
   ],
   "outputs": [

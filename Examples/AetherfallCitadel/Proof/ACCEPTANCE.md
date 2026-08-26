@@ -274,6 +274,32 @@ the accepted gameplay evidence above.
   now reports status `ok` with zero issues, and agents/Studio can discover the
   same production properties through component schemas instead of authoring
   data that validation falsely calls invalid.
+- The Warden modeling checkpoint replaced the visibly faceted arm frustums with
+  24-sided, six-ring capsules; raised the silhouette resolution of its torso,
+  hood, head, pauldrons, collar, greaves, weapon grip, crest, and spikes; added
+  mirrored elbow and knee guards, a rear armor ridge, and a cloak clasp; and
+  reduced whole-model displacement that was making clean armor edges noisy.
+  The first revision exposed a real procedural-authoring performance trap:
+  applying a segmented bevel after joining already-smooth spheres, capsules,
+  and toruses caused evaluation to exceed 90 seconds. The graph now follows a
+  Blender-style nondestructive structure in generic AGE primitives: separate
+  hard-surface and smooth branches, bevel only the hard-surface branches, then
+  recombine them before material assignment, weathering, weighted normals, and
+  box UV projection. Evaluation dropped to 1.54 seconds while retaining 85
+  reachable nodes, 9,766 editable points, 12,282 faces, two semantic material
+  surfaces, 43,948 compiled vertices, and 19,384 triangles.
+- That rendered checkpoint also exposed an authored coordinate-contract error:
+  Aetherfall had rotated AGE's Y-axis frustums and capsules as if their axial
+  direction were Z. Revision-checked graph patches restored upright torso,
+  hood, arms, greaves, crest, and weapon grip transforms. The accepted real
+  RTX 5090 High diagnostic frame is
+  `Proof/Captures/HeroAxisCorrection/vulkan-scene-1280x720-20260826014700390.png`:
+  11,345 distinct colors, 14.4% dominant-color share, mean luminance 0.104,
+  213 render-work draws, four dispatches, and zero observations or asset
+  fallbacks. The player now reads as an upright layered armored figure rather
+  than sideways discs, although rigid posing, stylized proportions, nearby
+  ruin coarseness, and broader realism remain active failures against the final
+  Diablo/Alan Wake visual bar.
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
 silhouettes remain too black, the Warden/sentinel/rubble/ruin geometry remains

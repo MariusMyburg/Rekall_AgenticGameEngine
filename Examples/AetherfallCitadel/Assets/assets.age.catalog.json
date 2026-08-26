@@ -291,8 +291,8 @@
       "displayName": "Aetherfall Dark Warden",
       "kind": "model",
       "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-warden-dark-mesh.age.mesh.json",
-      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-dark-model\\f05b925396e09ab366b57698742516c7ee0f00e149a9a6bc72e47f0ce3d59841.age.compiled-mesh.json",
-      "contentHash": "f05b925396e09ab366b57698742516c7ee0f00e149a9a6bc72e47f0ce3d59841",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-dark-model\\090c03556b8f03c4416078d4b62a20914b8ddccaad13d2c082d510d4035c9655.age.compiled-mesh.json",
+      "contentHash": "090c03556b8f03c4416078d4b62a20914b8ddccaad13d2c082d510d4035c9655",
       "glbMetadata": null,
       "textureMetadata": null,
       "provenance": null,
@@ -300,8 +300,8 @@
         "modelDocumentPath": "Assets/Models/aetherfall-warden-dark-model.age.model.json",
         "sourceKind": "Mesh",
         "sourceAssetId": "aetherfall-warden-dark-mesh",
-        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-dark-model/f05b925396e09ab366b57698742516c7ee0f00e149a9a6bc72e47f0ce3d59841.age.compiled-mesh.json",
-        "compiledContentHash": "f05b925396e09ab366b57698742516c7ee0f00e149a9a6bc72e47f0ce3d59841"
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-dark-model/090c03556b8f03c4416078d4b62a20914b8ddccaad13d2c082d510d4035c9655.age.compiled-mesh.json",
+        "compiledContentHash": "090c03556b8f03c4416078d4b62a20914b8ddccaad13d2c082d510d4035c9655"
       }
     },
     {

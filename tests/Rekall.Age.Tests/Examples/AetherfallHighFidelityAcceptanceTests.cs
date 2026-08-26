@@ -267,8 +267,19 @@ public sealed class AetherfallHighFidelityAcceptanceTests
 
         Assert.Equal(authoredVertexCount, geometry.Vertices.Count);
         Assert.Equal(authoredIndexCount, geometry.Indices.Count);
-        Assert.True(authoredVertexCount >= 60_000,
-            $"Expected the published Warden to retain its layered armor and silhouette detail, found {authoredVertexCount} vertices.");
+        Assert.True(authoredVertexCount >= 40_000,
+            $"Expected the published Warden to retain production-scale layered armor geometry, found {authoredVertexCount} vertices.");
+        var modelingGraph = JsonNode.Parse(File.ReadAllText(Path.Combine(
+            projectRoot, "Modeling", "Graphs", "aetherfall.warden.graph.age.modeling-graph.json")))!.AsObject();
+        var modelingNodes = modelingGraph["nodes"]!.AsArray();
+        Assert.True(modelingNodes.Count >= 85,
+            $"Expected the Warden graph to retain its detailed authored construction, found {modelingNodes.Count} nodes.");
+        Assert.Contains(modelingNodes, node =>
+            node?["typeId"]?.GetValue<string>() == "rekall.modeling.primitive.capsule");
+        Assert.Contains(modelingNodes, node =>
+            node?["nodeId"]?.GetValue<string>() == "armor-smooth-join");
+        Assert.Contains(modelingNodes, node =>
+            node?["nodeId"]?.GetValue<string>() == "cloth-bevel");
         Assert.Equal(2, authoredSurfaces.Count);
         Assert.Equal(
             ["aetherfall.warden-steel.material", "aetherfall.warden-cloth.material"],

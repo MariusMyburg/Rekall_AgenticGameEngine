@@ -219,6 +219,7 @@ public sealed class SceneRuntimeFoundationTests
                 "runtime.animation.morph",
                 "runtime.events.collision",
                 "runtime.events.trigger",
+                "runtime.destruction",
                 "runtime.ui.interaction",
                 "runtime.input.camera",
                 "runtime.input.camera_target_cycle",

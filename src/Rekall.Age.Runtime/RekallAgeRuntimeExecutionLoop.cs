@@ -76,6 +76,7 @@ public sealed class RekallAgeRuntimeExecutionLoop : IDisposable
             new RekallAgeUiInteractionSystem(),
             new RekallAgeCollisionEventSystem(),
             new RekallAgeTriggerEventSystem(),
+            new RekallAgeDestructionSystem(),
             new RekallAgeCameraInputSystem(),
             new RekallAgeCameraTargetCycleInputSystem(),
             new RekallAgeCameraTarget3DSystem()

@@ -52,6 +52,7 @@ public static class RekallAgeBuiltInComponentTypeCatalog
         "Rekall.SphereCollider3D",
         "Rekall.CapsuleCollider3D",
         "Rekall.MeshCollider",
+        "Rekall.Destructible",
         "Rekall.PlanetRenderer",
         "Rekall.CloudLayerRenderer",
         "Rekall.AtmosphereRenderer",

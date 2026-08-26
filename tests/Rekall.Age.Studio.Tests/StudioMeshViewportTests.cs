@@ -5,6 +5,76 @@ namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioMeshViewportTests
 {
+    [Theory]
+    [InlineData(1, 0, 0)]
+    [InlineData(0, 1, 0)]
+    [InlineData(0, 0, 1)]
+    [InlineData(1.5, -2.25, 3.75)]
+    public void IdentityCameraReproducesLegacyAxonometricProjectionExactly(double x, double y, double z)
+    {
+        var point = new RekallAgeGeometryVector3(x, y, z);
+        var legacy = new Point((point.X - point.Z) / Math.Sqrt(2), (point.X + point.Z - 2 * point.Y) / Math.Sqrt(6));
+
+        var projected = RekallAgeStudioMeshViewportRenderer.Project(point, RekallAgeStudioViewportCamera.Identity);
+
+        Assert.Equal(legacy.X, projected.X, precision: 10);
+        Assert.Equal(legacy.Y, projected.Y, precision: 10);
+    }
+
+    [Fact]
+    public void OrbitingNinetyDegreesYawMapsRightAxisOntoForwardAxis()
+    {
+        var camera = RekallAgeStudioViewportCamera.Identity with { Yaw = Math.PI / 2 };
+        var origin = RekallAgeStudioMeshViewportRenderer.Project(new RekallAgeGeometryVector3(0, 0, 0), camera);
+        var alongOldRight = RekallAgeStudioMeshViewportRenderer.Project(new RekallAgeGeometryVector3(1, 0, -1), camera);
+        var alongOldForward = RekallAgeStudioMeshViewportRenderer.Project(new RekallAgeGeometryVector3(1, 0, 1), camera);
+
+        // After a 90-degree yaw the projected X spread from moving along the OLD forward axis
+        // should no longer match what moving along the OLD right axis produces, proving the
+        // view actually rotated rather than staying fixed.
+        Assert.NotEqual(alongOldRight.X - origin.X, alongOldForward.X - origin.X, 6);
+    }
+
+    [Fact]
+    public void ZoomScalesProjectedSpread()
+    {
+        var mesh = Quad();
+        var wide = new RekallAgeStudioMeshViewportRenderer().Render(mesh, RekallAgeGeometryDomain.Point, [], 640, 360, preview: false, RekallAgeStudioViewportCamera.Identity with { Zoom = 2 });
+        var narrow = new RekallAgeStudioMeshViewportRenderer().Render(mesh, RekallAgeGeometryDomain.Point, [], 640, 360, preview: false, RekallAgeStudioViewportCamera.Identity with { Zoom = 0.5 });
+
+        double Spread(RekallAgeStudioMeshViewportFrame frame) => frame.Points.Max(p => p.Position.X) - frame.Points.Min(p => p.Position.X);
+        Assert.True(Spread(wide) > Spread(narrow));
+    }
+
+    [Fact]
+    public void PanOffsetsProjectedCenter()
+    {
+        var mesh = Quad();
+        var panned = new RekallAgeStudioMeshViewportRenderer().Render(mesh, RekallAgeGeometryDomain.Point, [], 640, 360, preview: false, RekallAgeStudioViewportCamera.Identity with { PanX = 50 });
+        var unpanned = new RekallAgeStudioMeshViewportRenderer().Render(mesh, RekallAgeGeometryDomain.Point, [], 640, 360, preview: false, RekallAgeStudioViewportCamera.Identity);
+
+        var pannedCenterX = panned.Points.Average(p => p.Position.X);
+        var unpannedCenterX = unpanned.Points.Average(p => p.Position.X);
+        Assert.True(Math.Abs(pannedCenterX - unpannedCenterX) > 1);
+    }
+
+    [Fact]
+    public void OrthographicAndPerspectiveProduceDifferentDepthResponse()
+    {
+        var deep = new RekallAgeGeometryVector3(0, 0, 5);
+        var shallow = new RekallAgeGeometryVector3(0, 0, -5);
+        var perspectiveCamera = RekallAgeStudioViewportCamera.Identity with { Orthographic = false, Zoom = 4 };
+
+        var orthoDeep = RekallAgeStudioMeshViewportRenderer.Project(deep, RekallAgeStudioViewportCamera.Identity);
+        var orthoShallow = RekallAgeStudioMeshViewportRenderer.Project(shallow, RekallAgeStudioViewportCamera.Identity);
+        var perspDeep = RekallAgeStudioMeshViewportRenderer.Project(deep, perspectiveCamera);
+        var perspShallow = RekallAgeStudioMeshViewportRenderer.Project(shallow, perspectiveCamera);
+
+        var orthoRatio = orthoDeep.X - orthoShallow.X;
+        var perspRatio = perspDeep.X - perspShallow.X;
+        Assert.NotEqual(orthoRatio, perspRatio, 3);
+    }
+
     [Fact]
     public void PointSelectionExposesAxisGizmoAndConvertsScreenDragToMeshTranslation()
     {

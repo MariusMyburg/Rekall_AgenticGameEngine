@@ -14,7 +14,20 @@ internal sealed record RekallAgeStudioMeshViewportFrame(
     IReadOnlyList<RekallAgeStudioMeshViewportPoint> Points,
     IReadOnlyList<RekallAgeStudioMeshViewportPoint> Corners,
     double ProjectionScale,
-    RekallAgeStudioMeshTransformGizmo? TransformGizmo);
+    RekallAgeStudioMeshTransformGizmo? TransformGizmo,
+    RekallAgeStudioViewportCamera Camera);
+
+/// <summary>
+/// Orbit camera state for the mesh-editing viewport. <see cref="Identity"/> reproduces the
+/// engine's original fixed axonometric projection exactly (see
+/// <see cref="RekallAgeStudioMeshViewportRenderer.DefaultRight"/>/<see cref="RekallAgeStudioMeshViewportRenderer.DefaultUp"/>);
+/// <see cref="Yaw"/>/<see cref="Pitch"/> orbit relative to that default framing rather than to
+/// world axes, so the well-tuned default view is always the starting point.
+/// </summary>
+internal readonly record struct RekallAgeStudioViewportCamera(double Yaw, double Pitch, double Zoom, double PanX, double PanY, bool Orthographic)
+{
+    public static RekallAgeStudioViewportCamera Identity { get; } = new(0, 0, 1, 0, 0, true);
+}
 
 internal sealed record RekallAgeStudioMeshViewportFace(ulong Id, IReadOnlyList<Point> Polygon);
 internal sealed record RekallAgeStudioMeshViewportEdge(ulong Id, Point A, Point B);
@@ -35,19 +48,23 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
         IReadOnlyCollection<ulong> selectedIds,
         int width,
         int height,
-        bool preview)
+        bool preview,
+        RekallAgeStudioViewportCamera? camera = null)
     {
         ArgumentNullException.ThrowIfNull(mesh); ArgumentNullException.ThrowIfNull(selectedIds);
         if (width < 64 || width > 4096 || height < 64 || height > 4096) throw new ArgumentOutOfRangeException(nameof(width), "Mesh viewport dimensions must be 64-4096 pixels.");
-        var raw = mesh.Topology.Positions.Select(Project).ToArray();
+        var activeCamera = camera ?? RekallAgeStudioViewportCamera.Identity;
+        var raw = mesh.Topology.Positions.Select(point => Project(point, activeCamera)).ToArray();
         var minX = raw.Min(point => point.X); var maxX = raw.Max(point => point.X);
         var minY = raw.Min(point => point.Y); var maxY = raw.Max(point => point.Y);
         var spanX = Math.Max(maxX - minX, 1e-9); var spanY = Math.Max(maxY - minY, 1e-9);
         const double padding = 28;
-        var scale = Math.Min((width - padding * 2) / spanX, (height - padding * 2) / spanY) * 0.55;
+        var scale = Math.Min((width - padding * 2) / spanX, (height - padding * 2) / spanY) * 0.55 * activeCamera.Zoom;
         if (!double.IsFinite(scale) || scale <= 0) scale = 1;
         var centerX = (minX + maxX) / 2; var centerY = (minY + maxY) / 2;
-        var projected = raw.Select(point => new Point(width / 2d + (point.X - centerX) * scale, height / 2d + (point.Y - centerY) * scale)).ToArray();
+        var projected = raw.Select(point => new Point(
+            width / 2d + (point.X - centerX) * scale + activeCamera.PanX,
+            height / 2d + (point.Y - centerY) * scale + activeCamera.PanY)).ToArray();
         var selected = selectedIds.ToHashSet(); var centers = new Dictionary<(RekallAgeGeometryDomain, ulong), Point>();
         var faces = new List<RekallAgeStudioMeshViewportFace>();
         for (var face = 0; face < mesh.Topology.FaceIds.Count; face++)
@@ -78,9 +95,9 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
                 var origin = new Point(selectedPointIndices.Average(index => projected[index].X), selectedPointIndices.Average(index => projected[index].Y));
                 gizmo = new(origin, new[]
                 {
-                    GizmoAxis(RekallAgeStudioMeshTransformAxis.X, origin),
-                    GizmoAxis(RekallAgeStudioMeshTransformAxis.Y, origin),
-                    GizmoAxis(RekallAgeStudioMeshTransformAxis.Z, origin)
+                    GizmoAxis(RekallAgeStudioMeshTransformAxis.X, origin, activeCamera),
+                    GizmoAxis(RekallAgeStudioMeshTransformAxis.Y, origin, activeCamera),
+                    GizmoAxis(RekallAgeStudioMeshTransformAxis.Z, origin, activeCamera)
                 });
             }
         }
@@ -134,7 +151,7 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
                     new Typeface("Segoe UI Semibold"), 11, new SolidColorBrush(Color.FromRgb(85, 214, 229)), 1), new Point(12, 10));
         }
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(visual); bitmap.Freeze();
-        return new(bitmap, centers, preview, faces, edges, points, corners, scale, gizmo);
+        return new(bitmap, centers, preview, faces, edges, points, corners, scale, gizmo, activeCamera);
     }
 
     public RekallAgeStudioMeshTransformGesture? BeginTransform(RekallAgeStudioMeshViewportFrame frame, double x, double y)
@@ -160,7 +177,7 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
         ArgumentNullException.ThrowIfNull(frame); ArgumentNullException.ThrowIfNull(gesture);
         if (!double.IsFinite(x) || !double.IsFinite(y) || !double.IsFinite(frame.ProjectionScale) || frame.ProjectionScale <= 0)
             throw new ArgumentOutOfRangeException(nameof(x), "Transform coordinates and projection scale must be finite and positive.");
-        var projectedAxis = Project(AxisVector(gesture.Axis));
+        var projectedAxis = Project(AxisVector(gesture.Axis), frame.Camera);
         var projectedLength = new Vector(projectedAxis.X, projectedAxis.Y).Length;
         var direction = new Vector(projectedAxis.X / projectedLength, projectedAxis.Y / projectedLength);
         var meshDistance = Vector.Multiply(new Point(x, y) - gesture.Start, direction) / (frame.ProjectionScale * projectedLength);
@@ -186,7 +203,81 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
         };
     }
 
-    private static Point Project(RekallAgeGeometryVector3 point) => new((point.X - point.Z) / Math.Sqrt(2), (point.X + point.Z - 2 * point.Y) / Math.Sqrt(6));
+    /// <summary>
+    /// The original fixed axonometric view's screen-right basis vector — the exact coefficients
+    /// of the legacy <c>(point.X - point.Z) / sqrt(2)</c> projection, expressed as a 3D axis so
+    /// the identity camera (<see cref="RekallAgeStudioViewportCamera.Identity"/>) reproduces it.
+    /// </summary>
+    internal static readonly RekallAgeGeometryVector3 DefaultRight = new(1 / Math.Sqrt(2), 0, -1 / Math.Sqrt(2));
+
+    /// <summary>The legacy projection's screen-up basis vector (the <c>(X + Z - 2Y) / sqrt(6)</c> coefficients).</summary>
+    internal static readonly RekallAgeGeometryVector3 DefaultUp = new(1 / Math.Sqrt(6), -2 / Math.Sqrt(6), 1 / Math.Sqrt(6));
+
+    /// <summary>The legacy view's line-of-sight axis, derived so (Right, Up, Forward) is orthonormal.</summary>
+    internal static readonly RekallAgeGeometryVector3 DefaultForward = Cross(DefaultRight, DefaultUp);
+
+    /// <summary>
+    /// Pure camera-space projection: rotates <paramref name="point"/> by the camera's yaw/pitch
+    /// and, in perspective mode, applies a depth divide using <see cref="RekallAgeStudioViewportCamera.Zoom"/>
+    /// as the camera's distance from its pivot. Deliberately excludes <see cref="RekallAgeStudioViewportCamera.PanX"/>/<see cref="RekallAgeStudioViewportCamera.PanY"/>
+    /// and does not scale orthographic output by <see cref="RekallAgeStudioViewportCamera.Zoom"/> —
+    /// both are screen-space framing concerns applied by <see cref="Render"/> after auto-fit, so
+    /// they are not silently cancelled out by auto-fit re-normalizing the projected bounds.
+    /// </summary>
+    internal static Point Project(RekallAgeGeometryVector3 point, RekallAgeStudioViewportCamera camera)
+    {
+        var (right, up, forward) = OrbitBasis(camera.Yaw, camera.Pitch);
+        var x = Dot(point, right);
+        var y = Dot(point, up);
+        var depth = Dot(point, forward);
+        var perspective = camera.Orthographic ? 1.0 : camera.Zoom / Math.Max(0.05, camera.Zoom - depth);
+        return new Point(x * perspective, y * perspective);
+    }
+
+    /// <summary>
+    /// Builds the camera's (right, up, forward) basis by orbiting the legacy default basis:
+    /// yaw always turns around the world-vertical axis (Blender's default orbit convention,
+    /// independent of the current pitch), then pitch turns around the resulting right axis.
+    /// At yaw = pitch = 0 this returns the legacy basis unchanged.
+    /// </summary>
+    private static (RekallAgeGeometryVector3 Right, RekallAgeGeometryVector3 Up, RekallAgeGeometryVector3 Forward) OrbitBasis(double yaw, double pitch)
+    {
+        var worldUp = new RekallAgeGeometryVector3(0, 1, 0);
+        var right = yaw == 0 ? DefaultRight : RotateAroundAxis(DefaultRight, worldUp, yaw);
+        var forward = yaw == 0 ? DefaultForward : RotateAroundAxis(DefaultForward, worldUp, yaw);
+        var up = DefaultUp;
+        if (pitch != 0)
+        {
+            up = RotateAroundAxis(up, right, pitch);
+            forward = RotateAroundAxis(forward, right, pitch);
+        }
+        return (right, up, forward);
+    }
+
+    /// <summary>Rodrigues' rotation formula: rotates <paramref name="v"/> by <paramref name="angle"/> radians around <paramref name="axis"/>.</summary>
+    private static RekallAgeGeometryVector3 RotateAroundAxis(RekallAgeGeometryVector3 v, RekallAgeGeometryVector3 axis, double angle)
+    {
+        var a = Normalize(axis);
+        var cos = Math.Cos(angle); var sin = Math.Sin(angle);
+        var dot = Dot(v, a);
+        var cross = Cross(a, v);
+        return new RekallAgeGeometryVector3(
+            v.X * cos + cross.X * sin + a.X * dot * (1 - cos),
+            v.Y * cos + cross.Y * sin + a.Y * dot * (1 - cos),
+            v.Z * cos + cross.Z * sin + a.Z * dot * (1 - cos));
+    }
+
+    private static double Dot(RekallAgeGeometryVector3 a, RekallAgeGeometryVector3 b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z;
+
+    private static RekallAgeGeometryVector3 Cross(RekallAgeGeometryVector3 a, RekallAgeGeometryVector3 b) => new(
+        a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
+
+    private static RekallAgeGeometryVector3 Normalize(RekallAgeGeometryVector3 v)
+    {
+        var length = Math.Sqrt(Dot(v, v));
+        return length <= 1e-12 ? v : new(v.X / length, v.Y / length, v.Z / length);
+    }
+
     private static RekallAgeGeometryVector3 AxisVector(RekallAgeStudioMeshTransformAxis axis) => axis switch
     {
         RekallAgeStudioMeshTransformAxis.X => new(1, 0, 0),
@@ -194,9 +285,9 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
         RekallAgeStudioMeshTransformAxis.Z => new(0, 0, 1),
         _ => throw new ArgumentOutOfRangeException(nameof(axis))
     };
-    private static RekallAgeStudioMeshTransformGizmoAxis GizmoAxis(RekallAgeStudioMeshTransformAxis axis, Point origin)
+    private static RekallAgeStudioMeshTransformGizmoAxis GizmoAxis(RekallAgeStudioMeshTransformAxis axis, Point origin, RekallAgeStudioViewportCamera camera)
     {
-        var projected = Project(AxisVector(axis));
+        var projected = Project(AxisVector(axis), camera);
         var direction = new Vector(projected.X, projected.Y); direction.Normalize();
         return new(axis, origin + direction * 52);
     }

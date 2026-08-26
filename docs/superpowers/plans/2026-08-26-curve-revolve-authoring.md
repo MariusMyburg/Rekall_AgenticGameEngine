@@ -49,7 +49,7 @@ assets, xUnit, native Vulkan capture.
 - Produces: discoverable `rekall.modeling.curve.revolve@1` and evaluator
   dispatch to `CreateCurveRevolve(...)`.
 
-- [ ] **Step 1: Write the failing catalog/schema test**
+- [x] **Step 1: Write the failing catalog/schema test**
 
   Add `CatalogPublishesTypedCurveRevolveContract` that finds the exact node and
   asserts a required Curve input named `curve`, a Geometry output named
@@ -57,21 +57,21 @@ assets, xUnit, native Vulkan capture.
   range `3..4096`, world-unit `weldDistance`, Vector3 `origin`, and material/
   slot strings.
 
-- [ ] **Step 2: Write the failing evaluation dispatch test**
+- [x] **Step 2: Write the failing evaluation dispatch test**
 
   Build a graph containing a two-point poly curve source, a revolve node with
   `axis=y`, `segments=8`, and an output node. Validate and evaluate it. The
   initial failure must identify the missing node descriptor/dispatch rather
   than malformed fixture data.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
   Run:
   `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter FullyQualifiedName~CurveRevolveTests`
 
   Expected: failure because `rekall.modeling.curve.revolve` is not registered.
 
-- [ ] **Step 4: Register the exact descriptor and dispatch**
+- [x] **Step 4: Register the exact descriptor and dispatch**
 
   Add a catalog node equivalent to:
 
@@ -92,7 +92,7 @@ assets, xUnit, native Vulkan capture.
   Route evaluator dispatch to `CreateCurveRevolve(graph, node, incoming,
   values)` without a game-specific branch.
 
-- [ ] **Step 5: Run the schema tests and commit**
+- [x] **Step 5: Run the schema tests and commit**
 
   Run the new schema test plus `ComprehensiveModelingCatalogTests`; require all
   selected tests green. Commit as `feat: expose curve revolve authoring`.

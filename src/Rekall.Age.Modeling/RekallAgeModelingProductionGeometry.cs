@@ -249,6 +249,74 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         int Point(int ring, int profileIndex) => ring * profileSegments + profileIndex;
     }
 
+    private static RekallAgeMeshAsset CreateCurveRevolve(
+        RekallAgeModelingGraphAsset graph,
+        RekallAgeModelingGraphNode node,
+        IReadOnlyList<RekallAgeModelingGraphLink> incoming,
+        IReadOnlyDictionary<string, NodeValue> values)
+    {
+        var curve = InputCurve(node, "curve", incoming, values);
+        if (curve.Splines.Count != 1)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_CURVE_SPLINE_COUNT_UNSUPPORTED", "Curve revolve accepts exactly one evaluated spline.", node.NodeId);
+        var profile = curve.Splines[0];
+        if (profile.Points.Count < 2)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_CURVE_PROFILE_INVALID", "Curve revolve requires at least two evaluated profile points.", node.NodeId);
+
+        var axisName = ReadString(node, "axis", "y").ToLowerInvariant();
+        var axis = axisName switch
+        {
+            "x" => Vector3.UnitX,
+            "y" => Vector3.UnitY,
+            "z" => Vector3.UnitZ,
+            _ => throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", $"Curve revolve axis '{axisName}' is unsupported.", node.NodeId)
+        };
+        var origin = ToVector(ReadVector3(node, "origin", new(0, 0, 0)));
+        var angleDegrees = ReadNumber(node, "angleDegrees", 360);
+        if (angleDegrees <= 0 || angleDegrees > 360)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Curve revolve angleDegrees must be greater than zero and at most 360.", node.NodeId);
+        var segments = ReadInteger(node, "segments", 32, 3, 4096);
+        var wraps = Math.Abs(angleDegrees - 360) <= 1e-9;
+        var ringCount = wraps ? segments : segments + 1;
+        var positions = new List<RekallAgeGeometryVector3>(ringCount * profile.Points.Count);
+        for (var ring = 0; ring < ringCount; ring++)
+        {
+            var radians = (float)(Math.PI / 180 * angleDegrees * ring / segments);
+            var rotation = Quaternion.CreateFromAxisAngle(axis, radians);
+            foreach (var point in profile.Points)
+            {
+                var rotated = origin + Vector3.Transform(ToVector(point.Position) - origin, rotation);
+                positions.Add(new(rotated.X, rotated.Y, rotated.Z));
+            }
+        }
+
+        var profileSpanCount = profile.Cyclic ? profile.Points.Count : profile.Points.Count - 1;
+        var faces = new List<int[]>(segments * profileSpanCount);
+        for (var ring = 0; ring < segments; ring++)
+        {
+            var nextRing = wraps ? (ring + 1) % ringCount : ring + 1;
+            for (var profileIndex = 0; profileIndex < profileSpanCount; profileIndex++)
+            {
+                var nextProfile = (profileIndex + 1) % profile.Points.Count;
+                faces.Add([
+                    Point(ring, profileIndex),
+                    Point(nextRing, profileIndex),
+                    Point(nextRing, nextProfile),
+                    Point(ring, nextProfile)]);
+            }
+        }
+
+        var mesh = BuildMesh(graph, node, positions, faces);
+        var materialValues = Enumerable.Range(0, mesh.Topology.FaceIds.Count)
+            .Select(_ => JsonSerializer.SerializeToElement(0)).ToArray();
+        return mesh with
+        {
+            MaterialSlots = [new(ReadString(node, "slotName", "Revolved Surface"), ReadString(node, "materialAssetId", "material.default"))],
+            Attributes = [new("material.index", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.Int32, materialValues, "material-index", RekallAgeGeometryInterpolation.Nearest, JsonSerializer.SerializeToElement(0))]
+        };
+
+        int Point(int ring, int profileIndex) => ring * profile.Points.Count + profileIndex;
+    }
+
     private static RekallAgeMeshAsset BuildMesh(RekallAgeModelingGraphAsset graph, RekallAgeModelingGraphNode node, IReadOnlyList<RekallAgeGeometryVector3> positions, IReadOnlyList<int[]> faces, bool createUvs = false)
     {
         var edgeMap = new Dictionary<(int, int), int>(); var edges = new List<RekallAgeMeshEdgePointIndices>(); var cornerPoints = new List<int>(); var cornerEdges = new List<int>(); var offsets = new List<int> { 0 };

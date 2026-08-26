@@ -186,6 +186,7 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             "rekall.modeling.curve.fillet" => new(Curve: new RekallAgeCurveOperations().Fillet(InputCurve(node, "curve", incoming, values), ReadPositive(node, "radius", 0.1), ReadInteger(node, "segments", 4, 1, 256))),
             "rekall.modeling.curve.join" => new(Curve: new RekallAgeCurveOperations().Join(InputCurves(node, "curve", incoming, values), ReadNumber(node, "tolerance", 0.0001))),
             "rekall.modeling.curve.profile_sweep" => new(CreateProfileSweep(graph, node, incoming, values)),
+            "rekall.modeling.curve.revolve" => new(CreateCurveRevolve(graph, node, incoming, values)),
             "rekall.modeling.transform" => TransformGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.deform.noise" => NoiseDeformGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.scatter.area" => ScatterAreaGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),

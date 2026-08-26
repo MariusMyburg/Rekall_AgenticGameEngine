@@ -1281,6 +1281,54 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task OpeningAnEntitysAnimationMixerAddingALayerThroughTheUiAndApplyingPersistsToTheScene()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-animation-mixer-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Animation Mixer Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+            var entity = Assert.Single(viewModel.EntityNodes);
+            viewModel.ComponentTypeInput = "Rekall.AnimationMixer";
+            await ExecuteAsync(viewModel.AddComponentCommand);
+            await viewModel.SelectEntityAsync(entity);
+
+            await ExecuteAsync(viewModel.OpenAnimationMixerCommand);
+            Assert.True(viewModel.AnimationMixerIsOpen);
+            Assert.Empty(viewModel.AnimationMixerLayers);
+
+            await ExecuteAsync(viewModel.AddAnimationMixerLayerCommand);
+            var layer = Assert.Single(viewModel.AnimationMixerLayers);
+            layer.Name = "idle";
+            layer.Clip = "hero-idle";
+            layer.Weight = "1";
+            await ExecuteAsync(viewModel.ApplyAnimationMixerLayersCommand);
+
+            var persisted = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            var mixer = persisted.Entities.Single(item => item.Id == entity.EntityId)
+                .Components.Single(component => component.Type == "Rekall.AnimationMixer");
+            var persistedLayer = Assert.Single(((JsonArray)mixer.Properties["layers"]!).OfType<JsonObject>());
+            Assert.Equal("idle", persistedLayer["name"]!.GetValue<string>());
+            Assert.Equal("hero-idle", persistedLayer["clip"]!.GetValue<string>());
+            Assert.Equal(1, persistedLayer["weight"]!.GetValue<double>(), precision: 6);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task OpeningAMaterialGraphExposesNodesAndAppliesAColorParameterEditThroughTheRealPatchPipeline()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-material-graph-" + Guid.NewGuid().ToString("N"));

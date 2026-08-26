@@ -124,6 +124,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _refreshMaterialGraphsCommand;
     private readonly RekallAgeAsyncCommand _openMaterialGraphCommand;
     private readonly RekallAgeAsyncCommand _applyMaterialGraphParametersCommand;
+    private readonly RekallAgeStudioAnimationMixerSession _animationMixer = new();
+    private readonly RekallAgeAsyncCommand _openAnimationMixerCommand;
+    private readonly RekallAgeAsyncCommand _applyAnimationMixerLayersCommand;
+    private readonly RekallAgeAsyncCommand _addAnimationMixerLayerCommand;
     private Process? _player;
     private CancellationTokenSource? _agentCancellation;
     private RekallAgeLanguageModelProviderLease? _languageModelProviderLease;
@@ -203,6 +207,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string? _selectedMaterialGraphAssetId;
     private string _materialGraphSummary = "Open a material graph to inspect its node contracts.";
     private RekallAgeStudioMaterialGraphNodeView? _selectedMaterialGraphNode;
+    private bool _animationMixerIsOpen;
+    private string _animationMixerSummary = "Select a scene entity, then open its Rekall.AnimationMixer component.";
     private string? _lastPackagePath;
     private string? _lastPackageOutputDirectory;
     private string? _lastPackageLaunchPath;
@@ -410,6 +416,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _refreshMaterialGraphsCommand = CreateAsyncCommand(RefreshMaterialGraphsAsync, HasOpenProject);
         _openMaterialGraphCommand = CreateAsyncCommand(OpenMaterialGraphAsync, CanOpenMaterialGraph);
         _applyMaterialGraphParametersCommand = CreateAsyncCommand(ApplyMaterialGraphParametersAsync, CanApplyMaterialGraphParameters);
+        _openAnimationMixerCommand = CreateAsyncCommand(OpenAnimationMixerAsync, CanOpenAnimationMixer);
+        _applyAnimationMixerLayersCommand = CreateAsyncCommand(ApplyAnimationMixerLayersAsync, CanApplyAnimationMixerLayers);
+        _addAnimationMixerLayerCommand = CreateAsyncCommand(
+            () => { AnimationMixerLayers.Add(new RekallAgeStudioAnimationMixerLayerModel("new-layer", string.Empty, "1", "loop", "1")); RefreshCommands(); return Task.CompletedTask; },
+            () => AnimationMixerIsOpen);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -448,6 +459,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<RekallAgeStudioMaterialGraphParameterModel> MaterialGraphParameterEditors { get; } = [];
     public ObservableCollection<string> MeshAttributeSummaries { get; } = [];
     public ObservableCollection<string> MeshMaterialSlotSummaries { get; } = [];
+    public ObservableCollection<RekallAgeStudioAnimationMixerLayerModel> AnimationMixerLayers { get; } = [];
+    public IReadOnlyList<string> AnimationMixerLoopModes { get; } = ["loop", "pingpong", "clamp"];
     public IReadOnlyList<RekallAgeGeometryDomain> MeshEditDomains { get; } =
         [RekallAgeGeometryDomain.Point, RekallAgeGeometryDomain.Edge, RekallAgeGeometryDomain.Face, RekallAgeGeometryDomain.Corner];
     public IReadOnlyList<RekallAgeLanguageModelToolExecution> LastAgentToolExecutions => _lastAgentToolExecutions;
@@ -527,6 +540,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand RefreshMaterialGraphsCommand => _refreshMaterialGraphsCommand;
     public ICommand OpenMaterialGraphCommand => _openMaterialGraphCommand;
     public ICommand ApplyMaterialGraphParametersCommand => _applyMaterialGraphParametersCommand;
+    public ICommand OpenAnimationMixerCommand => _openAnimationMixerCommand;
+    public ICommand ApplyAnimationMixerLayersCommand => _applyAnimationMixerLayersCommand;
+    public ICommand AddAnimationMixerLayerCommand => _addAnimationMixerLayerCommand;
 
     public string SelectedQualityPreset
     {
@@ -1041,6 +1057,18 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             if (!Set(ref _selectedMaterialGraphNode, value)) return;
             RefreshMaterialGraphParameterEditors();
         }
+    }
+
+    public bool AnimationMixerIsOpen
+    {
+        get => _animationMixerIsOpen;
+        private set { if (Set(ref _animationMixerIsOpen, value)) RefreshCommands(); }
+    }
+
+    public string AnimationMixerSummary
+    {
+        get => _animationMixerSummary;
+        private set => Set(ref _animationMixerSummary, value);
     }
 
     public void SelectMeshViewportElement(double normalizedX, double normalizedY, bool extend, bool toggle)
@@ -2217,6 +2245,25 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         && MaterialGraphParameterEditors.Count > 0
         && MaterialGraphParameterEditors.All(item => item.IsValid)
         && MaterialGraphParameterEditors.Any(item => item.IsModified);
+
+    private bool CanOpenAnimationMixer() => HasEditableProject() && _session.SelectedEntityId is not null;
+    private bool CanApplyAnimationMixerLayers() => HasEditableProject() && AnimationMixerIsOpen && AnimationMixerLayers.Count > 0;
+
+    private Task OpenAnimationMixerAsync() => RunModelingAsync(async () =>
+    {
+        await _animationMixer.OpenAsync(_session.ProjectRoot!, _session.SceneName!, _session.SelectedEntityId!, _lifecycleCancellation.Token);
+        Replace(AnimationMixerLayers, _animationMixer.Layers);
+        AnimationMixerIsOpen = _animationMixer.HasMixer;
+        AnimationMixerSummary = _animationMixer.HasMixer
+            ? $"{_animationMixer.EntityName}: {AnimationMixerLayers.Count} layer(s) in its authored Rekall.AnimationMixer."
+            : $"{_animationMixer.EntityName} has no Rekall.AnimationMixer component to edit.";
+    });
+
+    private Task ApplyAnimationMixerLayersAsync() => RunModelingAsync(async () =>
+    {
+        await _animationMixer.ApplyAsync(AnimationMixerLayers, _lifecycleCancellation.Token);
+        AnimationMixerSummary = $"{_animationMixer.EntityName}: applied {AnimationMixerLayers.Count} layer(s).";
+    });
 
     private void RefreshModelingGraphParameterEditors()
     {
@@ -4072,6 +4119,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _refreshMaterialGraphsCommand.RaiseCanExecuteChanged();
         _openMaterialGraphCommand.RaiseCanExecuteChanged();
         _applyMaterialGraphParametersCommand.RaiseCanExecuteChanged();
+        _openAnimationMixerCommand.RaiseCanExecuteChanged();
+        _applyAnimationMixerLayersCommand.RaiseCanExecuteChanged();
+        _addAnimationMixerLayerCommand.RaiseCanExecuteChanged();
     }
 
     private RekallAgeAsyncCommand CreateAsyncCommand(Func<Task> execute, Func<bool> canExecute) =>

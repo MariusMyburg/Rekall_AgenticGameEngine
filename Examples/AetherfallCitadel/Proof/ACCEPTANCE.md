@@ -943,3 +943,32 @@ the new background is an explicit fallback, not a claim that sky assets render.
   cloth transitions, texture/normal wear, animation clips, IK/foot planting,
   and a closer gameplay composition remain active work. Compact binary compiled
   meshes are also queued to remove the current pretty-JSON size inflation.
+
+## Native authored rig-animation checkpoint
+
+- AGE's ordinary `.age.animation.json` contract now targets any native
+  `Rekall.RigPose` joint by stable `jointId`. Translation, rotation, and scale
+  channels merge into canonical local delta matrices while retaining unrelated
+  joints. Quaternion keys are normalized and spherically interpolated; mixer
+  blending performs hemisphere correction and includes joint identity in its
+  blend key.
+- Aetherfall consumes the generic path with three inspectable assets:
+  presentation motion, guarded idle, and a keyed 0.8-second armored walk cycle.
+  Its agent-authored module selects pre-animation priority -5, derives idle/walk
+  weights from semantic movement, and retains responsibility for gameplay root
+  motion, facing, pelvis/chest/head accents, and ability state. The prior
+  code-only arm/leg/knee/foot oscillators are removed.
+- Runtime animation acceptance passes 31/31 and Aetherfall passes 45/45.
+  Project/scene validation have zero issues; both modules remain ready under
+  `windows-appcontainer-restricted` trust.
+- Native proof is
+  `Proof/Captures/WardenAuthoredWalkFinal/vulkan-scene-1280x720-20260826134808283.png`:
+  RTX 5090 High Vulkan, 320 draws, four dispatches, 65 renderables, 13,067
+  distinct colors, luminance 0.110, and zero observations, missing assets, or
+  fallbacks. High 2560x1440 `desktop60` passes at 6.626656 ms with 99 draws,
+  213,882 triangles, 1,095,508 vertices, and nine textures.
+- This closes reusable native-rig clip sampling and blending, not final
+  animation quality. Original-size review still finds the Warden overly bright,
+  procedurally modeled, and too small in the composition. Ability clips,
+  constraints/IK, foot planting, root-motion extraction, Studio curve editing,
+  fitted armor/cloth, surface detail, and lighting/material restraint remain.

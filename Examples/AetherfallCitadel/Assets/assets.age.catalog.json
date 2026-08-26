@@ -645,6 +645,45 @@
       },
       "provenance": null,
       "modelAssetMetadata": null
+    },
+    {
+      "id": "aetherfall-warden-idle",
+      "name": "aetherfall-warden-idle",
+      "displayName": "Aetherfall Warden Guarded Idle",
+      "kind": "animation",
+      "sourcePath": "Assets/animation/aetherfall-warden-idle.age.animation.json",
+      "importedPath": "Assets/animation/aetherfall-warden-idle.age.animation.json",
+      "contentHash": "beac6941b224257664157282c76f1345f664cfd291e4f29a1d9c6f1082d4ed32",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "aetherfall-warden-presentation",
+      "name": "aetherfall-warden-presentation",
+      "displayName": "Aetherfall Warden Presentation Motion",
+      "kind": "animation",
+      "sourcePath": "Assets/animation/aetherfall-warden-presentation.age.animation.json",
+      "importedPath": "Assets/animation/aetherfall-warden-presentation.age.animation.json",
+      "contentHash": "13cb06ca0c2b3de433185e7c7928b2b8c7931251f8f18e89b441885c9f0559b0",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "aetherfall-warden-walk",
+      "name": "aetherfall-warden-walk",
+      "displayName": "Aetherfall Warden Armored Walk",
+      "kind": "animation",
+      "sourcePath": "Assets/animation/aetherfall-warden-walk.age.animation.json",
+      "importedPath": "Assets/animation/aetherfall-warden-walk.age.animation.json",
+      "contentHash": "95238389afc055ebea6ca339c7305fcff8c9f0ce7ee075d08bcc55eb3b5fc64e",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
     }
   ]
 }

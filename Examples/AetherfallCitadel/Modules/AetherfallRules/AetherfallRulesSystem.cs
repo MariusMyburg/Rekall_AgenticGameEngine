@@ -8,7 +8,7 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
 {
     public string Id => nameof(AetherfallRulesSystem);
 
-    public int Priority => 10;
+    public int Priority => -5;
 
     public ValueTask<RekallAgeRuntimeWorld> UpdateAsync(
         RekallAgeRuntimeWorld world,
@@ -42,6 +42,7 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
         world = HostileSimulation.Update(world, context);
         world = UpdateMantlePose(world, context);
         world = UpdateWardenRigPose(world, context);
+        world = UpdateWardenAnimationMixer(world);
         warden = world.FindEntity(AetherfallConstants.WardenName);
         if (warden is not null
             && warden.ComponentNumber(AetherfallConstants.WardenStateType, "integrity", 100) <= 0)
@@ -109,18 +110,7 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
         var facingZ = warden.ComponentNumber(AetherfallConstants.WardenStateType, "facingZ", 1);
         var facingYaw = Math.Atan2(facingX, facingZ);
         var walkPhase = time * 7.5;
-        var legSwing = Math.Sin(walkPhase) * 0.48 * movement;
-        var armSwing = Math.Sin(walkPhase) * 0.34 * movement;
-        var kneeBendL = 0.08 + Math.Max(0, Math.Sin(walkPhase)) * 0.58 * movement;
-        var kneeBendR = 0.08 + Math.Max(0, -Math.Sin(walkPhase)) * 0.58 * movement;
-        var footPitchL = -kneeBendL * 0.48 - legSwing * 0.18;
-        var footPitchR = -kneeBendR * 0.48 + legSwing * 0.18;
         var stepBob = (0.5 - 0.5 * Math.Cos(walkPhase * 2)) * 0.045 * movement;
-        var pulseBlend = Math.Sin(Math.Clamp(
-            warden.ComponentNumber(AetherfallConstants.WardenStateType, "pulseCooldown")
-                / AetherfallConstants.PulseCooldownSeconds,
-            0,
-            1) * Math.PI);
         var dashBlend = Math.Clamp(
             (warden.ComponentNumber(AetherfallConstants.WardenStateType, "dashCooldown") - 0.52) / 0.33,
             0,
@@ -142,21 +132,7 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
                 Pose("pelvis", pelvis),
                 Pose("chest", chest),
                 Pose("head", System.Numerics.Matrix4x4.CreateRotationY((float)glance)
-                    * System.Numerics.Matrix4x4.CreateRotationZ((float)(-weightShift * 0.45))),
-                Pose("upper_arm_l", System.Numerics.Matrix4x4.CreateRotationX((float)(-armSwing - pulseBlend * 0.34))
-                    * System.Numerics.Matrix4x4.CreateRotationZ((float)(weightShift * 0.7))),
-                Pose("forearm_l", System.Numerics.Matrix4x4.CreateRotationX((float)(0.12 + breath * 1.4 + armSwing * 0.35 + pulseBlend * 0.58))),
-                Pose("upper_arm_r", System.Numerics.Matrix4x4.CreateRotationX((float)(armSwing - pulseBlend * 0.34))
-                    * System.Numerics.Matrix4x4.CreateRotationZ((float)(weightShift * 0.7))),
-                Pose("forearm_r", System.Numerics.Matrix4x4.CreateRotationX((float)(0.12 + breath * 1.4 - armSwing * 0.35 + pulseBlend * 0.58))),
-                Pose("leg_l", System.Numerics.Matrix4x4.CreateRotationX((float)legSwing)
-                    * System.Numerics.Matrix4x4.CreateRotationZ((float)(-weightShift * 0.22))),
-                Pose("leg_r", System.Numerics.Matrix4x4.CreateRotationX((float)-legSwing)
-                    * System.Numerics.Matrix4x4.CreateRotationZ((float)(-weightShift * 0.22))),
-                Pose("shin_l", System.Numerics.Matrix4x4.CreateRotationX((float)kneeBendL)),
-                Pose("foot_l", System.Numerics.Matrix4x4.CreateRotationX((float)footPitchL)),
-                Pose("shin_r", System.Numerics.Matrix4x4.CreateRotationX((float)kneeBendR)),
-                Pose("foot_r", System.Numerics.Matrix4x4.CreateRotationX((float)footPitchR)));
+                    * System.Numerics.Matrix4x4.CreateRotationZ((float)(-weightShift * 0.45))));
             return properties;
         }));
 
@@ -169,5 +145,49 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
                 matrix.M31, matrix.M32, matrix.M33, matrix.M34,
                 matrix.M41, matrix.M42, matrix.M43, matrix.M44)
         };
+    }
+
+    private static RekallAgeRuntimeWorld UpdateWardenAnimationMixer(RekallAgeRuntimeWorld world)
+    {
+        var warden = world.FindEntity(AetherfallConstants.WardenName);
+        if (warden is null)
+        {
+            return world;
+        }
+        var velocityX = warden.ComponentNumber(AetherfallConstants.WardenStateType, "velocityX");
+        var velocityZ = warden.ComponentNumber(AetherfallConstants.WardenStateType, "velocityZ");
+        var movement = Math.Clamp(
+            Math.Sqrt(velocityX * velocityX + velocityZ * velocityZ) / AetherfallConstants.WardenSpeed,
+            0,
+            1);
+        return world.UpdateEntity(warden.Id, entity => entity.UpsertComponent(
+            "Rekall.AnimationMixer",
+            new JsonObject
+            {
+                ["playing"] = true,
+                ["layers"] = new JsonArray(
+                    new JsonObject
+                    {
+                        ["name"] = "presentation",
+                        ["clip"] = "aetherfall-warden-presentation",
+                        ["weight"] = 1,
+                        ["loopMode"] = "pingpong"
+                    },
+                    new JsonObject
+                    {
+                        ["name"] = "guarded-idle",
+                        ["clip"] = "aetherfall-warden-idle",
+                        ["weight"] = 1 - movement,
+                        ["loopMode"] = "loop"
+                    },
+                    new JsonObject
+                    {
+                        ["name"] = "armored-walk",
+                        ["clip"] = "aetherfall-warden-walk",
+                        ["weight"] = movement,
+                        ["speed"] = 1 + movement * 0.08,
+                        ["loopMode"] = "loop"
+                    })
+            }));
     }
 }

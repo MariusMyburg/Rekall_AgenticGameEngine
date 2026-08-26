@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using System.Text.Json.Nodes;
 using Rekall.Age.Assets;
 using Rekall.Age.Modules;
@@ -130,27 +131,31 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
                     request.SampleTime,
                     context.FrameIndex,
                     observations);
-                var component = sampled.FindComponent(componentType);
-                if (component is not null
-                    && TryGetProperty(component.Properties, propertyName, out var value)
-                    && value is not null)
+                var jointId = ReadString(request.Track, "jointId");
+                if (TryReadTrackSample(sampled, componentType, propertyName, jointId, out var value))
                 {
                     samples.Add(new WeightedAnimationSample(
                         componentType,
                         propertyName,
-                        value.DeepClone(),
+                        jointId,
+                        value!.DeepClone(),
                         request.Weight,
                         request.LayerIndex));
                 }
             }
-            var blended = BlendSamples(samples);
+            var blended = samples.Count > 0
+                && samples[0].ComponentType.Equals("Rekall.RigPose", StringComparison.Ordinal)
+                && samples[0].PropertyName.Equals("rotation", StringComparison.OrdinalIgnoreCase)
+                    ? BlendRigRotations(samples)
+                    : BlendSamples(samples);
             if (blended is not null && samples.Count > 0)
             {
                 entitiesById[blendGroup.Key.TargetId] = ApplySampledValue(
                     currentTarget,
                     samples[0].ComponentType,
                     samples[0].PropertyName,
-                    blended);
+                    blended,
+                    samples[0].JointId);
             }
         }
         var entities = locallyAnimated.Select(entity => entitiesById[entity.Id]).ToArray();
@@ -597,6 +602,69 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         return HighestWeightValue(active);
     }
 
+    private static JsonNode? BlendRigRotations(IReadOnlyList<WeightedAnimationSample> samples)
+    {
+        var active = samples.Where(sample => sample.Weight > Epsilon).ToArray();
+        var totalWeight = active.Sum(sample => sample.Weight);
+        if (active.Length == 0 || totalWeight <= Epsilon
+            || active.Any(sample => !TryReadQuaternion(sample.Value, out _)))
+        {
+            return null;
+        }
+        _ = TryReadQuaternion(active[0].Value, out var reference);
+        var accumulated = Vector4.Zero;
+        foreach (var sample in active)
+        {
+            _ = TryReadQuaternion(sample.Value, out var rotation);
+            if (Quaternion.Dot(reference, rotation) < 0)
+            {
+                rotation = new Quaternion(-rotation.X, -rotation.Y, -rotation.Z, -rotation.W);
+            }
+            accumulated += new Vector4(rotation.X, rotation.Y, rotation.Z, rotation.W) * (float)sample.Weight;
+        }
+        if (accumulated.LengthSquared() < 1e-8f)
+        {
+            return null;
+        }
+        accumulated = Vector4.Normalize(accumulated);
+        return QuaternionNode(new Quaternion(accumulated.X, accumulated.Y, accumulated.Z, accumulated.W));
+    }
+
+    private static bool TryReadTrackSample(
+        RekallAgeRuntimeEntity entity,
+        string componentType,
+        string propertyName,
+        string? jointId,
+        out JsonNode? value)
+    {
+        value = null;
+        var component = entity.FindComponent(componentType);
+        if (component is null)
+        {
+            return false;
+        }
+        if (!componentType.Equals("Rekall.RigPose", StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(jointId))
+        {
+            return TryGetProperty(component.Properties, propertyName, out value) && value is not null;
+        }
+        var delta = (component.Properties["jointDeltas"] as JsonArray)?.OfType<JsonObject>().FirstOrDefault(item =>
+            string.Equals(ReadString(item, "jointId"), jointId, StringComparison.OrdinalIgnoreCase));
+        if (delta is null || !TryReadMatrix(delta["matrix"], out var matrix)
+            || !Matrix4x4.Decompose(matrix, out var scale, out var rotation, out var translation))
+        {
+            return false;
+        }
+        value = propertyName.ToLowerInvariant() switch
+        {
+            "translation" => new JsonArray((double)translation.X, (double)translation.Y, (double)translation.Z),
+            "rotation" => QuaternionNode(rotation),
+            "scale" => new JsonArray((double)scale.X, (double)scale.Y, (double)scale.Z),
+            _ => null
+        };
+        return value is not null;
+    }
+
     private static JsonNode HighestWeightValue(IEnumerable<WeightedAnimationSample> samples) =>
         samples.OrderByDescending(sample => sample.Weight)
             .ThenBy(sample => sample.LayerIndex)
@@ -672,6 +740,19 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
                 $"Animation track property '{propertyName}' is not a supported Rekall.Transform3D property."));
             return entity;
         }
+        var jointId = ReadString(track, "jointId");
+        var isRigJointTrack = componentType.Equals("Rekall.RigPose", StringComparison.Ordinal)
+            && !string.IsNullOrWhiteSpace(jointId);
+        if (componentType.Equals("Rekall.RigPose", StringComparison.Ordinal)
+            && (!isRigJointTrack || propertyName.ToLowerInvariant() is not ("translation" or "rotation" or "scale")))
+        {
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.rig_track_invalid",
+                entity,
+                "Rekall.RigPose animation tracks require a non-empty jointId and property translation, rotation, or scale."));
+            return entity;
+        }
 
         var interpolation = ReadString(track, "interpolation") ?? "linear";
         if (interpolation.ToLowerInvariant() is not ("step" or "linear" or "smooth" or "smoothstep" or "cubic"))
@@ -685,6 +766,15 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         }
         if (interpolation.Equals("cubic", StringComparison.OrdinalIgnoreCase))
         {
+            if (isRigJointTrack && propertyName.Equals("rotation", StringComparison.OrdinalIgnoreCase))
+            {
+                observations.Add(AnimationObservation(
+                    frame,
+                    "runtime.animation.rig_rotation_cubic_unsupported",
+                    entity,
+                    "Native rig rotation tracks support step, linear, smooth, and smoothstep interpolation; cubic quaternion tangents are not yet supported."));
+                return entity;
+            }
             if (!RekallAgeCubicAnimationSampler.TryCreateKeys(keyNodes, out var cubicKeys, out var issue))
             {
                 observations.Add(AnimationObservation(
@@ -704,7 +794,7 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
                     $"Animation track '{componentType}.{propertyName}' produced a non-finite cubic value."));
                 return entity;
             }
-            return ApplySampledValue(entity, componentType, propertyName, cubicValue);
+            return ApplySampledValue(entity, componentType, propertyName, cubicValue, jointId);
         }
 
         var keys = keyNodes.OfType<JsonObject>()
@@ -721,25 +811,41 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
                 $"Animation track '{componentType}.{propertyName}' has no keys with values."));
             return entity;
         }
-        var value = Sample(keys, sampleTime, interpolation);
+        var value = isRigJointTrack && propertyName.Equals("rotation", StringComparison.OrdinalIgnoreCase)
+            ? SampleQuaternion(keys, sampleTime, interpolation)
+            : Sample(keys, sampleTime, interpolation);
         if (value is null)
         {
+            if (isRigJointTrack)
+            {
+                observations.Add(AnimationObservation(
+                    frame,
+                    "runtime.animation.rig_track_value_invalid",
+                    entity,
+                    $"Native rig joint '{jointId}' {propertyName} keys must contain finite channel values of the required size."));
+            }
             return entity;
         }
 
-        return ApplySampledValue(entity, componentType, propertyName, value);
+        return ApplySampledValue(entity, componentType, propertyName, value, jointId);
     }
 
     private static RekallAgeRuntimeEntity ApplySampledValue(
         RekallAgeRuntimeEntity entity,
         string componentType,
         string propertyName,
-        JsonNode value)
+        JsonNode value,
+        string? jointId = null)
     {
         var component = entity.FindComponent(componentType);
         if (component is null)
         {
             return entity;
+        }
+        if (componentType.Equals("Rekall.RigPose", StringComparison.Ordinal)
+            && !string.IsNullOrWhiteSpace(jointId))
+        {
+            return ApplyRigJointSample(entity, component, jointId, propertyName, value);
         }
         var properties = (JsonObject)component.Properties.DeepClone();
         properties[propertyName] = value.DeepClone();
@@ -748,6 +854,168 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             : item).ToArray();
         return ApplyTransformProperty(entity with { Components = components }, componentType, propertyName, value);
     }
+
+    private static RekallAgeRuntimeEntity ApplyRigJointSample(
+        RekallAgeRuntimeEntity entity,
+        RekallAgeRuntimeComponent component,
+        string jointId,
+        string propertyName,
+        JsonNode value)
+    {
+        var properties = (JsonObject)component.Properties.DeepClone();
+        var deltas = properties["jointDeltas"] as JsonArray ?? new JsonArray();
+        properties["jointDeltas"] = deltas;
+        var existing = deltas.OfType<JsonObject>().FirstOrDefault(delta =>
+            string.Equals(ReadString(delta, "jointId"), jointId, StringComparison.OrdinalIgnoreCase));
+        var matrix = existing is null || !TryReadMatrix(existing["matrix"], out var current)
+            ? Matrix4x4.Identity
+            : current;
+        if (!Matrix4x4.Decompose(matrix, out var scale, out var rotation, out var translation))
+        {
+            scale = Vector3.One;
+            rotation = Quaternion.Identity;
+            translation = Vector3.Zero;
+        }
+
+        switch (propertyName.ToLowerInvariant())
+        {
+            case "translation" when TryReadVector3(value, out var sampledTranslation):
+                translation = sampledTranslation;
+                break;
+            case "rotation" when TryReadQuaternion(value, out var sampledRotation):
+                rotation = sampledRotation;
+                break;
+            case "scale" when TryReadVector3(value, out var sampledScale):
+                scale = sampledScale;
+                break;
+            default:
+                return entity;
+        }
+
+        var sampledMatrix = Matrix4x4.CreateScale(scale)
+            * Matrix4x4.CreateFromQuaternion(rotation)
+            * Matrix4x4.CreateTranslation(translation);
+        var updatedDelta = existing ?? new JsonObject { ["jointId"] = jointId };
+        updatedDelta["matrix"] = MatrixNode(sampledMatrix);
+        if (existing is null)
+        {
+            deltas.Add(updatedDelta);
+        }
+        var components = entity.Components.Select(item => ReferenceEquals(item, component)
+            ? new RekallAgeRuntimeComponent(item.Type, properties)
+            : item).ToArray();
+        return entity with { Components = components };
+    }
+
+    private static JsonNode? SampleQuaternion(AnimationKey[] keys, double time, string interpolation)
+    {
+        if (!keys.All(key => TryReadQuaternion(key.Value, out _)))
+        {
+            return null;
+        }
+        if (time <= keys[0].Time + Epsilon)
+        {
+            _ = TryReadQuaternion(keys[0].Value, out var first);
+            return QuaternionNode(first);
+        }
+        var rightIndex = Array.FindIndex(keys, key => key.Time + Epsilon >= time);
+        if (rightIndex <= 0)
+        {
+            _ = TryReadQuaternion(keys[^1].Value, out var last);
+            return QuaternionNode(last);
+        }
+        var left = keys[rightIndex - 1];
+        var right = keys[rightIndex];
+        _ = TryReadQuaternion(left.Value, out var from);
+        _ = TryReadQuaternion(right.Value, out var to);
+        if (interpolation.Equals("step", StringComparison.OrdinalIgnoreCase))
+        {
+            return QuaternionNode(Math.Abs(time - right.Time) <= Epsilon ? to : from);
+        }
+        var amount = Math.Clamp((time - left.Time) / Math.Max(Epsilon, right.Time - left.Time), 0, 1);
+        amount = Math.Round(amount, 5, MidpointRounding.AwayFromZero);
+        if (interpolation.Equals("smooth", StringComparison.OrdinalIgnoreCase)
+            || interpolation.Equals("smoothstep", StringComparison.OrdinalIgnoreCase))
+        {
+            amount = amount * amount * (3 - 2 * amount);
+        }
+        if (Quaternion.Dot(from, to) < 0)
+        {
+            to = new Quaternion(-to.X, -to.Y, -to.Z, -to.W);
+        }
+        return QuaternionNode(Quaternion.Normalize(Quaternion.Slerp(from, to, (float)amount)));
+    }
+
+    private static bool TryReadVector3(JsonNode? node, out Vector3 value)
+    {
+        value = default;
+        if (node is not JsonArray { Count: 3 } values
+            || !TryReadNumber(values[0], out var x)
+            || !TryReadNumber(values[1], out var y)
+            || !TryReadNumber(values[2], out var z)
+            || !double.IsFinite(x) || !double.IsFinite(y) || !double.IsFinite(z))
+        {
+            return false;
+        }
+        value = new Vector3((float)x, (float)y, (float)z);
+        return true;
+    }
+
+    private static bool TryReadQuaternion(JsonNode? node, out Quaternion value)
+    {
+        value = Quaternion.Identity;
+        if (node is not JsonArray { Count: 4 } values
+            || !TryReadNumber(values[0], out var x)
+            || !TryReadNumber(values[1], out var y)
+            || !TryReadNumber(values[2], out var z)
+            || !TryReadNumber(values[3], out var w)
+            || !double.IsFinite(x) || !double.IsFinite(y) || !double.IsFinite(z) || !double.IsFinite(w))
+        {
+            return false;
+        }
+        var quaternion = new Quaternion((float)x, (float)y, (float)z, (float)w);
+        if (quaternion.LengthSquared() < 1e-8f)
+        {
+            return false;
+        }
+        value = Quaternion.Normalize(quaternion);
+        return true;
+    }
+
+    private static bool TryReadMatrix(JsonNode? node, out Matrix4x4 matrix)
+    {
+        matrix = Matrix4x4.Identity;
+        if (node is not JsonArray { Count: 16 } values)
+        {
+            return false;
+        }
+        var numbers = new float[16];
+        for (var index = 0; index < numbers.Length; index++)
+        {
+            if (!TryReadNumber(values[index], out var number) || !double.IsFinite(number))
+            {
+                return false;
+            }
+            numbers[index] = (float)number;
+        }
+        matrix = new Matrix4x4(
+            numbers[0], numbers[1], numbers[2], numbers[3],
+            numbers[4], numbers[5], numbers[6], numbers[7],
+            numbers[8], numbers[9], numbers[10], numbers[11],
+            numbers[12], numbers[13], numbers[14], numbers[15]);
+        return true;
+    }
+
+    private static JsonArray QuaternionNode(Quaternion value) =>
+        [(double)value.X, (double)value.Y, (double)value.Z, (double)value.W];
+
+    private static JsonArray MatrixNode(Matrix4x4 value) =>
+    [
+        (double)value.M11, (double)value.M12, (double)value.M13, (double)value.M14,
+        (double)value.M21, (double)value.M22, (double)value.M23, (double)value.M24,
+        (double)value.M31, (double)value.M32, (double)value.M33, (double)value.M34,
+        (double)value.M41, (double)value.M42, (double)value.M43, (double)value.M44
+    ];
 
     private static JsonNode? Sample(AnimationKey[] keys, double time, string interpolation)
     {
@@ -1156,6 +1424,7 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
     private sealed record WeightedAnimationSample(
         string ComponentType,
         string PropertyName,
+        string? JointId,
         JsonNode Value,
         double Weight,
         int LayerIndex);
@@ -1247,7 +1516,8 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         string OwnerId,
         string TargetId,
         string ComponentType,
-        string PropertyName)
+        string PropertyName,
+        string JointId)
     {
         public static ResolvedTrackBlendKey From(ResolvedTargetedWeightedAnimationTrack resolved) => new(
             resolved.Request.OwnerId,
@@ -1255,7 +1525,8 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             ReadString(resolved.Request.Track, "component")
                 ?? ReadString(resolved.Request.Track, "targetComponent")
                 ?? string.Empty,
-            (ReadString(resolved.Request.Track, "property") ?? string.Empty).ToLowerInvariant());
+            (ReadString(resolved.Request.Track, "property") ?? string.Empty).ToLowerInvariant(),
+            (ReadString(resolved.Request.Track, "jointId") ?? string.Empty).ToLowerInvariant());
     }
     private readonly record struct AnimationColor(byte R, byte G, byte B, byte A);
 }

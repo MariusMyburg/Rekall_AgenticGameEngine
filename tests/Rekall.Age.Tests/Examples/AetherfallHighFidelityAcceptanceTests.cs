@@ -354,13 +354,13 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         var pose = Assert.Single(warden.Components, component => component.Type == "Rekall.RigPose");
         var leg = Assert.Single(pose.Properties["jointDeltas"]!.AsArray(), delta =>
             delta!["jointId"]!.GetValue<string>() == "leg_l")!.AsObject();
-        var matrix = leg["matrix"]!.AsArray().Select(value => value!.GetValue<float>()).ToArray();
+        var matrix = leg["matrix"]!.AsArray().Select(value => value!.GetValue<double>()).ToArray();
         var shin = Assert.Single(pose.Properties["jointDeltas"]!.AsArray(), delta =>
             delta!["jointId"]!.GetValue<string>() == "shin_l")!.AsObject();
-        var shinMatrix = shin["matrix"]!.AsArray().Select(value => value!.GetValue<float>()).ToArray();
+        var shinMatrix = shin["matrix"]!.AsArray().Select(value => value!.GetValue<double>()).ToArray();
         var foot = Assert.Single(pose.Properties["jointDeltas"]!.AsArray(), delta =>
             delta!["jointId"]!.GetValue<string>() == "foot_l")!.AsObject();
-        var footMatrix = foot["matrix"]!.AsArray().Select(value => value!.GetValue<float>()).ToArray();
+        var footMatrix = foot["matrix"]!.AsArray().Select(value => value!.GetValue<double>()).ToArray();
 
         Assert.True(Math.Abs(matrix[6]) > 0.15,
             $"Expected a readable movement-driven leg swing, found matrix[6]={matrix[6]:F6}.");

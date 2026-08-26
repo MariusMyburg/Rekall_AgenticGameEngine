@@ -4,10 +4,29 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 15:19 Africa/Johannesburg
+Last verified: 2026-08-26 15:48 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
+
+The current Godot/Blender-informed animation slice connects AGE's existing
+generic animation ecosystem to its native named-joint rigs. Ordinary animation
+tracks may now target `Rekall.RigPose` with stable `jointId` plus translation,
+rotation, or scale. Runtime sampling normalizes and spherically interpolates
+quaternions, mixer blending uses hemisphere correction, and blend identity
+keeps different joints separate. Aetherfall replaces code-only limb sine waves
+with three inspectable assets: presentation, guarded idle, and an authored
+armored walk. Its agent module writes semantic movement-derived mixer weights
+at pre-animation priority -5 while retaining gameplay root/facing and upper-
+body state. Runtime animation passes 31/31, Aetherfall passes 45/45,
+validation/trust are clean, and the native High frame has 13,067 colors, 320
+draws, four dispatches, 65 renderables, and zero observations or fallbacks.
+High 2560x1440 `desktop60` passes at 6.626656 ms with 1,095,508 vertices.
+The clip pipeline is now reusable and inspectable, but original-size review is
+still not the requested visual target: the Warden is too bright, too procedural,
+and too small in composition. Fitted forms, surface detail, material/lighting
+restraint, ability clips, IK/foot planting, and Studio animation editing remain
+active priorities.
 
 The current Warden anatomy slice expands the generic editable character graph
 to revision 23 / 115 reachable nodes and its native rig to 14 stable named

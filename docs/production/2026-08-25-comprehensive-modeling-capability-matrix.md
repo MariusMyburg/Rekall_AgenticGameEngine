@@ -99,7 +99,12 @@ contract, migration/expansion of the existing Tripo proof, Meshy adapter, then a
 capped same-fixture comparison. AGE must remain capable without either service
 and must treat generated output as untrusted imported source content subject to
 the same validation, editing, cooking, packaging, and provenance rules as any
-other asset.
+other asset. The refreshed terms review also requires immediate local capture of
+completed outputs, because Meshy currently documents three-day retention for
+non-Enterprise API assets, plus per-asset provider/plan/terms and attribution
+metadata. Tripo and Meshy both vary output rights by plan; AGE must preserve the
+facts and user consent without presenting itself as granting copyright,
+exclusivity, or commercial clearance.
 
 ## Current executable gate
 

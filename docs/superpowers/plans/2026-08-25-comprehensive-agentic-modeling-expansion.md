@@ -636,6 +636,14 @@ contracts.
   an upper bound before submission. Current references:
   https://platform.tripo3d.ai/docs/billing and
   https://docs.meshy.ai/en/api/pricing.
+- Provider retention and output rights are operational asset metadata, not a
+  one-time account-selection concern. Meshy's current API documentation says
+  non-Enterprise API outputs are retained for only three days, and its terms
+  distinguish free-plan CC BY 4.0 output from paid-plan rights. Tripo's current
+  terms likewise distinguish free and paid users and warn that generated output
+  may not be exclusive. AGE must therefore copy completed artifacts immediately,
+  record provider/plan/terms URL and retrieval timestamp, preserve attribution
+  obligations, and never imply copyright, exclusivity, or commercial clearance.
 
 **Evaluation recommendation:** build one generic asynchronous external-asset job
 contract first, migrate the existing Tripo proof onto it, then add Meshy as the
@@ -672,8 +680,11 @@ surface exercises more of the generic contract.
 Current official references:
 https://developers.tripo3d.com/en/docs/quick-start,
 https://developers.tripo3d.com/en/pricing,
+https://www.tripo3d.ai/terms,
 https://docs.meshy.ai/en/api/quick-start, and
-https://docs.meshy.ai/en/api/ai.
+https://docs.meshy.ai/en/api/ai,
+https://docs.meshy.ai/en/api/pricing, and
+https://www.meshy.ai/terms-of-use.
 
 - [ ] **Step 1: Define a provider-neutral generation contract**
 
@@ -700,6 +711,9 @@ https://docs.meshy.ai/en/api/ai.
   topology statistics, and deterministic reimport settings. Copy remote artifacts
   into the project before their URLs expire, validate them as untrusted imports,
   and expose the result to AGE's ordinary editable source/modifier/cook layers.
+  Persist the applicable provider terms URL, retrieval timestamp, account-plan
+  class, attribution requirement, and user-confirmed input-rights declaration;
+  treat these as provenance facts rather than AGE offering legal clearance.
 
 - [ ] **Step 4: Evaluate production suitability**
 

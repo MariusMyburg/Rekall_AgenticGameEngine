@@ -46,7 +46,8 @@ public enum RekallAgeGeometryValueType
     ColorLinear,
     Quaternion,
     Matrix4x4,
-    String
+    String,
+    Json
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<RekallAgeGeometryInterpolation>))]

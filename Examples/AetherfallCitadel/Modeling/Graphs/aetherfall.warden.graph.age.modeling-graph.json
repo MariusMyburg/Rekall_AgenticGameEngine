@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.warden.graph",
   "name": "Aetherfall Warden Silhouette",
-  "revision": 20,
+  "revision": 21,
   "nodes": [
     {
       "nodeId": "torso",
@@ -1197,14 +1197,23 @@
     },
     {
       "nodeId": "body-skin",
-      "typeId": "rekall.modeling.skin.linear_weights",
+      "typeId": "rekall.modeling.skin.envelope_weights",
       "typeVersion": 1,
       "parameters": {
-        "jointB": 1,
-        "jointA": 0,
-        "maximum": 3.05,
-        "minimum": 0.45,
-        "axis": "y"
+        "maximumInfluences": 4,
+        "fallbackToNearest": true,
+        "envelopes": [
+          { "jointIndex": 0, "head": [0, -1.7, 0], "tail": [0, -0.7, 0], "headRadius": 0.62, "tailRadius": 0.65, "falloff": 0.55, "weight": 0.9 },
+          { "jointIndex": 1, "head": [0, -0.65, 0], "tail": [0, 1.2, 0], "headRadius": 0.72, "tailRadius": 0.82, "falloff": 0.58, "weight": 1.1 },
+          { "jointIndex": 2, "head": [0, 1.0, 0], "tail": [0, 2.85, 0], "headRadius": 0.78, "tailRadius": 0.72, "falloff": 0.6, "weight": 1.15 },
+          { "jointIndex": 3, "head": [0, 2.78, 0], "tail": [0, 3.82, 0], "headRadius": 0.52, "tailRadius": 0.48, "falloff": 0.35, "weight": 1.25 },
+          { "jointIndex": 4, "head": [-0.52, 2.52, 0], "tail": [-1.06, 1.72, 0], "headRadius": 0.48, "tailRadius": 0.34, "falloff": 0.34, "weight": 1.3 },
+          { "jointIndex": 5, "head": [-1.0, 1.78, 0], "tail": [-1.43, 0.95, 0], "headRadius": 0.35, "tailRadius": 0.38, "falloff": 0.3, "weight": 1.35 },
+          { "jointIndex": 6, "head": [0.52, 2.52, 0], "tail": [1.06, 1.72, 0], "headRadius": 0.48, "tailRadius": 0.34, "falloff": 0.34, "weight": 1.3 },
+          { "jointIndex": 7, "head": [1.0, 1.78, 0], "tail": [1.43, 0.95, 0], "headRadius": 0.35, "tailRadius": 0.38, "falloff": 0.3, "weight": 1.35 },
+          { "jointIndex": 8, "head": [-0.42, 0.72, 0], "tail": [-0.42, -1.62, 0], "headRadius": 0.5, "tailRadius": 0.4, "falloff": 0.36, "weight": 1.25 },
+          { "jointIndex": 9, "head": [0.42, 0.72, 0], "tail": [0.42, -1.62, 0], "headRadius": 0.5, "tailRadius": 0.4, "falloff": 0.36, "weight": 1.25 }
+        ]
       }
     }
   ],

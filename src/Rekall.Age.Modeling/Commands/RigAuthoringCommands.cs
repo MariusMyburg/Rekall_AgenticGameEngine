@@ -137,7 +137,7 @@ internal static class RigCommandEvidence
         return new(rig.AssetId, rig.Name, fileRevision, rig.Revision, rig.Joints.Count,
             rig.Joints.Take(maximumSamples).Select(joint => joint.JointId).ToArray(), rig.Joints.Count > maximumSamples,
             report.Diagnostics.Take(64).ToArray(),
-            ["Attach with Rekall.RigPose and author named jointDeltas.", "Bind procedural points with rekall.modeling.skin.linear_weights."]);
+            ["Attach with Rekall.RigPose and author named jointDeltas.", "Bind procedural points with rekall.modeling.skin.envelope_weights for multi-joint rigs or rekall.modeling.skin.linear_weights for simple blends."]);
     }
 
     public static bool IsExpected(Exception error) => error is InvalidDataException or ArgumentException or IOException or UnauthorizedAccessException or RekallAgeDocumentRevisionException;

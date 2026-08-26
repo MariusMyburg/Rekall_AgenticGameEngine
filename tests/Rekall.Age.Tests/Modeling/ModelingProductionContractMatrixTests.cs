@@ -19,6 +19,7 @@ public sealed class ModelingProductionContractMatrixTests
         "subdivide_smooth",
         "set_edge_crease",
         "merge_by_distance",
+        "assign_envelope_skin_weights",
         "bend_points"
     };
 
@@ -30,6 +31,7 @@ public sealed class ModelingProductionContractMatrixTests
         "rekall.modifier.subdivide",
         "rekall.modifier.subdivide_smooth",
         "rekall.modifier.merge_by_distance",
+        "rekall.modifier.skin.envelope_weights",
         "rekall.modifier.deform.bend"
     };
 
@@ -192,23 +194,23 @@ public sealed class ModelingProductionContractMatrixTests
     public void ProductionMatricesExactlyCoverThePublishedOperationAndModifierCatalogs()
     {
         var operationIds = new RekallAgeMeshOperationExecutor().Descriptors.Select(item => item.OperationId).ToArray();
-        Assert.Equal(29, operationIds.Length);
+        Assert.Equal(30, operationIds.Length);
         Assert.All(new[]
         {
             "transform", "reverse_faces", "triangulate_faces", "extrude_faces", "delete",
             "generate_normals", "shade_faces", "mark_sharp", "auto_smooth", "project_uv", "mark_uv_seams", "unwrap_pack_uv", "subdivide_faces", "subdivide_smooth", "set_edge_crease", "merge_by_distance",
-            "bevel_edges", "select_edges_by_angle", "assign_linear_skin_weights", "taper_points", "bend_points", "inset_faces", "solidify", "weighted_normals",
+            "bevel_edges", "select_edges_by_angle", "assign_linear_skin_weights", "assign_envelope_skin_weights", "taper_points", "bend_points", "inset_faces", "solidify", "weighted_normals",
             "fill_holes", "bridge_edge_loops", "poke_faces", "dissolve_edges", "bisect_plane"
         }, expected => Assert.Contains(expected, operationIds));
 
         var modifierIds = RekallAgeModifierCatalog.CreateDefault().Descriptors.Select(item => item.TypeId).ToArray();
-        Assert.Equal(15, modifierIds.Length);
+        Assert.Equal(16, modifierIds.Length);
         Assert.All(new[]
         {
             "rekall.modifier.transform", "rekall.modifier.triangulate", "rekall.modifier.extrude",
             "rekall.modifier.subdivide", "rekall.modifier.subdivide_smooth", "rekall.modifier.merge_by_distance",
             "rekall.modifier.bevel", "rekall.modifier.solidify", "rekall.modifier.mirror", "rekall.modifier.array", "rekall.modifier.auto_smooth",
-            "rekall.modifier.weighted_normals", "rekall.modifier.skin.linear_weights", "rekall.modifier.deform.taper", "rekall.modifier.deform.bend"
+            "rekall.modifier.weighted_normals", "rekall.modifier.skin.linear_weights", "rekall.modifier.skin.envelope_weights", "rekall.modifier.deform.taper", "rekall.modifier.deform.bend"
         }, expected => Assert.Contains(expected, modifierIds));
     }
 
@@ -262,6 +264,7 @@ public sealed class ModelingProductionContractMatrixTests
             "project_uv" => new JsonObject { ["attribute"] = "uv.contract", ["axis"] = "xz" },
             "set_edge_crease" => new JsonObject { ["weight"] = 0.75 },
             "merge_by_distance" => new JsonObject { ["distance"] = 0.0001 },
+            "assign_envelope_skin_weights" => EnvelopeParameters(),
             "bend_points" => new JsonObject { ["axis"] = "y", ["bendAxis"] = "z", ["minimum"] = -1.0, ["maximum"] = 1.0, ["angleDegrees"] = 15.0 },
             _ => new JsonObject()
         };
@@ -273,8 +276,23 @@ public sealed class ModelingProductionContractMatrixTests
         "rekall.modifier.transform" => new JsonObject { ["x"] = 0.25, ["y"] = -0.5, ["z"] = 0.75 },
         "rekall.modifier.extrude" => new JsonObject { ["z"] = 0.5, ["selection"] = "contract-face" },
         "rekall.modifier.merge_by_distance" => new JsonObject { ["distance"] = 0.0001 },
+        "rekall.modifier.skin.envelope_weights" => EnvelopeParameters(),
         "rekall.modifier.deform.bend" => new JsonObject { ["axis"] = "y", ["bendAxis"] = "z", ["minimum"] = -1.0, ["maximum"] = 1.0, ["angleDegrees"] = 15.0 },
         _ => new JsonObject()
+    };
+
+    private static JsonObject EnvelopeParameters() => new()
+    {
+        ["envelopes"] = new JsonArray(new JsonObject
+        {
+            ["jointIndex"] = 0,
+            ["head"] = new JsonArray(0, -1, 0),
+            ["tail"] = new JsonArray(0, 1, 0),
+            ["headRadius"] = 2,
+            ["tailRadius"] = 2,
+            ["falloff"] = 0,
+            ["weight"] = 0.5
+        })
     };
 
     private static async ValueTask<RekallAgeMeshAsset> Box()

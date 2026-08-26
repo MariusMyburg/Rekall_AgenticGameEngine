@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.warden.rig",
   "name": "Aetherfall Warden Native Rig",
-  "revision": 1,
+  "revision": 2,
   "joints": [
     {
       "jointId": "root",
@@ -28,27 +28,58 @@
       ]
     },
     {
+      "jointId": "pelvis",
+      "name": "Pelvis",
+      "parentIndex": 0,
+      "bindLocalMatrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0.65, 0, 1]
+    },
+    {
       "jointId": "chest",
       "name": "Chest",
-      "parentIndex": 0,
-      "bindLocalMatrix": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        1.45,
-        0,
-        1
-      ]
+      "parentIndex": 1,
+      "bindLocalMatrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1.25, 0, 1]
+    },
+    {
+      "jointId": "head",
+      "name": "Head",
+      "parentIndex": 2,
+      "bindLocalMatrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1.25, 0, 1]
+    },
+    {
+      "jointId": "upper_arm_l",
+      "name": "Upper Arm.L",
+      "parentIndex": 2,
+      "bindLocalMatrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -0.72, 0.25, 0, 1]
+    },
+    {
+      "jointId": "forearm_l",
+      "name": "Forearm.L",
+      "parentIndex": 4,
+      "bindLocalMatrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -0.35, -0.6, 0, 1]
+    },
+    {
+      "jointId": "upper_arm_r",
+      "name": "Upper Arm.R",
+      "parentIndex": 2,
+      "bindLocalMatrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.72, 0.25, 0, 1]
+    },
+    {
+      "jointId": "forearm_r",
+      "name": "Forearm.R",
+      "parentIndex": 6,
+      "bindLocalMatrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.35, -0.6, 0, 1]
+    },
+    {
+      "jointId": "leg_l",
+      "name": "Leg.L",
+      "parentIndex": 1,
+      "bindLocalMatrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -0.42, -0.65, 0, 1]
+    },
+    {
+      "jointId": "leg_r",
+      "name": "Leg.R",
+      "parentIndex": 1,
+      "bindLocalMatrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.42, -0.65, 0, 1]
     }
   ]
 }

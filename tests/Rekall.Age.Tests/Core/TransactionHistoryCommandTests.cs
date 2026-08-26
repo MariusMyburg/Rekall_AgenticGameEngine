@@ -9,6 +9,26 @@ namespace Rekall.Age.Tests.Core;
 public sealed class TransactionHistoryCommandTests
 {
     [Fact]
+    public async Task TransactionHistoryRetainsNewestEntriesWithinItsJournalBudget()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeTransactionLogStore(maximumLogBytes: 4_096);
+        var ids = new List<string>();
+        for (var index = 0; index < 10; index++)
+        {
+            var transaction = RekallAgeTransaction.Begin($"bounded-{index:D2}-" + new string((char)('a' + index), 700));
+            ids.Add(transaction.Id);
+            await store.AppendAsync(root, transaction, "test", CancellationToken.None);
+        }
+
+        var document = await store.LoadAsync(root, CancellationToken.None);
+        Assert.Contains(document.Transactions, transaction => transaction.Id == ids[^1]);
+        Assert.DoesNotContain(document.Transactions, transaction => transaction.Id == ids[0]);
+        Assert.InRange(document.Transactions.Count, 1, 9);
+        Assert.True(new FileInfo(store.GetPath(root)).Length <= 4_096);
+    }
+
+    [Fact]
     public async Task DeferredResourcePreimageRecordsSuppliedPreSaveBytesAfterTheResourceChanges()
     {
         var root = TestPaths.CreateTempDirectory();

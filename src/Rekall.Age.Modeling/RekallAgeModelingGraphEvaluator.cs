@@ -340,6 +340,18 @@ public sealed partial class RekallAgeModelingGraphEvaluator
                     ["jointB"] = ReadInteger(node, "jointB", 1, 0, int.MaxValue)
                 },
                 RekallAgeGeometryDomain.Point),
+            "rekall.modeling.skin.envelope_weights" => ApplySemanticOperation(
+                graph,
+                node,
+                InputGeometry(node, "geometry", incoming, values),
+                "assign_envelope_skin_weights",
+                new JsonObject
+                {
+                    ["envelopes"] = node.Parameters["envelopes"]?.DeepClone() ?? new JsonArray(),
+                    ["maximumInfluences"] = ReadInteger(node, "maximumInfluences", 4, 1, 4),
+                    ["fallbackToNearest"] = ReadBoolean(node, "fallbackToNearest", true)
+                },
+                RekallAgeGeometryDomain.Point),
             "rekall.modeling.inset" => ApplySemanticOperation(
                 graph,
                 node,

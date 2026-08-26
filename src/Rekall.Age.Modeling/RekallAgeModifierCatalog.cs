@@ -45,6 +45,9 @@ public sealed class RekallAgeModifierCatalog
             new("rekall.modifier.skin.linear_weights", 1, "Linear Skin Weights", "Authors normalized two-joint point bindings from an axis-aligned blend range.",
                 RekallAgeMeshChangeKind.Attributes,
                 [Text("axis", "y"), Number("minimum", 0), Number("maximum", 1), Integer("jointA", 0, 0, int.MaxValue), Integer("jointB", 1, 0, int.MaxValue), Text("selection", "")], preserve),
+            new("rekall.modifier.skin.envelope_weights", 1, "Envelope Skin Weights", "Authors normalized strongest-four point bindings from tapered joint envelopes.",
+                RekallAgeMeshChangeKind.Attributes,
+                [Structured("envelopes", new JsonArray()), Integer("maximumInfluences", 4, 1, 4), Boolean("fallbackToNearest", true), Text("selection", "")], preserve),
             new("rekall.modifier.solidify", 1, "Solidify", "Adds shell thickness and optional boundary rims to a surface.",
                 RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes,
                 [Number("thickness", 0.05), Number("offset", 0), Boolean("rim", true), Boolean("evenThickness", true), Text("selection", "")], preserve),
@@ -69,4 +72,5 @@ public sealed class RekallAgeModifierCatalog
     private static RekallAgeModelingParameterDescriptor BoundedNumber(string id, double value, double minimum, double maximum) => new(id, id, RekallAgeModelingValueType.Scalar, JsonValue.Create(value), minimum, maximum);
     private static RekallAgeModelingParameterDescriptor Boolean(string id, bool value) => new(id, id, RekallAgeModelingValueType.Boolean, JsonValue.Create(value));
     private static RekallAgeModelingParameterDescriptor Text(string id, string value) => new(id, id, RekallAgeModelingValueType.String, JsonValue.Create(value));
+    private static RekallAgeModelingParameterDescriptor Structured(string id, JsonNode value) => new(id, id, RekallAgeModelingValueType.Json, value);
 }

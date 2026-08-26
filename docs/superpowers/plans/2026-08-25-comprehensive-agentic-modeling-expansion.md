@@ -591,6 +591,16 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   rig documents, bind-pose generation, constraints, richer weighting tools,
   Studio visualization, and a production-quality full character remain open.
 
+  2026-08-26 envelope-weight checkpoint: AGE now publishes Blender-inspired
+  tapered segment envelopes through the mesh operation, modeling graph, and
+  modifier stack, with deterministic Godot-compatible strongest-four
+  normalized bindings. Aetherfall's Warden expands to ten named joints, its
+  baked mesh uses at least six distinct joints, and renderer acceptance proves
+  actual vertex movement from nine agent-authored pose deltas. The production
+  bake also exposed and drove a bounded transaction-journal retention repair.
+  Multi-joint authoring is now functional; constraints/IK, retargeting, weight
+  paint, Studio rig visualization, and production character art remain open.
+
   2026-08-26 native-rig/bend checkpoint: AGE now stores validated named-joint
   hierarchy and bind matrices in a versioned rig asset, evaluates bind-global,
   pose-global, and skin matrices deterministically, exposes revision-safe rig
@@ -627,10 +637,12 @@ contracts.
   Studio task UI, explicit cost/consent preflight, durable provenance manifest,
   post-processing, rigging/animation, or provider-neutral abstraction.
 - The current Tripo adapter defaults to `Turbo-v1.0-20250506`. Tripo's current
-  generation documentation also lists P1, v3.1, v3.0, and v2.5 families and
-  documents model-specific parameter compatibility. Provider model IDs and
-  supported options must therefore be discovered/configured data rather than
-  assumed to remain stable in AGE code.
+  v3 generation documentation now identifies `v3.1-20260211` as its latest
+  high-quality model and documents model-specific parameter compatibility.
+  That concrete drift makes migration off the hard-coded model default part of
+  the provider-contract work, not optional cleanup. Provider model IDs and
+  supported options must be discovered/configured data rather than assumed to
+  remain stable in AGE code.
 
 - Tripo's official API exposes text-, image-, and multi-view-to-model tasks,
   optional PBR/UV/quad/parts controls, post-process conversion, and GLTF/FBX/OBJ
@@ -661,6 +673,13 @@ contracts.
   optional parts/quad output likewise reinforce runtime capability discovery.
   The AGE adapter must not infer quality from a provider marketing label or
   silently map AGE quality presets to paid remote operations.
+- Tripo's current v3 surface also publishes labeled multiview inputs, GLB/GLTF/
+  FBX/OBJ/STL rig inputs up to 150 MB, asynchronous rigging, and animation
+  retargeting. Meshy's current surface publishes one-to-four image generation,
+  GLB-first results, quad or triangle remesh with a target polycount, and
+  dedicated conversion/resizing. These are strong capability matches for AGE,
+  but they also confirm that a direct provider-specific Studio workflow would
+  age badly.
 - Both services meter work in credits, with cost depending on generation model
   and optional texture/topology/post-process stages. Prices are intentionally
   not frozen into this plan; AGE must fetch or accept a provider quote and show
@@ -774,11 +793,13 @@ https://www.meshy.ai/terms-of-use.
   a fresh official-API integration test and the editable packaged-game acceptance
   evidence above; otherwise retain local-file import as the reliable fallback.
 
-**Scheduling note (confirmed 2026-08-26):** retain this item on the post-
-Aetherfall list. Research and contract design may be refreshed without blocking
-the current playable milestone, but do not begin provider implementation or
-paid generation runs until Aetherfall's immediate modeling, animation, gameplay,
-and visual acceptance work is complete.
+**Scheduling note (user-requested and reconfirmed 2026-08-26):** retain this
+item explicitly on the post-Aetherfall list. Research and contract design may
+be refreshed without blocking the current playable milestone, but do not begin
+provider implementation or paid generation runs until Aetherfall's immediate
+modeling, animation, gameplay, and visual acceptance work is complete. The
+first implementation slice is the provider-neutral asynchronous job contract;
+then migrate Tripo, add Meshy, and run the capped same-fixture comparison.
 
 ## Plan self-review
 

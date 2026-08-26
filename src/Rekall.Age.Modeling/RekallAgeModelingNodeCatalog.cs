@@ -190,6 +190,14 @@ public sealed class RekallAgeModelingNodeCatalog
                 Integer("jointB", "Joint B", 1, 0, int.MaxValue),
                 Text("selectionSet", "Selection Set", "")
             ]),
+        Node("rekall.modeling.skin.envelope_weights", "Envelope Skin Weights", "Authors normalized strongest-four skin bindings from structured tapered joint envelopes.",
+            [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)],
+            [
+                Structured("envelopes", "Joint Envelopes", new JsonArray()),
+                Integer("maximumInfluences", "Maximum Influences", 4, 1, 4),
+                Boolean("fallbackToNearest", "Fallback To Nearest", true),
+                Text("selectionSet", "Selection Set", "")
+            ]),
         Node("rekall.modeling.inset", "Inset Faces", "Builds deterministic recessed or raised face panels with explicit border topology.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Input("selection", RekallAgeModelingValueType.Selection), Output("geometry", RekallAgeModelingValueType.Geometry)],
             [

@@ -784,3 +784,43 @@ the new background is an explicit fallback, not a claim that sky assets render.
   restricted-host trust, and 2560x1440 High `desktop60` passes without blockers
   or warnings at 8.642528 ms measured GPU time, 97 scene draws, 203,638
   triangles, 873,116 vertices, and nine textures.
+
+## Multi-joint envelope deformation checkpoint
+
+- AGE now exposes `assign_envelope_skin_weights` through the ordinary mesh
+  operation, `rekall.modeling.skin.envelope_weights` graph node, and
+  `rekall.modifier.skin.envelope_weights` modifier. Following Blender's
+  segment/radius/falloff envelope model, it aggregates duplicate joint
+  envelopes, deterministically keeps the strongest one through four
+  influences, normalizes and pads the canonical `Int4`/`Float4` bindings, and
+  can either bind to the nearest envelope or fail closed without mutation.
+  The four-influence payload matches Godot's ordinary skinning boundary.
+- Aetherfall is a real consumer rather than a special engine behavior. The
+  Warden rig expands from two to ten stable named joints; its 84-node graph
+  authors explicit envelopes and the baked mesh uses at least six distinct
+  joints. The agent-authored module emits nine named pelvis, chest, head, arm,
+  forearm, and leg deltas. Acceptance compares renderer-built vertices across
+  representative runtime frames and proves actual deformation.
+- Native proof is
+  `Proof/Captures/EnvelopeRig/vulkan-scene-1280x720-20260826115159733.png`:
+  RTX 5090 High Vulkan, 11,785 distinct colors, mean luminance 0.114, 305
+  render-work draws, four dispatches, 65 renderables, and zero observations,
+  missing assets, or fallbacks. Original-size inspection found no exploded or
+  unstable deformation.
+- The first successful 23 MB graph bake exposed a generic delivery defect: the
+  64 MiB transaction JSON journal overflowed after the resource had already
+  changed, causing the CLI to exit with failure. The journal now retains the
+  newest entries that fit its configured budget, always preserves the current
+  transaction, and can omit oversized inline deltas while retaining its
+  snapshot-backed exact preimage metadata. Repeating the same Warden bake exits
+  cleanly; the transaction-history class passes 8/8.
+- The combined Aetherfall gameplay and high-fidelity selection remains 44/44.
+  Project and scene validation report zero issues, both modules pass the
+  `windows-appcontainer-restricted` trust posture, and 2560x1440 High
+  `desktop60` passes at 8.066848 ms measured GPU time, 97 scene draws, 203,638
+  triangles, 873,116 vertices, and nine textures.
+- This is a functional multi-joint deformation checkpoint, not final character
+  art. The current Warden remains visibly procedural and blocky; higher-detail
+  anatomy, clothing, surface materials, locomotion, combat motion, and richer
+  secondary deformation remain required for the intended dark high-fidelity
+  result.

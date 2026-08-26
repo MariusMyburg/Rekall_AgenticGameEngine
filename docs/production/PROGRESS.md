@@ -4,10 +4,29 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 11:39 Africa/Johannesburg
+Last verified: 2026-08-26 13:57 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
+
+The current Blender/Godot-informed deformation checkpoint replaces the
+Warden's two-joint demonstration with generic multi-joint envelope authoring.
+`assign_envelope_skin_weights`, its modeling node, and its modifier calculate
+influence from tapered bone segments, retain the deterministic strongest four,
+and publish normalized canonical joint bindings. The live Aetherfall consumer
+now has ten named joints, uses at least six of them in its baked mesh, emits
+nine named runtime pose deltas, and proves actual renderer-built vertex change.
+Its native High Vulkan proof is stable with 11,785 colors, mean luminance
+0.114, 305 render-work draws, four dispatches, and no missing assets,
+fallbacks, or observations. The same 23 MB graph bake also exposed and drove a
+generic transaction-journal repair: bounded history now retains the newest
+entries that fit, preserves the current entry and snapshot-backed exact
+preimages, and returns a clean CLI result after mutation. Focused skin tests
+pass 12/12, transaction history passes 8/8, combined Aetherfall evidence passes
+44/44, validation and module trust are clean, and 2560x1440 High `desktop60`
+passes at 8.066848 ms GPU time. This is functional deformation infrastructure;
+the Warden remains visibly intermediate and still needs higher-detail anatomy,
+clothing, materials, and production locomotion/combat animation.
 
 The current deformation-authoring checkpoint adds two generic, inspectable
 modeling contracts. `assign_linear_skin_weights` and its graph/modifier

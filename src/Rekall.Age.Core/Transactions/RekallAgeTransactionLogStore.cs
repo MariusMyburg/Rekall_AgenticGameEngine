@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Rekall.Age.Core.Persistence;
 
@@ -44,12 +45,21 @@ public sealed record RekallAgeTransactionResourcePreimageEntry(
 
 public sealed class RekallAgeTransactionLogStore
 {
+    private readonly long _maximumLogBytes;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         MaxDepth = RekallAgePersistedJson.MaximumDocumentDepth
     };
+
+    public RekallAgeTransactionLogStore(long maximumLogBytes = RekallAgePersistedJson.MaximumDocumentBytes)
+    {
+        if (maximumLogBytes < 1_024 || maximumLogBytes > RekallAgePersistedJson.MaximumDocumentBytes)
+            throw new ArgumentOutOfRangeException(nameof(maximumLogBytes),
+                $"Transaction journal budget must be from 1024 through {RekallAgePersistedJson.MaximumDocumentBytes} bytes.");
+        _maximumLogBytes = maximumLogBytes;
+    }
 
     public string GetPath(string projectRoot)
     {
@@ -66,10 +76,7 @@ public sealed class RekallAgeTransactionLogStore
             return RekallAgeTransactionLogDocument.Empty;
         }
 
-        return await RekallAgePersistedJson.ReadAsync<RekallAgeTransactionLogDocument>(
-            path,
-            JsonOptions,
-            cancellationToken);
+        return (await LoadVersionedAsync(path, _maximumLogBytes, cancellationToken).ConfigureAwait(false)).Value;
     }
 
     public async ValueTask AppendAsync(
@@ -99,20 +106,14 @@ public sealed class RekallAgeTransactionLogStore
         for (var attempt = 1; ; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var existing = await LoadVersionedAsync(path, cancellationToken).ConfigureAwait(false);
-            var document = new RekallAgeTransactionLogDocument(
-                existing.Value.Transactions
-                    .Where(item => !item.Id.Equals(entry.Id, StringComparison.Ordinal))
-                    .Append(entry)
-                    .OrderByDescending(item => item.StartedAtUtc)
-                    .ToArray());
-            var json = JsonSerializer.Serialize(document, JsonOptions) + Environment.NewLine;
+            var existing = await LoadVersionedAsync(path, _maximumLogBytes, cancellationToken).ConfigureAwait(false);
+            var json = SerializeBounded(existing.Value, entry);
             try
             {
                 await RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
                     path,
                     json,
-                    RekallAgePersistedJson.MaximumDocumentBytes,
+                    _maximumLogBytes,
                     existing.Revision,
                     cancellationToken).ConfigureAwait(false);
                 return;
@@ -129,6 +130,7 @@ public sealed class RekallAgeTransactionLogStore
 
     private static async ValueTask<RekallAgeVersionedDocument<RekallAgeTransactionLogDocument>> LoadVersionedAsync(
         string path,
+        long maximumLogBytes,
         CancellationToken cancellationToken)
     {
         if (!File.Exists(path))
@@ -140,11 +142,54 @@ public sealed class RekallAgeTransactionLogStore
 
         var snapshot = await RekallAgeBoundedFileSnapshot.ReadAsync(
             path,
-            RekallAgePersistedJson.MaximumDocumentBytes,
+            maximumLogBytes,
             cancellationToken).ConfigureAwait(false);
         var document = JsonSerializer.Deserialize<RekallAgeTransactionLogDocument>(snapshot.Bytes, JsonOptions)
             ?? throw new InvalidOperationException($"Document '{path}' could not be deserialized as a transaction log.");
         return new RekallAgeVersionedDocument<RekallAgeTransactionLogDocument>(document, snapshot.Revision);
+    }
+
+    private string SerializeBounded(
+        RekallAgeTransactionLogDocument existing,
+        RekallAgeTransactionLogEntry entry)
+    {
+        var history = existing.Transactions
+            .Where(item => !item.Id.Equals(entry.Id, StringComparison.Ordinal))
+            .OrderByDescending(item => item.StartedAtUtc)
+            .ToArray();
+        var current = entry;
+        var currentOnly = Serialize([current]);
+        if (Encoding.UTF8.GetByteCount(currentOnly) > _maximumLogBytes && current.ResourceDeltas.Count > 0)
+        {
+            current = current with { ResourceDeltas = Array.Empty<RekallAgeTransactionResourceDeltaEntry>() };
+            currentOnly = Serialize([current]);
+        }
+        if (Encoding.UTF8.GetByteCount(currentOnly) > _maximumLogBytes)
+            throw new InvalidDataException(
+                $"Transaction journal entry is {Encoding.UTF8.GetByteCount(currentOnly)} bytes; the journal budget is {_maximumLogBytes} bytes.");
+
+        var low = 0;
+        var high = history.Length;
+        var best = currentOnly;
+        while (low <= high)
+        {
+            var count = low + (high - low) / 2;
+            var candidate = Serialize(
+                history.Take(count).Append(current).OrderByDescending(item => item.StartedAtUtc).ToArray());
+            if (Encoding.UTF8.GetByteCount(candidate) <= _maximumLogBytes)
+            {
+                best = candidate;
+                low = count + 1;
+            }
+            else
+            {
+                high = count - 1;
+            }
+        }
+        return best;
+
+        static string Serialize(IReadOnlyList<RekallAgeTransactionLogEntry> transactions) =>
+            JsonSerializer.Serialize(new RekallAgeTransactionLogDocument(transactions), JsonOptions) + Environment.NewLine;
     }
 
     private static async ValueTask<IReadOnlyList<RekallAgeTransactionResourcePreimageEntry>> PersistPreimagesAsync(

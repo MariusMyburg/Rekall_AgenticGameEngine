@@ -120,6 +120,13 @@ public sealed class RekallAgeModifierStackEvaluator
                     ["jointA"] = ReadInteger(modifier.Parameters, "jointA", 0),
                     ["jointB"] = ReadInteger(modifier.Parameters, "jointB", 1)
                 })).Mesh,
+            "rekall.modifier.skin.envelope_weights" => _executor.Execute(source, new("assign_envelope_skin_weights", RekallAgeGeometryDomain.Point,
+                Select(source, RekallAgeGeometryDomain.Point, selection), new JsonObject
+                {
+                    ["envelopes"] = modifier.Parameters["envelopes"]?.DeepClone() ?? new JsonArray(),
+                    ["maximumInfluences"] = ReadInteger(modifier.Parameters, "maximumInfluences", 4),
+                    ["fallbackToNearest"] = ReadBoolean(modifier.Parameters, "fallbackToNearest", true)
+                })).Mesh,
             "rekall.modifier.solidify" => _executor.Execute(source, new("solidify", RekallAgeGeometryDomain.Face,
                 Select(source, RekallAgeGeometryDomain.Face, selection), new JsonObject
                 {

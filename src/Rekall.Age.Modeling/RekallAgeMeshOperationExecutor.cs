@@ -179,6 +179,16 @@ public sealed partial class RekallAgeMeshOperationExecutor
                 new("jointB", RekallAgeGeometryValueType.Int32, false, JsonSerializer.SerializeToElement(1), "Non-negative joint index at or above the maximum.")
             ]),
         new(
+            "assign_envelope_skin_weights",
+            "Authors deterministic normalized strongest-four point skin bindings from tapered bone-segment envelopes.",
+            RekallAgeGeometryDomain.Point,
+            RekallAgeMeshChangeKind.Attributes,
+            [
+                new("envelopes", RekallAgeGeometryValueType.Json, true, null, "One through 256 structured joint envelopes with head/tail positions, radii, falloff, and optional weight."),
+                new("maximumInfluences", RekallAgeGeometryValueType.Int32, false, JsonSerializer.SerializeToElement(4), "Maximum retained joint influences from one through four."),
+                new("fallbackToNearest", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Bind zero-influence points to the nearest envelope instead of failing.")
+            ]),
+        new(
             "mark_uv_seams",
             "Marks selected stable edges as UV chart seams in a named edge-domain Bool attribute.",
             RekallAgeGeometryDomain.Edge,
@@ -287,6 +297,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
             "bevel_edges" => BevelEdges(source, request),
             "select_edges_by_angle" => SelectEdgesByAngle(source, request),
             "assign_linear_skin_weights" => AssignLinearSkinWeights(source, request),
+            "assign_envelope_skin_weights" => AssignEnvelopeSkinWeights(source, request),
             "inset_faces" => InsetFaces(source, request),
             "solidify" => Solidify(source, request),
             "weighted_normals" => WeightedNormals(source, request),

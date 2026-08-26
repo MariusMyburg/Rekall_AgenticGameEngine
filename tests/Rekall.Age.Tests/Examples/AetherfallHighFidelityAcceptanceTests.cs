@@ -267,15 +267,21 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
         var rig = await new RekallAgeRigAssetStore().LoadAsync(
             projectRoot, "aetherfall.warden.rig", CancellationToken.None);
-        Assert.Equal(["root", "chest"], rig.Joints.Select(joint => joint.JointId));
+        Assert.Equal(
+            ["root", "pelvis", "chest", "head", "upper_arm_l", "forearm_l", "upper_arm_r", "forearm_r", "leg_l", "leg_r"],
+            rig.Joints.Select(joint => joint.JointId));
 
         var graph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
             projectRoot, "aetherfall.warden.graph", CancellationToken.None);
-        Assert.Contains(graph.Nodes, node => node.TypeId == "rekall.modeling.skin.linear_weights");
+        Assert.Contains(graph.Nodes, node => node.TypeId == "rekall.modeling.skin.envelope_weights");
         var mesh = await new RekallAgeMeshAssetStore().LoadAsync(
             projectRoot, "aetherfall-warden-dark-mesh", CancellationToken.None);
-        Assert.Contains(mesh.Attributes, attribute => attribute.Semantic == "joint-indices-0");
-        Assert.Contains(mesh.Attributes, attribute => attribute.Semantic == "joint-weights-0");
+        var joints = Assert.Single(mesh.Attributes, attribute => attribute.Semantic == "joint-indices-0");
+        var weights = Assert.Single(mesh.Attributes, attribute => attribute.Semantic == "joint-weights-0");
+        Assert.True(joints.Values.SelectMany(value => value.EnumerateArray())
+            .Select(value => value.GetInt32()).Distinct().Count() >= 6);
+        Assert.All(weights.Values, value =>
+            Assert.Equal(1, value.EnumerateArray().Sum(item => item.GetDouble()), 8));
 
         var scene = await new RekallAgeSceneStore().LoadAsync(projectRoot, "Main", CancellationToken.None);
         var warden = Assert.Single(scene.Entities, entity => entity.Name == "AetherWarden");
@@ -293,6 +299,7 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             Assert.Single(later.World.Entities, entity => entity.Id == warden.Id).Components,
             component => component.Type == "Rekall.RigPose");
         Assert.NotEqual(earlyPose.Properties.ToJsonString(), laterPose.Properties.ToJsonString());
+        Assert.True(laterPose.Properties["jointDeltas"]!.AsArray().Count >= 8);
         var builder = new RekallAgeRuntimeRenderFrameBuilder();
         var earlyFrame = builder.Build(early.World, 640, 360, false);
         var laterFrame = builder.Build(later.World, 640, 360, false);

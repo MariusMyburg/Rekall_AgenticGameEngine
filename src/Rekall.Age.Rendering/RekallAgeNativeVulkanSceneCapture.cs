@@ -2801,6 +2801,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             ICollection<string> errors)
         {
             var hasBloom = HasPostPass(commandPlan, "bloom");
+            var hasSsao = HasPostPass(commandPlan, "ssao-resolve");
             var hasFog = plan.FogPlan.UsesFroxelGrid;
             var compiled = new RekallAgeVulkanShaderCompiler().CompileHighFidelityPostPipeline(plan.ShadowPlan.Enabled);
             if (!compiled.Compiled)
@@ -2814,6 +2815,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
             fixed (byte* fogCode = compiled.Fog.Spirv)
             fixed (byte* analyticFogCode = compiled.AnalyticFog.Spirv)
+            fixed (byte* ssaoCode = compiled.Ssao.Spirv)
             fixed (byte* bloomCode = compiled.Bloom.Spirv)
             fixed (byte* vertexCode = compiled.FullscreenVertex.Spirv)
             fixed (byte* toneCode = compiled.ToneMap.Spirv)
@@ -2826,6 +2828,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 if (hasBloom)
                 {
                     state.BloomShader = CreateShaderModule(state, bloomCode, compiled.Bloom.Spirv.Length);
+                }
+
+                if (hasSsao)
+                {
+                    state.SsaoShader = CreateShaderModule(state, ssaoCode, compiled.Ssao.Spirv.Length);
                 }
 
                 state.FullscreenVertexShader = CreateShaderModule(state, vertexCode, compiled.FullscreenVertex.Spirv.Length);
@@ -2861,6 +2868,24 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 PBindings = analyticBindings
             };
             ThrowIfFailed(state.Vk.CreateDescriptorSetLayout(state.Device, &analyticLayoutInfo, null, out state.AnalyticFogDescriptorSetLayout), "vkCreateDescriptorSetLayout analytic fog");
+
+            if (hasSsao)
+            {
+                var ssaoBinding = new DescriptorSetLayoutBinding(
+                    0,
+                    DescriptorType.CombinedImageSampler,
+                    1,
+                    ShaderStageFlags.FragmentBit);
+                var ssaoLayoutInfo = new DescriptorSetLayoutCreateInfo
+                {
+                    SType = StructureType.DescriptorSetLayoutCreateInfo,
+                    BindingCount = 1,
+                    PBindings = &ssaoBinding
+                };
+                ThrowIfFailed(
+                    state.Vk.CreateDescriptorSetLayout(state.Device, &ssaoLayoutInfo, null, out state.SsaoDescriptorSetLayout),
+                    "vkCreateDescriptorSetLayout ssao");
+            }
 
             if (hasFog)
             {
@@ -2915,7 +2940,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
             var poolSizes = stackalloc DescriptorPoolSize[]
             {
-                new(DescriptorType.CombinedImageSampler, 7),
+                new(DescriptorType.CombinedImageSampler, hasSsao ? 8u : 7u),
                 new(DescriptorType.StorageImage, 3),
                 new(DescriptorType.StorageBuffer, 1),
                 new(DescriptorType.UniformBuffer, 3)
@@ -2923,7 +2948,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             var poolInfo = new DescriptorPoolCreateInfo
             {
                 SType = StructureType.DescriptorPoolCreateInfo,
-                MaxSets = 4,
+                MaxSets = hasSsao ? 5u : 4u,
                 PoolSizeCount = 4,
                 PPoolSizes = poolSizes
             };
@@ -2933,6 +2958,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 state.FogDescriptorSet = AllocateDescriptorSet(state, state.PostDescriptorPool, state.FogDescriptorSetLayout);
             }
             state.AnalyticFogDescriptorSet = AllocateDescriptorSet(state, state.PostDescriptorPool, state.AnalyticFogDescriptorSetLayout);
+            if (hasSsao)
+            {
+                state.SsaoDescriptorSet = AllocateDescriptorSet(state, state.PostDescriptorPool, state.SsaoDescriptorSetLayout);
+            }
             if (hasBloom)
             {
                 state.BloomDescriptorSet = AllocateDescriptorSet(state, state.PostDescriptorPool, state.BloomDescriptorSetLayout);
@@ -3022,6 +3051,20 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             };
             state.Vk.UpdateDescriptorSets(state.Device, 2, analyticWrites, 0, null);
 
+            if (hasSsao)
+            {
+                var ssaoImage = new DescriptorImageInfo(
+                    state.FogDepthSampler,
+                    state.DepthView,
+                    ImageLayout.ShaderReadOnlyOptimal);
+                var ssaoWrite = ImageWrite(
+                    state.SsaoDescriptorSet,
+                    0,
+                    DescriptorType.CombinedImageSampler,
+                    &ssaoImage);
+                state.Vk.UpdateDescriptorSets(state.Device, 1, &ssaoWrite, 0, null);
+            }
+
             if (hasBloom)
             {
                 var bloomImages = stackalloc DescriptorImageInfo[]
@@ -3083,6 +3126,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             fixed (byte* entryName = entry)
             {
                 CreateAnalyticFogPipeline(state, target, entryName);
+                if (hasSsao)
+                {
+                    CreateSsaoPipeline(state, target, entryName);
+                }
 
                 if (hasFog)
                 {
@@ -3582,6 +3629,110 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             ThrowIfFailed(
                 state.Vk.CreateGraphicsPipelines(state.Device, default, 1, &pipelineInfo, null, out state.AnalyticFogPipeline),
                 "vkCreateGraphicsPipelines analytic fog");
+        }
+
+        private static void CreateSsaoPipeline(
+            VulkanState state,
+            RekallAgeVulkanSceneRenderTarget target,
+            byte* entryName)
+        {
+            var pushRange = new PushConstantRange(
+                ShaderStageFlags.FragmentBit,
+                0,
+                (uint)Marshal.SizeOf<SsaoPushConstants>());
+            var setLayout = state.SsaoDescriptorSetLayout;
+            var layoutInfo = new PipelineLayoutCreateInfo
+            {
+                SType = StructureType.PipelineLayoutCreateInfo,
+                SetLayoutCount = 1,
+                PSetLayouts = &setLayout,
+                PushConstantRangeCount = 1,
+                PPushConstantRanges = &pushRange
+            };
+            ThrowIfFailed(
+                state.Vk.CreatePipelineLayout(state.Device, &layoutInfo, null, out state.SsaoPipelineLayout),
+                "vkCreatePipelineLayout ssao");
+
+            var stages = stackalloc PipelineShaderStageCreateInfo[]
+            {
+                new()
+                {
+                    SType = StructureType.PipelineShaderStageCreateInfo,
+                    Stage = ShaderStageFlags.VertexBit,
+                    Module = state.FullscreenVertexShader,
+                    PName = entryName
+                },
+                new()
+                {
+                    SType = StructureType.PipelineShaderStageCreateInfo,
+                    Stage = ShaderStageFlags.FragmentBit,
+                    Module = state.SsaoShader,
+                    PName = entryName
+                }
+            };
+            var vertexInput = new PipelineVertexInputStateCreateInfo { SType = StructureType.PipelineVertexInputStateCreateInfo };
+            var inputAssembly = new PipelineInputAssemblyStateCreateInfo
+            {
+                SType = StructureType.PipelineInputAssemblyStateCreateInfo,
+                Topology = PrimitiveTopology.TriangleList
+            };
+            var viewport = new Viewport(0, 0, target.Width, target.Height, 0, 1);
+            var scissor = new Rect2D(new Offset2D(0, 0), new Extent2D(target.Width, target.Height));
+            var viewportState = new PipelineViewportStateCreateInfo
+            {
+                SType = StructureType.PipelineViewportStateCreateInfo,
+                ViewportCount = 1,
+                PViewports = &viewport,
+                ScissorCount = 1,
+                PScissors = &scissor
+            };
+            var rasterization = new PipelineRasterizationStateCreateInfo
+            {
+                SType = StructureType.PipelineRasterizationStateCreateInfo,
+                PolygonMode = PolygonMode.Fill,
+                CullMode = CullModeFlags.None,
+                FrontFace = FrontFace.Clockwise,
+                LineWidth = 1
+            };
+            var multisample = new PipelineMultisampleStateCreateInfo
+            {
+                SType = StructureType.PipelineMultisampleStateCreateInfo,
+                RasterizationSamples = SampleCountFlags.Count1Bit
+            };
+            var blendAttachment = new PipelineColorBlendAttachmentState
+            {
+                BlendEnable = true,
+                SrcColorBlendFactor = BlendFactor.Zero,
+                DstColorBlendFactor = BlendFactor.SrcColor,
+                ColorBlendOp = BlendOp.Add,
+                SrcAlphaBlendFactor = BlendFactor.Zero,
+                DstAlphaBlendFactor = BlendFactor.One,
+                AlphaBlendOp = BlendOp.Add,
+                ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit
+            };
+            var blend = new PipelineColorBlendStateCreateInfo
+            {
+                SType = StructureType.PipelineColorBlendStateCreateInfo,
+                AttachmentCount = 1,
+                PAttachments = &blendAttachment
+            };
+            var pipelineInfo = new GraphicsPipelineCreateInfo
+            {
+                SType = StructureType.GraphicsPipelineCreateInfo,
+                StageCount = 2,
+                PStages = stages,
+                PVertexInputState = &vertexInput,
+                PInputAssemblyState = &inputAssembly,
+                PViewportState = &viewportState,
+                PRasterizationState = &rasterization,
+                PMultisampleState = &multisample,
+                PColorBlendState = &blend,
+                Layout = state.SsaoPipelineLayout,
+                RenderPass = state.FogCompositeRenderPass
+            };
+            ThrowIfFailed(
+                state.Vk.CreateGraphicsPipelines(state.Device, default, 1, &pipelineInfo, null, out state.SsaoPipeline),
+                "vkCreateGraphicsPipelines ssao");
         }
 
         private static DescriptorSet AllocateDescriptorSet(
@@ -4181,6 +4332,13 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             state.Vk.CmdEndRenderPass(state.CommandBuffer);
             gpuFrameQuery?.EndPass(state.CommandBuffer, "opaque-hdr");
 
+            if (HasPostPass(commandPlan, "ssao-resolve"))
+            {
+                gpuFrameQuery?.BeginPass(state.CommandBuffer, "ssao-resolve");
+                RecordSsaoCommands(state, commandPlan, highFidelityPlan);
+                gpuFrameQuery?.EndPass(state.CommandBuffer, "ssao-resolve");
+            }
+
             if (highFidelityPlan.FogPlan.UsesFroxelGrid)
             {
                 RecordFroxelFogCommands(state, commandPlan, highFidelityPlan.FogPlan, gpuFrameQuery);
@@ -4339,6 +4497,59 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 &copy);
             gpuFrameQuery?.EndPass(state.CommandBuffer, "present");
             ThrowIfFailed(state.Vk.EndCommandBuffer(state.CommandBuffer), "vkEndCommandBuffer HDR");
+        }
+
+        private static void RecordSsaoCommands(
+            VulkanState state,
+            RekallAgeVulkanSceneCommandPlan commandPlan,
+            RekallAgeVulkanHighFidelityFramePlan highFidelityPlan)
+        {
+            var target = commandPlan.PreparedFrame.Target;
+            var ao = new RekallAgeInteractiveAmbientOcclusionPlanner().Plan(highFidelityPlan.QualityPlan);
+            if (!ao.Enabled)
+            {
+                return;
+            }
+
+            TransitionDepthForFog(state, toShaderRead: true);
+            var begin = new RenderPassBeginInfo
+            {
+                SType = StructureType.RenderPassBeginInfo,
+                RenderPass = state.FogCompositeRenderPass,
+                Framebuffer = state.FogCompositeFramebuffer,
+                RenderArea = new Rect2D(new Offset2D(0, 0), new Extent2D(target.Width, target.Height))
+            };
+            state.Vk.CmdBeginRenderPass(state.CommandBuffer, &begin, SubpassContents.Inline);
+            state.Vk.CmdBindPipeline(state.CommandBuffer, PipelineBindPoint.Graphics, state.SsaoPipeline);
+            var descriptorSet = state.SsaoDescriptorSet;
+            state.Vk.CmdBindDescriptorSets(
+                state.CommandBuffer,
+                PipelineBindPoint.Graphics,
+                state.SsaoPipelineLayout,
+                0,
+                1,
+                &descriptorSet,
+                0,
+                null);
+            var camera = commandPlan.PreparedFrame.Batch.EffectiveCamera;
+            var parameters = new SsaoPushConstants(
+                new Vector4(1f / target.Width, 1f / target.Height, ao.RadiusPixels, ao.Strength),
+                new Vector4(camera.NearClip, camera.FarClip, ao.Bias, camera.Orthographic ? 1 : 0),
+                new Vector4(
+                    ao.SampleCount,
+                    commandPlan.PreparedFrame.Frame.FrameIndex % 64,
+                    0.55f,
+                    0));
+            state.Vk.CmdPushConstants(
+                state.CommandBuffer,
+                state.SsaoPipelineLayout,
+                ShaderStageFlags.FragmentBit,
+                0,
+                (uint)Marshal.SizeOf<SsaoPushConstants>(),
+                &parameters);
+            state.Vk.CmdDraw(state.CommandBuffer, 3, 1, 0, 0);
+            state.Vk.CmdEndRenderPass(state.CommandBuffer);
+            TransitionDepthForFog(state, toShaderRead: false);
         }
 
         private static void RecordAnalyticFogCommands(
@@ -4884,6 +5095,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 "bloom-pyramid",
                 "ldr-color"
             };
+            if (plan.QualityPlan?.Post.Ssao == true)
+            {
+                allocated.Add("depth-buffer");
+            }
             if (plan.ShadowPlan.Enabled)
             {
                 allocated.Add("shadow-directional");
@@ -5112,6 +5327,14 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
                 reports.Add(pass.Name switch
                 {
+                    "ssao-resolve" => new(
+                        pass.Name,
+                        pass.Kind,
+                        pass.Reads,
+                        pass.Writes,
+                        true,
+                        0,
+                        1),
                     "fog-integrate" => new(
                         pass.Name,
                         pass.Kind,
@@ -6060,6 +6283,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             float SourceHeight);
 
         [StructLayout(LayoutKind.Sequential)]
+        private readonly record struct SsaoPushConstants(
+            Vector4 TexelRadiusStrength,
+            Vector4 DepthProjection,
+            Vector4 Execution);
+
+        [StructLayout(LayoutKind.Sequential)]
         private readonly record struct ToneMapPushConstants(
             float Exposure,
             float WhitePoint,
@@ -6523,10 +6752,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public DescriptorSetLayout BloomDescriptorSetLayout;
             public DescriptorSetLayout FogDescriptorSetLayout;
             public DescriptorSetLayout AnalyticFogDescriptorSetLayout;
+            public DescriptorSetLayout SsaoDescriptorSetLayout;
             public DescriptorSetLayout ToneMapDescriptorSetLayout;
             public DescriptorSet BloomDescriptorSet;
             public DescriptorSet FogDescriptorSet;
             public DescriptorSet AnalyticFogDescriptorSet;
+            public DescriptorSet SsaoDescriptorSet;
             public DescriptorSet ToneMapDescriptorSet;
             public DescriptorSetLayout ParticleComputeDescriptorSetLayout;
             public DescriptorSetLayout ParticleDrawDescriptorSetLayout;
@@ -6558,10 +6789,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public PipelineLayout BloomPipelineLayout;
             public PipelineLayout FogPipelineLayout;
             public PipelineLayout AnalyticFogPipelineLayout;
+            public PipelineLayout SsaoPipelineLayout;
             public PipelineLayout ToneMapPipelineLayout;
             public Pipeline BloomPipeline;
             public Pipeline FogPipeline;
             public Pipeline AnalyticFogPipeline;
+            public Pipeline SsaoPipeline;
             public Pipeline ToneMapPipeline;
             public PipelineLayout ParticleComputePipelineLayout;
             public PipelineLayout ParticleDrawPipelineLayout;
@@ -6570,6 +6803,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public ShaderModule BloomShader;
             public ShaderModule FogShader;
             public ShaderModule AnalyticFogShader;
+            public ShaderModule SsaoShader;
             public ShaderModule FullscreenVertexShader;
             public ShaderModule ToneMapShader;
             public ShaderModule ParticleComputeShader;
@@ -6661,6 +6895,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
                     if (FogPipeline.Handle != 0) Vk.DestroyPipeline(Device, FogPipeline, null);
                     if (AnalyticFogPipeline.Handle != 0) Vk.DestroyPipeline(Device, AnalyticFogPipeline, null);
+                    if (SsaoPipeline.Handle != 0) Vk.DestroyPipeline(Device, SsaoPipeline, null);
 
                     if (ToneMapPipelineLayout.Handle != 0)
                     {
@@ -6674,6 +6909,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
                     if (FogPipelineLayout.Handle != 0) Vk.DestroyPipelineLayout(Device, FogPipelineLayout, null);
                     if (AnalyticFogPipelineLayout.Handle != 0) Vk.DestroyPipelineLayout(Device, AnalyticFogPipelineLayout, null);
+                    if (SsaoPipelineLayout.Handle != 0) Vk.DestroyPipelineLayout(Device, SsaoPipelineLayout, null);
 
                     if (ToneMapShader.Handle != 0)
                     {
@@ -6692,6 +6928,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
                     if (FogShader.Handle != 0) Vk.DestroyShaderModule(Device, FogShader, null);
                     if (AnalyticFogShader.Handle != 0) Vk.DestroyShaderModule(Device, AnalyticFogShader, null);
+                    if (SsaoShader.Handle != 0) Vk.DestroyShaderModule(Device, SsaoShader, null);
 
                     if (PostDescriptorPool.Handle != 0)
                     {
@@ -6727,6 +6964,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
 
                     if (FogDescriptorSetLayout.Handle != 0) Vk.DestroyDescriptorSetLayout(Device, FogDescriptorSetLayout, null);
                     if (AnalyticFogDescriptorSetLayout.Handle != 0) Vk.DestroyDescriptorSetLayout(Device, AnalyticFogDescriptorSetLayout, null);
+                    if (SsaoDescriptorSetLayout.Handle != 0) Vk.DestroyDescriptorSetLayout(Device, SsaoDescriptorSetLayout, null);
                     if (ParticleImageDescriptorSetLayout.Handle != 0) Vk.DestroyDescriptorSetLayout(Device, ParticleImageDescriptorSetLayout, null);
                     if (ParticleDrawDescriptorSetLayout.Handle != 0) Vk.DestroyDescriptorSetLayout(Device, ParticleDrawDescriptorSetLayout, null);
                     if (ParticleComputeDescriptorSetLayout.Handle != 0) Vk.DestroyDescriptorSetLayout(Device, ParticleComputeDescriptorSetLayout, null);

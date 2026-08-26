@@ -82,7 +82,7 @@ public sealed class VulkanSceneCommandPlanTests
 
         Assert.True(plan.Ready, string.Join(" ", plan.Blockers));
         Assert.Equal(
-            ["fog-integrate", "fog-debug-readback", "transparent-particles", "bloom", "tone-map", "ui", "present"],
+            ["ssao-resolve", "fog-integrate", "fog-debug-readback", "transparent-particles", "bloom", "tone-map", "ui", "present"],
             plan.PostPasses.Select(pass => pass.Name));
         Assert.True(plan.CopiesColorToReadback);
         Assert.Equal(Format.R16G16B16A16Sfloat, target.ColorFormat);

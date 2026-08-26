@@ -1055,8 +1055,15 @@ public sealed class VulkanHighFidelityCaptureTests
         Assert.Contains(report.Resources, resource => resource.Name == "scene-hdr"
             && resource.Format == "R16G16B16A16_SFloat"
             && resource.Allocated);
+        Assert.Contains(report.Resources, resource => resource.Name == "depth-buffer"
+            && resource.Format == "D32_SFloat"
+            && resource.Allocated);
         Assert.Contains(report.Resources, resource => resource.Name == "bloom-pyramid"
             && resource.Allocated);
+        Assert.Contains(report.Passes, pass => pass.Name == "ssao-resolve"
+            && pass.Executed
+            && pass.DispatchCount == 0
+            && pass.DrawCount == 1);
         Assert.Contains(report.Passes, pass => pass.Name == "bloom"
             && pass.Executed
             && pass.DispatchCount > 0);

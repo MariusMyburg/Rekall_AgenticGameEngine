@@ -160,14 +160,14 @@ git commit -m "feat: compile native ssao shader"
 - Consumes: compiled `Ssao`, sampled `SceneDepthImageView`, shared sampler, active-camera projection facts, `RekallAgeInteractiveAmbientOcclusionPlan`.
 - Produces: optional Vulkan SSAO shader/layout/descriptor/pipeline, one fullscreen draw, `ssao-resolve` frame report, and optional GPU timing.
 
-- [ ] **Step 1: Add failing plan/report integration tests**
+- [x] **Step 1: Add failing plan/report integration tests**
 
 Require High command plans/reports to contain an enabled `ssao-resolve` pass
 with one draw and zero dispatches; require Performance to omit it. Extend the
 native capture test to require an executed pass and an allocated
 `scene-depth`/`depth-buffer` sampled resource without changing fallback rules.
 
-- [ ] **Step 2: Run focused native tests and verify RED**
+- [x] **Step 2: Run focused native tests and verify RED**
 
 ```powershell
 dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~VulkanHighFidelityCaptureTests|FullyQualifiedName~VulkanSceneCommandPlanTests"
@@ -175,7 +175,7 @@ dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter
 
 Expected: SSAO pass execution/report assertions fail.
 
-- [ ] **Step 3: Add conditional Vulkan objects and cleanup**
+- [x] **Step 3: Add conditional Vulkan objects and cleanup**
 
 When `plan.QualityPlan.Post.Ssao` is true, create:
 
@@ -192,7 +192,7 @@ render pass with load semantics, depth testing disabled, and multiplicative
 RGB blending (`src=Zero`, `dst=SrcColor`). Destroy every nonzero handle in
 `VulkanState.Dispose`.
 
-- [ ] **Step 4: Record the pass with explicit transitions**
+- [x] **Step 4: Record the pass with explicit transitions**
 
 After opaque rendering, transition scene depth from
 `DepthStencilAttachmentOptimal` to `ShaderReadOnlyOptimal`, begin the HDR load
@@ -208,14 +208,14 @@ new SsaoPushConstants(
 draw three fullscreen vertices, end the pass, and leave depth shader-readable
 for fog. Wrap it in `gpuFrameQuery.BeginPass/EndPass("ssao-resolve")`.
 
-- [ ] **Step 5: Make reports and capability validation truthful**
+- [x] **Step 5: Make reports and capability validation truthful**
 
 Add `ssao-resolve` to executed pass mapping with `Executed=true`, `DrawCount=1`,
 `DispatchCount=0`; include sampled-depth format validation and a stable
 `REKALL_SSAO_DEPTH_SAMPLING_UNSUPPORTED` diagnostic on failure. Report no SSAO
 resource or pass when disabled.
 
-- [ ] **Step 6: Run focused renderer tests and verify GREEN**
+- [x] **Step 6: Run focused renderer tests and verify GREEN**
 
 Run the Step 2 command plus:
 
@@ -225,7 +225,7 @@ dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter
 
 Expected: zero failures and native integration evidence shows one SSAO draw.
 
-- [ ] **Step 7: Commit native execution**
+- [x] **Step 7: Commit native execution**
 
 ```powershell
 git add src/Rekall.Age.Rendering/RekallAgeNativeVulkanSceneCapture.cs tests/Rekall.Age.Tests/Rendering/VulkanHighFidelityCaptureTests.cs tests/Rekall.Age.Tests/Rendering/VulkanSceneCommandPlanTests.cs

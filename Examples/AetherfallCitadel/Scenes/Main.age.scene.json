@@ -939,22 +939,111 @@
           }
         },
         {
-          "type": "Rekall.MeshRenderer",
+          "type": "Rekall.AnimationClip",
           "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
-          "type": "Rekall.ModelAssetReference",
-          "properties": {
-            "assetId": "aetherfall-warden-dark-model"
-          }
-        },
-        {
-          "type": "Rekall.Material",
-          "properties": {
-            "baseColor": "#ffffff"
+            "version": 1,
+            "durationSeconds": 1.4,
+            "tracks": [
+              {
+                "interpolation": "smooth",
+                "component": "Rekall.Transform3D",
+                "property": "yaw",
+                "keys": [
+                  {
+                    "value": -4,
+                    "time": 0
+                  },
+                  {
+                    "value": 4,
+                    "time": 0.7
+                  },
+                  {
+                    "value": -4,
+                    "time": 1.4
+                  }
+                ]
+              },
+              {
+                "interpolation": "smooth",
+                "component": "Rekall.Transform3D",
+                "targetPath": "Warden Articulated Pauldron",
+                "property": "roll",
+                "keys": [
+                  {
+                    "value": -6,
+                    "time": 0
+                  },
+                  {
+                    "value": -18,
+                    "time": 0.7
+                  },
+                  {
+                    "value": -6,
+                    "time": 1.4
+                  }
+                ]
+              },
+              {
+                "interpolation": "smooth",
+                "component": "Rekall.Transform3D",
+                "targetPath": "Warden Runeblade",
+                "property": "roll",
+                "keys": [
+                  {
+                    "value": -28,
+                    "time": 0
+                  },
+                  {
+                    "value": 14,
+                    "time": 0.7
+                  },
+                  {
+                    "value": -28,
+                    "time": 1.4
+                  }
+                ]
+              },
+              {
+                "interpolation": "smooth",
+                "component": "Rekall.Transform3D",
+                "targetPath": "Warden Deformable Mantle",
+                "property": "roll",
+                "keys": [
+                  {
+                    "value": -3,
+                    "time": 0
+                  },
+                  {
+                    "value": 3,
+                    "time": 0.7
+                  },
+                  {
+                    "value": -3,
+                    "time": 1.4
+                  }
+                ]
+              },
+              {
+                "interpolation": "smooth",
+                "component": "Rekall.Transform3D",
+                "targetPath": "Warden Deformable Mantle",
+                "property": "pitch",
+                "keys": [
+                  {
+                    "value": -2,
+                    "time": 0
+                  },
+                  {
+                    "value": 5,
+                    "time": 0.7
+                  },
+                  {
+                    "value": -2,
+                    "time": 1.4
+                  }
+                ]
+              }
+            ]
           }
         },
         {
@@ -965,31 +1054,22 @@
           }
         },
         {
-          "type": "Rekall.AnimationClip",
+          "type": "Rekall.Material",
           "properties": {
-            "version": 1,
-            "durationSeconds": 1.4,
-            "tracks": [
-              {
-                "component": "Rekall.Transform3D",
-                "property": "yaw",
-                "interpolation": "linear",
-                "keys": [
-                  {
-                    "time": 0,
-                    "value": -5
-                  },
-                  {
-                    "time": 0.7,
-                    "value": 5
-                  },
-                  {
-                    "time": 1.4,
-                    "value": -5
-                  }
-                ]
-              }
-            ]
+            "baseColor": "#ffffff"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-warden-dark-model"
           }
         },
         {
@@ -10205,41 +10285,6 @@
       ],
       "components": [
         {
-          "type": "Rekall.AnimationClip",
-          "properties": {
-            "tracks": [
-              {
-                "keys": [
-                  {
-                    "time": 0,
-                    "value": -4
-                  },
-                  {
-                    "time": 0.55,
-                    "value": -16
-                  },
-                  {
-                    "time": 1.1,
-                    "value": -4
-                  }
-                ],
-                "component": "Rekall.Transform3D",
-                "property": "roll",
-                "interpolation": "linear"
-              }
-            ],
-            "version": 1,
-            "durationSeconds": 1.1
-          }
-        },
-        {
-          "type": "Rekall.AnimationPlayer",
-          "properties": {
-            "loopMode": "ping-pong",
-            "playing": true
-          }
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "roughnessFactor": 0.31,
@@ -10718,41 +10763,6 @@
         "weapon"
       ],
       "components": [
-        {
-          "type": "Rekall.AnimationClip",
-          "properties": {
-            "tracks": [
-              {
-                "keys": [
-                  {
-                    "time": 0,
-                    "value": -24
-                  },
-                  {
-                    "time": 0.36,
-                    "value": 22
-                  },
-                  {
-                    "time": 0.72,
-                    "value": -24
-                  }
-                ],
-                "component": "Rekall.Transform3D",
-                "property": "roll",
-                "interpolation": "linear"
-              }
-            ],
-            "version": 1,
-            "durationSeconds": 0.72
-          }
-        },
-        {
-          "type": "Rekall.AnimationPlayer",
-          "properties": {
-            "loopMode": "ping-pong",
-            "playing": true
-          }
-        },
         {
           "type": "Rekall.Material",
           "properties": {

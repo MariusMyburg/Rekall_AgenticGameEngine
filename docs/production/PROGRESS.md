@@ -4,10 +4,32 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 09:47 Africa/Johannesburg
+Last verified: 2026-08-26 10:20 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
+
+The current animation checkpoint makes an ordinary authored timeline capable
+of driving a complete entity hierarchy instead of forcing every attachment to
+own an unsynchronized clip. Animation tracks may address an exact entity ID or
+a bounded slash-separated direct-child ID/name path relative to the clip owner;
+the same targeting works for simple clips, weighted mixers, and state-graph
+mixers. Missing, ambiguous, invalid, or conflicting targets fail closed with
+structured runtime observations. Aetherfall now uses one 1.4-second Warden
+timeline to coordinate root yaw, pauldron roll, runeblade roll, and two-axis
+mantle motion, removing the pauldron and blade child clocks. A fresh native High
+capture proves the feature in the installed Vulkan renderer, and High
+`desktop60` passes at 97 draws, 193,762 triangles, 833,624 vertices, nine
+textures, and 5.111776 ms. Runtime animation passes 28/28, state-graph runtime
+passes 10/10, module metadata passes 11/11, and the complete Aetherfall
+selection passes 42/42 after its two
+shared-project suites were placed in one non-parallel collection to prevent
+module receipt rebuild/load races. Gameplay remains 2/4/4/5 and validation is
+clean. This produces coherent rigid attachment motion, not a production
+character: the Warden's major body masses remain fused into a largely rigid
+baked mesh. The next visible capability target is a split/deformable character
+body plus deeper Blender-inspired non-destructive modeling, beginning with the
+remaining bevel/chamfer subset, weighting, profile/material, and Studio gaps.
 
 The current character-authoring checkpoint expands the live Warden from 89 to
 101 generic modeling nodes through the normal graph, bake, and Model Asset

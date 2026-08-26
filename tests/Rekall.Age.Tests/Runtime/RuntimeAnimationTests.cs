@@ -154,6 +154,78 @@ public sealed class RuntimeAnimationTests
     }
 
     [Fact]
+    public async Task AnimationMixerBlendsTracksOnTargetedChildHierarchy()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var assetDirectory = Path.Combine(root, "Assets", "animation");
+        Directory.CreateDirectory(assetDirectory);
+        var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationMixer",
+                new JsonObject
+                {
+                    ["playing"] = true,
+                    ["layers"] = new JsonArray
+                    {
+                        new JsonObject { ["name"] = "guard", ["clip"] = "clip-guard", ["weight"] = 0.25 },
+                        new JsonObject { ["name"] = "strike", ["clip"] = "clip-strike", ["weight"] = 0.75 }
+                    }
+                }));
+        var hand = RekallAgeEntityDocument.Create("Hand", ["joint"]) with { ParentId = actor.Id };
+        hand = hand.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Transform3D", new JsonObject { ["roll"] = 0 }));
+        foreach (var (name, value) in new[] { ("guard", -20), ("strike", 40) })
+        {
+            var target = name == "guard"
+                ? new KeyValuePair<string, JsonNode?>("targetPath", "Hand")
+                : new KeyValuePair<string, JsonNode?>("targetEntityId", hand.Id);
+            await File.WriteAllTextAsync(
+                Path.Combine(assetDirectory, $"{name}.age.animation.json"),
+                new JsonObject
+                {
+                    ["version"] = 1,
+                    ["durationSeconds"] = 1,
+                    ["tracks"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            [target.Key] = target.Value,
+                            ["component"] = "Rekall.Transform3D",
+                            ["property"] = "roll",
+                            ["interpolation"] = "linear",
+                            ["keys"] = new JsonArray
+                            {
+                                new JsonObject { ["time"] = 0, ["value"] = value },
+                                new JsonObject { ["time"] = 1, ["value"] = value }
+                            }
+                        }
+                    }
+                }.ToJsonString());
+        }
+        await new RekallAgeAssetCatalogStore().SaveAsync(
+            root,
+            new RekallAgeAssetCatalogDocument(
+            [
+                new RekallAgeAssetDocument("clip-guard", "guard", "Guard", "animation", string.Empty,
+                    "Assets/animation/guard.age.animation.json", "test"),
+                new RekallAgeAssetDocument("clip-strike", "strike", "Strike", "animation", string.Empty,
+                    "Assets/animation/strike.age.animation.json", "test")
+            ]),
+            CancellationToken.None);
+        var world = new RekallAgeRuntimeWorldBuilder().Build(
+            RekallAgeSceneDocument.Create("Main", ["world", "animation"])
+                .AddEntity(actor)
+                .AddEntity(hand));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault(root)
+            .RunAsync(world, 1, CancellationToken.None);
+
+        var runtimeHand = result.World.Entities.Single(entity => entity.Id == hand.Id);
+        Assert.Equal(25, runtimeHand.Transform.Rotation3D.Z, precision: 3);
+        Assert.DoesNotContain(result.World.Observations, observation => observation.Severity == "error");
+    }
+
+    [Fact]
     public async Task AnimationMixerRejectsUnboundedLayerWork()
     {
         var layers = new JsonArray();
@@ -598,6 +670,78 @@ public sealed class RuntimeAnimationTests
         Assert.Equal(0.5, player.TimeSeconds, precision: 4);
         Assert.DoesNotContain(result.World.Observations, observation =>
             observation.Code == "REKALL_ANIMATION_MISSING_CLIP");
+    }
+
+    [Fact]
+    public async Task AnimationClipTargetsChildHierarchyAndExplicitEntityDeterministically()
+    {
+        var actor = RekallAgeEntityDocument.Create("Actor", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["x"] = 0, ["roll"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationClip",
+                new JsonObject
+                {
+                    ["version"] = 1,
+                    ["durationSeconds"] = 1,
+                    ["tracks"] = new JsonArray
+                    {
+                        new JsonObject
+                        {
+                            ["targetPath"] = "Shoulder/Hand",
+                            ["component"] = "Rekall.Transform3D",
+                            ["property"] = "roll",
+                            ["interpolation"] = "linear",
+                            ["keys"] = new JsonArray
+                            {
+                                new JsonObject { ["time"] = 0, ["value"] = -20 },
+                                new JsonObject { ["time"] = 1, ["value"] = 40 }
+                            }
+                        }
+                    }
+                }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.AnimationPlayer",
+                new JsonObject { ["playing"] = true, ["loopMode"] = "clamp" }));
+        var shoulder = RekallAgeEntityDocument.Create("Shoulder", ["joint"]) with { ParentId = actor.Id };
+        shoulder = shoulder.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Transform3D", new JsonObject { ["roll"] = 0 }));
+        var hand = RekallAgeEntityDocument.Create("Hand", ["joint"]) with { ParentId = shoulder.Id };
+        hand = hand.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Transform3D", new JsonObject { ["roll"] = 0 }));
+        var lantern = RekallAgeEntityDocument.Create("Lantern", ["prop"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D", new JsonObject { ["x"] = 0 }));
+        var explicitTrack = new JsonObject
+        {
+            ["targetEntityId"] = lantern.Id,
+            ["component"] = "Rekall.Transform3D",
+            ["property"] = "x",
+            ["interpolation"] = "linear",
+            ["keys"] = new JsonArray
+            {
+                new JsonObject { ["time"] = 0, ["value"] = 0 },
+                new JsonObject { ["time"] = 1, ["value"] = 8 }
+            }
+        };
+        ((JsonArray)actor.Components.Single(component => component.Type == "Rekall.AnimationClip")
+            .Properties["tracks"]!).Add(explicitTrack);
+        var world = new RekallAgeRuntimeWorldBuilder().Build(
+            RekallAgeSceneDocument.Create("Main", ["world", "animation"])
+                .AddEntity(actor)
+                .AddEntity(shoulder)
+                .AddEntity(hand)
+                .AddEntity(lantern));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, 30, CancellationToken.None);
+
+        var runtimeHand = result.World.Entities.Single(entity => entity.Id == hand.Id);
+        var runtimeLantern = result.World.Entities.Single(entity => entity.Id == lantern.Id);
+        Assert.Equal(10, runtimeHand.Transform.Rotation3D.Z, precision: 3);
+        Assert.Equal(4, runtimeLantern.Transform.Position3D.X, precision: 3);
+        Assert.DoesNotContain(result.World.Observations, observation => observation.Severity == "error");
     }
 
     [Fact]

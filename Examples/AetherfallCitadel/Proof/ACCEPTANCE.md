@@ -522,6 +522,42 @@ the new background is an explicit fallback, not a claim that sky assets render.
   Character anatomy, clothing, animation, architectural density, materials,
   and composition also remain visibly below the requested final fidelity.
 
+## Hierarchy-targeted animation checkpoint
+
+- Generic `Rekall.AnimationClip` tracks may now omit a target to animate their
+  owner, use `targetEntityId` for an exact arbitrary entity, or use
+  `targetPath` for 1-32 slash-separated direct-child ID or unique-name segments
+  relative to the owner. The path model is inspired by Godot's node-path
+  animation concept while retaining AGE entity IDs and component/property
+  contracts. Invalid, missing, ambiguous, and conflicting targets fail closed
+  with structured runtime observations.
+- Targeted tracks execute in simple clips, weighted animation mixers, and
+  state-graph-produced mixers. Local animation resolves first and targeted
+  mutations then apply in deterministic owner/path/property order; weighted
+  layers blend on the resolved target rather than independently overwriting it.
+- Aetherfall's Warden now uses one 1.4-second root timeline for root yaw,
+  pauldron roll, runeblade roll, and two-axis mantle motion. The redundant
+  pauldron and runeblade `AnimationPlayer`/`AnimationClip` child clocks were
+  removed, and acceptance asserts that the authored target paths resolve and
+  produce distinct runtime transforms on all three attachments.
+- The fresh installed native Vulkan capture is
+  `Proof/Captures/HierarchyAnimation/vulkan-scene-1280x720-20260826080803287.png`.
+  At High it is informative with 11,686 distinct colors, 16.9% dominant-color
+  share, mean luminance 0.100, 65 renderables, 301 render-work draws, four
+  dispatches, and zero observations or fallbacks. The coordinated accessory
+  motion works, but a still frame is necessarily subtle and the main body
+  silhouette remains rigid because its large masses are fused into one baked
+  model. Split/skinned body authoring is the next character-quality requirement.
+- Runtime animation passes 28/28, state-graph runtime passes 10/10, component
+  metadata passes 11/11, and the complete Aetherfall selection passes 42/42.
+  The latter also proves the test
+  isolation repair: both shared-project suites now occupy one non-parallel
+  collection, preventing module build receipts from being deleted while another
+  test is loading them. High `desktop60` passes at 97 scene draws, 193,762
+  triangles, 833,624 vertices, nine textures, and 5.111776 ms measured GPU time.
+  The existing deterministic gameplay proofs remain 2/4/4/5 and both project
+  and scene validation remain clean after the scene mutation.
+
 ## Warden limb-detail and facial-focal checkpoint
 
 - The ordinary AGE modeling graph now authors the Warden with 101 typed nodes:

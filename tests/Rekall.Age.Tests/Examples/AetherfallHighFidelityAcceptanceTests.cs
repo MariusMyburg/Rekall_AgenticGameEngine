@@ -13,6 +13,7 @@ using Rekall.Age.Modeling.Contracts;
 
 namespace Rekall.Age.Tests.Examples;
 
+[Collection("Aetherfall Citadel acceptance")]
 public sealed class AetherfallHighFidelityAcceptanceTests
 {
     [Fact]
@@ -258,13 +259,24 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             .Where(entity => entity.ParentId == authoredWarden.Id
                 && entity.Visible
                 && entity.Tags.Contains("character-articulation", StringComparer.Ordinal)
-                && entity.Components.Any(component => component.Type == "Rekall.ModelAssetReference")
-                && entity.Components.Any(component => component.Type == "Rekall.AnimationPlayer")
-                && entity.Components.Any(component => component.Type == "Rekall.AnimationClip"))
+                && entity.Components.Any(component => component.Type == "Rekall.ModelAssetReference"))
             .OrderBy(entity => entity.Name, StringComparer.Ordinal)
             .ToArray();
         Assert.True(attachments.Length >= 2,
             $"Expected at least two visible model-backed Warden attachments, found {attachments.Length}.");
+        Assert.All(attachments, attachment =>
+            Assert.DoesNotContain(attachment.Components, component => component.Type == "Rekall.AnimationPlayer"));
+
+        var hierarchyClip = Assert.Single(
+            authoredWarden.Components, component => component.Type == "Rekall.AnimationClip");
+        var targetPaths = hierarchyClip.Properties["tracks"]!.AsArray()
+            .OfType<JsonObject>()
+            .Select(track => track["targetPath"]?.GetValue<string>())
+            .Where(path => path is not null)
+            .ToArray();
+        Assert.Contains("Warden Articulated Pauldron", targetPaths);
+        Assert.Contains("Warden Runeblade", targetPaths);
+        Assert.Contains("Warden Deformable Mantle", targetPaths);
 
         var runeblade = Assert.Single(attachments, entity => entity.Name == "Warden Runeblade");
         var modelReference = Assert.Single(runeblade.Components, component => component.Type == "Rekall.ModelAssetReference");
@@ -282,6 +294,17 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         Assert.NotEqual(
             authoredBladeTransform.Properties["roll"]!.GetValue<double>(),
             animatedBlade.Transform.Rotation3D.Z);
+        var authoredPauldron = Assert.Single(attachments, entity => entity.Name == "Warden Articulated Pauldron");
+        var animatedPauldron = Assert.Single(
+            animated.World.Entities, entity => entity.Name == authoredPauldron.Name);
+        Assert.NotEqual(
+            Assert.Single(authoredPauldron.Components, component => component.Type == "Rekall.Transform3D")
+                .Properties["roll"]!.GetValue<double>(),
+            animatedPauldron.Transform.Rotation3D.Z);
+        var authoredMantle = Assert.Single(scene.Entities, entity => entity.Name == "Warden Deformable Mantle");
+        var animatedMantle = Assert.Single(animated.World.Entities, entity => entity.Name == authoredMantle.Name);
+        Assert.NotEqual(0, animatedMantle.Transform.Rotation3D.X);
+        Assert.NotEqual(0, animatedMantle.Transform.Rotation3D.Z);
 
         var beforeFrame = new RekallAgeRuntimeRenderFrameBuilder().Build(animated.World, 640, 360, false);
         var beforeBlade = Assert.Single(beforeFrame.Renderables, item => item.EntityName == "Warden Runeblade");

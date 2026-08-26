@@ -9,6 +9,10 @@ using Rekall.Age.Runtime.Abstractions;
 
 namespace Rekall.Age.Tests.Examples;
 
+[CollectionDefinition("Aetherfall Citadel acceptance", DisableParallelization = true)]
+public sealed class AetherfallCitadelAcceptanceCollection;
+
+[Collection("Aetherfall Citadel acceptance")]
 public sealed class AetherfallCitadelAcceptanceTests
 {
     [Fact]

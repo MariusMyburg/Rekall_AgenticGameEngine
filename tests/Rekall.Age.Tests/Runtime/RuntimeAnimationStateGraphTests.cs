@@ -41,6 +41,38 @@ public sealed class RuntimeAnimationStateGraphTests
     }
 
     [Fact]
+    public async Task GraphCrossFadeBlendsDifferentSelectorsThatResolveToTheSameChild()
+    {
+        var root = await CreateClipCatalogAsync();
+        var actor = Graph(phase: 1, transitionSeconds: 1);
+        var hand = RekallAgeEntityDocument.Create("Hand", ["joint"]) with { ParentId = actor.Id };
+        hand = hand.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Transform3D", new JsonObject { ["x"] = 0 }));
+
+        var idlePath = Path.Combine(root, "Assets", "animation", "idle.json");
+        var idleClip = JsonNode.Parse(await File.ReadAllTextAsync(idlePath))!.AsObject();
+        idleClip["tracks"]![0]!["targetPath"] = "Hand";
+        await File.WriteAllTextAsync(idlePath, idleClip.ToJsonString());
+        var activePath = Path.Combine(root, "Assets", "animation", "active.json");
+        var activeClip = JsonNode.Parse(await File.ReadAllTextAsync(activePath))!.AsObject();
+        activeClip["tracks"]![0]!["targetEntityId"] = hand.Id;
+        await File.WriteAllTextAsync(activePath, activeClip.ToJsonString());
+
+        var world = new RekallAgeRuntimeWorldBuilder().Build(
+            RekallAgeSceneDocument.Create("Main", ["world", "animation"])
+                .AddEntity(actor)
+                .AddEntity(hand));
+        var halfway = await RekallAgeRuntimeExecutionLoop.CreateDefault(root)
+            .RunAsync(world, 30, CancellationToken.None);
+
+        var runtimeActor = halfway.World.Entities.Single(entity => entity.Id == actor.Id);
+        var runtimeHand = halfway.World.Entities.Single(entity => entity.Id == hand.Id);
+        Assert.Equal(0, runtimeActor.Transform.Position3D.X, precision: 3);
+        Assert.Equal(5, runtimeHand.Transform.Position3D.X, precision: 3);
+        Assert.DoesNotContain(halfway.World.Observations, observation => observation.Severity == "error");
+    }
+
+    [Fact]
     public async Task GraphEmitsBoundBeginEnterExitAndEndFactsExactlyOnce()
     {
         var root = await CreateClipCatalogAsync();

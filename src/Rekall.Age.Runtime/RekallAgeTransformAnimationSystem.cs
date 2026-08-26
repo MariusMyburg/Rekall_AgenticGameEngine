@@ -38,7 +38,122 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         await EnsureAssetsAsync(context.CancellationToken);
         var emitted = new List<RekallAgeRuntimeEvent>();
         var observations = new List<RekallAgeRuntimeObservation>();
-        var entities = world.Entities.Select(entity => ApplyAnimation(entity, context, emitted, observations)).ToArray();
+        var targetedTracks = new List<TargetedAnimationTrack>();
+        var targetedMixerTracks = new List<TargetedWeightedAnimationTrack>();
+        var locallyAnimated = world.Entities
+            .Select(entity => ApplyAnimation(
+                entity,
+                context,
+                emitted,
+                observations,
+                targetedTracks,
+                targetedMixerTracks))
+            .ToArray();
+        var entitiesById = locallyAnimated.ToDictionary(entity => entity.Id, StringComparer.Ordinal);
+        var childrenByParentId = locallyAnimated
+            .Where(entity => entity.ParentId is not null)
+            .GroupBy(entity => entity.ParentId!, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<RekallAgeRuntimeEntity>)group.ToArray(),
+                StringComparer.Ordinal);
+        foreach (var targetedTrack in targetedTracks)
+        {
+            var owner = entitiesById[targetedTrack.OwnerId];
+            var target = ResolveTrackTarget(
+                owner,
+                targetedTrack.Track,
+                entitiesById,
+                childrenByParentId,
+                context.FrameIndex,
+                observations);
+            if (target is null)
+            {
+                continue;
+            }
+
+            var currentTarget = entitiesById[target.Id];
+            entitiesById[target.Id] = ApplyTrack(
+                currentTarget,
+                targetedTrack.Track,
+                targetedTrack.SampleTime,
+                context.FrameIndex,
+                observations);
+        }
+        var resolvedMixerTracks = new List<ResolvedTargetedWeightedAnimationTrack>();
+        foreach (var request in targetedMixerTracks)
+        {
+            var owner = entitiesById[request.OwnerId];
+            var target = ResolveTrackTarget(
+                owner,
+                request.Track,
+                entitiesById,
+                childrenByParentId,
+                context.FrameIndex,
+                observations);
+            if (target is not null)
+            {
+                resolvedMixerTracks.Add(new ResolvedTargetedWeightedAnimationTrack(request, target.Id));
+            }
+        }
+        foreach (var blendGroup in resolvedMixerTracks
+                     .GroupBy(ResolvedTrackBlendKey.From)
+                     .OrderBy(group => group.Key.OwnerId, StringComparer.Ordinal)
+                     .ThenBy(group => group.Key.TargetId, StringComparer.Ordinal)
+                     .ThenBy(group => group.Key.ComponentType, StringComparer.Ordinal)
+                     .ThenBy(group => group.Key.PropertyName, StringComparer.Ordinal))
+        {
+            var requests = blendGroup
+                .Select(item => item.Request)
+                .OrderBy(request => request.LayerIndex)
+                .ToArray();
+            var currentTarget = entitiesById[blendGroup.Key.TargetId];
+            var samples = new List<WeightedAnimationSample>();
+            foreach (var request in requests)
+            {
+                var componentType = ReadString(request.Track, "component")
+                    ?? ReadString(request.Track, "targetComponent");
+                var propertyName = ReadString(request.Track, "property");
+                if (string.IsNullOrWhiteSpace(componentType) || string.IsNullOrWhiteSpace(propertyName))
+                {
+                    _ = ApplyTrack(
+                        currentTarget,
+                        request.Track,
+                        request.SampleTime,
+                        context.FrameIndex,
+                        observations);
+                    continue;
+                }
+                var sampled = ApplyTrack(
+                    currentTarget,
+                    request.Track,
+                    request.SampleTime,
+                    context.FrameIndex,
+                    observations);
+                var component = sampled.FindComponent(componentType);
+                if (component is not null
+                    && TryGetProperty(component.Properties, propertyName, out var value)
+                    && value is not null)
+                {
+                    samples.Add(new WeightedAnimationSample(
+                        componentType,
+                        propertyName,
+                        value.DeepClone(),
+                        request.Weight,
+                        request.LayerIndex));
+                }
+            }
+            var blended = BlendSamples(samples);
+            if (blended is not null && samples.Count > 0)
+            {
+                entitiesById[blendGroup.Key.TargetId] = ApplySampledValue(
+                    currentTarget,
+                    samples[0].ComponentType,
+                    samples[0].PropertyName,
+                    blended);
+            }
+        }
+        var entities = locallyAnimated.Select(entity => entitiesById[entity.Id]).ToArray();
         return world with
         {
             Entities = entities,
@@ -54,7 +169,9 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         RekallAgeRuntimeEntity entity,
         RekallAgeRuntimeWorldFrameContext context,
         List<RekallAgeRuntimeEvent> emitted,
-        List<RekallAgeRuntimeObservation> observations)
+        List<RekallAgeRuntimeObservation> observations,
+        List<TargetedAnimationTrack> targetedTracks,
+        List<TargetedWeightedAnimationTrack> targetedMixerTracks)
     {
         var updated = ApplyLegacyTransformRates(entity, context);
         if (updated.FindComponent(GraphComponent) is not null)
@@ -62,13 +179,13 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             var graphMixer = updated.FindComponent(GraphMixerComponent);
             return graphMixer is null
                 ? updated
-                : ApplyMixer(updated, graphMixer, context, emitted, observations);
+                : ApplyMixer(updated, graphMixer, context, emitted, observations, targetedMixerTracks);
         }
 
         var mixer = updated.FindComponent(MixerComponent);
         if (mixer is not null && ReadBoolean(mixer.Properties, "playing", true))
         {
-            return ApplyMixer(updated, mixer, context, emitted, observations);
+            return ApplyMixer(updated, mixer, context, emitted, observations, targetedMixerTracks);
         }
 
         var clip = updated.FindComponent(ClipComponent);
@@ -126,7 +243,17 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
                 {
                     if (trackNode is JsonObject track)
                     {
-                        updated = ApplyTrack(updated, track, sampleTime, context.FrameIndex, observations);
+                        if (HasExternalTrackTarget(track))
+                        {
+                            targetedTracks.Add(new TargetedAnimationTrack(
+                                updated.Id,
+                                track,
+                                sampleTime));
+                        }
+                        else
+                        {
+                            updated = ApplyTrack(updated, track, sampleTime, context.FrameIndex, observations);
+                        }
                     }
                     else
                     {
@@ -162,12 +289,105 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         });
     }
 
+    private static bool HasExternalTrackTarget(JsonObject track) =>
+        track.ContainsKey("targetEntityId") || track.ContainsKey("targetPath");
+
+    private static RekallAgeRuntimeEntity? ResolveTrackTarget(
+        RekallAgeRuntimeEntity owner,
+        JsonObject track,
+        IReadOnlyDictionary<string, RekallAgeRuntimeEntity> entitiesById,
+        IReadOnlyDictionary<string, IReadOnlyList<RekallAgeRuntimeEntity>> childrenByParentId,
+        int frame,
+        List<RekallAgeRuntimeObservation> observations)
+    {
+        var targetEntityId = ReadString(track, "targetEntityId");
+        var targetPath = ReadString(track, "targetPath");
+        if (targetEntityId is not null && targetPath is not null)
+        {
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.track_target_conflict",
+                owner,
+                "Animation track must specify targetEntityId or targetPath, not both."));
+            return null;
+        }
+
+        if (targetEntityId is not null)
+        {
+            if (entitiesById.TryGetValue(targetEntityId, out var target))
+            {
+                return target;
+            }
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.track_target_missing",
+                owner,
+                $"Animation track target entity '{targetEntityId}' was not found."));
+            return null;
+        }
+
+        if (targetPath is null || targetPath == ".")
+        {
+            return owner;
+        }
+        if (targetPath.Length > 1_024)
+        {
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.track_target_path_invalid",
+                owner,
+                "Animation track targetPath exceeds 1,024 characters."));
+            return null;
+        }
+
+        var segments = targetPath.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length is < 1 or > 32
+            || targetPath.StartsWith("/", StringComparison.Ordinal)
+            || segments.Any(segment => segment is "." or ".."))
+        {
+            observations.Add(AnimationObservation(
+                frame,
+                "runtime.animation.track_target_path_invalid",
+                owner,
+                $"Animation track targetPath '{targetPath}' must contain 1-32 relative child id/name segments."));
+            return null;
+        }
+
+        var current = owner;
+        foreach (var segment in segments)
+        {
+            var children = childrenByParentId.GetValueOrDefault(current.Id) ?? [];
+            var idMatches = children.Where(entity => entity.Id.Equals(segment, StringComparison.Ordinal)).ToArray();
+            var matches = idMatches.Length > 0
+                ? idMatches
+                : children.Where(entity => entity.Name.Equals(segment, StringComparison.Ordinal)).ToArray();
+            if (matches.Length == 1)
+            {
+                current = matches[0];
+                continue;
+            }
+
+            observations.Add(AnimationObservation(
+                frame,
+                matches.Length == 0
+                    ? "runtime.animation.track_target_missing"
+                    : "runtime.animation.track_target_ambiguous",
+                owner,
+                matches.Length == 0
+                    ? $"Animation track targetPath '{targetPath}' did not resolve child segment '{segment}'."
+                    : $"Animation track targetPath '{targetPath}' resolves child segment '{segment}' ambiguously; use entity ids."));
+            return null;
+        }
+        return current;
+    }
+
     private RekallAgeRuntimeEntity ApplyMixer(
         RekallAgeRuntimeEntity entity,
         RekallAgeRuntimeComponent mixer,
         RekallAgeRuntimeWorldFrameContext context,
         List<RekallAgeRuntimeEvent> emitted,
-        List<RekallAgeRuntimeObservation> observations)
+        List<RekallAgeRuntimeObservation> observations,
+        List<TargetedWeightedAnimationTrack> targetedMixerTracks)
     {
         if (!TryGetArray(mixer.Properties, "layers", out var layers))
         {
@@ -192,7 +412,6 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
         var previousLayers = TryGetArray(previousState, "layers", out var stateLayers)
             ? stateLayers.OfType<JsonObject>().ToArray()
             : [];
-        var samples = new Dictionary<string, List<WeightedAnimationSample>>(StringComparer.Ordinal);
         var layerStates = new JsonArray();
         var maximumTime = 0d;
         var maximumDuration = 0d;
@@ -290,15 +509,12 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
                                 $"Animation mixer layer '{name}' contains a track entry that is not a JSON object."));
                             continue;
                         }
-                        CollectMixerSample(
-                            entity,
+                        targetedMixerTracks.Add(new TargetedWeightedAnimationTrack(
+                            entity.Id,
                             track,
                             sampleTime,
                             currentWeight,
-                            layerIndex,
-                            context.FrameIndex,
-                            observations,
-                            samples);
+                            layerIndex));
                     }
                 }
             }
@@ -322,18 +538,7 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             layerIndex++;
         }
 
-        var updated = entity;
-        foreach (var targetSamples in samples.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Value))
-        {
-            var value = BlendSamples(targetSamples);
-            if (value is not null)
-            {
-                var target = targetSamples[0];
-                updated = ApplySampledValue(updated, target.ComponentType, target.PropertyName, value);
-            }
-        }
-
-        return updated.UpsertComponent(StateComponent, new JsonObject
+        return entity.UpsertComponent(StateComponent, new JsonObject
         {
             ["version"] = 1,
             ["mode"] = "mixer",
@@ -343,45 +548,6 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
             ["playing"] = true,
             ["layers"] = layerStates
         });
-    }
-
-    private static void CollectMixerSample(
-        RekallAgeRuntimeEntity entity,
-        JsonObject track,
-        double sampleTime,
-        double weight,
-        int layerIndex,
-        int frame,
-        List<RekallAgeRuntimeObservation> observations,
-        Dictionary<string, List<WeightedAnimationSample>> samples)
-    {
-        var componentType = ReadString(track, "component") ?? ReadString(track, "targetComponent");
-        var propertyName = ReadString(track, "property");
-        if (string.IsNullOrWhiteSpace(componentType) || string.IsNullOrWhiteSpace(propertyName))
-        {
-            _ = ApplyTrack(entity, track, sampleTime, frame, observations);
-            return;
-        }
-
-        var sampled = ApplyTrack(entity, track, sampleTime, frame, observations);
-        var component = sampled.FindComponent(componentType);
-        if (component is null || !TryGetProperty(component.Properties, propertyName, out var value) || value is null)
-        {
-            return;
-        }
-
-        var key = componentType + "\u001f" + propertyName.ToLowerInvariant();
-        if (!samples.TryGetValue(key, out var targetSamples))
-        {
-            targetSamples = [];
-            samples[key] = targetSamples;
-        }
-        targetSamples.Add(new WeightedAnimationSample(
-            componentType,
-            propertyName,
-            value.DeepClone(),
-            weight,
-            layerIndex));
     }
 
     private static JsonNode? BlendSamples(IReadOnlyList<WeightedAnimationSample> samples)
@@ -1067,5 +1233,29 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
     }
 
     private sealed record AnimationKey(double Time, JsonNode? Value);
+    private sealed record TargetedAnimationTrack(string OwnerId, JsonObject Track, double SampleTime);
+    private sealed record TargetedWeightedAnimationTrack(
+        string OwnerId,
+        JsonObject Track,
+        double SampleTime,
+        double Weight,
+        int LayerIndex);
+    private sealed record ResolvedTargetedWeightedAnimationTrack(
+        TargetedWeightedAnimationTrack Request,
+        string TargetId);
+    private sealed record ResolvedTrackBlendKey(
+        string OwnerId,
+        string TargetId,
+        string ComponentType,
+        string PropertyName)
+    {
+        public static ResolvedTrackBlendKey From(ResolvedTargetedWeightedAnimationTrack resolved) => new(
+            resolved.Request.OwnerId,
+            resolved.TargetId,
+            ReadString(resolved.Request.Track, "component")
+                ?? ReadString(resolved.Request.Track, "targetComponent")
+                ?? string.Empty,
+            (ReadString(resolved.Request.Track, "property") ?? string.Empty).ToLowerInvariant());
+    }
     private readonly record struct AnimationColor(byte R, byte G, byte B, byte A);
 }

@@ -729,3 +729,29 @@ the new background is an explicit fallback, not a claim that sky assets render.
   combined), project
   validation, scene validation, module trust, and the 2560x1440 High
   `desktop60` budget at 6.496608 ms measured GPU time.
+
+## Rounded articulated-character checkpoint
+
+- The external Warden pauldron no longer duplicates an entire upper arm. Its
+  editable 19-node graph now builds a compact layered shell from smooth sphere
+  forms, a rolled torus rim, a front boss, and an authored rivet array. The
+  graph explicitly excludes the obsolete upper-arm, elbow, vambrace, and spike
+  branches that caused the doubled toy silhouette.
+- The main Warden graph replaces rectangular coat panels and box boots with
+  mirrored smooth capsule construction, and replaces the flat inset box visor
+  with a rounded capsule faceplate. Smooth cloth/armor branches bypass the
+  hard-surface segmented-bevel path, retaining useful density without the
+  earlier topology explosion.
+- `Proof/Captures/RoundedVisor/vulkan-scene-1280x720-20260826110408142.png`
+  is the native RTX 5090 High Vulkan proof: 301 render-work draws, four
+  dispatches, 9,780 distinct colors, zero observations, zero missing assets,
+  and zero fallbacks. The doubled arm is gone and the feet, coat tails, shoulder
+  shell, and faceplate read as rounded armor forms. This remains an intermediate
+  hero asset; closer composition, anatomy, surface wear, layered materials, and
+  richer locomotion/combat animation are still required for final visual
+  acceptance.
+- The full Aetherfall high-fidelity class passes 24/24. Project and scene
+  validation report zero issues, both gameplay modules are ready under the
+  `windows-appcontainer-restricted` posture, and the 2560x1440 High
+  `desktop60` budget passes at 6.335008 ms measured GPU time, 97 scene draws,
+  197,410 triangles, 835,052 vertices, and nine textures.

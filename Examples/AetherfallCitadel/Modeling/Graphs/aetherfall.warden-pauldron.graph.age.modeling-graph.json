@@ -1,181 +1,49 @@
 {
   "schemaVersion": 1,
   "assetId": "aetherfall.warden-pauldron.graph",
-  "name": "Aetherfall Warden Articulated Pauldron",
-  "revision": 1,
+  "name": "Aetherfall Warden Layered Pauldron",
+  "revision": 3,
   "nodes": [
-    {
-      "nodeId": "upper-arm",
-      "typeId": "rekall.modeling.primitive.capsule",
-      "typeVersion": 1,
-      "parameters": { "radius": 0.31, "depth": 1.32, "segments": 24, "hemisphereRings": 6 }
-    },
-    {
-      "nodeId": "upper-arm-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": { "translation": [0, -0.72, 0], "rotation": [0, 0, -8], "scale": [1, 1, 0.9] }
-    },
-    {
-      "nodeId": "shoulder-shell",
-      "typeId": "rekall.modeling.primitive.sphere",
-      "typeVersion": 1,
-      "parameters": { "radius": 0.58, "segments": 32, "rings": 20 }
-    },
-    {
-      "nodeId": "shoulder-shell-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": { "translation": [0, -0.08, 0], "scale": [1.28, 0.72, 1.02] }
-    },
-    {
-      "nodeId": "elbow",
-      "typeId": "rekall.modeling.primitive.sphere",
-      "typeVersion": 1,
-      "parameters": { "radius": 0.35, "segments": 24, "rings": 14 }
-    },
-    {
-      "nodeId": "elbow-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": { "translation": [-0.08, -1.38, 0], "scale": [1.15, 0.82, 1.08] }
-    },
-    {
-      "nodeId": "vambrace",
-      "typeId": "rekall.modeling.primitive.frustum",
-      "typeVersion": 1,
-      "parameters": { "radiusBottom": 0.25, "radiusTop": 0.33, "depth": 0.82, "segments": 24, "capBottom": true, "capTop": true }
-    },
-    {
-      "nodeId": "vambrace-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": { "translation": [-0.13, -1.82, 0], "rotation": [0, 0, -8], "scale": [1, 1, 0.9] }
-    },
-    {
-      "nodeId": "spike",
-      "typeId": "rekall.modeling.primitive.frustum",
-      "typeVersion": 1,
-      "parameters": { "radiusBottom": 0.18, "radiusTop": 0.02, "depth": 0.72, "segments": 16, "capBottom": true, "capTop": true }
-    },
-    {
-      "nodeId": "spike-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": { "translation": [-0.88, -0.05, 0], "rotation": [0, 0, 90], "scale": [1, 1.2, 1] }
-    },
-    {
-      "nodeId": "ridge",
-      "typeId": "rekall.modeling.primitive.box",
-      "typeVersion": 1,
-      "parameters": { "sizeX": 0.18, "sizeY": 0.92, "sizeZ": 0.72 }
-    },
-    {
-      "nodeId": "ridge-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": { "translation": [-0.35, -0.2, -0.04], "rotation": [0, 0, -14] }
-    },
-    {
-      "nodeId": "rivet",
-      "typeId": "rekall.modeling.primitive.sphere",
-      "typeVersion": 1,
-      "parameters": { "radius": 0.065, "segments": 16, "rings": 8 }
-    },
-    {
-      "nodeId": "rivet-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": { "translation": [-0.47, -0.08, 0.53], "scale": [0.65, 0.65, 0.45] }
-    },
-    {
-      "nodeId": "rivets",
-      "typeId": "rekall.modeling.array",
-      "typeVersion": 1,
-      "parameters": { "count": 4, "offset": [0, -0.24, 0], "relativeOffset": false, "instanceMode": false }
-    },
-    {
-      "nodeId": "hard-join",
-      "typeId": "rekall.modeling.join",
-      "typeVersion": 1,
-      "parameters": {}
-    },
-    {
-      "nodeId": "bevel",
-      "typeId": "rekall.modeling.bevel",
-      "typeVersion": 1,
-      "parameters": { "width": 0.035, "segments": 3, "profile": 0.5, "clampOverlap": true, "hardenNormals": true }
-    },
-    {
-      "nodeId": "smooth-join",
-      "typeId": "rekall.modeling.join",
-      "typeVersion": 1,
-      "parameters": {}
-    },
-    {
-      "nodeId": "post-join",
-      "typeId": "rekall.modeling.join",
-      "typeVersion": 1,
-      "parameters": {}
-    },
-    {
-      "nodeId": "material",
-      "typeId": "rekall.modeling.material.assign",
-      "typeVersion": 1,
-      "parameters": { "materialAssetId": "aetherfall.warden-steel.material", "slotName": "Articulated Armor" }
-    },
-    {
-      "nodeId": "weather",
-      "typeId": "rekall.modeling.deform.noise",
-      "typeVersion": 1,
-      "parameters": { "amplitude": 0.009, "frequency": 6.2, "seed": 1429, "axis": "z" }
-    },
-    {
-      "nodeId": "normals",
-      "typeId": "rekall.modeling.weighted_normals",
-      "typeVersion": 1,
-      "parameters": { "attribute": "normal.weighted", "faceAreaWeight": 1.0 }
-    },
-    {
-      "nodeId": "uv",
-      "typeId": "rekall.modeling.project_uv",
-      "typeVersion": 1,
-      "parameters": { "projection": "box", "axis": "xy", "scaleU": 0.5, "scaleV": 0.5 }
-    },
-    {
-      "nodeId": "output",
-      "typeId": "rekall.modeling.output.mesh",
-      "typeVersion": 1,
-      "parameters": {}
-    }
+    { "nodeId": "shoulder-shell", "typeId": "rekall.modeling.primitive.sphere", "typeVersion": 1, "parameters": { "radius": 0.56, "segments": 40, "rings": 24 } },
+    { "nodeId": "shoulder-shell-x", "typeId": "rekall.modeling.transform", "typeVersion": 1, "parameters": { "translation": [0, 0, 0], "rotation": [0, 0, -5], "scale": [1.18, 0.5, 1.0] } },
+    { "nodeId": "crown-lamella", "typeId": "rekall.modeling.primitive.sphere", "typeVersion": 1, "parameters": { "radius": 0.48, "segments": 36, "rings": 20 } },
+    { "nodeId": "crown-lamella-x", "typeId": "rekall.modeling.transform", "typeVersion": 1, "parameters": { "translation": [-0.04, 0.17, 0], "rotation": [0, 0, -8], "scale": [1.2, 0.38, 0.93] } },
+    { "nodeId": "lower-lamella", "typeId": "rekall.modeling.primitive.sphere", "typeVersion": 1, "parameters": { "radius": 0.52, "segments": 36, "rings": 20 } },
+    { "nodeId": "lower-lamella-x", "typeId": "rekall.modeling.transform", "typeVersion": 1, "parameters": { "translation": [0.03, -0.27, 0.02], "rotation": [0, 0, -2], "scale": [1.08, 0.32, 0.96] } },
+    { "nodeId": "rolled-rim", "typeId": "rekall.modeling.primitive.torus", "typeVersion": 1, "parameters": { "majorRadius": 0.43, "minorRadius": 0.055, "majorSegments": 48, "minorSegments": 10 } },
+    { "nodeId": "rolled-rim-x", "typeId": "rekall.modeling.transform", "typeVersion": 1, "parameters": { "translation": [0.02, -0.35, 0], "rotation": [0, 0, 0], "scale": [1.22, 0.9, 1.0] } },
+    { "nodeId": "front-boss", "typeId": "rekall.modeling.primitive.sphere", "typeVersion": 1, "parameters": { "radius": 0.105, "segments": 20, "rings": 12 } },
+    { "nodeId": "front-boss-x", "typeId": "rekall.modeling.transform", "typeVersion": 1, "parameters": { "translation": [-0.39, 0.02, -0.49], "scale": [0.8, 0.8, 0.42] } },
+    { "nodeId": "rivet", "typeId": "rekall.modeling.primitive.sphere", "typeVersion": 1, "parameters": { "radius": 0.045, "segments": 16, "rings": 8 } },
+    { "nodeId": "rivet-x", "typeId": "rekall.modeling.transform", "typeVersion": 1, "parameters": { "translation": [-0.34, -0.2, -0.51], "scale": [0.75, 0.75, 0.38] } },
+    { "nodeId": "rivets", "typeId": "rekall.modeling.array", "typeVersion": 1, "parameters": { "count": 4, "offset": [0.23, 0, 0], "relativeOffset": false, "instanceMode": false } },
+    { "nodeId": "shell-join", "typeId": "rekall.modeling.join", "typeVersion": 1, "parameters": {} },
+    { "nodeId": "material", "typeId": "rekall.modeling.material.assign", "typeVersion": 1, "parameters": { "materialAssetId": "aetherfall.warden-steel.material", "slotName": "Layered Pauldron" } },
+    { "nodeId": "weather", "typeId": "rekall.modeling.deform.noise", "typeVersion": 1, "parameters": { "amplitude": 0.006, "frequency": 7.5, "seed": 1429, "axis": "z" } },
+    { "nodeId": "normals", "typeId": "rekall.modeling.weighted_normals", "typeVersion": 1, "parameters": { "attribute": "normal.weighted", "faceAreaWeight": 1.0, "cornerAngleWeight": 1.0 } },
+    { "nodeId": "uv", "typeId": "rekall.modeling.project_uv", "typeVersion": 1, "parameters": { "projection": "box", "axis": "xy", "scaleU": 0.55, "scaleV": 0.55 } },
+    { "nodeId": "output", "typeId": "rekall.modeling.output.mesh", "typeVersion": 1, "parameters": {} }
   ],
   "links": [
-    { "linkId": "upper-arm-x", "fromNodeId": "upper-arm", "fromPortId": "geometry", "toNodeId": "upper-arm-x", "toPortId": "geometry" },
-    { "linkId": "shoulder-shell-x", "fromNodeId": "shoulder-shell", "fromPortId": "geometry", "toNodeId": "shoulder-shell-x", "toPortId": "geometry" },
-    { "linkId": "elbow-x", "fromNodeId": "elbow", "fromPortId": "geometry", "toNodeId": "elbow-x", "toPortId": "geometry" },
-    { "linkId": "vambrace-x", "fromNodeId": "vambrace", "fromPortId": "geometry", "toNodeId": "vambrace-x", "toPortId": "geometry" },
-    { "linkId": "spike-x", "fromNodeId": "spike", "fromPortId": "geometry", "toNodeId": "spike-x", "toPortId": "geometry" },
-    { "linkId": "ridge-x", "fromNodeId": "ridge", "fromPortId": "geometry", "toNodeId": "ridge-x", "toPortId": "geometry" },
+    { "linkId": "shell-x", "fromNodeId": "shoulder-shell", "fromPortId": "geometry", "toNodeId": "shoulder-shell-x", "toPortId": "geometry" },
+    { "linkId": "crown-x", "fromNodeId": "crown-lamella", "fromPortId": "geometry", "toNodeId": "crown-lamella-x", "toPortId": "geometry" },
+    { "linkId": "lower-x", "fromNodeId": "lower-lamella", "fromPortId": "geometry", "toNodeId": "lower-lamella-x", "toPortId": "geometry" },
+    { "linkId": "rim-x", "fromNodeId": "rolled-rim", "fromPortId": "geometry", "toNodeId": "rolled-rim-x", "toPortId": "geometry" },
+    { "linkId": "boss-x", "fromNodeId": "front-boss", "fromPortId": "geometry", "toNodeId": "front-boss-x", "toPortId": "geometry" },
     { "linkId": "rivet-x", "fromNodeId": "rivet", "fromPortId": "geometry", "toNodeId": "rivet-x", "toPortId": "geometry" },
     { "linkId": "rivets", "fromNodeId": "rivet-x", "fromPortId": "geometry", "toNodeId": "rivets", "toPortId": "geometry" },
-    { "linkId": "hard-vambrace", "fromNodeId": "vambrace-x", "fromPortId": "geometry", "toNodeId": "hard-join", "toPortId": "geometry" },
-    { "linkId": "hard-spike", "fromNodeId": "spike-x", "fromPortId": "geometry", "toNodeId": "hard-join", "toPortId": "geometry" },
-    { "linkId": "hard-ridge", "fromNodeId": "ridge-x", "fromPortId": "geometry", "toNodeId": "hard-join", "toPortId": "geometry" },
-    { "linkId": "hard-bevel", "fromNodeId": "hard-join", "fromPortId": "geometry", "toNodeId": "bevel", "toPortId": "geometry" },
-    { "linkId": "smooth-arm", "fromNodeId": "upper-arm-x", "fromPortId": "geometry", "toNodeId": "smooth-join", "toPortId": "geometry" },
-    { "linkId": "smooth-shell", "fromNodeId": "shoulder-shell-x", "fromPortId": "geometry", "toNodeId": "smooth-join", "toPortId": "geometry" },
-    { "linkId": "smooth-elbow", "fromNodeId": "elbow-x", "fromPortId": "geometry", "toNodeId": "smooth-join", "toPortId": "geometry" },
-    { "linkId": "smooth-rivets", "fromNodeId": "rivets", "fromPortId": "geometry", "toNodeId": "smooth-join", "toPortId": "geometry" },
-    { "linkId": "post-hard", "fromNodeId": "bevel", "fromPortId": "geometry", "toNodeId": "post-join", "toPortId": "geometry" },
-    { "linkId": "post-smooth", "fromNodeId": "smooth-join", "fromPortId": "geometry", "toNodeId": "post-join", "toPortId": "geometry" },
-    { "linkId": "material", "fromNodeId": "post-join", "fromPortId": "geometry", "toNodeId": "material", "toPortId": "geometry" },
+    { "linkId": "join-shell", "fromNodeId": "shoulder-shell-x", "fromPortId": "geometry", "toNodeId": "shell-join", "toPortId": "geometry" },
+    { "linkId": "join-crown", "fromNodeId": "crown-lamella-x", "fromPortId": "geometry", "toNodeId": "shell-join", "toPortId": "geometry" },
+    { "linkId": "join-lower", "fromNodeId": "lower-lamella-x", "fromPortId": "geometry", "toNodeId": "shell-join", "toPortId": "geometry" },
+    { "linkId": "join-rim", "fromNodeId": "rolled-rim-x", "fromPortId": "geometry", "toNodeId": "shell-join", "toPortId": "geometry" },
+    { "linkId": "join-boss", "fromNodeId": "front-boss-x", "fromPortId": "geometry", "toNodeId": "shell-join", "toPortId": "geometry" },
+    { "linkId": "join-rivets", "fromNodeId": "rivets", "fromPortId": "geometry", "toNodeId": "shell-join", "toPortId": "geometry" },
+    { "linkId": "material", "fromNodeId": "shell-join", "fromPortId": "geometry", "toNodeId": "material", "toPortId": "geometry" },
     { "linkId": "weather", "fromNodeId": "material", "fromPortId": "geometry", "toNodeId": "weather", "toPortId": "geometry" },
     { "linkId": "normals", "fromNodeId": "weather", "fromPortId": "geometry", "toNodeId": "normals", "toPortId": "geometry" },
     { "linkId": "uv", "fromNodeId": "normals", "fromPortId": "geometry", "toNodeId": "uv", "toPortId": "geometry" },
     { "linkId": "output", "fromNodeId": "uv", "fromPortId": "geometry", "toNodeId": "output", "toPortId": "input" }
   ],
-  "outputs": [
-    { "name": "mesh", "nodeId": "output", "portId": "geometry" }
-  ],
+  "outputs": [ { "name": "mesh", "nodeId": "output", "portId": "geometry" } ],
   "exposedParameters": []
 }

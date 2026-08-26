@@ -474,6 +474,15 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   interoperability remain explicit engine work rather than being hidden in the
   example.
 
+  Rounded-character checkpoint, 2026-08-26: executable acceptance exposed that
+  the external "pauldron" graph duplicated an upper arm, elbow, vambrace, and
+  spike. It is now a compact 19-node layered shell with a rolled rim, boss, and
+  rivets. The 71-node main Warden replaces rectangular coat panels, box boots,
+  and the inset box visor with smooth capsule coat tails, boots, and faceplate,
+  routed around the hard-surface bevel chain. This removes visible blockout
+  artifacts with ordinary generic graph primitives while retaining editability;
+  anatomy, layered armor, surface wear, and richer animation remain open.
+
 - [ ] **Step 3: Bake, publish, catalog, and place**
 
   Publish immutable models, preserve material slots/UVs/tangents, place coherent

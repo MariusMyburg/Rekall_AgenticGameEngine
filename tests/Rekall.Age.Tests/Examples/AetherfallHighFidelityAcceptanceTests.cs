@@ -367,6 +367,18 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             authoredBladeTransform.Properties["roll"]!.GetValue<double>(),
             animatedBlade.Transform.Rotation3D.Z);
         var authoredPauldron = Assert.Single(attachments, entity => entity.Name == "Warden Articulated Pauldron");
+        var pauldronGraph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
+            projectRoot, "aetherfall.warden-pauldron.graph", CancellationToken.None);
+        Assert.Contains(pauldronGraph.Nodes, node => node.NodeId == "lower-lamella");
+        Assert.Contains(pauldronGraph.Nodes, node => node.NodeId == "rolled-rim");
+        foreach (var obsoleteArmPart in new[] { "upper-arm", "elbow", "vambrace", "spike" })
+            Assert.DoesNotContain(pauldronGraph.Nodes, node => node.NodeId == obsoleteArmPart);
+        var pauldronMesh = await new RekallAgeMeshAssetStore().LoadAsync(
+            projectRoot, "aetherfall-warden-pauldron-mesh", CancellationToken.None);
+        var pauldronHeight = pauldronMesh.Topology.Positions.Max(point => point.Y)
+            - pauldronMesh.Topology.Positions.Min(point => point.Y);
+        Assert.True(pauldronHeight <= 1.2,
+            $"The articulated pauldron should be a compact shoulder shell, not a duplicate full arm; height was {pauldronHeight:F3}.");
         var animatedPauldron = Assert.Single(
             animated.World.Entities, entity => entity.Name == authoredPauldron.Name);
         Assert.NotEqual(
@@ -701,19 +713,30 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             node?["nodeId"]?.GetValue<string>() == "cloth-bevel");
         foreach (var nodeId in new[]
         {
-            "thigh-guards", "bracers", "gauntlets", "eye-slit-x", "aether-material"
+            "thigh-guards", "bracers", "gauntlets", "eye-slit-x", "aether-material", "coat-tail", "coat-tails"
         })
         {
             Assert.Contains(modelingNodes, node => node?["nodeId"]?.GetValue<string>() == nodeId);
         }
         foreach (var obsoletePlaceholder in new[]
         {
-            "pauldron-spike", "blade", "cloak"
+            "pauldron-spike", "blade", "cloak", "coat-l", "coat-r"
         })
         {
             Assert.DoesNotContain(modelingNodes, node =>
                 node?["nodeId"]?.GetValue<string>() == obsoletePlaceholder);
         }
+        Assert.Contains(modelingNodes, node =>
+            node?["nodeId"]?.GetValue<string>() == "coat-tail"
+            && node?["typeId"]?.GetValue<string>() == "rekall.modeling.primitive.capsule");
+        Assert.Contains(modelingNodes, node =>
+            node?["nodeId"]?.GetValue<string>() == "boot"
+            && node?["typeId"]?.GetValue<string>() == "rekall.modeling.primitive.capsule");
+        Assert.Contains(modelingNodes, node =>
+            node?["nodeId"]?.GetValue<string>() == "faceplate"
+            && node?["typeId"]?.GetValue<string>() == "rekall.modeling.primitive.capsule");
+        Assert.DoesNotContain(modelingNodes, node =>
+            node?["nodeId"]?.GetValue<string>() == "faceplate-inset");
         Assert.Equal(3, authoredSurfaces.Count);
         Assert.Equal(
             [

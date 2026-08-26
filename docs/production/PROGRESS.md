@@ -5669,6 +5669,31 @@ environmental-gate chronology, raw artifact hashes, and residue audit:
   explicit cost/consent, provenance/licensing, resumable jobs, and ordinary AGE
   edit/reimport/cook/package acceptance.
 
+## Rounded Warden construction checkpoint
+
+- The Warden's duplicate external arm was traced to a pauldron graph that also
+  authored an upper arm, elbow, vambrace, and spike. The rebuilt generic
+  pauldron graph is now a bounded layered shell with a rolled rim, boss, and
+  rivets; focused acceptance prevents those obsolete body-part nodes from
+  returning and constrains the authored mesh height.
+- The 71-node main graph replaces box coat panels, box boots, and the flat inset
+  box faceplate with mirrored capsule coat tails, capsule boots, and a rounded
+  capsule visor. Smooth branches feed their dedicated armor/cloth joins rather
+  than the hard-surface bevel chain. This improves the gameplay silhouette
+  using existing AGE primitives and records the content rules as executable
+  acceptance instead of adding Warden-specific engine behavior.
+- Native proof is
+  `Examples/AetherfallCitadel/Proof/Captures/RoundedVisor/vulkan-scene-1280x720-20260826110408142.png`:
+  High Vulkan on RTX 5090, 301 render-work draws, four dispatches, zero asset
+  fallbacks, and zero observations. The full Aetherfall class passes 24/24;
+  project and scene validation have zero issues; both modules are restricted
+  and ready.
+- The 2560x1440 High `desktop60` inspection passes with no blockers or warnings
+  at 6.335008 ms measured GPU time, 97 scene draws, 197,410 triangles, 835,052
+  vertices, and nine textures. The next visual slice is materially richer hero
+  anatomy, armor layering, material variation/wear, and animation at a more
+  revealing gameplay composition—not further edge-case hardening of this pass.
+
 ## Evidence index
 
 - `docs/production/2026-08-17-engine-maturity-audit.md`

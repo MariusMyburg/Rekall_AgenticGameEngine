@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "assetId": "aetherfall-warden-pauldron-model",
-  "displayName": "Aetherfall Warden Articulated Pauldron",
-  "revision": 1,
+  "displayName": "Aetherfall Warden Layered Pauldron",
+  "revision": 2,
   "source": {
     "kind": "Mesh",
     "assetId": "aetherfall-warden-pauldron-mesh",
@@ -10,12 +10,12 @@
   },
   "buildState": 0,
   "lastSuccessfulBuild": {
-    "sourceFileRevision": "bc3632a4cd40abb92ef733d752bf024b2cb3f7a00f751e4e3435eec92b5335bd",
-    "sourceLogicalRevision": 1,
-    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-warden-pauldron-model/3a70594050f75fd7b9e323c5cdffb0a4e060aad27ca2dc5b7b55980decc7dba2.age.compiled-mesh.json",
-    "compiledContentHash": "3a70594050f75fd7b9e323c5cdffb0a4e060aad27ca2dc5b7b55980decc7dba2",
+    "sourceFileRevision": "fd66bed9169d1df6f85d492dc9011eab332d6c8109c3e6657c7eb35fc0054816",
+    "sourceLogicalRevision": 3,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-warden-pauldron-model/35f963f16842c4c14bfae9f4ee1a228a2aab5812a6f84781a04a4d58196de536.age.compiled-mesh.json",
+    "compiledContentHash": "35f963f16842c4c14bfae9f4ee1a228a2aab5812a6f84781a04a4d58196de536",
     "compilerVersion": "rekall-age-model-compiler-v1",
-    "builtAtUtc": "2026-08-26T02:25:53.6496983+00:00",
+    "builtAtUtc": "2026-08-26T10:54:17.4917774+00:00",
     "diagnostics": []
   },
   "frozen": false

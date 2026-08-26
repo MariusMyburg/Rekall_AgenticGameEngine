@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.warden.graph",
   "name": "Aetherfall Warden Silhouette",
-  "revision": 14,
+  "revision": 17,
   "nodes": [
     {
       "nodeId": "torso",
@@ -67,58 +67,39 @@
       }
     },
     {
-      "nodeId": "coat-l",
-      "typeId": "rekall.modeling.primitive.box",
+      "nodeId": "coat-tail",
+      "typeId": "rekall.modeling.primitive.capsule",
       "typeVersion": 1,
       "parameters": {
-        "sizeX": 0.8,
-        "sizeY": 2.3,
-        "sizeZ": 0.38
+        "radius": 0.36,
+        "depth": 1.45,
+        "segments": 28,
+        "hemisphereRings": 7
       }
     },
     {
-      "nodeId": "coat-l-x",
+      "nodeId": "coat-tail-x",
       "typeId": "rekall.modeling.transform",
       "typeVersion": 1,
       "parameters": {
         "translation": [
-          -0.43,
-          0.45,
-          0.12
+          -0.36,
+          0.35,
+          0.16
         ],
         "rotation": [
-          8,
+          6,
           0,
-          8
-        ]
+          5
+        ],
+        "scale": [0.78, 1, 0.5]
       }
     },
     {
-      "nodeId": "coat-r",
-      "typeId": "rekall.modeling.primitive.box",
+      "nodeId": "coat-tails",
+      "typeId": "rekall.modeling.mirror",
       "typeVersion": 1,
-      "parameters": {
-        "sizeX": 0.8,
-        "sizeY": 2.3,
-        "sizeZ": 0.38
-      }
-    },
-    {
-      "nodeId": "coat-r-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": {
-        "translation": [
-          0.43,
-          0.45,
-          0.12
-        ],
-        "rotation": [
-          -8,
-          0,
-          -8
-        ]
-      }
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
     },
     {
       "nodeId": "arm-l-x",
@@ -291,23 +272,13 @@
     },
     {
       "nodeId": "faceplate",
-      "typeId": "rekall.modeling.primitive.box",
+      "typeId": "rekall.modeling.primitive.capsule",
       "typeVersion": 1,
       "parameters": {
-        "sizeX": 0.66,
-        "sizeY": 0.58,
-        "sizeZ": 0.16
-      }
-    },
-    {
-      "nodeId": "faceplate-inset",
-      "typeId": "rekall.modeling.inset",
-      "typeVersion": 1,
-      "parameters": {
-        "thickness": 0.055,
-        "depth": -0.025,
-        "individual": true,
-        "boundary": true
+        "radius": 0.16,
+        "depth": 0.42,
+        "segments": 32,
+        "hemisphereRings": 8
       }
     },
     {
@@ -317,14 +288,15 @@
       "parameters": {
         "translation": [
           0,
-          3.22,
-          -0.43
+          3.2,
+          -0.44
         ],
         "rotation": [
-          -7,
+          -5,
           0,
-          0
-        ]
+          90
+        ],
+        "scale": [1, 0.9, 0.48]
       }
     },
     {
@@ -413,12 +385,13 @@
     },
     {
       "nodeId": "boot",
-      "typeId": "rekall.modeling.primitive.box",
+      "typeId": "rekall.modeling.primitive.capsule",
       "typeVersion": 1,
       "parameters": {
-        "sizeX": 0.48,
-        "sizeY": 0.42,
-        "sizeZ": 0.82
+        "radius": 0.27,
+        "depth": 0.72,
+        "segments": 28,
+        "hemisphereRings": 7
       }
     },
     {
@@ -428,14 +401,15 @@
       "parameters": {
         "translation": [
           -0.42,
-          -1.22,
-          -0.2
+          -1.28,
+          -0.16
         ],
         "rotation": [
-          0,
+          90,
           0,
           -2
-        ]
+        ],
+        "scale": [0.86, 1, 0.74]
       }
     },
     {
@@ -1155,17 +1129,17 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "tx4",
-      "fromNodeId": "coat-l",
+      "linkId": "coat-tail-x",
+      "fromNodeId": "coat-tail",
       "fromPortId": "geometry",
-      "toNodeId": "coat-l-x",
+      "toNodeId": "coat-tail-x",
       "toPortId": "geometry"
     },
     {
-      "linkId": "tx5",
-      "fromNodeId": "coat-r",
+      "linkId": "coat-tail-mirror",
+      "fromNodeId": "coat-tail-x",
       "fromPortId": "geometry",
-      "toNodeId": "coat-r-x",
+      "toNodeId": "coat-tails",
       "toPortId": "geometry"
     },
     {
@@ -1211,15 +1185,8 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "faceplate-inset",
-      "fromNodeId": "faceplate",
-      "fromPortId": "geometry",
-      "toNodeId": "faceplate-inset",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "faceplate-x",
-      "fromNodeId": "faceplate-inset",
+      "fromNodeId": "faceplate",
       "fromPortId": "geometry",
       "toNodeId": "faceplate-x",
       "toPortId": "geometry"
@@ -1288,17 +1255,10 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "cloth-coat-l",
-      "fromNodeId": "coat-l-x",
+      "linkId": "cloth-coat-tails",
+      "fromNodeId": "coat-tails",
       "fromPortId": "geometry",
-      "toNodeId": "cloth-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "cloth-coat-r",
-      "fromNodeId": "coat-r-x",
-      "fromPortId": "geometry",
-      "toNodeId": "cloth-join",
+      "toNodeId": "cloth-smooth-join",
       "toPortId": "geometry"
     },
     {
@@ -1319,7 +1279,7 @@
       "linkId": "armor-faceplate",
       "fromNodeId": "faceplate-x",
       "fromPortId": "geometry",
-      "toNodeId": "armor-join",
+      "toNodeId": "armor-smooth-join",
       "toPortId": "geometry"
     },
     {
@@ -1340,7 +1300,7 @@
       "linkId": "armor-boots",
       "fromNodeId": "boots",
       "fromPortId": "geometry",
-      "toNodeId": "armor-join",
+      "toNodeId": "armor-smooth-join",
       "toPortId": "geometry"
     },
     {

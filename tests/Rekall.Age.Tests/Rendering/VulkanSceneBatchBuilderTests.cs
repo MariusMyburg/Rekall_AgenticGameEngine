@@ -21,11 +21,17 @@ public sealed class VulkanSceneBatchBuilderTests
                 WhitePoint: 11.2,
                 ColorGradeAssetId: null,
                 BackgroundPolicy: "color")
+            {
+                AmbientSkyColor = "#80a0c0",
+                AmbientGroundColor = "#604020"
+            }
         };
 
         var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, []);
 
         Assert.Equal(new Vector4(0.55f, -0.35f, 11.2f, 1), batch.Frame.EnvironmentParameters);
+        Assert.Equal(new Vector4(128 / 255f, 160 / 255f, 192 / 255f, 1), batch.Frame.EnvironmentAmbientSkyColor);
+        Assert.Equal(new Vector4(96 / 255f, 64 / 255f, 32 / 255f, 1), batch.Frame.EnvironmentAmbientGroundColor);
     }
 
     [Fact]

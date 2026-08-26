@@ -2490,7 +2490,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 batch.Frame.AdditionalLightParameters,
                 PointLight(batch.Frame, 1).Color, PointLight(batch.Frame, 1).Position, PointLight(batch.Frame, 1).Parameters,
                 PointLight(batch.Frame, 2).Color, PointLight(batch.Frame, 2).Position, PointLight(batch.Frame, 2).Parameters,
-                PointLight(batch.Frame, 3).Color, PointLight(batch.Frame, 3).Position, PointLight(batch.Frame, 3).Parameters),
+                PointLight(batch.Frame, 3).Color, PointLight(batch.Frame, 3).Position, PointLight(batch.Frame, 3).Parameters,
+                EnvironmentAmbientSkyColor: batch.Frame.EnvironmentAmbientSkyColor,
+                EnvironmentAmbientGroundColor: batch.Frame.EnvironmentAmbientGroundColor),
             BuildStereoUniforms(batch),
             meshCount,
             triangleCount.Value,
@@ -2597,7 +2599,30 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 (float)Math.Clamp(environment.Exposure, -8, 8),
                 (float)Math.Clamp(environment.WhitePoint, 0.1, 64),
                 environment.ToneMapper.Equals("agx", StringComparison.OrdinalIgnoreCase) ? 1 : 0);
-        return packet with { FrameUniform = packet.FrameUniform with { EnvironmentParameters = parameters } };
+        var ambientSkyColor = ParseEnvironmentColor(environment?.AmbientSkyColor);
+        var ambientGroundColor = ParseEnvironmentColor(environment?.AmbientGroundColor);
+        return packet with
+        {
+            FrameUniform = packet.FrameUniform with
+            {
+                EnvironmentParameters = parameters,
+                EnvironmentAmbientSkyColor = ambientSkyColor,
+                EnvironmentAmbientGroundColor = ambientGroundColor
+            }
+        };
+    }
+
+    private static Vector4 ParseEnvironmentColor(string? value)
+    {
+        if (value is { Length: 7 or 9 } && value[0] == '#'
+            && byte.TryParse(value.AsSpan(1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var red)
+            && byte.TryParse(value.AsSpan(3, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var green)
+            && byte.TryParse(value.AsSpan(5, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var blue))
+        {
+            return new Vector4(red / 255f, green / 255f, blue / 255f, 1);
+        }
+
+        return Vector4.One;
     }
 
     private GeometryCacheKey CreateGeometryCacheKey(Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame)
@@ -3700,6 +3725,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec4 ShadowSplitDepths;
             vec4 ShadowParameters;
             vec4 EnvironmentParameters;
+            vec4 EnvironmentAmbientSkyColor;
+            vec4 EnvironmentAmbientGroundColor;
         } Frame;
 
         layout(set = 1, binding = 0) uniform DrawUniformBuffer
@@ -3770,6 +3797,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec4 ShadowSplitDepths;
             vec4 ShadowParameters;
             vec4 EnvironmentParameters;
+            vec4 EnvironmentAmbientSkyColor;
+            vec4 EnvironmentAmbientGroundColor;
         } Frame;
         
         layout(set = 1, binding = 0) uniform DrawUniformBuffer
@@ -4557,7 +4586,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             float ambientStrength = hasAtmosphereData()
                 ? spaceAmbientFloor()
                 : 0.12 * max(Frame.EnvironmentParameters.x, 0.0);
-            vec3 ambient = albedo * ambientStrength * occlusion;
+            float ambientHemisphere = clamp(normal.y * 0.5 + 0.5, 0.0, 1.0);
+            vec3 environmentAmbientColor = mix(Frame.EnvironmentAmbientGroundColor.rgb, Frame.EnvironmentAmbientSkyColor.rgb, ambientHemisphere);
+            vec3 ambient = albedo * environmentAmbientColor * ambientStrength * occlusion;
             vec3 waterFresnel = fresnelSchlick(ndotv, vec3(0.02));
             ambient += waterFresnel * Frame.LightColor.rgb * directTransmittance * waterCoverage * 0.018;
             vec3 emissive = pow(max(texture(sampler2D(EmissiveTexture, EmissiveSampler), fsin_UV).rgb * Draw.EmissiveFactors.rgb, vec3(0.0)), vec3(2.2)) * Draw.EmissiveFactors.a;
@@ -4839,7 +4870,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         Matrix4x4 ShadowViewProjection3 = default,
         Vector4 ShadowSplitDepths = default,
         Vector4 ShadowParameters = default,
-        Vector4 EnvironmentParameters = default);
+        Vector4 EnvironmentParameters = default,
+        Vector4 EnvironmentAmbientSkyColor = default,
+        Vector4 EnvironmentAmbientGroundColor = default);
 
     [StructLayout(LayoutKind.Sequential)]
     private readonly record struct DirectionalShadowFrameUniform(Matrix4x4 ViewProjection);

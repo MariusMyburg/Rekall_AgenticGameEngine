@@ -11,6 +11,23 @@ namespace Rekall.Age.Tests.Examples;
 
 public sealed class AetherfallHighFidelityAcceptanceTests
 {
+    [Theory]
+    [InlineData("aetherfall.weathered-ruin.graph")]
+    [InlineData("aetherfall.broken-arch.graph")]
+    [InlineData("aetherfall.hollow-sentinel.graph")]
+    [InlineData("aetherfall.rubble-boulder.graph")]
+    [InlineData("aetherfall.ruin-dressing-scatter.graph")]
+    [InlineData("aetherfall.warden.graph")]
+    public async Task ThreeDimensionalAuthoredModelsUseFaceAwareBoxProjection(string graphAssetId)
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var graph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
+            projectRoot, graphAssetId, CancellationToken.None);
+
+        var projection = Assert.Single(graph.Nodes, node => node.TypeId == "rekall.modeling.project_uv");
+        Assert.Equal("box", projection.Parameters["projection"]!.GetValue<string>());
+    }
+
     [Fact]
     public async Task WeatheredRuinPublishesLayeredMasonryAndDamagedCrownDetail()
     {
@@ -112,7 +129,10 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         var components = entities.SelectMany(entity => entity!["components"]!.AsArray()).ToArray();
 
         Assert.Single(components, component => Type(component) == "Rekall.RenderQualityProfile");
-        Assert.Single(components, component => Type(component) == "Rekall.Environment3D");
+        var environment = Assert.Single(components, component => Type(component) == "Rekall.Environment3D");
+        Assert.Equal("#9fb3c2", String(environment?["properties"], "ambientSkyColor"));
+        Assert.Equal("#795743", String(environment?["properties"], "ambientGroundColor"));
+        Assert.InRange(Number(environment?["properties"], "ambientEnergy"), 1.5, 2.25);
         Assert.Single(components, component => Type(component) == "Rekall.ShadowSettings");
         Assert.True(Bool(Assert.Single(entities, entity => HasComponent(entity, "Rekall.UiCanvas")), "visible"));
         Assert.True(components.Count(component => Type(component) == "Rekall.FogVolume") >= 2);

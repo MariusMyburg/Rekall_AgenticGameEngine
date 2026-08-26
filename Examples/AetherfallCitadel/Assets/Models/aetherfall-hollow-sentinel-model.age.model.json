@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall-hollow-sentinel-model",
   "displayName": "Hollow Sentinel",
-  "revision": 4,
+  "revision": 5,
   "source": {
     "kind": "Mesh",
     "assetId": "aetherfall-hollow-sentinel-mesh",
@@ -10,12 +10,12 @@
   },
   "buildState": 0,
   "lastSuccessfulBuild": {
-    "sourceFileRevision": "e88c7da7735c4ce7abb34e051e348f7f33c855849f21cc4efa51154cb0b780de",
-    "sourceLogicalRevision": 4,
-    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-hollow-sentinel-model/aefb602d46a7ec6d0f38324546ccc41b4bff456fb689e3c2f45867fc72b75b9b.age.compiled-mesh.json",
-    "compiledContentHash": "aefb602d46a7ec6d0f38324546ccc41b4bff456fb689e3c2f45867fc72b75b9b",
+    "sourceFileRevision": "988294ddfd43fbbf8a8a62883e1b43fedfb645984405fe8d143b2caac414c002",
+    "sourceLogicalRevision": 5,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-hollow-sentinel-model/c174a35ac9babfff57968f4730d2c365041f059d439bbd1314f42d7613231b8d.age.compiled-mesh.json",
+    "compiledContentHash": "c174a35ac9babfff57968f4730d2c365041f059d439bbd1314f42d7613231b8d",
     "compilerVersion": "rekall-age-model-compiler-v1",
-    "builtAtUtc": "2026-08-25T20:20:14.8189049+00:00",
+    "builtAtUtc": "2026-08-26T00:54:03.360331+00:00",
     "diagnostics": []
   },
   "frozen": false

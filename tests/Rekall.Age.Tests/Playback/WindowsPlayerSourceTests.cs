@@ -11,6 +11,16 @@ namespace Rekall.Age.Tests.Playback;
 public sealed class WindowsPlayerSourceTests
 {
     [Fact]
+    public void WindowsPlayerConsumesAuthoredHemisphericalAmbientLighting()
+    {
+        var program = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Rekall.Age.Player.Windows", "Program.cs"));
+
+        Assert.Contains("AmbientSkyColor", program, StringComparison.Ordinal);
+        Assert.Contains("AmbientGroundColor", program, StringComparison.Ordinal);
+        Assert.Contains("mix(Frame.EnvironmentAmbientGroundColor.rgb, Frame.EnvironmentAmbientSkyColor.rgb", program, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WindowsPlayerNormalMappingFallsBackForDegenerateUvDerivatives()
     {
         var program = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Rekall.Age.Player.Windows", "Program.cs"));

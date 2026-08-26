@@ -133,7 +133,11 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 environment.ToneMapper,
                 environment.WhitePoint,
                 environment.ColorGradeAssetId,
-                environment.BackgroundPolicy);
+                environment.BackgroundPolicy)
+            {
+                AmbientSkyColor = environment.AmbientSkyColor,
+                AmbientGroundColor = environment.AmbientGroundColor
+            };
     }
 
     private static IReadOnlyList<RekallAgeRuntimeViewportParticleEmitter> BuildParticleEmitters(RekallAgeRuntimeWorld world) =>

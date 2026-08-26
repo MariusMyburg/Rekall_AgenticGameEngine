@@ -5456,7 +5456,9 @@
         {
           "type": "Rekall.Environment3D",
           "properties": {
-            "ambientEnergy": 0.55,
+            "ambientEnergy": 2.0,
+            "ambientSkyColor": "#9fb3c2",
+            "ambientGroundColor": "#795743",
             "exposure": -1.15,
             "toneMapper": "agx",
             "whitePoint": 11.2,

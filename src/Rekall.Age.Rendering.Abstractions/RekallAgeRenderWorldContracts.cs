@@ -243,7 +243,12 @@ public sealed record RekallAgeRuntimeViewportEnvironment(
     string ToneMapper,
     double WhitePoint,
     string? ColorGradeAssetId,
-    string BackgroundPolicy);
+    string BackgroundPolicy)
+{
+    public string AmbientSkyColor { get; init; } = "#ffffff";
+
+    public string AmbientGroundColor { get; init; } = "#ffffff";
+}
 
 public sealed record RekallAgeRuntimeViewportParticleScalarKey(double NormalizedAge, double Value);
 

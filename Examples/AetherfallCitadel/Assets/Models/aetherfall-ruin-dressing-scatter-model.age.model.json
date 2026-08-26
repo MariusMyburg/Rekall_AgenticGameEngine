@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall-ruin-dressing-scatter-model",
   "displayName": "Ruin Dressing Scatter Cluster",
-  "revision": 1,
+  "revision": 2,
   "source": {
     "kind": "Mesh",
     "assetId": "aetherfall-ruin-dressing-scatter-mesh",
@@ -10,12 +10,12 @@
   },
   "buildState": 0,
   "lastSuccessfulBuild": {
-    "sourceFileRevision": "06ed4748d4fd52a77f9dc9a2955ae564cc685681b2b2d39ce5f787a84a7113ad",
-    "sourceLogicalRevision": 1,
-    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-ruin-dressing-scatter-model/99e55a48bb6bef9e151c78bde75e3afe54f211b7df5d12b7d8298f5b7f372d03.age.compiled-mesh.json",
-    "compiledContentHash": "99e55a48bb6bef9e151c78bde75e3afe54f211b7df5d12b7d8298f5b7f372d03",
+    "sourceFileRevision": "a65086c4104c9e8ea015441c9a7d4a7f05de8cc8225f4fc1dd566f53c6839f6a",
+    "sourceLogicalRevision": 2,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-ruin-dressing-scatter-model/80d109551aa1527d3ba9b8ebf2c11bd99c6831daf9958a012948b4bdfb5dff2b.age.compiled-mesh.json",
+    "compiledContentHash": "80d109551aa1527d3ba9b8ebf2c11bd99c6831daf9958a012948b4bdfb5dff2b",
     "compilerVersion": "rekall-age-model-compiler-v1",
-    "builtAtUtc": "2026-08-25T17:20:19.9135123+00:00",
+    "builtAtUtc": "2026-08-26T00:54:11.5957528+00:00",
     "diagnostics": []
   },
   "frozen": false

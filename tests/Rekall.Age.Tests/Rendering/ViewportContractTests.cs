@@ -33,6 +33,8 @@ public sealed class ViewportContractTests
                 {
                     ["skyAsset"] = "asset_sky",
                     ["ambientEnergy"] = 1.5,
+                    ["ambientSkyColor"] = "#91afd0",
+                    ["ambientGroundColor"] = "#503d32",
                     ["exposure"] = 0.25,
                     ["toneMapper"] = "agx",
                     ["whitePoint"] = 11.2,
@@ -74,11 +76,15 @@ public sealed class ViewportContractTests
         Assert.Equal(72, quality.Intent.TargetFramesPerSecond);
         var environment = Assert.Single(world.Subsystems.Rendering.Environments);
         Assert.Equal("asset_sky", environment.SkyAssetId);
+        Assert.Equal("#91afd0", environment.AmbientSkyColor);
+        Assert.Equal("#503d32", environment.AmbientGroundColor);
         Assert.Equal("agx", environment.ToneMapper);
         Assert.Equal("skybox", environment.BackgroundPolicy);
         var viewport = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 640, 360, false);
         Assert.NotNull(viewport.Environment);
         Assert.Equal(1.5, viewport.Environment.AmbientEnergy);
+        Assert.Equal("#91afd0", viewport.Environment.AmbientSkyColor);
+        Assert.Equal("#503d32", viewport.Environment.AmbientGroundColor);
         Assert.Equal(0.25, viewport.Environment.Exposure);
         Assert.Equal("agx", viewport.Environment.ToneMapper);
         Assert.Equal("asset_grade", viewport.Environment.ColorGradeAssetId);

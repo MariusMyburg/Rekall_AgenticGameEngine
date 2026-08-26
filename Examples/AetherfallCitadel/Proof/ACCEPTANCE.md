@@ -224,6 +224,29 @@ the accepted gameplay evidence above.
   pools. True screen-cluster assignment and per-cluster overflow remain; the
   current quality-scaled sixteen-light array is the first production Forward+
   bridge, not the final dense-world lighting architecture.
+- AGE environment authoring now carries separate `ambientSkyColor` and
+  `ambientGroundColor` values alongside ambient energy. Both the native Vulkan
+  path and the standalone Windows player evaluate a normal-oriented
+  hemispherical ambient term; equal white defaults preserve older scenes. This
+  follows Godot's useful separation of environment ambient color and energy
+  without copying its renderer implementation or turning the feature into an
+  Aetherfall-specific light.
+- Aetherfall authors a restrained cool sky (`#9fb3c2`) and warm stone bounce
+  (`#795743`) at ambient energy `2.0`. More importantly, the resulting visual
+  inspection exposed that the six principal three-dimensional modeling graphs
+  still used one-axis planar UV projection. AGE's existing generic face-aware
+  box projection was applied through revision-checked graph patch, bake, and
+  live-linked model rebuild commands to the Warden, hollow sentinel, weathered
+  ruin, broken arch, rubble boulder, and ruin dressing. The near ruins now wrap
+  the masonry texture around their depth instead of collapsing side faces into
+  uniform dark texture strips.
+- The aligned real RTX 5090 High proof is
+  `Proof/Captures/HemisphereBoxFinal/vulkan-scene-1280x720-20260826010143841.png`:
+  23,611 distinct colors, 55.8% dominant-color share, mean luminance 0.075,
+  213 render-work draws, and zero observations, missing assets, unsupported
+  assets, or fallbacks. After the scene and six-model mutation, movement,
+  combat, progression, and reset still pass all 2/4/4/5 strict assertions;
+  Warden movement remains exactly `0.506840` on X.
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
 silhouettes remain too black, prop geometry remains visibly coarse, and the

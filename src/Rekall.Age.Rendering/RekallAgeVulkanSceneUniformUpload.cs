@@ -126,7 +126,15 @@ public static class RekallAgeVulkanSceneUniformUploadBuilder
             frame.EnvironmentParameters.X,
             frame.EnvironmentParameters.Y,
             frame.EnvironmentParameters.Z,
-            frame.EnvironmentParameters.W);
+            frame.EnvironmentParameters.W,
+            frame.EnvironmentAmbientSkyColor.X,
+            frame.EnvironmentAmbientSkyColor.Y,
+            frame.EnvironmentAmbientSkyColor.Z,
+            frame.EnvironmentAmbientSkyColor.W,
+            frame.EnvironmentAmbientGroundColor.X,
+            frame.EnvironmentAmbientGroundColor.Y,
+            frame.EnvironmentAmbientGroundColor.Z,
+            frame.EnvironmentAmbientGroundColor.W);
     }
 
     public static RekallAgeVulkanSceneGpuDrawPushConstants BuildDrawPushConstants(
@@ -478,7 +486,15 @@ public readonly record struct RekallAgeVulkanSceneGpuFrameUniform(
     float EnvironmentAmbientEnergy,
     float EnvironmentExposure,
     float EnvironmentWhitePoint,
-    float EnvironmentToneMapper);
+    float EnvironmentToneMapper,
+    float EnvironmentAmbientSkyR,
+    float EnvironmentAmbientSkyG,
+    float EnvironmentAmbientSkyB,
+    float EnvironmentAmbientSkyA,
+    float EnvironmentAmbientGroundR,
+    float EnvironmentAmbientGroundG,
+    float EnvironmentAmbientGroundB,
+    float EnvironmentAmbientGroundA);
 
 [StructLayout(LayoutKind.Sequential)]
 public readonly record struct RekallAgeVulkanSceneGpuDrawPushConstants(

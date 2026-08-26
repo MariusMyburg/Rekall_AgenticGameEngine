@@ -138,6 +138,10 @@ public sealed record RekallAgeVulkanSceneFrameUniform(
 {
     public IReadOnlyList<RekallAgeVulkanPointLight> PointLights { get; init; } = [];
 
+    public Vector4 EnvironmentAmbientSkyColor { get; init; } = Vector4.One;
+
+    public Vector4 EnvironmentAmbientGroundColor { get; init; } = Vector4.One;
+
     public int PointLightBudget { get; init; } = 4;
 
     public IReadOnlyList<string> DroppedPointLightEntityIds { get; init; } = [];

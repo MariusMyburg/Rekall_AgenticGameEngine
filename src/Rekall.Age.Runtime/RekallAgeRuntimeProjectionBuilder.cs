@@ -151,7 +151,9 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             ReadString(component.Properties, "colorGrade"),
                             ReadString(component.Properties, "backgroundPolicy") ?? "skybox")
                         {
-                            ProjectionSource = RekallAgeRuntimeProjectionSources.BuiltIn
+                            ProjectionSource = RekallAgeRuntimeProjectionSources.BuiltIn,
+                            AmbientSkyColor = ReadString(component.Properties, "ambientSkyColor") ?? "#ffffff",
+                            AmbientGroundColor = ReadString(component.Properties, "ambientGroundColor") ?? "#ffffff"
                         });
                         break;
                     case "Rekall.ShadowSettings":

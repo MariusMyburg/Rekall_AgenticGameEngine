@@ -455,6 +455,10 @@ public sealed record RekallAgeRuntimeEnvironment3D(
     string BackgroundPolicy)
 {
     public string ProjectionSource { get; init; } = RekallAgeRuntimeProjectionSources.Authored;
+
+    public string AmbientSkyColor { get; init; } = "#ffffff";
+
+    public string AmbientGroundColor { get; init; } = "#ffffff";
 }
 
 public sealed record RekallAgeRuntimeShadowSettings(

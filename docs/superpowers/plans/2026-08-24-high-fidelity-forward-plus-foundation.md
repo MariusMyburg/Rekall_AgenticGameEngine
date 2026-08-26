@@ -705,6 +705,16 @@ Performance deterministically reports seven drops. This completes the bounded
 many-light bridge; true screen/depth cluster assignment, per-cluster lists, and
 per-cluster overflow facts remain before the architecture is fully Forward+.
 
+2026-08-26 environment/UV result: `Rekall.Environment3D` now authors separate
+sky and ground ambient colors with backward-compatible white defaults. Native
+Vulkan and the Windows player consume the same normal-oriented hemispherical
+term. Aetherfall's real-player inspection then identified collapsed planar UVs
+on six genuinely three-dimensional assets; their ordinary graphs now use
+face-aware box projection and were rebaked/rebuilt through AGE's public
+revision-checked commands. The accepted aligned capture is recorded in
+`Proof/ACCEPTANCE.md`; this improves material continuity and indirect form
+readability but does not complete the final visual bar.
+
 - [ ] **Step 5: Re-run strict gameplay assertions after the final mutation**
 
 Run all four checked-in proof matrices. If any assertion fails, repair the authored behavior; do not weaken it.

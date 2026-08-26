@@ -67,6 +67,8 @@ layout(set = 0, binding = 0) uniform FrameUniform
     vec4 additionalLightPosition16;
     vec4 additionalLightParameters16;
     vec4 environmentParameters;
+    vec4 environmentAmbientSkyColor;
+    vec4 environmentAmbientGroundColor;
 } frame;
 
 layout(set = 1, binding = 0) uniform DrawUniformBuffer
@@ -794,7 +796,9 @@ void main()
     float ambientStrength = hasAtmosphereData()
         ? spaceAmbientFloor()
         : 0.12 * max(frame.environmentParameters.x, 0.0);
-    vec3 ambient = albedo * ambientStrength * occlusion;
+    float ambientHemisphere = clamp(normal.y * 0.5 + 0.5, 0.0, 1.0);
+    vec3 environmentAmbientColor = mix(frame.environmentAmbientGroundColor.rgb, frame.environmentAmbientSkyColor.rgb, ambientHemisphere);
+    vec3 ambient = albedo * environmentAmbientColor * ambientStrength * occlusion;
     vec3 waterFresnel = fresnelSchlick(ndotv, vec3(0.02));
     ambient += waterFresnel * frame.lightColor.rgb * directTransmittance * waterCoverage * 0.018;
     vec3 emissive = pow(max(texture(sampler2D(emissiveTexture, emissiveSampler), fragUv).rgb * draw.emissiveFactors.rgb, vec3(0.0)), vec3(2.2)) * draw.emissiveFactors.a;

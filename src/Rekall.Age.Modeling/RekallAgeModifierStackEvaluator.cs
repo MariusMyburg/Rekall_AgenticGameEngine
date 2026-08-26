@@ -69,6 +69,18 @@ public sealed class RekallAgeModifierStackEvaluator
         {
             "rekall.modifier.transform" => _executor.Execute(source, new("transform", RekallAgeGeometryDomain.Point,
                 Select(source, RekallAgeGeometryDomain.Point, selection), VectorParameters(modifier.Parameters))).Mesh,
+            "rekall.modifier.deform.taper" => _executor.Execute(source, new("taper_points", RekallAgeGeometryDomain.Point,
+                Select(source, RekallAgeGeometryDomain.Point, selection), new JsonObject
+                {
+                    ["axis"] = ReadString(modifier.Parameters, "axis", "y"),
+                    ["minimum"] = ReadNumber(modifier.Parameters, "minimum", 0),
+                    ["maximum"] = ReadNumber(modifier.Parameters, "maximum", 1),
+                    ["startScale"] = ReadNumber(modifier.Parameters, "startScale", 1),
+                    ["endScale"] = ReadNumber(modifier.Parameters, "endScale", 0.5),
+                    ["centerX"] = ReadNumber(modifier.Parameters, "centerX", 0),
+                    ["centerY"] = ReadNumber(modifier.Parameters, "centerY", 0),
+                    ["centerZ"] = ReadNumber(modifier.Parameters, "centerZ", 0)
+                })).Mesh,
             "rekall.modifier.triangulate" => _executor.Execute(source, new("triangulate_faces", RekallAgeGeometryDomain.Face,
                 Select(source, RekallAgeGeometryDomain.Face, selection), new JsonObject())).Mesh,
             "rekall.modifier.extrude" => _executor.Execute(source, new("extrude_faces", RekallAgeGeometryDomain.Face,
@@ -86,6 +98,15 @@ public sealed class RekallAgeModifierStackEvaluator
                     ["hardenNormals"] = ReadBoolean(modifier.Parameters, "hardenNormals", false),
                     ["weightAttribute"] = ReadString(modifier.Parameters, "weightAttribute", ""),
                     ["materialIndex"] = ReadInteger(modifier.Parameters, "materialIndex", -1)
+                })).Mesh,
+            "rekall.modifier.skin.linear_weights" => _executor.Execute(source, new("assign_linear_skin_weights", RekallAgeGeometryDomain.Point,
+                Select(source, RekallAgeGeometryDomain.Point, selection), new JsonObject
+                {
+                    ["axis"] = ReadString(modifier.Parameters, "axis", "y"),
+                    ["minimum"] = ReadNumber(modifier.Parameters, "minimum", 0),
+                    ["maximum"] = ReadNumber(modifier.Parameters, "maximum", 1),
+                    ["jointA"] = ReadInteger(modifier.Parameters, "jointA", 0),
+                    ["jointB"] = ReadInteger(modifier.Parameters, "jointB", 1)
                 })).Mesh,
             "rekall.modifier.solidify" => _executor.Execute(source, new("solidify", RekallAgeGeometryDomain.Face,
                 Select(source, RekallAgeGeometryDomain.Face, selection), new JsonObject

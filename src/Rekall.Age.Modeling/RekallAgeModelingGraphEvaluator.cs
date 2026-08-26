@@ -189,6 +189,19 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             "rekall.modeling.curve.revolve" => new(CreateCurveRevolve(graph, node, incoming, values)),
             "rekall.modeling.transform" => TransformGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.deform.noise" => NoiseDeformGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
+            "rekall.modeling.deform.taper" => ApplySemanticOperation(
+                graph, node, InputGeometry(node, "geometry", incoming, values), "taper_points",
+                new JsonObject
+                {
+                    ["axis"] = ReadString(node, "axis", "y"),
+                    ["minimum"] = ReadNumber(node, "minimum", 0),
+                    ["maximum"] = ReadNumber(node, "maximum", 1),
+                    ["startScale"] = ReadNumber(node, "startScale", 1),
+                    ["endScale"] = ReadNumber(node, "endScale", 0.5),
+                    ["centerX"] = ReadVector3(node, "center", new(0, 0, 0)).X,
+                    ["centerY"] = ReadVector3(node, "center", new(0, 0, 0)).Y,
+                    ["centerZ"] = ReadVector3(node, "center", new(0, 0, 0)).Z
+                }, RekallAgeGeometryDomain.Point),
             "rekall.modeling.scatter.area" => ScatterAreaGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.join" => JoinGeometry(graph, node, incoming, values),
             "rekall.modeling.boolean" => BooleanGeometry(
@@ -300,6 +313,20 @@ public sealed partial class RekallAgeModelingGraphEvaluator
                     ["includeBoundary"] = ReadBoolean(node, "includeBoundary", false)
                 },
                 RekallAgeGeometryDomain.Edge),
+            "rekall.modeling.skin.linear_weights" => ApplySemanticOperation(
+                graph,
+                node,
+                InputGeometry(node, "geometry", incoming, values),
+                "assign_linear_skin_weights",
+                new JsonObject
+                {
+                    ["axis"] = ReadString(node, "axis", "y"),
+                    ["minimum"] = ReadNumber(node, "minimum", 0),
+                    ["maximum"] = ReadNumber(node, "maximum", 1),
+                    ["jointA"] = ReadInteger(node, "jointA", 0, 0, int.MaxValue),
+                    ["jointB"] = ReadInteger(node, "jointB", 1, 0, int.MaxValue)
+                },
+                RekallAgeGeometryDomain.Point),
             "rekall.modeling.inset" => ApplySemanticOperation(
                 graph,
                 node,

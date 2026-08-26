@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.warden-mantle.graph",
+  "name": "Aetherfall Warden Deformable Mantle",
+  "revision": 1,
+  "nodes": [
+    {
+      "nodeId": "cloth-grid",
+      "typeId": "rekall.modeling.primitive.grid",
+      "typeVersion": 1,
+      "parameters": { "sizeX": 2.4, "sizeY": 3.6, "segmentsX": 16, "segmentsY": 24 }
+    },
+    {
+      "nodeId": "hang",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": { "translation": [0, -1.8, 0] }
+    },
+    {
+      "nodeId": "silhouette",
+      "typeId": "rekall.modeling.deform.taper",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "y", "minimum": -3.6, "maximum": 0,
+        "startScale": 1.0, "endScale": 0.72, "center": [0, 0, 0]
+      }
+    },
+    {
+      "nodeId": "cloth-folds",
+      "typeId": "rekall.modeling.deform.noise",
+      "typeVersion": 1,
+      "parameters": { "amplitude": 0.085, "frequency": 2.7, "seed": 2508, "axis": "z" }
+    },
+    {
+      "nodeId": "thickness",
+      "typeId": "rekall.modeling.solidify",
+      "typeVersion": 1,
+      "parameters": { "thickness": 0.045, "offset": 0, "rim": true, "evenThickness": true }
+    },
+    {
+      "nodeId": "skin",
+      "typeId": "rekall.modeling.skin.linear_weights",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "y", "minimum": -3.6, "maximum": 0,
+        "jointA": 1, "jointB": 0
+      }
+    },
+    {
+      "nodeId": "uv",
+      "typeId": "rekall.modeling.project_uv",
+      "typeVersion": 1,
+      "parameters": { "projection": "box", "axis": "xy", "scaleU": 0.4166666667, "scaleV": 0.2777777778 }
+    },
+    {
+      "nodeId": "normals",
+      "typeId": "rekall.modeling.weighted_normals",
+      "typeVersion": 1,
+      "parameters": { "attribute": "normal.authored", "faceAreaWeight": 1, "cornerAngleWeight": 1 }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    { "linkId": "grid-hang", "fromNodeId": "cloth-grid", "fromPortId": "geometry", "toNodeId": "hang", "toPortId": "geometry" },
+    { "linkId": "hang-taper", "fromNodeId": "hang", "fromPortId": "geometry", "toNodeId": "silhouette", "toPortId": "geometry" },
+    { "linkId": "taper-folds", "fromNodeId": "silhouette", "fromPortId": "geometry", "toNodeId": "cloth-folds", "toPortId": "geometry" },
+    { "linkId": "folds-thickness", "fromNodeId": "cloth-folds", "fromPortId": "geometry", "toNodeId": "thickness", "toPortId": "geometry" },
+    { "linkId": "thickness-skin", "fromNodeId": "thickness", "fromPortId": "geometry", "toNodeId": "skin", "toPortId": "geometry" },
+    { "linkId": "skin-uv", "fromNodeId": "skin", "fromPortId": "geometry", "toNodeId": "uv", "toPortId": "geometry" },
+    { "linkId": "uv-normals", "fromNodeId": "uv", "fromPortId": "geometry", "toNodeId": "normals", "toPortId": "geometry" },
+    { "linkId": "normals-output", "fromNodeId": "normals", "fromPortId": "geometry", "toNodeId": "output", "toPortId": "input" }
+  ],
+  "outputs": [
+    { "name": "mesh", "nodeId": "output", "portId": "geometry" }
+  ],
+  "exposedParameters": []
+}

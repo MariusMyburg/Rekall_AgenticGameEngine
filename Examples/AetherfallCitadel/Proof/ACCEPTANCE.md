@@ -672,3 +672,35 @@ the new background is an explicit fallback, not a claim that sky assets render.
   streaming, hierarchical occlusion, skinned/morph LOD remapping, authored LOD
   variants, and visibly richer characters, clothing, ruins, props, materials,
   animation, and composition remain in progress.
+
+## Procedural skin-weight and taper-deform checkpoint
+
+- AGE now authors complete two-joint point skin bindings through
+  `assign_linear_skin_weights`, `rekall.modeling.skin.linear_weights`, and
+  `rekall.modifier.skin.linear_weights`. The contract accepts X/Y/Z geometry
+  ranges, emits normalized canonical `joint-indices-0`/`joint-weights-0`
+  attributes, preserves complete existing bindings, and rejects partial,
+  duplicate, incompatible, or canonical-name-conflicting data.
+- Generic `taper_points`, `rekall.modeling.deform.taper`, and
+  `rekall.modifier.deform.taper` scale planes perpendicular to an authored axis
+  between explicit endpoint scales around an authored center. This is reusable
+  for cloth, foliage, props, characters, and architecture; no mantle behavior
+  was added to engine core.
+- `aetherfall.warden-mantle.graph` is a stored nine-node production consumer:
+  16x24 grid, hanging transform, tapered silhouette, deterministic cloth folds,
+  solidified thickness/rim, linear weights, box UVs, and weighted normals. Its
+  revision-checked bake replaces the former hand-shaped 40-point source with
+  850 editable points and 848 faces. The rebuilt Model Asset contains 3,392
+  skinned vertices and 1,696 triangles, all with compiled joint bindings.
+- Runtime acceptance proves the live weighted mantle changes vertex position
+  between frames 1 and 30. Modeling passes 246/246 and the complete Aetherfall
+  selection passes 42/42; project and scene validation report zero issues.
+  High `desktop60` at 2560x1440 passes with 97 scene draws, 195,210 triangles,
+  836,424 vertices, and nine textures.
+- The native RTX 5090 frame-30 diagnostic is
+  `Proof/Captures/DeformableMantle/vulkan-scene-1280x720-20260826093900972.png`:
+  11,773 distinct colors, 16.9% dominant-color share, mean luminance 0.100,
+  301 render-work draws, four dispatches, and zero observations or fallbacks.
+  It proves clean integration but not final art. The Warden body, garment
+  construction, materials, and pose still read as blockout quality and remain
+  the next visible character work.

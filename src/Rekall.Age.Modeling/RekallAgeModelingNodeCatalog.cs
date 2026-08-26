@@ -91,6 +91,17 @@ public sealed class RekallAgeModelingNodeCatalog
                 Integer("seed", "Seed", 0, int.MinValue, int.MaxValue),
                 Text("axis", "Axis", "z", ["x", "y", "z"])
             ]),
+        Node("rekall.modeling.deform.taper", "Taper Deform", "Linearly scales point planes perpendicular to an axis for cloth, foliage, props, characters, and architecture.",
+            [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)],
+            [
+                Text("axis", "Axis", "y", ["x", "y", "z"]),
+                Number("minimum", "Minimum", 0, -1_000_000, 1_000_000, "world-unit"),
+                Number("maximum", "Maximum", 1, -1_000_000, 1_000_000, "world-unit"),
+                Number("startScale", "Start Scale", 1, 0.000001, 1_000_000),
+                Number("endScale", "End Scale", 0.5, 0.000001, 1_000_000),
+                Vector3("center", "Center", "world-unit"),
+                Text("selectionSet", "Selection Set", "")
+            ]),
         Node("rekall.modeling.scatter.area", "Scatter Area", "Creates deterministic transformed copies across a bounded horizontal area for reusable environmental dressing.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)],
             [
@@ -157,6 +168,16 @@ public sealed class RekallAgeModelingNodeCatalog
                 Number("minimumAngleDegrees", "Minimum Angle", 30, 0, 180, "degree"),
                 Number("maximumAngleDegrees", "Maximum Angle", 180, 0, 180, "degree"),
                 Boolean("includeBoundary", "Include Boundary", false)
+            ]),
+        Node("rekall.modeling.skin.linear_weights", "Linear Skin Weights", "Authors normalized two-joint skin bindings from point position along an axis for deformable meshes.",
+            [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)],
+            [
+                Text("axis", "Axis", "y", ["x", "y", "z"]),
+                Number("minimum", "Minimum", 0, -1_000_000, 1_000_000, "world-unit"),
+                Number("maximum", "Maximum", 1, -1_000_000, 1_000_000, "world-unit"),
+                Integer("jointA", "Joint A", 0, 0, int.MaxValue),
+                Integer("jointB", "Joint B", 1, 0, int.MaxValue),
+                Text("selectionSet", "Selection Set", "")
             ]),
         Node("rekall.modeling.inset", "Inset Faces", "Builds deterministic recessed or raised face panels with explicit border topology.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Input("selection", RekallAgeModelingValueType.Selection), Output("geometry", RekallAgeModelingValueType.Geometry)],

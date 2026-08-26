@@ -310,8 +310,8 @@
       "displayName": "Aetherfall Warden Deformable Mantle",
       "kind": "model",
       "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-warden-mantle-mesh.age.mesh.json",
-      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-mantle-model\\f0177cf731b175a50c82524997b24a9580f1b2e84a3ffb47ea45bec12eab7590.age.compiled-mesh.json",
-      "contentHash": "f0177cf731b175a50c82524997b24a9580f1b2e84a3ffb47ea45bec12eab7590",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-mantle-model\\b6207717ca27d60f0ef17656bd9578d7c83a5090fa3c764891e6db0c7aa1fa19.age.compiled-mesh.json",
+      "contentHash": "b6207717ca27d60f0ef17656bd9578d7c83a5090fa3c764891e6db0c7aa1fa19",
       "glbMetadata": null,
       "textureMetadata": null,
       "provenance": null,
@@ -319,8 +319,8 @@
         "modelDocumentPath": "Assets/Models/aetherfall-warden-mantle-model.age.model.json",
         "sourceKind": "Mesh",
         "sourceAssetId": "aetherfall-warden-mantle-mesh",
-        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-mantle-model/f0177cf731b175a50c82524997b24a9580f1b2e84a3ffb47ea45bec12eab7590.age.compiled-mesh.json",
-        "compiledContentHash": "f0177cf731b175a50c82524997b24a9580f1b2e84a3ffb47ea45bec12eab7590"
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-mantle-model/b6207717ca27d60f0ef17656bd9578d7c83a5090fa3c764891e6db0c7aa1fa19.age.compiled-mesh.json",
+        "compiledContentHash": "b6207717ca27d60f0ef17656bd9578d7c83a5090fa3c764891e6db0c7aa1fa19"
       }
     },
     {

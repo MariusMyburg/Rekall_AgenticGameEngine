@@ -26,6 +26,17 @@ public sealed partial class RekallAgeMeshOperationExecutor
             RekallAgeMeshChangeKind.Positions,
             [NumberParameter("x"), NumberParameter("y"), NumberParameter("z")]),
         new(
+            "taper_points",
+            "Linearly scales selected point planes perpendicular to an axis across an authored coordinate range.",
+            RekallAgeGeometryDomain.Point,
+            RekallAgeMeshChangeKind.Positions,
+            [
+                StringParameter("axis", "y", "Taper axis: x, y, or z."),
+                NumberParameter("minimum"), NumberParameter("maximum", 1),
+                NumberParameter("startScale", 1), NumberParameter("endScale", 0.5),
+                NumberParameter("centerX"), NumberParameter("centerY"), NumberParameter("centerZ")
+            ]),
+        new(
             "reverse_faces",
             "Reverses selected face winding while preserving stable face/corner identity and corner attributes.",
             RekallAgeGeometryDomain.Face,
@@ -145,6 +156,17 @@ public sealed partial class RekallAgeMeshOperationExecutor
                 new("includeBoundary", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(false), "Include one-face boundary edges.")
             ]),
         new(
+            "assign_linear_skin_weights",
+            "Authors normalized two-joint point skin bindings from position along an axis and bounded blend range.",
+            RekallAgeGeometryDomain.Point,
+            RekallAgeMeshChangeKind.Attributes,
+            [
+                StringParameter("axis", "y", "Blend axis: x, y, or z."),
+                NumberParameter("minimum"), NumberParameter("maximum", 1),
+                new("jointA", RekallAgeGeometryValueType.Int32, false, JsonSerializer.SerializeToElement(0), "Non-negative joint index at or below the minimum."),
+                new("jointB", RekallAgeGeometryValueType.Int32, false, JsonSerializer.SerializeToElement(1), "Non-negative joint index at or above the maximum.")
+            ]),
+        new(
             "mark_uv_seams",
             "Marks selected stable edges as UV chart seams in a named edge-domain Bool attribute.",
             RekallAgeGeometryDomain.Edge,
@@ -233,6 +255,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
         var result = request.OperationId switch
         {
             "transform" => Transform(source, request),
+            "taper_points" => TaperPoints(source, request),
             "reverse_faces" => ReverseFaces(source, request),
             "triangulate_faces" => TriangulateFaces(source, request),
             "extrude_faces" => ExtrudeFaces(source, request),
@@ -250,6 +273,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
             "merge_by_distance" => MergeByDistance(source, request),
             "bevel_edges" => BevelEdges(source, request),
             "select_edges_by_angle" => SelectEdgesByAngle(source, request),
+            "assign_linear_skin_weights" => AssignLinearSkinWeights(source, request),
             "inset_faces" => InsetFaces(source, request),
             "solidify" => Solidify(source, request),
             "weighted_normals" => WeightedNormals(source, request),

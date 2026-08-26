@@ -561,6 +561,17 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   Complete deformation, rigs, weights, constraints, and animated character
   evidence through the same source/evaluated/cooked boundary.
 
+  2026-08-26 first deformation/weight checkpoint: AGE now publishes
+  selection-aware linear two-joint skin assignment and axis/range/center taper
+  deformation through semantic operations, procedural nodes, and modifier
+  stacks. Aetherfall's mantle is no longer a manually authored 40-point proof;
+  a stored nine-node graph evaluates and revision-check-bakes 850 editable
+  points / 848 faces, then compiles 3,392 skinned vertices / 1,696 triangles.
+  Runtime acceptance proves frame-dependent skeletal deformation. Modeling
+  passes 246 tests and Aetherfall passes all 42 tests. This begins Wave 3; native
+  rig documents, bind-pose generation, constraints, richer weighting tools,
+  Studio visualization, and a production-quality full character remain open.
+
 - [ ] **Step 3: Execute Wave 4 as an independently accepted tranche**
 
   Complete bounded sculpt/paint/retopology/advanced proceduralism with compact

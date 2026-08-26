@@ -4,10 +4,35 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 11:08 Africa/Johannesburg
+Last verified: 2026-08-26 11:39 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
+
+The current deformation-authoring checkpoint adds two generic, inspectable
+modeling contracts. `assign_linear_skin_weights` and its graph/modifier
+surfaces author normalized two-joint point bindings from geometry along any
+local axis, preserve an existing complete pair, and fail closed on missing
+pairs, duplicate semantics, incompatible types, or unrelated canonical-name
+collisions. `taper_points` and its graph/modifier surfaces linearly scale planes
+perpendicular to X/Y/Z around an authored center and range, giving agents a
+reusable silhouette tool rather than a character-specific cape generator.
+Aetherfall's mantle now comes from a nine-node stored graph: a 16x24 cloth
+grid, hang transform, taper, deterministic folds, solidify, skin weights, UVs,
+and weighted normals. Revision-checked bake and Model Asset rebuild produce 850
+editable points / 848 faces and 3,392 compiled skinned vertices / 1,696
+triangles, versus the former hand-shaped 40-point mesh. Runtime acceptance
+proves a weighted vertex changes between frames 1 and 30. Modeling passes
+246/246, Aetherfall passes 42/42, project and scene validation are clean, and
+High `desktop60` at 2560x1440 passes at 97 draws, 195,210 triangles, 836,424
+vertices, and nine textures. The fresh frame-30 RTX 5090 capture is informative
+with 11,773 colors, mean luminance 0.100, 301 render-work draws, and zero
+observations or fallbacks. This closes a real procedural weighting and simple-
+deform gap; it does not make the Warden production quality. The capture still
+reads as a blockout because body silhouette, authored materials, garment
+construction, and animation remain too coarse. Those are the next visible
+character milestone, alongside native rig documents, bind poses, constraints,
+paint/normalize/prune tools, and Studio rig visualization.
 
 The current Blender/Godot-informed modeling tranche removes AGE's complete-edge
 bevel restriction. `bevel_edges` now accepts arbitrary selected two-face

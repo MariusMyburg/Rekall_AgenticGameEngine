@@ -232,6 +232,18 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         Assert.Contains(mantle.Components, component => component.Type == "Rekall.ModelAssetReference");
         Assert.Contains(mantle.Components, component => component.Type == "Rekall.SkeletonPose");
 
+        var mantleGraph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
+            projectRoot, "aetherfall.warden-mantle.graph", CancellationToken.None);
+        Assert.Contains(mantleGraph.Nodes, node => node.TypeId == "rekall.modeling.deform.taper");
+        Assert.Contains(mantleGraph.Nodes, node => node.TypeId == "rekall.modeling.skin.linear_weights");
+        Assert.Contains(mantleGraph.Nodes, node => node.TypeId == "rekall.modeling.solidify");
+        var mantleMesh = await new RekallAgeMeshAssetStore().LoadAsync(
+            projectRoot, "aetherfall-warden-mantle-mesh", CancellationToken.None);
+        Assert.True(mantleMesh.Topology.PointIds.Count >= 800,
+            $"Expected a dense authored mantle, found {mantleMesh.Topology.PointIds.Count} points.");
+        Assert.Contains(mantleMesh.Attributes, attribute => attribute.Semantic == "joint-indices-0");
+        Assert.Contains(mantleMesh.Attributes, attribute => attribute.Semantic == "joint-weights-0");
+
         var initial = new RekallAgeRuntimeWorldBuilder().Build(scene, projectRoot);
         var loop = RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot);
         var early = await loop.RunAsync(initial, 1, CancellationToken.None);

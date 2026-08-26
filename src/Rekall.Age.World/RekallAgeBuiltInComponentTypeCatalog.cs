@@ -73,6 +73,7 @@ public static class RekallAgeBuiltInComponentTypeCatalog
         "Rekall.AnimationMixer",
         "Rekall.AnimationStateGraph",
         "Rekall.SkeletalAnimator",
+        "Rekall.SkeletonPose",
         "Rekall.MorphWeights",
         "Rekall.UiCanvas",
         "Rekall.UiElement",

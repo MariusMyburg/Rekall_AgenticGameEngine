@@ -13,6 +13,33 @@ namespace Rekall.Age.Tests.Examples;
 public sealed class AetherfallHighFidelityAcceptanceTests
 {
     [Fact]
+    public async Task WardenMantleUsesNativeProceduralWeightsAndRuntimePoseDeformation()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var scene = await new RekallAgeSceneStore().LoadAsync(projectRoot, "Main", CancellationToken.None);
+        var mantle = Assert.Single(scene.Entities, entity => entity.Name == "Warden Deformable Mantle");
+        Assert.Contains("deformable-character", mantle.Tags);
+        Assert.Contains(mantle.Components, component => component.Type == "Rekall.ModelAssetReference");
+        Assert.Contains(mantle.Components, component => component.Type == "Rekall.SkeletonPose");
+
+        var initial = new RekallAgeRuntimeWorldBuilder().Build(scene, projectRoot);
+        var loop = RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot);
+        var early = await loop.RunAsync(initial, 1, CancellationToken.None);
+        var later = await loop.RunAsync(initial, 30, CancellationToken.None);
+        var builder = new RekallAgeRuntimeRenderFrameBuilder();
+        var earlyFrame = builder.Build(early.World, 640, 360, false);
+        var laterFrame = builder.Build(later.World, 640, 360, false);
+        var earlyMesh = Assert.Single(
+            new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(earlyFrame), mesh => mesh.EntityName == mantle.Name);
+        var laterMesh = Assert.Single(
+            new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(laterFrame), mesh => mesh.EntityName == mantle.Name);
+
+        Assert.NotEmpty(Assert.Single(earlyFrame.Renderables, item => item.EntityName == mantle.Name).GeometryMesh!.SkinBindings!);
+        Assert.NotEqual(earlyMesh.Vertices[^1].X, laterMesh.Vertices[^1].X);
+        Assert.DoesNotContain(laterFrame.Observations, observation => observation.Target == mantle.Name);
+    }
+
+    [Fact]
     public async Task WardenUsesModelBackedParentedArticulationThatFollowsGameplayRoot()
     {
         var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");

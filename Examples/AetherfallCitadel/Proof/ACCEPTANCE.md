@@ -355,3 +355,36 @@ the new background is an explicit fallback, not a claim that sky assets render.
   It does not claim Blender-class deformable procedural skin authoring or final
   Diablo/Alan Wake fidelity; those remain active high-priority modeling and
   content goals.
+
+## Native weighted procedural mantle checkpoint
+
+- AGE procedural meshes now carry canonical point-domain `joint-indices-0`
+  (`Int4`) and `joint-weights-0` (`Float4`) attributes through validation,
+  semantic mesh editing, compilation, Model Asset projection, and the existing
+  morph-before-skin Vulkan deformation path. Bindings are pair-validated,
+  finite, nonnegative, normalized, and expanded to emitted corner vertices.
+- `Rekall.SkeletonPose` is now a discoverable built-in component rather than a
+  runtime-only reserved name that ordinary agents and Studio cannot author.
+  The game remains responsible for pose behavior: `AetherfallRulesSystem`
+  emits two generic joint matrices from elapsed time without adding cape or
+  character logic to engine core.
+- Aetherfall consumes the path with `Warden Deformable Mantle`, a 40-point,
+  28-quad weighted mesh authored and reshaped through AGE's public mesh/model
+  commands. Its tapered sides, longitudinal folds, and pointed hem remain
+  editable source geometry, and the runtime test proves a weighted vertex
+  changes position between frames 1 and 30.
+- The real RTX 5090 High Vulkan proof is
+  `Proof/Captures/ProceduralSkinningShaped/vulkan-scene-1280x720-20260826030318049.png`.
+  At frame 30 it records 11,471 distinct colors, 14.5% dominant-color share,
+  mean luminance 0.104, 225 render-work draws, four dispatches, and zero
+  observations, missing assets, unsupported assets, or fallbacks.
+- The complete Aetherfall high-fidelity acceptance class passes 17/17. After
+  the final source-mesh and model rebuild, movement, combat, progression, and
+  reset still pass all 2/4/4/5 strict assertions; Warden X movement remains
+  `0.506840`. Project and scene validation report zero issues. High
+  `desktop60` at 1280x720 passes at 71 scene draws, 193,124 triangles, 748,520
+  vertices, seven textures, and a measured 4.665 ms GPU frame.
+- This is the first native weighted procedural consumer, not final character
+  production. Native armature assets, bind-pose/hierarchy editing, automatic
+  and painted weight tools, constraints, Studio rig visualization, and a much
+  larger character/environment fidelity pass remain outstanding.

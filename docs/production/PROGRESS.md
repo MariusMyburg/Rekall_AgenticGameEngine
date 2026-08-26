@@ -4,23 +4,25 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 04:33 Africa/Johannesburg
+Last verified: 2026-08-26 05:06 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
 
-The current Aetherfall engine-driven milestone adds generic runtime 3D parent
-transform composition, including frame-local caching and bounded diagnostics
-for missing parents and cycles. The real game consumes it through two detailed
-AGE-authored Warden attachments—a beveled runeblade and articulated pauldron—
-using ordinary Model Asset, parent, and animation contracts. A real RTX 5090
-High Vulkan combat capture succeeds with zero observations or asset fallbacks;
-the Aetherfall acceptance class passes 16/16, strict movement/combat/
-progression/reset proofs pass 2/4/4/5, validation reports zero issues, and the
-High desktop60 budget passes at 70 draws, 193,068 triangles, and 748,408
-vertices. This is a functional rigid-articulation milestone, not final visual
-acceptance: native deformable procedural armature/weight authoring and a major
-character/environment fidelity pass remain in progress.
+The current Aetherfall engine-driven milestone adds native weighted procedural
+mesh deformation. Point-domain joint indices and weights survive validation,
+ordinary semantic mesh edits, model compilation, runtime projection, and the
+existing generic skeleton-pose renderer. Aetherfall proves the contract with a
+public-command-authored, tapered and folded Warden mantle whose weighted vertex
+position changes between runtime frames. `Rekall.SkeletonPose` is now exposed
+through the ordinary built-in authoring schema. A real RTX 5090 High Vulkan
+capture succeeds with zero observations or asset fallbacks; the Aetherfall
+acceptance class passes 17/17, strict movement/combat/progression/reset proofs
+pass 2/4/4/5, validation reports zero issues, and the High desktop60 budget
+passes at 71 draws, 193,124 triangles, 748,520 vertices, and a measured 4.665
+ms GPU frame. This is a functional skin-binding milestone, not final visual
+acceptance: native armature documents, weight-paint tooling, constraints, and a
+major character/environment fidelity pass remain in progress.
 
 Current execution order is governed by
 [`STRATEGIC-PRIORITIES.md`](STRATEGIC-PRIORITIES.md). The immediate acceptance
@@ -3134,6 +3136,20 @@ behavior.
   `0CD2E7AA3AB10D941004E455A69E6EEAF532E47425B5DA52417D89F73A50EE9B`.
 
 ## Recently completed
+
+The native procedural skin-binding slice is acceptance-green. AGE now
+validates paired point-domain `Int4` joint indices and `Float4` weights,
+normalizes them, preserves them through mesh operations, expands them during
+cook, projects them through live-linked Model Assets, and reuses the existing
+morph-before-skin renderer. Aetherfall's shaped 40-point/28-quad mantle is the
+first editable weighted consumer. Focused compiler/model/renderer/animation
+tests pass 74/74; the complete high-fidelity game class passes 17/17; strict
+gameplay proofs pass 2/4/4/5; project/scene validation reports zero issues; and
+High `desktop60` passes at 71 draws, 193,124 triangles, 748,520 vertices, seven
+textures, and 4.665 ms measured GPU time. The retained real Vulkan frame has
+11,471 distinct colors and zero observations, missing assets, unsupported
+assets, or fallbacks. This closes native weight transport and deformation, not
+the remaining rig-document, weight-paint, constraint, or final-fidelity work.
 
 The freshly assembled `3a84dbc` product now passes the complete installed
 distribution acceptance in one clean run. The first attempt isolated a bug in

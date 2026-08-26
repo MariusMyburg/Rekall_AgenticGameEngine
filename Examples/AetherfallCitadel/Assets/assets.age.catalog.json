@@ -305,6 +305,25 @@
       }
     },
     {
+      "id": "aetherfall-warden-mantle-model",
+      "name": "aetherfall-warden-mantle-model",
+      "displayName": "Aetherfall Warden Deformable Mantle",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-warden-mantle-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-mantle-model\\f0177cf731b175a50c82524997b24a9580f1b2e84a3ffb47ea45bec12eab7590.age.compiled-mesh.json",
+      "contentHash": "f0177cf731b175a50c82524997b24a9580f1b2e84a3ffb47ea45bec12eab7590",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-warden-mantle-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-warden-mantle-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-mantle-model/f0177cf731b175a50c82524997b24a9580f1b2e84a3ffb47ea45bec12eab7590.age.compiled-mesh.json",
+        "compiledContentHash": "f0177cf731b175a50c82524997b24a9580f1b2e84a3ffb47ea45bec12eab7590"
+      }
+    },
+    {
       "id": "aetherfall-warden-model",
       "name": "aetherfall-warden-model",
       "displayName": "Aether Warden",

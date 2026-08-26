@@ -115,6 +115,14 @@ public sealed class RekallAgeSkeletalAnimatorComponent : RekallAgeComponent
     [RekallAgeProperty(Minimum = 0)] public double StartTimeSeconds { get; init; }
 }
 
+[RekallAgeComponent("Skeleton Pose", Description = "Supplies generic finite joint matrices for a weighted mesh. Imported skeletal animation writes this component at runtime; agent-authored modules may also update it for native AGE rigs.")]
+public sealed class RekallAgeSkeletonPoseComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 0)] public int SkinIndex { get; init; }
+    [RekallAgeProperty(Kind = "skeletonJoints", Description = "Array of 1 to 4096 {jointIndex,matrix} objects. jointIndex is non-negative and matrix is a finite row-major 4x4 array of 16 numbers.")]
+    public object[] Joints { get; init; } = [];
+}
+
 [RekallAgeComponent("Morph Weights", Description = "Supplies a complete generic morph-target weight array for the Rekall.MeshRenderer on the same entity. The existing AnimationClip, AnimationMixer, cubic interpolation, and AnimationStateGraph contracts can animate Weights.")]
 public sealed class RekallAgeMorphWeightsComponent : RekallAgeComponent
 {

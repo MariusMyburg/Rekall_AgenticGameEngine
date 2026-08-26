@@ -10325,6 +10325,104 @@
       "locked": false
     },
     {
+      "id": "ent_db81529e712a4582b7efe2af4bc97203",
+      "name": "Warden Deformable Mantle",
+      "tags": [
+        "cloth",
+        "deformable-character",
+        "player-visual"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#20252b"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "receiveShadows": true,
+            "castShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-warden-mantle-model"
+          }
+        },
+        {
+          "type": "Rekall.SkeletonPose",
+          "properties": {
+            "joints": [
+              {
+                "matrix": [
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "jointIndex": 0
+              },
+              {
+                "matrix": [
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "jointIndex": 1
+              }
+            ],
+            "skinIndex": 0
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "y": 3.5,
+            "x": 0,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0,
+            "scaleX": 0.82,
+            "z": -0.55,
+            "scaleZ": 0.82,
+            "scaleY": 0.82
+          }
+        }
+      ],
+      "parentId": "warden",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
       "id": "warden-halo",
       "name": "Warden Halo",
       "tags": [

@@ -75,7 +75,7 @@ AGE remains an independent C# implementation.
 | Capability | Status | Delivery wave | Reference inspiration | Required evidence |
 |---|---|---|---|---|
 | Displace/simple deform/lattice/curve deform/shrinkwrap | Planned | Wave 3 | corresponding Blender modifiers | Tests, Studio/agent surface, animated visible consumer |
-| Armature/skin/weights/constraints | Planned | Wave 3 | Blender armature/skin modifier; Godot skin/skeleton resources | Stable rig contracts, cook, runtime animation, character acceptance |
+| Armature/skin/weights/constraints | Partial | Wave 3: point-domain `Int4` joint indices and `Float4` weights now validate, normalize, survive semantic mesh edits, compile into corner-expanded vertices, project through Model Assets, and deform through the existing skeleton-pose renderer; Aetherfall provides a weighted animated consumer | Blender armature modifier and vertex groups; Godot mesh arrays, Skin, and Skeleton resources | Add native rig/armature documents, hierarchy editing, bind-pose generation, weight assign/paint/normalize/prune tools, constraints, Studio visualization, and complete character acceptance |
 | Sculpt/attribute/weight paint | Planned | Wave 4 | Blender sculpt BVH/stroke cache | Deterministic brush stamps, local dirtiness, compact undo |
 | Multires/dynamic topology/retopology | Planned | Wave 4 | Blender multires/sculpt/retopo concepts | Explicit lossy policy and attribute-transfer report |
 | GLB/OBJ/PLY/STL import and reimport | Partial | Wave 2 | Blender import nodes; Godot resource importers | Normalize into AGE source docs with hashes/settings/license/dependencies |

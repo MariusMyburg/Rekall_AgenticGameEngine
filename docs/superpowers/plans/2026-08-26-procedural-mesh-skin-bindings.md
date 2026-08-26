@@ -30,9 +30,9 @@ authored mesh with the existing generic skeleton-pose renderer path.
 
 ### Task 4: Playable consumer and evidence
 
-- [ ] Author a small weighted Aetherfall character part through ordinary mesh
+- [x] Author a small weighted Aetherfall character part through ordinary mesh
   attributes and a generic pose-producing module/component.
-- [ ] Capture a real High Vulkan frame showing deformation.
-- [ ] Re-run strict gameplay, validation, and Desktop60 budget gates.
-- [ ] Update modeling matrix, Aetherfall acceptance, and production progress.
+- [x] Capture a real High Vulkan frame showing deformation.
+- [x] Re-run strict gameplay, validation, and Desktop60 budget gates.
+- [x] Update modeling matrix, Aetherfall acceptance, and production progress.
 - [ ] Commit and push only after fresh verification succeeds.

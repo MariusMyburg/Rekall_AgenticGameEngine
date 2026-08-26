@@ -199,18 +199,18 @@ JSON modeling graphs, native Vulkan capture.
 - Produces: rebuilt Warden and weathered-ruin Model Assets plus retained visual,
   gameplay, validation, and performance evidence.
 
-- [ ] **Step 1: Add failing Aetherfall acceptance assertions**
+- [x] **Step 1: Add failing Aetherfall acceptance assertions**
 
   Require both graphs to contain `rekall.modeling.auto_smooth` immediately
   before their weighted-normal node, require nonzero corner-angle weighting,
   and require published compiled normals to contain more than one distinct
   shading direction while remaining finite/unit length.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
   Run `AetherfallHighFidelityAcceptanceTests`. Expected: graph nodes absent.
 
-- [ ] **Step 3: Mutate and rebuild through ordinary AGE commands**
+- [x] **Step 3: Mutate and rebuild through ordinary AGE commands**
 
   Insert auto smooth at 55 degrees for the Warden and 35 degrees for the ruin,
   rewire each final graph edge through it, set weighted normal output to
@@ -218,7 +218,7 @@ JSON modeling graphs, native Vulkan capture.
   and rebuild their existing Model Assets in place. Do not hand-edit cooked
   mesh bytes or add Aetherfall behavior to engine core.
 
-- [ ] **Step 4: Run focused GREEN and capture Vulkan evidence**
+- [x] **Step 4: Run focused GREEN and capture Vulkan evidence**
 
   Run the consolidated normal/model/Aetherfall selection, then capture frame 30
   at 1280x720 High with native Vulkan into
@@ -226,14 +226,14 @@ JSON modeling graphs, native Vulkan capture.
   smoother curved Warden forms and preserved crisp masonry/bevel boundaries,
   with zero black-dot noise, missing assets, fallbacks, or observations.
 
-- [ ] **Step 5: Re-run playable and performance gates**
+- [x] **Step 5: Re-run playable and performance gates**
 
   Run the checked-in movement/combat/progression/reset proof pairs and require
   2/4/4/5 strict passes. Run project validation, scene validation, and the High
   desktop60 budget at 1280x720; require zero issues and every budget within its
   configured limit.
 
-- [ ] **Step 6: Record, verify, commit, and push**
+- [x] **Step 6: Record, verify, commit, and push**
 
   Record exact capture statistics, visual inspection, test counts, gameplay
   counts, validation, and timing. Update the modeling matrix from planned to

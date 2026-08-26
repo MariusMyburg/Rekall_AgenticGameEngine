@@ -4,25 +4,26 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 05:31 Africa/Johannesburg
+Last verified: 2026-08-26 06:01 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
 
-The current Aetherfall engine-driven milestone adds truthful native Vulkan
-screen-space ambient occlusion on top of native weighted procedural mesh
-deformation. High/Epic now execute a bounded depth-derived `ssao-resolve` pass
-between opaque HDR and volumetric fog instead of advertising a placeholder AO
-resource. A real RTX 5090 High capture succeeds with clean restrained contact
-darkening, zero observations or asset fallbacks, and no black-dot noise or
-newly crushed silhouettes. The consolidated selection passes 72/72; strict
-movement/combat/progression/reset proofs pass 2/4/4/5; both validators report
-zero issues; and the High desktop60 budget passes at 71 scene draws, 193,124
-triangles, 748,520 vertices, and a measured 4.810080 ms GPU frame. SSAO itself
-accounts for one render-work draw and 0.011712 ms. This is a functional
-depth-only SSAO and skin-binding milestone, not final visual acceptance:
-normal-aware denoising, native armature/weight-paint tooling, and a major
-character/environment fidelity pass remain in progress.
+The current Aetherfall engine-driven milestone adds generic split-normal
+authoring on top of truthful native Vulkan SSAO and weighted procedural mesh
+deformation. Semantic mesh edits, graphs, and modifiers now expose face smooth,
+edge sharp, angle auto-smooth, and area/corner-angle-weighted split corner
+normals. Aetherfall's Warden and weathered ruin are live-linked consumers baked
+and rebuilt through ordinary AGE commands. The RTX 5090 High capture remains
+clean and informative with 11,509 distinct colors and zero observations,
+missing assets, unsupported assets, fallbacks, or black-dot noise. The focused
+selection passes 80/80; strict movement/combat/progression/reset proofs pass
+2/4/4/5; both validators report zero issues; and High desktop60 passes at 71
+scene draws, 193,124 triangles, 748,520 vertices, and 5.307360 ms measured GPU
+time. This closes the first split-normal policy slice, not final visual
+acceptance: custom-normal edit/transfer, substantially richer geometry and
+materials, dense world dressing, native rig authoring, animation, and final
+composition remain in progress.
 
 Current execution order is governed by
 [`STRATEGIC-PRIORITIES.md`](STRATEGIC-PRIORITIES.md). The immediate acceptance
@@ -3136,6 +3137,18 @@ behavior.
   `0CD2E7AA3AB10D941004E455A69E6EEAF532E47425B5DA52417D89F73A50EE9B`.
 
 ## Recently completed
+
+- Generic split-normal authoring is accepted end to end. AGE stores face
+  `normal.smooth` and edge `normal.sharp` policy, classifies sharpness from a
+  bounded angle, and builds deterministic split smooth fans with area and
+  corner-angle weighting. The Warden (55 degrees) and weathered ruin (35
+  degrees) now publish `normal.authored` through their real procedural graph,
+  baked mesh, and Model Asset chains. The retained native High frame is
+  `Examples/AetherfallCitadel/Proof/Captures/SplitNormals/vulkan-scene-1280x720-20260826035849526.png`;
+  focused tests pass 80/80, gameplay remains 2/4/4/5, validation is clean, and
+  `desktop60` passes at 5.307360 ms. The external Tripo/Meshy generation study
+  remains explicitly queued after native Aetherfall modeling acceptance behind
+  a provider-neutral asynchronous job and normalized GLB import contract.
 
 - Native Vulkan SSAO now executes as a truthful graphics pass after opaque HDR
   and before fog. High uses eight deterministic depth taps and Epic twelve,

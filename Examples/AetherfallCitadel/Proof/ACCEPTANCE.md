@@ -418,3 +418,33 @@ the new background is an explicit fallback, not a claim that sky assets render.
   deferred normal-aware, half-resolution, bilateral/temporal-denoised solution,
   and it does not by itself close the remaining character, prop, environment,
   material, composition, and animation fidelity gap.
+
+## Split-normal authoring checkpoint
+
+- AGE now exposes generic face smoothing, explicit sharp-edge marking, angle-
+  based auto smoothing, and split weighted corner-normal generation through
+  semantic mesh edits, procedural graphs, and modifier stacks. The source
+  policy remains inspectable as face `normal.smooth` and edge `normal.sharp`
+  attributes; the baked semantic corner output is `normal.authored`.
+- Aetherfall's Warden graph uses a 55-degree policy and its weathered ruin uses
+  35 degrees. Both were patched, baked, and rebuilt through ordinary revision-
+  checked AGE commands rather than by editing cooked mesh bytes.
+- The strict consumer test first failed 0/2 because both auto-smooth nodes were
+  absent, then passed 2/2 after authoring. The consolidated normal, graph,
+  modifier, compiler, command, and high-fidelity selection passes 80/80.
+- The retained RTX 5090 High Vulkan frame is
+  `Proof/Captures/SplitNormals/vulkan-scene-1280x720-20260826035849526.png`.
+  Frame 30 is informative with 11,509 distinct colors, 17.0% dominant-color
+  share, mean luminance 0.100, 64 renderables, 226 render-work draws, four
+  dispatches, and zero observations, missing assets, unsupported assets, or
+  fallbacks. Visual inspection shows stable curved armor/stone shading and
+  preserved hard architectural boundaries without black-dot noise.
+- Movement, combat, progression, and reset retain all 2/4/4/5 strict passes;
+  project and scene validation report zero issues. High `desktop60` remains
+  within every configured budget at 71 scene draws, 193,124 triangles, 748,520
+  vertices, seven textures, and 5.307360 ms measured GPU time; SSAO accounts
+  for 0.012000 ms and the complete workload remains 226 draws/four dispatches.
+- This closes the first split-normal policy slice, not Aetherfall's visual-
+  fidelity target. Custom-normal editing/transfer, richer high-resolution
+  geometry, production materials, denser world dressing, animation, and final
+  composition remain substantial visible work.

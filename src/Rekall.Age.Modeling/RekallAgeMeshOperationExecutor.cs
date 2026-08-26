@@ -49,6 +49,16 @@ public sealed partial class RekallAgeMeshOperationExecutor
                 NumberParameter("centerX"), NumberParameter("centerY"), NumberParameter("centerZ")
             ]),
         new(
+            "crater_stamp",
+            "Displaces selected points downward along an axis in a smooth radial falloff around a center point and radius, for terrain deformation such as explosion craters.",
+            RekallAgeGeometryDomain.Point,
+            RekallAgeMeshChangeKind.Positions,
+            [
+                StringParameter("axis", "y", "Displacement axis: x, y, or z."),
+                NumberParameter("centerX"), NumberParameter("centerY"), NumberParameter("centerZ"),
+                NumberParameter("radius", 1), NumberParameter("depth", 1)
+            ]),
+        new(
             "reverse_faces",
             "Reverses selected face winding while preserving stable face/corner identity and corner attributes.",
             RekallAgeGeometryDomain.Face,
@@ -279,6 +289,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
             "transform" => Transform(source, request),
             "taper_points" => TaperPoints(source, request),
             "bend_points" => BendPoints(source, request),
+            "crater_stamp" => CraterStamp(source, request),
             "reverse_faces" => ReverseFaces(source, request),
             "triangulate_faces" => TriangulateFaces(source, request),
             "extrude_faces" => ExtrudeFaces(source, request),

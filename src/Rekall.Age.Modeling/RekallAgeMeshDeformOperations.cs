@@ -82,6 +82,75 @@ public sealed partial class RekallAgeMeshOperationExecutor
             };
     }
 
+    /// <summary>
+    /// Displaces selected points downward along <c>axis</c> in a smooth radial falloff around a
+    /// center point: full <c>depth</c> at the center, zero at and beyond <c>radius</c>, monotonic
+    /// in between. Planar distance is measured in the plane perpendicular to <c>axis</c>, so a
+    /// crater on a flat ground mesh (axis "y") radiates outward in X/Z regardless of each point's
+    /// own height.
+    /// </summary>
+    private static RekallAgeMeshOperationResult CraterStamp(
+        RekallAgeMeshAsset source,
+        RekallAgeMeshOperationRequest request)
+    {
+        RequireDomain(request, RekallAgeGeometryDomain.Point);
+        var pointIndices = ResolveIndices(source.Topology.PointIds, request.ElementIds, "point");
+        var axis = ReadBoundedString(request.Parameters, "axis", "y").ToLowerInvariant();
+        if (axis is not ("x" or "y" or "z"))
+            throw Failure("REKALL_MESH_CRATER_AXIS_INVALID", "Crater axis must be x, y, or z.");
+        var centerX = ReadFiniteDouble(request.Parameters, "centerX");
+        var centerY = ReadFiniteDouble(request.Parameters, "centerY");
+        var centerZ = ReadFiniteDouble(request.Parameters, "centerZ");
+        var radius = ReadFiniteDouble(request.Parameters, "radius", 1);
+        if (radius <= 0)
+            throw Failure("REKALL_MESH_CRATER_RADIUS_INVALID", "Crater radius must be positive.");
+        var depth = ReadFiniteDouble(request.Parameters, "depth", 1);
+
+        var positions = source.Topology.Positions.ToArray();
+        var affected = new List<RekallAgeGeometryVector3>(pointIndices.Count * 2);
+        foreach (var index in pointIndices)
+        {
+            var before = positions[index];
+            var dx = axis == "x" ? 0 : before.X - centerX;
+            var dy = axis == "y" ? 0 : before.Y - centerY;
+            var dz = axis == "z" ? 0 : before.Z - centerZ;
+            var distance = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+            var falloff = distance >= radius ? 0 : (Math.Cos(distance / radius * Math.PI) + 1) / 2;
+            var displacement = depth * falloff;
+            var after = displacement == 0 ? before : WithCoordinate(before, axis, Coordinate(before, axis) - displacement);
+            if (!IsFinite(after.X) || !IsFinite(after.Y) || !IsFinite(after.Z))
+                throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", "Crater parameters produce a non-finite position.");
+            affected.Add(before);
+            affected.Add(after);
+            positions[index] = after;
+        }
+
+        var mesh = source with
+        {
+            Revision = checked(source.Revision + 1),
+            Topology = source.Topology with { Positions = positions }
+        };
+        var ids = request.ElementIds.Order().ToArray();
+        return Result(source, mesh,
+            ChangeSet(RekallAgeMeshChangeKind.Positions, modifiedPoints: ids, affectedBounds: Bounds(affected)),
+            ids.Select(id => Preserve(RekallAgeGeometryDomain.Point, id)).ToArray());
+
+        static double Coordinate(RekallAgeGeometryVector3 point, string coordinateAxis) => coordinateAxis switch
+        {
+            "x" => point.X,
+            "y" => point.Y,
+            _ => point.Z
+        };
+
+        static RekallAgeGeometryVector3 WithCoordinate(RekallAgeGeometryVector3 point, string coordinateAxis, double value) =>
+            coordinateAxis switch
+            {
+                "x" => point with { X = value },
+                "y" => point with { Y = value },
+                _ => point with { Z = value }
+            };
+    }
+
     private static RekallAgeMeshOperationResult TaperPoints(
         RekallAgeMeshAsset source,
         RekallAgeMeshOperationRequest request)

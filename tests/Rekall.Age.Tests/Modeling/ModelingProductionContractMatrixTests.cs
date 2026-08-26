@@ -20,7 +20,8 @@ public sealed class ModelingProductionContractMatrixTests
         "set_edge_crease",
         "merge_by_distance",
         "assign_envelope_skin_weights",
-        "bend_points"
+        "bend_points",
+        "crater_stamp"
     };
 
     public static TheoryData<string> ModifierCases => new()
@@ -194,12 +195,12 @@ public sealed class ModelingProductionContractMatrixTests
     public void ProductionMatricesExactlyCoverThePublishedOperationAndModifierCatalogs()
     {
         var operationIds = new RekallAgeMeshOperationExecutor().Descriptors.Select(item => item.OperationId).ToArray();
-        Assert.Equal(30, operationIds.Length);
+        Assert.Equal(31, operationIds.Length);
         Assert.All(new[]
         {
             "transform", "reverse_faces", "triangulate_faces", "extrude_faces", "delete",
             "generate_normals", "shade_faces", "mark_sharp", "auto_smooth", "project_uv", "mark_uv_seams", "unwrap_pack_uv", "subdivide_faces", "subdivide_smooth", "set_edge_crease", "merge_by_distance",
-            "bevel_edges", "select_edges_by_angle", "assign_linear_skin_weights", "assign_envelope_skin_weights", "taper_points", "bend_points", "inset_faces", "solidify", "weighted_normals",
+            "bevel_edges", "select_edges_by_angle", "assign_linear_skin_weights", "assign_envelope_skin_weights", "taper_points", "bend_points", "crater_stamp", "inset_faces", "solidify", "weighted_normals",
             "fill_holes", "bridge_edge_loops", "poke_faces", "dissolve_edges", "bisect_plane"
         }, expected => Assert.Contains(expected, operationIds));
 
@@ -266,6 +267,7 @@ public sealed class ModelingProductionContractMatrixTests
             "merge_by_distance" => new JsonObject { ["distance"] = 0.0001 },
             "assign_envelope_skin_weights" => EnvelopeParameters(),
             "bend_points" => new JsonObject { ["axis"] = "y", ["bendAxis"] = "z", ["minimum"] = -1.0, ["maximum"] = 1.0, ["angleDegrees"] = 15.0 },
+            "crater_stamp" => new JsonObject { ["axis"] = "y", ["centerX"] = 0.0, ["centerY"] = 0.0, ["centerZ"] = 0.0, ["radius"] = 2.0, ["depth"] = 0.25 },
             _ => new JsonObject()
         };
         return new(operationId, domain, elementIds, parameters);

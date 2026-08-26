@@ -272,13 +272,19 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         };
         var origin = ToVector(ReadVector3(node, "origin", new(0, 0, 0)));
         var angleDegrees = ReadNumber(node, "angleDegrees", 360);
-        if (angleDegrees <= 0 || angleDegrees > 360)
-            throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Curve revolve angleDegrees must be greater than zero and at most 360.", node.NodeId);
+        if (!double.IsFinite(angleDegrees) || angleDegrees <= 0 || angleDegrees > 36_000)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Curve revolve angleDegrees must be finite, greater than zero, and at most 36000.", node.NodeId);
+        var pitchPerTurn = ReadNumber(node, "pitchPerTurn", 0);
+        if (!double.IsFinite(pitchPerTurn) || pitchPerTurn < -1_000_000 || pitchPerTurn > 1_000_000)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Curve revolve pitchPerTurn must be finite and from -1000000 through 1000000 world units.", node.NodeId);
+        if (angleDegrees > 360 && Math.Abs(pitchPerTurn) <= 1e-12)
+            throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Curve revolve angleDegrees above 360 requires a nonzero pitchPerTurn to avoid overlapping revolutions.", node.NodeId);
         var segments = ReadInteger(node, "segments", 32, 3, 4096);
         var weldDistance = ReadNumber(node, "weldDistance", 0.000001);
         if (weldDistance < 0 || weldDistance > 1)
             throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Curve revolve weldDistance must be from zero through one world unit.", node.NodeId);
-        var wraps = Math.Abs(angleDegrees - 360) <= 1e-9;
+        var pitched = Math.Abs(pitchPerTurn) > 1e-12;
+        var wraps = !pitched && Math.Abs(angleDegrees - 360) <= 1e-9;
         var ringCount = wraps ? segments : segments + 1;
         var profileSpanCount = profile.Cyclic ? profile.Points.Count : profile.Points.Count - 1;
         var maximumPointCount = checked((long)ringCount * profile.Points.Count);
@@ -296,28 +302,34 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         var positions = new List<RekallAgeGeometryVector3>((int)maximumPointCount);
         var pointProfileIndices = new List<int>((int)maximumPointCount);
         var pointAngles = new List<double>((int)maximumPointCount);
+        var pointAxialOffsets = new List<double>((int)maximumPointCount);
         var pointLookup = new int[ringCount, profile.Points.Count];
         var weldedPointIndices = Enumerable.Repeat(-1, profile.Points.Count).ToArray();
         var onAxis = profile.Points.Select(point => RadialDistance(ToVector(point.Position), origin, axis) <= weldDistance).ToArray();
         for (var ring = 0; ring < ringCount; ring++)
         {
-            var radians = (float)(Math.PI / 180 * angleDegrees * ring / segments);
+            var ringAngleDegrees = angleDegrees * ring / segments;
+            var radians = (float)(Math.PI / 180 * ringAngleDegrees);
+            var axialOffset = pitchPerTurn * ringAngleDegrees / 360;
             var rotation = Quaternion.CreateFromAxisAngle(axis, radians);
             for (var profileIndex = 0; profileIndex < profile.Points.Count; profileIndex++)
             {
-                if (onAxis[profileIndex] && weldedPointIndices[profileIndex] >= 0)
+                if (!pitched && onAxis[profileIndex] && weldedPointIndices[profileIndex] >= 0)
                 {
                     pointLookup[ring, profileIndex] = weldedPointIndices[profileIndex];
                     continue;
                 }
                 var point = profile.Points[profileIndex];
-                var rotated = origin + Vector3.Transform(ToVector(point.Position) - origin, rotation);
+                var rotated = origin
+                    + Vector3.Transform(ToVector(point.Position) - origin, rotation)
+                    + axis * (float)axialOffset;
                 var pointIndex = positions.Count;
                 positions.Add(new(rotated.X, rotated.Y, rotated.Z));
                 pointProfileIndices.Add(profileIndex);
-                pointAngles.Add(onAxis[profileIndex] ? 0 : angleDegrees * ring / segments);
+                pointAngles.Add(!pitched && onAxis[profileIndex] ? 0 : ringAngleDegrees);
+                pointAxialOffsets.Add(axialOffset);
                 pointLookup[ring, profileIndex] = pointIndex;
-                if (onAxis[profileIndex]) weldedPointIndices[profileIndex] = pointIndex;
+                if (!pitched && onAxis[profileIndex]) weldedPointIndices[profileIndex] = pointIndex;
             }
         }
 
@@ -370,6 +382,7 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             return JsonSerializer.SerializeToElement($"{point.SourceSplineId}:{point.SourceStartControlPointId}:{point.SourceEndControlPointId}:{point.SegmentT:R}");
         }).ToArray();
         var angleValues = pointAngles.Select(value => JsonSerializer.SerializeToElement(value)).ToArray();
+        var axialOffsetValues = pointAxialOffsets.Select(value => JsonSerializer.SerializeToElement(value)).ToArray();
         var materialValues = Enumerable.Range(0, mesh.Topology.FaceIds.Count)
             .Select(_ => JsonSerializer.SerializeToElement(0)).ToArray();
         var smoothValues = Enumerable.Range(0, mesh.Topology.FaceIds.Count)
@@ -382,6 +395,7 @@ public sealed partial class RekallAgeModelingGraphEvaluator
                 new("uv.generated", RekallAgeGeometryDomain.Corner, RekallAgeGeometryValueType.Float2, uvValues, "texcoord-0"),
                 new("curve.source.span", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.String, provenanceValues, "curve-source-span", RekallAgeGeometryInterpolation.Nearest),
                 new("revolve.angle", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.Float, angleValues, "revolve-angle"),
+                new("revolve.axial_offset", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.Float, axialOffsetValues, "revolve-axial-offset"),
                 new("material.index", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.Int32, materialValues, "material-index", RekallAgeGeometryInterpolation.Nearest, JsonSerializer.SerializeToElement(0)),
                 new("normal.smooth", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.Bool, smoothValues, "smooth-shading", RekallAgeGeometryInterpolation.Nearest, JsonSerializer.SerializeToElement(true))
             ]

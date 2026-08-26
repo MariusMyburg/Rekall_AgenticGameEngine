@@ -28,8 +28,12 @@ public sealed class CurveRevolveTests
         Assert.Equal(RekallAgeModelingValueType.Vector3,
             Assert.Single(descriptor.Parameters, parameter => parameter.ParameterId == "origin").ValueType);
         var angle = Assert.Single(descriptor.Parameters, parameter => parameter.ParameterId == "angleDegrees");
-        Assert.Equal(360, angle.Maximum);
+        Assert.Equal(36_000, angle.Maximum);
         Assert.Equal("degree", angle.Unit);
+        var pitch = Assert.Single(descriptor.Parameters, parameter => parameter.ParameterId == "pitchPerTurn");
+        Assert.Equal(-1_000_000, pitch.Minimum);
+        Assert.Equal(1_000_000, pitch.Maximum);
+        Assert.Equal("world-unit", pitch.Unit);
         var segments = Assert.Single(descriptor.Parameters, parameter => parameter.ParameterId == "segments");
         Assert.Equal(3, segments.Minimum);
         Assert.Equal(4096, segments.Maximum);
@@ -176,6 +180,54 @@ public sealed class CurveRevolveTests
         Assert.Equal(maxY, positions.Max(point => point.Y), 6);
         Assert.Equal(minZ, positions.Min(point => point.Z), 6);
         Assert.Equal(maxZ, positions.Max(point => point.Z), 6);
+    }
+
+    [Theory]
+    [InlineData(2.0, 0.0, 4.25, 4.0)]
+    [InlineData(-2.0, -4.0, 0.25, -4.0)]
+    public async Task SignedPitchProducesOpenMultiTurnScrewWithInspectableAxialOffsets(
+        double pitchPerTurn,
+        double expectedMinimumY,
+        double expectedMaximumY,
+        double expectedFinalOffset)
+    {
+        var result = await EvaluateProfileAsync(
+            [new(1, 0, 0), new(1, 0.25, 0)],
+            cyclic: false,
+            new JsonObject
+            {
+                ["axis"] = "y",
+                ["angleDegrees"] = 720.0,
+                ["segments"] = 8,
+                ["pitchPerTurn"] = pitchPerTurn
+            });
+
+        Assert.True(result.Succeeded, Diagnostics(result));
+        var mesh = result.Outputs["mesh"];
+        Assert.Equal(18, mesh.Topology.PointIds.Count);
+        Assert.Equal(8, mesh.Topology.FaceIds.Count);
+        Assert.Equal(expectedMinimumY, mesh.Topology.Positions.Min(point => point.Y), 6);
+        Assert.Equal(expectedMaximumY, mesh.Topology.Positions.Max(point => point.Y), 6);
+        Assert.Equal(18, new RekallAgeMeshValidator().Validate(mesh).Summary.BoundaryEdgeCount);
+
+        var angles = Attribute(mesh, "revolve.angle", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.Float);
+        var offsets = Attribute(mesh, "revolve.axial_offset", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.Float);
+        Assert.Equal(720, angles.Values.Max(value => value.GetDouble()), 6);
+        Assert.Equal(expectedFinalOffset, offsets.Values[^1].GetDouble(), 6);
+    }
+
+    [Fact]
+    public async Task MultiTurnZeroPitchRejectsOverlappingRevolution()
+    {
+        var result = await EvaluateProfileAsync(
+            [new(1, 0, 0), new(1, 1, 0)],
+            cyclic: false,
+            new JsonObject { ["angleDegrees"] = 720.0, ["segments"] = 16, ["pitchPerTurn"] = 0.0 });
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Code == "REKALL_MODELING_EVALUATION_PARAMETER_INVALID"
+            && diagnostic.Message.Contains("pitchPerTurn", StringComparison.Ordinal));
     }
 
     [Fact]

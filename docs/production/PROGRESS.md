@@ -4,34 +4,31 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 06:38 Africa/Johannesburg
+Last verified: 2026-08-26 07:02 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
 
-The current Aetherfall engine-driven milestone adds generic typed curve
-revolution on top of split-normal authoring, truthful native Vulkan SSAO, and
-weighted procedural mesh deformation. `rekall.modeling.curve.revolve@1`
-generates deterministic partial or closed revolutions around X/Y/Z, welds
-axis poles, emits seam-correct corner UVs plus source-span and angular
-provenance, assigns materials, and compiles through the ordinary graph/mesh/
-Model Asset path. Aetherfall's Warden now consumes a 40-segment layered cuirass
-profile and its weathered ruin consumes paired 32-segment closed crown-capital
-profiles, all patched, baked, and rebuilt through revision-checked AGE
-commands. The retained RTX 5090 High frame is clean and informative with
-11,725 distinct colors and zero observations, missing assets, unsupported
-assets, fallbacks, or black-dot noise. The consolidated selection passes
-85/85; strict movement/combat/progression/reset proofs pass 2/4/4/5; both
-validators report zero issues; and High desktop60 passes at 91 scene draws,
-224,564 triangles, 1,158,440 vertices, seven textures, and 6.374784 ms measured
-GPU time. A first whole-ruin bevel placement exceeded the vertex budget at
-2,799,400 vertices; routing the already-smooth capital branch after that
-legacy modifier fixed the multiplication without removing the authored form.
-This closes the first curve-revolve slice, not final visual acceptance:
-screw/helix, explicit cap policies, fields, multi-spline output, mesh Spin,
-modifier and Studio gizmo workflows, custom-normal transfer, substantially
-richer production assets/materials, native rig authoring, animation, and final
-composition remain in progress.
+The current Aetherfall engine-driven milestone extends generic typed curve
+revolution into signed multi-turn screw/helix authoring. The same
+`rekall.modeling.curve.revolve@1` node now accepts bounded `pitchPerTurn`, angles
+up to 36,000 degrees, open whole-turn topology, and signed
+`revolve.axial_offset` provenance while preserving its zero-pitch partial/full
+revolution behavior. Aetherfall's rebuilt conduit publishes counter-wound
+1,080-degree coils, a beveled obsidian body, and a raised aether core, then
+replaces both old ruin-proxy scene instances through the ordinary graph/bake/
+Model Asset path. The retained RTX 5090 High frame is clean and informative
+with 11,735 distinct colors and zero observations, missing assets, unsupported
+assets, fallbacks, or black-dot noise. All 22 Aetherfall high-fidelity tests
+pass; strict movement/combat/progression/reset proofs pass 2/4/4/5; both
+validators report zero issues; and High desktop60 passes at 92 scene draws,
+224,496 triangles, 1,165,544 vertices, seven textures, and 5.545472 ms measured
+GPU time. This closes screw/helix pitch, not final visual acceptance: automatic
+LOD generation is now urgent because source detail is near the 1,250,000-
+vertex budget, while explicit cap policies, fields, multi-spline output, mesh
+Spin, modifier and Studio gizmo workflows, custom-normal transfer,
+substantially richer production assets/materials, native rig authoring,
+animation, and final composition remain in progress.
 
 Current execution order is governed by
 [`STRATEGIC-PRIORITIES.md`](STRATEGIC-PRIORITIES.md). The immediate acceptance
@@ -3145,6 +3142,19 @@ behavior.
   `0CD2E7AA3AB10D941004E455A69E6EEAF532E47425B5DA52417D89F73A50EE9B`.
 
 ## Recently completed
+
+- Generic curve screw/helix authoring is accepted end to end. Signed
+  `pitchPerTurn`, multi-turn open topology, and axial-offset provenance now
+  compile through the standard curve/graph/mesh/Model Asset path. Aetherfall's
+  two live conduits replace ruin proxies with a raised core and counter-wound
+  1,080-degree coils. The retained native High frame is
+  `Examples/AetherfallCitadel/Proof/Captures/CurveScrew/vulkan-scene-1280x720-20260826045904181.png`;
+  all 22 high-fidelity tests pass, gameplay remains 2/4/4/5, validation is
+  clean, and `desktop60` passes at 5.545472 ms. Generated LOD variants are now
+  the immediate scalability requirement because the detailed source scene is
+  at 1,165,544 of 1,250,000 allowed vertices. Tripo/Meshy generation/import
+  remains researched and queued behind the native Aetherfall milestone through
+  the documented provider-neutral asynchronous job boundary.
 
 - Generic typed curve revolution is accepted end to end. AGE now publishes
   `rekall.modeling.curve.revolve@1` with bounded X/Y/Z partial/full rings,

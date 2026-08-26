@@ -489,3 +489,35 @@ the new background is an explicit fallback, not a claim that sky assets render.
   output, mesh-selection Spin, a modifier form, Studio profile/axis editing,
   higher-resolution production assets, richer materials, animation, world
   dressing, and composition remain substantial work.
+
+## Curve screw/helix authoring checkpoint
+
+- AGE extends `rekall.modeling.curve.revolve@1` with bounded signed
+  `pitchPerTurn` and angles up to 36,000 degrees. A pitched revolution remains
+  open across whole turns, advances along the selected X/Y/Z axis, and emits
+  signed point-domain `revolve.axial_offset` alongside the existing source-span,
+  angle, UV, material, and smoothing data. Zero-pitch revolutions above one turn
+  are rejected because they would only generate overlapping geometry.
+- Aetherfall's conduit graph now consumes the generic primitive twice: two
+  1,080-degree, 96-segment counter-wound coils surround a beveled obsidian body,
+  and a transformed spherical aether core rises above it. The result was
+  evaluated, baked, published, rebuilt at model revision 3, and assigned to both
+  live conduit entities through ordinary AGE commands; the old ruin proxies are
+  gone.
+- The retained RTX 5090 High Vulkan frame is
+  `Proof/Captures/CurveScrew/vulkan-scene-1280x720-20260826045904181.png`.
+  Frame 30 is informative with 11,735 distinct colors, 16.9% dominant-color
+  share, mean luminance 0.101, 64 renderables, 285 render-work draws, four
+  dispatches, and zero observations, missing assets, unsupported assets, or
+  fallbacks. Visual inspection confirms that the left conduit reads as a tall
+  authored device with an elevated core and helical cage.
+- All 22 Aetherfall high-fidelity acceptance tests pass. Movement, combat,
+  progression, and reset retain all 2/4/4/5 strict executable assertions, and
+  project plus scene validation report zero issues. High `desktop60` passes at
+  92 scene draw calls, 224,496 triangles, 1,165,544 vertices, seven textures,
+  and 5.545472 ms measured GPU time.
+- The source-detail increase is intentionally retained, but the scene is now
+  near its 1,250,000-vertex desktop60 limit. Automatic generated LOD variants
+  and distance selection are therefore the next scalability requirement.
+  Character anatomy, clothing, animation, architectural density, materials,
+  and composition also remain visibly below the requested final fidelity.

@@ -5855,6 +5855,40 @@ environmental-gate chronology, raw artifact hashes, and residue audit:
   `desktop60` passes at 8.642528 ms GPU time, 203,638 triangles, 873,116
   vertices, 97 scene draws, and nine textures.
 
+## Studio orbit/pan/zoom viewport camera checkpoint
+
+- Studio's mesh-editing viewport previously had no camera at all: a fixed
+  axonometric projection with no way to rotate, pan, or zoom the view. It now
+  has a real orbit camera. Middle-mouse drag orbits (yaw always turns around
+  world-up, independent of pitch — Blender's default orbit convention), shift
+  + middle-drag pans, the scroll wheel dollies zoom, and toolbar buttons offer
+  "Frame Selected" (reset pan/zoom) and an orthographic/perspective toggle.
+  Left-button gizmo drag and element selection are completely unchanged.
+- `RekallAgeStudioMeshViewportRenderer.Project` is now camera-aware:
+  `RekallAgeStudioViewportCamera.Identity` reproduces the original fixed
+  projection exactly (proven by a 4-point regression test), so orbiting is a
+  rotation *relative to* the same well-tuned default framing, not a
+  fundamentally different view. Zoom/pan are applied in `Render` after
+  auto-fit rather than inside `Project`, because baking them into `Project`
+  let the auto-fit step's own re-normalization silently cancel them back out
+  — caught empirically by the first implementation's zoom/pan tests going red.
+- This is sub-project 2 (of two identified during the 2026-08-26 brainstorm)
+  from the Studio 3D-modeling-parity audit, and its first slice: sub-project 1
+  (the animation workspace) was intentionally reordered behind it since real
+  camera navigation is a prerequisite for any interactive 3D authoring tool,
+  including the eventual gizmo-based pose editor. See
+  `docs/superpowers/specs/2026-08-26-studio-3d-viewport-navigation-design.md`
+  and `docs/superpowers/plans/2026-08-26-studio-3d-viewport-navigation.md`.
+- Remaining modeling-parity gaps identified by the same audit, still open: a
+  visual node-graph canvas (today's "Procedural Geometry" panel is a flat
+  parameter-form list with no wiring view), modal direct-manipulation mesh
+  tools (extrude/bevel/inset are combo-box-plus-form, not drag gestures), a
+  materials/UV panel depth audit, and the animation workspace itself (see the
+  "Studio has no animation-authoring surface" gap above).
+- Verified: full `Rekall.Age.Studio.Tests` suite 98/98 (92 before this slice),
+  no regressions; `Rekall.Age.Tests` Aetherfall filter unaffected at 50/50;
+  solution builds Release with 0 warnings/errors.
+
 ## Ability-driven authored rig animation checkpoint
 
 - `ability.pulse` and `ability.dash` now drive authored motion instead of only

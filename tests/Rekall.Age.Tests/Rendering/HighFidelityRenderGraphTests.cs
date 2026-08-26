@@ -34,12 +34,28 @@ public sealed class HighFidelityRenderGraphTests
         var graph = Build("High");
 
         Assert.Equal(
-            ["depth-normal", "shadow-directional", "cluster-build", "opaque-hdr", "fog-integrate", "fog-debug-readback", "transparent-particles", "bloom", "tone-map", "ui", "present"],
+            ["depth-normal", "shadow-directional", "cluster-build", "opaque-hdr", "ssao-resolve", "fog-integrate", "fog-debug-readback", "transparent-particles", "bloom", "tone-map", "ui", "present"],
             graph.Passes.Select(pass => pass.Name));
         Assert.All(graph.Passes, pass => Assert.All(
             pass.Reads,
             resource => Assert.Contains(graph.Resources, item => item.Name == resource)));
         Assert.True(graph.IsValid);
+    }
+
+    [Fact]
+    public void BuilderDeclaresTruthfulQualityScaledSsaoResolveAfterOpaqueBeforeFog()
+    {
+        var high = Build("High");
+
+        Assert.DoesNotContain(high.Resources, item => item.Name == "ssao-occlusion");
+        var ssao = Assert.Single(high.Passes, item => item.Name == "ssao-resolve");
+        Assert.Equal("graphics", ssao.Kind);
+        Assert.Equal(["depth-buffer"], ssao.Reads);
+        Assert.Equal(["scene-hdr"], ssao.Writes);
+        Assert.True(high.Passes.Single(pass => pass.Name == "opaque-hdr").Order < ssao.Order);
+        Assert.True(ssao.Order < high.Passes.Single(pass => pass.Name == "fog-integrate").Order);
+
+        Assert.DoesNotContain(Build("Performance").Passes, pass => pass.Name == "ssao-resolve");
     }
 
     [Fact]
@@ -215,7 +231,7 @@ public sealed class HighFidelityRenderGraphTests
     {
         var graph = Build("High");
 
-        Assert.Equal(144_795_648, graph.EstimatedBytes);
+        Assert.Equal(143_874_048, graph.EstimatedBytes);
         Assert.Equal(
             graph.Resources
                 .Where(resource => resource.Lifetime != "external")

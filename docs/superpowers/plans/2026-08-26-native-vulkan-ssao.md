@@ -33,7 +33,7 @@
 - Consumes: `RekallAgeResolvedRenderFeaturePlan.Post.Ssao` and `RekallAgeInteractiveAmbientOcclusionPlanner.Plan(...)`.
 - Produces: graph pass named `ssao-resolve` with reads `depth-buffer` and writes `scene-hdr`, ordered immediately after `opaque-hdr`.
 
-- [ ] **Step 1: Write failing graph-order tests**
+- [x] **Step 1: Write failing graph-order tests**
 
 Add assertions equivalent to:
 
@@ -49,7 +49,7 @@ Assert.True(ssao.Order < high.Passes.Single(p => p.Name == "fog-integrate").Orde
 Assert.DoesNotContain(Build("Performance").Passes, p => p.Name == "ssao-resolve");
 ```
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run:
 
@@ -59,7 +59,7 @@ dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter
 
 Expected: graph-order assertions fail because SSAO is a fictitious cluster output and no `ssao-resolve` pass exists.
 
-- [ ] **Step 3: Implement the graph contract**
+- [x] **Step 3: Implement the graph contract**
 
 Remove the conditional `ssao-occlusion` resource, remove it from `ClusterWrites`/`OpaqueReads`, insert:
 
@@ -72,11 +72,11 @@ if (plan.Post.Ssao)
 
 immediately after `opaque-hdr` and before `fog-integrate`. Keep every later order monotonic.
 
-- [ ] **Step 4: Run the focused tests and verify GREEN**
+- [x] **Step 4: Run the focused tests and verify GREEN**
 
 Run the Step 2 command. Expected: all selected tests pass and graph validation remains valid.
 
-- [ ] **Step 5: Commit the truthful graph boundary**
+- [x] **Step 5: Commit the truthful graph boundary**
 
 ```powershell
 git add src/Rekall.Age.Rendering/RekallAgeHighFidelityRenderGraphBuilder.cs tests/Rekall.Age.Tests/Rendering/HighFidelityRenderGraphTests.cs

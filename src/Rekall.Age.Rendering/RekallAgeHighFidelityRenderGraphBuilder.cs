@@ -24,11 +24,6 @@ public sealed class RekallAgeHighFidelityRenderGraphBuilder
             Resource("cluster-indices", "R32_UInt", DivideRoundUp(plan.RenderWidth, 16), DivideRoundUp(plan.RenderHeight, 16), 24, "transient", ["storage", "sampled"])
         };
 
-        if (plan.Post.Ssao)
-        {
-            resources.Add(Resource("ssao-occlusion", "R8_UNorm", DivideRoundUp(plan.RenderWidth, 2), DivideRoundUp(plan.RenderHeight, 2), 1, "transient", ["storage", "sampled"]));
-        }
-
         resources.Add(Resource(
             "scene-hdr",
             "R16G16B16A16_SFloat",
@@ -69,11 +64,16 @@ public sealed class RekallAgeHighFidelityRenderGraphBuilder
         {
             Pass("depth-normal", "graphics", [], ["depth-buffer", "normal-buffer"], 0),
             Pass("shadow-directional", "graphics", [], ["shadow-directional"], 1),
-            Pass("cluster-build", "compute", ["depth-buffer", "normal-buffer"], ClusterWrites(plan), 2),
-            Pass("opaque-hdr", "graphics", OpaqueReads(plan), ["scene-hdr"], 3)
+            Pass("cluster-build", "compute", ["depth-buffer", "normal-buffer"], ["cluster-indices"], 2),
+            Pass("opaque-hdr", "graphics", ["depth-buffer", "normal-buffer", "shadow-directional", "cluster-indices"], ["scene-hdr"], 3)
         };
 
         var nextOrder = 4;
+        if (plan.Post.Ssao)
+        {
+            passes.Add(Pass("ssao-resolve", "graphics", ["depth-buffer"], ["scene-hdr"], nextOrder++));
+        }
+
         passes.Add(plan.Fog.Mode.Equals("analytic", StringComparison.OrdinalIgnoreCase)
             ? Pass("fog-integrate", "graphics", ["scene-hdr", "depth-buffer"], ["scene-hdr"], nextOrder++)
             : Pass("fog-integrate", "compute", ["scene-hdr", "depth-buffer", "fog-history"], ["fog-froxel", "fog-history", "scene-hdr"], nextOrder++));
@@ -148,20 +148,6 @@ public sealed class RekallAgeHighFidelityRenderGraphBuilder
                     $"Viewport dimensions {frame.Width}x{frame.Height} do not match resolved output dimensions {plan.OutputWidth}x{plan.OutputHeight}."))
                 .ToArray()
         };
-    }
-
-    private static IReadOnlyList<string> ClusterWrites(RekallAgeResolvedRenderFeaturePlan plan) =>
-        plan.Post.Ssao ? ["cluster-indices", "ssao-occlusion"] : ["cluster-indices"];
-
-    private static IReadOnlyList<string> OpaqueReads(RekallAgeResolvedRenderFeaturePlan plan)
-    {
-        var reads = new List<string> { "depth-buffer", "normal-buffer", "shadow-directional", "cluster-indices" };
-        if (plan.Post.Ssao)
-        {
-            reads.Add("ssao-occlusion");
-        }
-
-        return reads;
     }
 
     private static RekallAgeHighFidelityRenderResource Resource(

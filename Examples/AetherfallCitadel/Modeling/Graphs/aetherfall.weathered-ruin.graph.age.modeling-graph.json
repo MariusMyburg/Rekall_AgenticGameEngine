@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.weathered-ruin.graph",
   "name": "Weathered Ruin Wall Module",
-  "revision": 11,
+  "revision": 12,
   "nodes": [
     {
       "nodeId": "wall",
@@ -871,6 +871,12 @@
           0.0
         ]
       }
+    },
+    {
+      "nodeId": "capital-post-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
     }
   ],
   "links": [
@@ -1099,13 +1105,6 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "join-weather",
-      "fromNodeId": "soften",
-      "fromPortId": "geometry",
-      "toNodeId": "weather-x",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "weather2",
       "fromNodeId": "weather-x",
       "fromPortId": "geometry",
@@ -1197,10 +1196,24 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "capital-pair-trim",
+      "linkId": "soften-capital-post",
+      "fromNodeId": "soften",
+      "fromPortId": "geometry",
+      "toNodeId": "capital-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "capital-pair-post",
       "fromNodeId": "capital-pair",
       "fromPortId": "geometry",
-      "toNodeId": "trim-join",
+      "toNodeId": "capital-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "capital-post-weather",
+      "fromNodeId": "capital-post-join",
+      "fromPortId": "geometry",
+      "toNodeId": "weather-x",
       "toPortId": "geometry"
     }
   ],

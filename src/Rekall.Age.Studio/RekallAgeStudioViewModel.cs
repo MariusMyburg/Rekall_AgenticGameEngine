@@ -95,6 +95,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _refreshMeshAssetsCommand;
     private readonly RekallAgeAsyncCommand _createMeshPrimitiveCommand;
     private readonly RekallAgeAsyncCommand _openMeshAssetCommand;
+    private readonly RekallAgeAsyncCommand _frameSelectedMeshViewportCommand;
+    private readonly RekallAgeAsyncCommand _toggleMeshViewportProjectionCommand;
     private readonly RekallAgeAsyncCommand _publishModelCommand;
     private readonly RekallAgeAsyncCommand _placeModelCommand;
     private readonly RekallAgeAsyncCommand _publishAndPlaceModelCommand;
@@ -369,6 +371,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _refreshMeshAssetsCommand = CreateAsyncCommand(RefreshMeshAssetsAsync, HasOpenProject);
         _createMeshPrimitiveCommand = CreateAsyncCommand(CreateMeshPrimitiveAsync, CanCreateMeshPrimitive);
         _openMeshAssetCommand = CreateAsyncCommand(OpenMeshAssetAsync, CanOpenMeshAsset);
+        _frameSelectedMeshViewportCommand = CreateAsyncCommand(
+            () => { FrameSelectedMeshViewport(); return Task.CompletedTask; },
+            () => _meshViewportFrame is not null);
+        _toggleMeshViewportProjectionCommand = CreateAsyncCommand(
+            () => { ToggleMeshViewportProjection(); return Task.CompletedTask; },
+            () => _meshViewportFrame is not null);
         _publishModelCommand = CreateAsyncCommand(PublishModelAsync, CanPublishModel);
         _placeModelCommand = CreateAsyncCommand(PlaceModelAsync, CanPlaceModel);
         _publishAndPlaceModelCommand = CreateAsyncCommand(PublishAndPlaceModelAsync, CanPublishAndPlaceModel);
@@ -474,6 +482,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand RefreshMeshAssetsCommand => _refreshMeshAssetsCommand;
     public ICommand CreateMeshPrimitiveCommand => _createMeshPrimitiveCommand;
     public ICommand OpenMeshAssetCommand => _openMeshAssetCommand;
+
+    public ICommand FrameSelectedMeshViewportCommand => _frameSelectedMeshViewportCommand;
+
+    public ICommand ToggleMeshViewportProjectionCommand => _toggleMeshViewportProjectionCommand;
     public ICommand PublishModelCommand => _publishModelCommand;
     public ICommand PlaceModelCommand => _placeModelCommand;
     public ICommand PublishAndPlaceModelCommand => _publishAndPlaceModelCommand;
@@ -3773,6 +3785,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _refreshMeshAssetsCommand.RaiseCanExecuteChanged();
         _createMeshPrimitiveCommand.RaiseCanExecuteChanged();
         _openMeshAssetCommand.RaiseCanExecuteChanged();
+        _frameSelectedMeshViewportCommand.RaiseCanExecuteChanged();
+        _toggleMeshViewportProjectionCommand.RaiseCanExecuteChanged();
         _publishModelCommand.RaiseCanExecuteChanged();
         _placeModelCommand.RaiseCanExecuteChanged();
         _publishAndPlaceModelCommand.RaiseCanExecuteChanged();

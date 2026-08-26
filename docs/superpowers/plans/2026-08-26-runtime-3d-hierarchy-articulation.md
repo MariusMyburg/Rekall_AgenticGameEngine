@@ -31,27 +31,27 @@
 - Consumes: `RekallAgeRuntimeWorld`, entity `ParentId`, and `RekallAgeRuntimeTransform`
 - Produces: `Resolve(string entityId)`, plus bounded `RekallAgeRuntimeViewportObservation` diagnostics
 
-- [ ] **Step 1: Write failing frame-builder tests**
+- [x] **Step 1: Write failing frame-builder tests**
 
   Add literal parent/child scenes proving combined translation/rotation/scale,
   and separate missing-parent/cycle cases proving local fallback plus stable
   diagnostic codes.
 
-- [ ] **Step 2: Run the focused tests and confirm RED**
+- [x] **Step 2: Run the focused tests and confirm RED**
 
   Run `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter "FullyQualifiedName~ViewportContractTests.RuntimeFrameComposesParented3DTransforms|FullyQualifiedName~ViewportContractTests.RuntimeFrameReportsInvalid3DTransformHierarchy"` and confirm the child remains local and diagnostics are absent.
 
-- [ ] **Step 3: Implement the resolver and integrate all spatial projections**
+- [x] **Step 3: Implement the resolver and integrate all spatial projections**
 
   Compose matrices in renderer order, cache per frame, convert the resulting
   quaternion back to finite XYZ Euler degrees, and use resolved transforms for
   cameras, renderables, lights, particles, and fog.
 
-- [ ] **Step 4: Run the focused tests and relevant rendering suite**
+- [x] **Step 4: Run the focused tests and relevant rendering suite**
 
   Run the focused filter again, then `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --filter "FullyQualifiedName~ViewportContractTests|FullyQualifiedName~ModelAssetRenderingTests|FullyQualifiedName~VulkanSceneMeshBuilderTests"`.
 
-- [ ] **Step 5: Commit the generic engine slice**
+- [x] **Step 5: Commit the generic engine slice**
 
   Commit the resolver, frame integration, tests, spec, and plan as `feat: add runtime 3d transform hierarchies`.
 
@@ -144,4 +144,3 @@
   used consistently across tasks.
 - Native deformable procedural skinning is explicitly preserved as later scope,
   not silently claimed by this milestone.
-

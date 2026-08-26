@@ -11,6 +11,101 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class ViewportContractTests
 {
     [Fact]
+    public void RuntimeFrameComposesParented3DTransforms()
+    {
+        var parent = RekallAgeEntityDocument.Create("Moving Rig", ["rig"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+            {
+                ["x"] = 10,
+                ["y"] = 2,
+                ["z"] = 3,
+                ["yaw"] = 90,
+                ["scaleX"] = 2,
+                ["scaleY"] = 2,
+                ["scaleZ"] = 2
+            }));
+        var child = RekallAgeEntityDocument.Create("Animated Attachment", ["attachment"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject
+            {
+                ["primitive"] = "cube"
+            }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+            {
+                ["x"] = 1,
+                ["y"] = 0.5,
+                ["z"] = 0,
+                ["scaleX"] = 0.5,
+                ["scaleY"] = 0.25,
+                ["scaleZ"] = 0.75
+            })) with { ParentId = parent.Id };
+        var world = new RekallAgeRuntimeWorldBuilder().Build(
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+                .AddEntity(parent)
+                .AddEntity(child));
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var rendered = Assert.Single(frame.Renderables, item => item.EntityName == "Animated Attachment");
+        Assert.Equal(10, rendered.X, precision: 5);
+        Assert.Equal(3, rendered.Y, precision: 5);
+        Assert.Equal(1, rendered.Z, precision: 5);
+        Assert.Equal(90, rendered.RotationY, precision: 5);
+        Assert.Equal(1, rendered.ScaleX, precision: 5);
+        Assert.Equal(0.5, rendered.ScaleY, precision: 5);
+        Assert.Equal(1.5, rendered.ScaleZ, precision: 5);
+        Assert.DoesNotContain(frame.Observations, item => item.Subsystem == "transform");
+    }
+
+    [Fact]
+    public void RuntimeFrameReportsInvalid3DTransformHierarchy()
+    {
+        var missingParent = RekallAgeEntityDocument.Create("Orphan Attachment", ["attachment"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject
+            {
+                ["primitive"] = "cube"
+            }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+            {
+                ["x"] = 4,
+                ["y"] = 5,
+                ["z"] = 6
+            })) with { ParentId = "missing-parent" };
+        var cycleA = RekallAgeEntityDocument.Create("Cycle A", ["attachment"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject
+            {
+                ["primitive"] = "cube"
+            }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+            {
+                ["x"] = 1
+            })) with { ParentId = "cycle-b" };
+        var cycleB = RekallAgeEntityDocument.Create("Cycle B", ["rig"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+            {
+                ["x"] = 2
+            })) with { ParentId = cycleA.Id };
+        cycleA = cycleA with { Id = "cycle-a", ParentId = "cycle-b" };
+        cycleB = cycleB with { Id = "cycle-b", ParentId = "cycle-a" };
+        var world = new RekallAgeRuntimeWorldBuilder().Build(
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+                .AddEntity(missingParent)
+                .AddEntity(cycleA)
+                .AddEntity(cycleB));
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var orphan = Assert.Single(frame.Renderables, item => item.EntityName == "Orphan Attachment");
+        Assert.Equal(4, orphan.X);
+        Assert.Equal(5, orphan.Y);
+        Assert.Equal(6, orphan.Z);
+        Assert.Contains(frame.Observations, item => item.Code == "runtime.transform.parent_missing");
+        Assert.Contains(frame.Observations, item => item.Code == "runtime.transform.parent_cycle");
+    }
+
+    [Fact]
     public void RuntimeProjectionPreservesGenericQualityAndEnvironmentAuthoring()
     {
         var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])

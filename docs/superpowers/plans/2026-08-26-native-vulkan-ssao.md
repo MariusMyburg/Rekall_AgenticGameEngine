@@ -94,7 +94,7 @@ git commit -m "feat: declare native ssao resolve pass"
 - Consumes: fullscreen UV, combined scene-depth sampler at set 0 binding 0, and `SsaoPushConstants`.
 - Produces: `RekallAgeVulkanHighFidelityShaderCompilationResult.Ssao` as a fragment SPIR-V module.
 
-- [ ] **Step 1: Write the failing compiler contract**
+- [x] **Step 1: Write the failing compiler contract**
 
 Extend the post-pipeline test to require:
 
@@ -105,7 +105,7 @@ Assert.NotEmpty(result.Ssao.Spirv);
 Assert.Equal(0, result.Ssao.Spirv.Length % 4);
 ```
 
-- [ ] **Step 2: Run the compiler test and verify RED**
+- [x] **Step 2: Run the compiler test and verify RED**
 
 ```powershell
 dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter FullyQualifiedName~VulkanShaderCompilerTests.CompileHighFidelityPostShadersProducesComputeAndGraphicsSpirvModules
@@ -113,13 +113,13 @@ dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter
 
 Expected: compilation fails because `Ssao` is absent.
 
-- [ ] **Step 3: Add the shader result and compiler input**
+- [x] **Step 3: Add the shader result and compiler input**
 
 Compile `Shaders/rekall_ssao.frag` as a fragment stage and add it between
 `AnalyticFog` and `Bloom` in `RekallAgeVulkanHighFidelityShaderCompilationResult`.
 Include `ssao.Spirv.Length > 0` in `Compiled`.
 
-- [ ] **Step 4: Implement bounded depth-derived AO**
+- [x] **Step 4: Implement bounded depth-derived AO**
 
 The shader must expose:
 
@@ -138,11 +138,11 @@ compare reconstructed linear depth with `DepthProjection.z` bias, range-weight
 each hit, and output `vec4(mix(1.0, floor, occlusion * strength))`. Keep every
 normalize/divide guarded against zero.
 
-- [ ] **Step 5: Run shader/compiler tests and verify GREEN**
+- [x] **Step 5: Run shader/compiler tests and verify GREEN**
 
 Run the Step 2 command plus `FullyQualifiedName~InteractiveAmbientOcclusionPlannerTests`. Expected: all pass with non-empty aligned SPIR-V.
 
-- [ ] **Step 6: Commit the shader contract**
+- [x] **Step 6: Commit the shader contract**
 
 ```powershell
 git add src/Rekall.Age.Rendering/Shaders/rekall_ssao.frag src/Rekall.Age.Rendering/RekallAgeVulkanShaderCompiler.cs tests/Rekall.Age.Tests/Rendering/VulkanShaderCompilerTests.cs

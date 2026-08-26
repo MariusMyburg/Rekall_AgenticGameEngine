@@ -47,6 +47,10 @@ public sealed class RekallAgeVulkanShaderCompiler
             Path.Combine("Shaders", "rekall_fog.frag"),
             RekallAgeVulkanShaderStage.Fragment,
             errors);
+        var ssao = CompileShader(
+            Path.Combine("Shaders", "rekall_ssao.frag"),
+            RekallAgeVulkanShaderStage.Fragment,
+            errors);
         var bloom = CompileShader(
             Path.Combine("Shaders", "rekall_bloom.comp"),
             RekallAgeVulkanShaderStage.Compute,
@@ -67,9 +71,10 @@ public sealed class RekallAgeVulkanShaderCompiler
         }
 
         return new RekallAgeVulkanHighFidelityShaderCompilationResult(
-            errors.Count == 0 && fog.Spirv.Length > 0 && analyticFog.Spirv.Length > 0 && bloom.Spirv.Length > 0 && toneMap.Spirv.Length > 0 && fullscreenVertex.Spirv.Length > 0,
+            errors.Count == 0 && fog.Spirv.Length > 0 && analyticFog.Spirv.Length > 0 && ssao.Spirv.Length > 0 && bloom.Spirv.Length > 0 && toneMap.Spirv.Length > 0 && fullscreenVertex.Spirv.Length > 0,
             fog,
             analyticFog,
+            ssao,
             bloom,
             fullscreenVertex,
             toneMap,
@@ -261,6 +266,7 @@ public sealed record RekallAgeVulkanHighFidelityShaderCompilationResult(
     bool Compiled,
     RekallAgeVulkanCompiledShader Fog,
     RekallAgeVulkanCompiledShader AnalyticFog,
+    RekallAgeVulkanCompiledShader Ssao,
     RekallAgeVulkanCompiledShader Bloom,
     RekallAgeVulkanCompiledShader FullscreenVertex,
     RekallAgeVulkanCompiledShader ToneMap,

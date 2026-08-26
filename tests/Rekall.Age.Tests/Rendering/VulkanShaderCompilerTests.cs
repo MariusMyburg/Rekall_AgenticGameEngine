@@ -125,11 +125,13 @@ public sealed class VulkanShaderCompilerTests
         Assert.Empty(result.Errors);
         Assert.Equal(RekallAgeVulkanShaderStage.Compute, result.Bloom.Stage);
         Assert.EndsWith("rekall_bloom.comp", result.Bloom.SourcePath, StringComparison.Ordinal);
+        Assert.Equal(RekallAgeVulkanShaderStage.Fragment, result.Ssao.Stage);
+        Assert.EndsWith("rekall_ssao.frag", result.Ssao.SourcePath, StringComparison.Ordinal);
         Assert.Equal(RekallAgeVulkanShaderStage.Vertex, result.FullscreenVertex.Stage);
         Assert.Equal(RekallAgeVulkanShaderStage.Fragment, result.ToneMap.Stage);
         Assert.EndsWith("rekall_tonemap.frag", result.ToneMap.SourcePath, StringComparison.Ordinal);
         Assert.All(
-            [result.Bloom.Spirv, result.FullscreenVertex.Spirv, result.ToneMap.Spirv],
+            [result.Ssao.Spirv, result.Bloom.Spirv, result.FullscreenVertex.Spirv, result.ToneMap.Spirv],
             spirv =>
             {
                 Assert.NotEmpty(spirv);

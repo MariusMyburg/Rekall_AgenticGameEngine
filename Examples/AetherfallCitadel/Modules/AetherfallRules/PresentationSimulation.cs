@@ -87,12 +87,6 @@ internal static class PresentationSimulation
         RekallAgeRuntimeEntity warden)
     {
         var origin = warden.Transform.Position3D;
-        world = Place(world, "Warden Mantle", origin, 0, 0.25, 0);
-        world = Place(world, "Warden Crown", origin, 0, 1.25, 0.02);
-        world = Place(world, "Warden Halo", origin, 0, 1.15, 0.2);
-        world = Place(world, "Warden Wing Left", origin, -0.45, 0.12, -0.14);
-        world = Place(world, "Warden Wing Right", origin, 0.45, 0.12, -0.14);
-        world = Place(world, "Warden Blade", origin, 0.62, 0.25, 0.28);
         return world;
     }
 

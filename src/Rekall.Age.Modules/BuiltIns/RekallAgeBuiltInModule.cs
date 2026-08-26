@@ -78,6 +78,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeAnimationStateGraphComponent>();
         builder.RegisterComponent<RekallAgeSkeletalAnimatorComponent>();
         builder.RegisterComponent<RekallAgeSkeletonPoseComponent>();
+        builder.RegisterComponent<RekallAgeRigPoseComponent>();
         builder.RegisterComponent<RekallAgeMorphWeightsComponent>();
         builder.RegisterComponent<RekallAgeUiCanvasComponent>();
         builder.RegisterComponent<RekallAgeUiElementComponent>();

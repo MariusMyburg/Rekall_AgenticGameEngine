@@ -5632,6 +5632,43 @@ root-cause ledger, commands, local timestamps/timings/counts, failed
 environmental-gate chronology, raw artifact hashes, and residue audit:
 [`docs/production/evidence/2026-08-25-task-5b-studio-gauntlet.md`](evidence/2026-08-25-task-5b-studio-gauntlet.md).
 
+## Native rig, bend deformation, and grounded Warden checkpoint
+
+- AGE now owns a versioned native rig document with stable named joints,
+  parent hierarchy, bind-local matrices, strict validation, deterministic bind
+  and pose evaluation, revision-safe create/replace/inspect/list commands, and
+  a generic `Rekall.RigPose` runtime component. The renderer resolves named
+  finite joint deltas into skin matrices and emits typed observations for
+  missing, malformed, or incompatible rig state.
+- Generic `bend_points`, `rekall.modeling.deform.bend`, and
+  `rekall.modifier.deform.bend` curve cross-sections through an authored range
+  around an explicit origin. Aetherfall consumes the primitive for its mantle;
+  the character module consumes the native named rig for delta-time-driven
+  chest breathing and weight shift. Runtime acceptance compares actual rendered
+  vertices at distinct frames, not merely component presence.
+- The Warden construction was pruned of duplicate cape, blade, spike, and
+  placeholder branches, grounded at 0.58 world scale, relit with a restrained
+  warm softbox, and rebuilt with higher-segment armor/cloth bevels. The compact
+  73-node source graph compiles 44,696 vertices across the steel, cloth, and
+  restrained-aether surfaces while explicitly excluding the obsolete toy-like
+  branches.
+- Verification is zero-failure for the 257-test modeling selection and the
+  24-test Aetherfall high-fidelity acceptance class (281 combined). Project and Main scene
+  validation report zero issues; both gameplay modules pass the
+  `windows-appcontainer-restricted` trust inspection. Native High Vulkan capture
+  on the RTX 5090 reports 301 render-work draws, four dispatches, zero asset
+  fallbacks, and zero observations.
+- The 2560x1440 High `desktop60` budget passes at 6.496608 ms GPU frame time,
+  97 scene draws, 194,378 triangles, 828,116 vertices, and nine textures. This
+  proves the current engine slice; the player character still needs materially
+  richer anatomy, armor construction, surface detail, animation, and closer
+  composition before final visual acceptance.
+- The provider-neutral Tripo/Meshy generation/import evaluation remains on the
+  post-Aetherfall list. Its current recommendation is to migrate the existing
+  Tripo proof first and use Meshy as the second-adapter breadth benchmark, with
+  explicit cost/consent, provenance/licensing, resumable jobs, and ordinary AGE
+  edit/reimport/cook/package acceptance.
+
 ## Evidence index
 
 - `docs/production/2026-08-17-engine-maturity-audit.md`

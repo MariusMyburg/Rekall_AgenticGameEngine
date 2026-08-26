@@ -18,7 +18,8 @@ public sealed class ModelingProductionContractMatrixTests
         "subdivide_faces",
         "subdivide_smooth",
         "set_edge_crease",
-        "merge_by_distance"
+        "merge_by_distance",
+        "bend_points"
     };
 
     public static TheoryData<string> ModifierCases => new()
@@ -28,7 +29,8 @@ public sealed class ModelingProductionContractMatrixTests
         "rekall.modifier.extrude",
         "rekall.modifier.subdivide",
         "rekall.modifier.subdivide_smooth",
-        "rekall.modifier.merge_by_distance"
+        "rekall.modifier.merge_by_distance",
+        "rekall.modifier.deform.bend"
     };
 
     public static TheoryData<string, JsonObject, int> ClosedPrimitiveCases => new()
@@ -190,23 +192,23 @@ public sealed class ModelingProductionContractMatrixTests
     public void ProductionMatricesExactlyCoverThePublishedOperationAndModifierCatalogs()
     {
         var operationIds = new RekallAgeMeshOperationExecutor().Descriptors.Select(item => item.OperationId).ToArray();
-        Assert.Equal(28, operationIds.Length);
+        Assert.Equal(29, operationIds.Length);
         Assert.All(new[]
         {
             "transform", "reverse_faces", "triangulate_faces", "extrude_faces", "delete",
             "generate_normals", "shade_faces", "mark_sharp", "auto_smooth", "project_uv", "mark_uv_seams", "unwrap_pack_uv", "subdivide_faces", "subdivide_smooth", "set_edge_crease", "merge_by_distance",
-            "bevel_edges", "select_edges_by_angle", "assign_linear_skin_weights", "taper_points", "inset_faces", "solidify", "weighted_normals",
+            "bevel_edges", "select_edges_by_angle", "assign_linear_skin_weights", "taper_points", "bend_points", "inset_faces", "solidify", "weighted_normals",
             "fill_holes", "bridge_edge_loops", "poke_faces", "dissolve_edges", "bisect_plane"
         }, expected => Assert.Contains(expected, operationIds));
 
         var modifierIds = RekallAgeModifierCatalog.CreateDefault().Descriptors.Select(item => item.TypeId).ToArray();
-        Assert.Equal(14, modifierIds.Length);
+        Assert.Equal(15, modifierIds.Length);
         Assert.All(new[]
         {
             "rekall.modifier.transform", "rekall.modifier.triangulate", "rekall.modifier.extrude",
             "rekall.modifier.subdivide", "rekall.modifier.subdivide_smooth", "rekall.modifier.merge_by_distance",
             "rekall.modifier.bevel", "rekall.modifier.solidify", "rekall.modifier.mirror", "rekall.modifier.array", "rekall.modifier.auto_smooth",
-            "rekall.modifier.weighted_normals", "rekall.modifier.skin.linear_weights", "rekall.modifier.deform.taper"
+            "rekall.modifier.weighted_normals", "rekall.modifier.skin.linear_weights", "rekall.modifier.deform.taper", "rekall.modifier.deform.bend"
         }, expected => Assert.Contains(expected, modifierIds));
     }
 
@@ -260,6 +262,7 @@ public sealed class ModelingProductionContractMatrixTests
             "project_uv" => new JsonObject { ["attribute"] = "uv.contract", ["axis"] = "xz" },
             "set_edge_crease" => new JsonObject { ["weight"] = 0.75 },
             "merge_by_distance" => new JsonObject { ["distance"] = 0.0001 },
+            "bend_points" => new JsonObject { ["axis"] = "y", ["bendAxis"] = "z", ["minimum"] = -1.0, ["maximum"] = 1.0, ["angleDegrees"] = 15.0 },
             _ => new JsonObject()
         };
         return new(operationId, domain, elementIds, parameters);
@@ -270,6 +273,7 @@ public sealed class ModelingProductionContractMatrixTests
         "rekall.modifier.transform" => new JsonObject { ["x"] = 0.25, ["y"] = -0.5, ["z"] = 0.75 },
         "rekall.modifier.extrude" => new JsonObject { ["z"] = 0.5, ["selection"] = "contract-face" },
         "rekall.modifier.merge_by_distance" => new JsonObject { ["distance"] = 0.0001 },
+        "rekall.modifier.deform.bend" => new JsonObject { ["axis"] = "y", ["bendAxis"] = "z", ["minimum"] = -1.0, ["maximum"] = 1.0, ["angleDegrees"] = 15.0 },
         _ => new JsonObject()
     };
 

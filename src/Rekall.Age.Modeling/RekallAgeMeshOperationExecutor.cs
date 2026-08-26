@@ -37,6 +37,18 @@ public sealed partial class RekallAgeMeshOperationExecutor
                 NumberParameter("centerX"), NumberParameter("centerY"), NumberParameter("centerZ")
             ]),
         new(
+            "bend_points",
+            "Bends selected points through an authored angle and coordinate range while rotating cross-sections around an origin.",
+            RekallAgeGeometryDomain.Point,
+            RekallAgeMeshChangeKind.Positions,
+            [
+                StringParameter("axis", "y", "Longitudinal bend axis: x, y, or z."),
+                StringParameter("bendAxis", "z", "Perpendicular displacement axis: x, y, or z."),
+                NumberParameter("minimum"), NumberParameter("maximum", 1),
+                NumberParameter("angleDegrees", 45),
+                NumberParameter("centerX"), NumberParameter("centerY"), NumberParameter("centerZ")
+            ]),
+        new(
             "reverse_faces",
             "Reverses selected face winding while preserving stable face/corner identity and corner attributes.",
             RekallAgeGeometryDomain.Face,
@@ -256,6 +268,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
         {
             "transform" => Transform(source, request),
             "taper_points" => TaperPoints(source, request),
+            "bend_points" => BendPoints(source, request),
             "reverse_faces" => ReverseFaces(source, request),
             "triangulate_faces" => TriangulateFaces(source, request),
             "extrude_faces" => ExtrudeFaces(source, request),

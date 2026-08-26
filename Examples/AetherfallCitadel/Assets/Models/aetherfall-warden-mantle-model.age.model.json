@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall-warden-mantle-model",
   "displayName": "Aetherfall Warden Deformable Mantle",
-  "revision": 4,
+  "revision": 6,
   "source": {
     "kind": "Mesh",
     "assetId": "aetherfall-warden-mantle-mesh",
@@ -10,12 +10,12 @@
   },
   "buildState": 0,
   "lastSuccessfulBuild": {
-    "sourceFileRevision": "60ac6b6941707db4b350f6e6755c6929004db30c2bba7473475d225124415e87",
-    "sourceLogicalRevision": 4,
-    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-warden-mantle-model/b6207717ca27d60f0ef17656bd9578d7c83a5090fa3c764891e6db0c7aa1fa19.age.compiled-mesh.json",
-    "compiledContentHash": "b6207717ca27d60f0ef17656bd9578d7c83a5090fa3c764891e6db0c7aa1fa19",
+    "sourceFileRevision": "aaa69182f359789532fc0bef7bcf99258d7e75b895d521a1073ae02d612140fe",
+    "sourceLogicalRevision": 6,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-warden-mantle-model/094d4e7610bd36458f32863a3a581733bb34b4d91bd0f358b52c8cf4fc36e790.age.compiled-mesh.json",
+    "compiledContentHash": "094d4e7610bd36458f32863a3a581733bb34b4d91bd0f358b52c8cf4fc36e790",
     "compilerVersion": "rekall-age-model-compiler-v1",
-    "builtAtUtc": "2026-08-26T09:42:08.7562552+00:00",
+    "builtAtUtc": "2026-08-26T10:27:35.4994438+00:00",
     "diagnostics": []
   },
   "frozen": false

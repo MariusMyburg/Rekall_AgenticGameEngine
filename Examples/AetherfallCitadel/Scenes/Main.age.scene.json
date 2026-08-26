@@ -1073,15 +1073,45 @@
           }
         },
         {
+          "type": "Rekall.RigPose",
+          "properties": {
+            "jointDeltas": [
+              {
+                "jointId": "chest",
+                "matrix": [
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1,
+                  0,
+                  0,
+                  0,
+                  0,
+                  1
+                ]
+              }
+            ],
+            "skinIndex": 0,
+            "assetId": "aetherfall.warden.rig"
+          }
+        },
+        {
           "type": "Rekall.Transform3D",
           "properties": {
             "x": 0,
             "y": 0.8,
             "z": -12,
-            "scaleX": 0.88,
-            "scaleY": 0.88,
-            "scaleZ": 0.88,
-            "pitch": 0
+            "pitch": 0,
+            "scaleX": 0.58,
+            "scaleY": 0.58,
+            "scaleZ": 0.58
           }
         }
       ],
@@ -10328,106 +10358,6 @@
       "locked": false
     },
     {
-      "id": "warden-blade",
-      "name": "Warden Blade",
-      "tags": [
-        "player-visual",
-        "authored-model",
-        "weapon"
-      ],
-      "components": [
-        {
-          "type": "Rekall.GeometryPrimitive",
-          "properties": {
-            "primitive": "cone",
-            "color": "#252b2d"
-          }
-        },
-        {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
-          "type": "Rekall.Material",
-          "properties": {
-            "baseColor": "#525958",
-            "metallicFactor": 0.62,
-            "roughnessFactor": 0.38,
-            "emissiveColor": "#262b2b",
-            "emissiveStrength": 0.012
-          }
-        },
-        {
-          "type": "Rekall.Transform3D",
-          "properties": {
-            "x": 0.9,
-            "y": 1.15,
-            "z": -11.65,
-            "scaleX": 0.12,
-            "scaleY": 1.45,
-            "scaleZ": 0.12,
-            "roll": -18
-          }
-        }
-      ],
-      "parentId": null,
-      "prefabSourceId": null,
-      "visible": false,
-      "locked": false
-    },
-    {
-      "id": "warden-crown",
-      "name": "Warden Crown",
-      "tags": [
-        "player-visual",
-        "authored-model"
-      ],
-      "components": [
-        {
-          "type": "Rekall.GeometryPrimitive",
-          "properties": {
-            "primitive": "sphere",
-            "color": "#252b2d"
-          }
-        },
-        {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
-          "type": "Rekall.Material",
-          "properties": {
-            "baseColor": "#525958",
-            "metallicFactor": 0.22,
-            "roughnessFactor": 0.62,
-            "emissiveColor": "#262b2b",
-            "emissiveStrength": 0.012
-          }
-        },
-        {
-          "type": "Rekall.Transform3D",
-          "properties": {
-            "x": 0,
-            "y": 2.35,
-            "z": -11.95,
-            "scaleX": 0.28,
-            "scaleY": 0.3,
-            "scaleZ": 0.28
-          }
-        }
-      ],
-      "parentId": null,
-      "prefabSourceId": null,
-      "visible": false,
-      "locked": false
-    },
-    {
       "id": "fx-dash",
       "name": "Warden Dash Ribbon",
       "tags": [
@@ -10615,146 +10545,6 @@
       "locked": false
     },
     {
-      "id": "warden-halo",
-      "name": "Warden Halo",
-      "tags": [
-        "player-visual",
-        "authored-model",
-        "focal"
-      ],
-      "components": [
-        {
-          "type": "Rekall.GeometryPrimitive",
-          "properties": {
-            "primitive": "torus",
-            "color": "#252b2d"
-          }
-        },
-        {
-          "type": "Rekall.ModelAssetReference",
-          "properties": {
-            "assetId": "aetherfall-resonance-halo-model"
-          }
-        },
-        {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
-          "type": "Rekall.Material",
-          "properties": {
-            "baseColor": "#525958",
-            "metallicFactor": 0.22,
-            "roughnessFactor": 0.62,
-            "emissiveColor": "#262b2b",
-            "emissiveStrength": 0.012
-          }
-        },
-        {
-          "type": "Rekall.AnimationPlayer",
-          "properties": {
-            "playing": true,
-            "loopMode": "loop"
-          }
-        },
-        {
-          "type": "Rekall.AnimationClip",
-          "properties": {
-            "version": 1,
-            "durationSeconds": 4,
-            "tracks": [
-              {
-                "component": "Rekall.Transform3D",
-                "property": "yaw",
-                "interpolation": "linear",
-                "keys": [
-                  {
-                    "time": 0,
-                    "value": 0
-                  },
-                  {
-                    "time": 4,
-                    "value": 360
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "type": "Rekall.Transform3D",
-          "properties": {
-            "x": 0,
-            "y": 1.95,
-            "z": -11.8,
-            "scaleX": 0.95,
-            "scaleY": 0.95,
-            "scaleZ": 0.18,
-            "pitch": 90
-          }
-        }
-      ],
-      "parentId": null,
-      "prefabSourceId": null,
-      "visible": false,
-      "locked": false
-    },
-    {
-      "id": "warden-mantle",
-      "name": "Warden Mantle",
-      "tags": [
-        "player-visual",
-        "authored-model"
-      ],
-      "components": [
-        {
-          "type": "Rekall.GeometryPrimitive",
-          "properties": {
-            "primitive": "cube",
-            "color": "#252b2d"
-          }
-        },
-        {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
-          "type": "Rekall.Material",
-          "properties": {
-            "baseColor": "#525958",
-            "metallicFactor": 0.22,
-            "roughnessFactor": 0.62,
-            "emissiveColor": "#262b2b",
-            "emissiveStrength": 0.012,
-            "baseColorTexture": "asset_citadel-obsidian-albedo-v1_d4ec000a",
-            "normalScale": 0.35,
-            "normalTexture": "asset_citadel-obsidian-normal-dx-v1_6fa94a83"
-          }
-        },
-        {
-          "type": "Rekall.Transform3D",
-          "properties": {
-            "x": 0,
-            "y": 1,
-            "z": -12,
-            "scaleX": 0.55,
-            "scaleY": 0.9,
-            "scaleZ": 0.42
-          }
-        }
-      ],
-      "parentId": null,
-      "prefabSourceId": null,
-      "visible": false,
-      "locked": false
-    },
-    {
       "id": "ent_9a5061e78aa8404b8f98169c8e99e6b9",
       "name": "Warden Runeblade",
       "tags": [
@@ -10818,12 +10608,12 @@
         {
           "type": "Rekall.PointLight",
           "properties": {
-            "color": "#5586a2",
-            "intensity": 8.8,
             "range": 14,
             "priority": 90,
             "shadowPriority": 90,
-            "castShadows": false
+            "castShadows": false,
+            "intensity": 4.2,
+            "color": "#806f5f"
           }
         },
         {
@@ -10841,106 +10631,6 @@
       "parentId": null,
       "prefabSourceId": null,
       "visible": true,
-      "locked": false
-    },
-    {
-      "id": "warden-wing-left",
-      "name": "Warden Wing Left",
-      "tags": [
-        "player-visual",
-        "authored-model"
-      ],
-      "components": [
-        {
-          "type": "Rekall.GeometryPrimitive",
-          "properties": {
-            "primitive": "cone",
-            "color": "#252b2d"
-          }
-        },
-        {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
-          "type": "Rekall.Material",
-          "properties": {
-            "baseColor": "#525958",
-            "metallicFactor": 0.22,
-            "roughnessFactor": 0.62,
-            "emissiveColor": "#262b2b",
-            "emissiveStrength": 0.012
-          }
-        },
-        {
-          "type": "Rekall.Transform3D",
-          "properties": {
-            "x": -0.85,
-            "y": 1.25,
-            "z": -11.88,
-            "scaleX": 0.22,
-            "scaleY": 0.75,
-            "scaleZ": 0.16,
-            "roll": -15
-          }
-        }
-      ],
-      "parentId": null,
-      "prefabSourceId": null,
-      "visible": false,
-      "locked": false
-    },
-    {
-      "id": "warden-wing-right",
-      "name": "Warden Wing Right",
-      "tags": [
-        "player-visual",
-        "authored-model"
-      ],
-      "components": [
-        {
-          "type": "Rekall.GeometryPrimitive",
-          "properties": {
-            "primitive": "cone",
-            "color": "#252b2d"
-          }
-        },
-        {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
-          "type": "Rekall.Material",
-          "properties": {
-            "baseColor": "#525958",
-            "metallicFactor": 0.22,
-            "roughnessFactor": 0.62,
-            "emissiveColor": "#262b2b",
-            "emissiveStrength": 0.012
-          }
-        },
-        {
-          "type": "Rekall.Transform3D",
-          "properties": {
-            "x": 0.85,
-            "y": 1.25,
-            "z": -11.88,
-            "scaleX": 0.22,
-            "scaleY": 0.75,
-            "scaleZ": 0.16,
-            "roll": 15
-          }
-        }
-      ],
-      "parentId": null,
-      "prefabSourceId": null,
-      "visible": false,
       "locked": false
     },
     {

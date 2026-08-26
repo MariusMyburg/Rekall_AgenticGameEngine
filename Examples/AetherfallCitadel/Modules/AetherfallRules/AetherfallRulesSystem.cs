@@ -41,6 +41,7 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
         world = EncounterSimulation.Update(world, context);
         world = HostileSimulation.Update(world, context);
         world = UpdateMantlePose(world, context);
+        world = UpdateWardenRigPose(world, context);
         warden = world.FindEntity(AetherfallConstants.WardenName);
         if (warden is not null
             && warden.ComponentNumber(AetherfallConstants.WardenStateType, "integrity", 100) <= 0)
@@ -85,5 +86,37 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
                 0, 0, 1, 0,
                 x, 0, z, 1)
         };
+    }
+
+    private static RekallAgeRuntimeWorld UpdateWardenRigPose(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeModuleFrameContext context)
+    {
+        var warden = world.FindEntity(AetherfallConstants.WardenName);
+        if (warden is null)
+        {
+            return world;
+        }
+
+        var time = context.ElapsedTime.TotalSeconds;
+        var breath = Math.Sin(time * 2.2) * 0.018;
+        var weightShift = Math.Sin(time * 1.35 + 0.4) * 0.035;
+        var delta = System.Numerics.Matrix4x4.CreateRotationX((float)breath)
+            * System.Numerics.Matrix4x4.CreateRotationZ((float)weightShift);
+        return world.UpdateEntity(warden.Id, entity => entity.UpdateComponent("Rekall.RigPose", properties =>
+        {
+            properties["assetId"] = "aetherfall.warden.rig";
+            properties["skinIndex"] = 0;
+            properties["jointDeltas"] = new JsonArray(new JsonObject
+            {
+                ["jointId"] = "chest",
+                ["matrix"] = new JsonArray(
+                    delta.M11, delta.M12, delta.M13, delta.M14,
+                    delta.M21, delta.M22, delta.M23, delta.M24,
+                    delta.M31, delta.M32, delta.M33, delta.M34,
+                    delta.M41, delta.M42, delta.M43, delta.M44)
+            });
+            return properties;
+        }));
     }
 }

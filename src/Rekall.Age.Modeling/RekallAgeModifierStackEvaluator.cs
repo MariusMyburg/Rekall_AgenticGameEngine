@@ -81,6 +81,18 @@ public sealed class RekallAgeModifierStackEvaluator
                     ["centerY"] = ReadNumber(modifier.Parameters, "centerY", 0),
                     ["centerZ"] = ReadNumber(modifier.Parameters, "centerZ", 0)
                 })).Mesh,
+            "rekall.modifier.deform.bend" => _executor.Execute(source, new("bend_points", RekallAgeGeometryDomain.Point,
+                Select(source, RekallAgeGeometryDomain.Point, selection), new JsonObject
+                {
+                    ["axis"] = ReadString(modifier.Parameters, "axis", "y"),
+                    ["bendAxis"] = ReadString(modifier.Parameters, "bendAxis", "z"),
+                    ["minimum"] = ReadNumber(modifier.Parameters, "minimum", 0),
+                    ["maximum"] = ReadNumber(modifier.Parameters, "maximum", 1),
+                    ["angleDegrees"] = ReadNumber(modifier.Parameters, "angleDegrees", 45),
+                    ["centerX"] = ReadNumber(modifier.Parameters, "centerX", 0),
+                    ["centerY"] = ReadNumber(modifier.Parameters, "centerY", 0),
+                    ["centerZ"] = ReadNumber(modifier.Parameters, "centerZ", 0)
+                })).Mesh,
             "rekall.modifier.triangulate" => _executor.Execute(source, new("triangulate_faces", RekallAgeGeometryDomain.Face,
                 Select(source, RekallAgeGeometryDomain.Face, selection), new JsonObject())).Mesh,
             "rekall.modifier.extrude" => _executor.Execute(source, new("extrude_faces", RekallAgeGeometryDomain.Face,

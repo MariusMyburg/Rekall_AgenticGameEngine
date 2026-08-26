@@ -704,3 +704,28 @@ the new background is an explicit fallback, not a claim that sky assets render.
   It proves clean integration but not final art. The Warden body, garment
   construction, materials, and pose still read as blockout quality and remain
   the next visible character work.
+
+## Native named-rig and grounded-character checkpoint
+
+- `aetherfall.warden.rig` is a native AGE rig asset with stable `root` and
+  `chest` joints. `Rekall.RigPose` drives the skinned Warden Model Asset through
+  module-authored, delta-time-based named joint matrices; acceptance proves the
+  runtime JSON pose and the resulting rendered vertices both change between
+  representative frames.
+- The mantle now uses the generic bend-deform node in addition to taper, folds,
+  thickness, UVs, normals, and skin weights. Duplicate legacy cape/wing/crown/
+  blade scene entities and the main graph's toy spike, duplicate blade, and
+  duplicate cloak branches were removed.
+- The grounded 0.58-scale Warden source remains a compact 73-node editable
+  graph, but higher-quality bevel construction raises the rebuilt model to
+  44,696 compiled vertices and preserves three deliberate material surfaces.
+  The player fill is reduced to intensity 4.2 and warmed to `#806f5f`.
+- `Proof/Captures/WardenDetailed/vulkan-scene-1280x720-20260826103940219.png`
+  is the post-change native High Vulkan frame: RTX 5090 hardware path, 301
+  render-work draws, four dispatches, zero observations, zero missing assets,
+  and zero fallbacks. It is correctly grounded and more coherent, but remains
+  an intermediate blockout rather than the requested final high-detail hero.
+- Verification passes modeling 257/257, Aetherfall high-fidelity 24/24 (281
+  combined), project
+  validation, scene validation, module trust, and the 2560x1440 High
+  `desktop60` budget at 6.496608 ms measured GPU time.

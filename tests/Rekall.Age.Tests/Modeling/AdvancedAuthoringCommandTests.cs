@@ -17,7 +17,9 @@ public sealed class AdvancedAuthoringCommandTests
         "rekall.modifier.types.search", "rekall.modifier.stack.create", "rekall.modifier.stack.inspect",
         "rekall.modifier.stack.apply_patch", "rekall.modifier.stack.evaluate", "rekall.modifier.stack.bake",
         "rekall.modeling.curve.create", "rekall.modeling.curve.replace", "rekall.modeling.curve.inspect",
-        "rekall.modeling.curve.list", "rekall.modeling.curve.evaluate"
+        "rekall.modeling.curve.list", "rekall.modeling.curve.evaluate",
+        "rekall.modeling.rig.create", "rekall.modeling.rig.replace", "rekall.modeling.rig.inspect",
+        "rekall.modeling.rig.list"
     ];
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -103,6 +105,34 @@ public sealed class AdvancedAuthoringCommandTests
         var inspected = await Execute(registry, "rekall.modeling.curve.inspect", $$"""{ "projectRoot": {{JsonSerializer.Serialize(root)}}, "assetId": "curve.command" }""");
         Assert.True(listed.Ok, listed.Summary);
         Assert.True(inspected.Ok, inspected.Summary);
+    }
+
+    [Fact]
+    public async Task JsonRigLoopCreatesInspectsListsAndRevisionReplacesNamedHierarchy()
+    {
+        var root = TestPaths.CreateTempDirectory(); var registry = RekallAgeDefaultCommandRegistry.Create();
+        var joints = """
+        [
+          { "jointId": "root", "name": "Root", "parentIndex": null, "bindLocalMatrix": [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1] },
+          { "jointId": "chest", "name": "Chest", "parentIndex": 0, "bindLocalMatrix": [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,1,0,1] }
+        ]
+        """;
+        var created = await Execute(registry, "rekall.modeling.rig.create", $$"""
+        { "projectRoot": {{JsonSerializer.Serialize(root)}}, "assetId": "rig.command", "name": "Command Rig", "joints": {{joints}} }
+        """);
+        Assert.True(created.Ok, created.Summary);
+        var fileRevision = JsonSerializer.SerializeToElement(created.Value, JsonOptions).GetProperty("rig").GetProperty("fileRevision").GetString();
+
+        var replaced = await Execute(registry, "rekall.modeling.rig.replace", $$"""
+        { "projectRoot": {{JsonSerializer.Serialize(root)}}, "assetId": "rig.command", "expectedRevision": {{JsonSerializer.Serialize(fileRevision)}}, "name": "Command Rig 2", "joints": {{joints}} }
+        """);
+        var inspected = await Execute(registry, "rekall.modeling.rig.inspect", $$"""{ "projectRoot": {{JsonSerializer.Serialize(root)}}, "assetId": "rig.command" }""");
+        var listed = await Execute(registry, "rekall.modeling.rig.list", $$"""{ "projectRoot": {{JsonSerializer.Serialize(root)}} }""");
+
+        Assert.True(replaced.Ok, replaced.Summary);
+        Assert.Equal(2, JsonSerializer.SerializeToElement(replaced.Value, JsonOptions).GetProperty("rig").GetProperty("logicalRevision").GetInt64());
+        Assert.Equal(2, JsonSerializer.SerializeToElement(inspected.Value, JsonOptions).GetProperty("rig").GetProperty("jointCount").GetInt32());
+        Assert.Equal("rig.command", Assert.Single(JsonSerializer.SerializeToElement(listed.Value, JsonOptions).GetProperty("assetIds").EnumerateArray()).GetString());
     }
 
     private static ValueTask<RekallAgeDynamicCommandResult> Execute(RekallAgeCommandRegistry registry, string name, string json) =>

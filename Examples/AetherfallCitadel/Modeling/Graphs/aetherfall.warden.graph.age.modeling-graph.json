@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.warden.graph",
   "name": "Aetherfall Warden Silhouette",
-  "revision": 10,
+  "revision": 14,
   "nodes": [
     {
       "nodeId": "torso",
@@ -67,36 +67,6 @@
       }
     },
     {
-      "nodeId": "hood",
-      "typeId": "rekall.modeling.primitive.frustum",
-      "typeVersion": 1,
-      "parameters": {
-        "radiusBottom": 0.72,
-        "radiusTop": 0.18,
-        "depth": 1.2,
-        "segments": 20,
-        "capBottom": true,
-        "capTop": true
-      }
-    },
-    {
-      "nodeId": "hood-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": {
-        "translation": [
-          0,
-          3.5,
-          0.12
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ]
-      }
-    },
-    {
       "nodeId": "coat-l",
       "typeId": "rekall.modeling.primitive.box",
       "typeVersion": 1,
@@ -151,28 +121,6 @@
       }
     },
     {
-      "nodeId": "shoulders",
-      "typeId": "rekall.modeling.primitive.box",
-      "typeVersion": 1,
-      "parameters": {
-        "sizeX": 2.15,
-        "sizeY": 0.42,
-        "sizeZ": 0.7
-      }
-    },
-    {
-      "nodeId": "shoulders-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": {
-        "translation": [
-          0,
-          2.65,
-          0
-        ]
-      }
-    },
-    {
       "nodeId": "arm-l-x",
       "typeId": "rekall.modeling.transform",
       "typeVersion": 1,
@@ -203,33 +151,6 @@
           6,
           -8,
           -16
-        ]
-      }
-    },
-    {
-      "nodeId": "blade",
-      "typeId": "rekall.modeling.primitive.box",
-      "typeVersion": 1,
-      "parameters": {
-        "sizeX": 0.12,
-        "sizeY": 2.2,
-        "sizeZ": 0.42
-      }
-    },
-    {
-      "nodeId": "blade-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": {
-        "translation": [
-          1.48,
-          1.15,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          -13
         ]
       }
     },
@@ -294,44 +215,6 @@
       }
     },
     {
-      "nodeId": "pauldron-l",
-      "typeId": "rekall.modeling.primitive.sphere",
-      "typeVersion": 1,
-      "parameters": {
-        "radius": 0.52,
-        "segments": 28,
-        "rings": 16
-      }
-    },
-    {
-      "nodeId": "pauldron-l-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": {
-        "translation": [
-          -1.02,
-          2.62,
-          0
-        ],
-        "scale": [
-          1.1,
-          0.5,
-          0.86
-        ]
-      }
-    },
-    {
-      "nodeId": "pauldron-pair",
-      "typeId": "rekall.modeling.mirror",
-      "typeVersion": 1,
-      "parameters": {
-        "axis": "x",
-        "origin": 0,
-        "mergeDistance": 0,
-        "bisect": false
-      }
-    },
-    {
       "nodeId": "gorget",
       "typeId": "rekall.modeling.primitive.torus",
       "typeVersion": 1,
@@ -361,33 +244,6 @@
           1.2,
           1,
           0.85
-        ]
-      }
-    },
-    {
-      "nodeId": "blade-guard",
-      "typeId": "rekall.modeling.primitive.box",
-      "typeVersion": 1,
-      "parameters": {
-        "sizeX": 0.88,
-        "sizeY": 0.12,
-        "sizeZ": 0.18
-      }
-    },
-    {
-      "nodeId": "blade-guard-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": {
-        "translation": [
-          1.42,
-          2.1,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          -13
         ]
       }
     },
@@ -434,40 +290,6 @@
       }
     },
     {
-      "nodeId": "cloak",
-      "typeId": "rekall.modeling.primitive.grid",
-      "typeVersion": 1,
-      "parameters": {
-        "sizeX": 1.65,
-        "sizeY": 2.65,
-        "segmentsX": 3,
-        "segmentsY": 5
-      }
-    },
-    {
-      "nodeId": "cloak-solid",
-      "typeId": "rekall.modeling.solidify",
-      "typeVersion": 1,
-      "parameters": {
-        "thickness": 0.09,
-        "offset": 0,
-        "rim": true,
-        "evenThickness": true
-      }
-    },
-    {
-      "nodeId": "cloak-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": {
-        "translation": [
-          0,
-          1.45,
-          0.43
-        ]
-      }
-    },
-    {
       "nodeId": "faceplate",
       "typeId": "rekall.modeling.primitive.box",
       "typeVersion": 1,
@@ -503,82 +325,6 @@
           0,
           0
         ]
-      }
-    },
-    {
-      "nodeId": "helmet-crest",
-      "typeId": "rekall.modeling.primitive.frustum",
-      "typeVersion": 1,
-      "parameters": {
-        "radiusBottom": 0.17,
-        "radiusTop": 0.035,
-        "depth": 0.72,
-        "segments": 18,
-        "capBottom": true,
-        "capTop": true
-      }
-    },
-    {
-      "nodeId": "helmet-crest-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": {
-        "translation": [
-          0,
-          3.93,
-          0.06
-        ],
-        "rotation": [
-          0,
-          0,
-          0
-        ],
-        "scale": [
-          0.65,
-          1,
-          1
-        ]
-      }
-    },
-    {
-      "nodeId": "pauldron-spike",
-      "typeId": "rekall.modeling.primitive.frustum",
-      "typeVersion": 1,
-      "parameters": {
-        "radiusBottom": 0.2,
-        "radiusTop": 0.025,
-        "depth": 0.72,
-        "segments": 18,
-        "capBottom": true,
-        "capTop": true
-      }
-    },
-    {
-      "nodeId": "pauldron-spike-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": {
-        "translation": [
-          -1.38,
-          2.86,
-          0.02
-        ],
-        "rotation": [
-          0,
-          0,
-          -48
-        ]
-      }
-    },
-    {
-      "nodeId": "pauldron-spikes",
-      "typeId": "rekall.modeling.mirror",
-      "typeVersion": 1,
-      "parameters": {
-        "axis": "x",
-        "origin": 0,
-        "mergeDistance": 0,
-        "bisect": false
       }
     },
     {
@@ -704,63 +450,6 @@
       }
     },
     {
-      "nodeId": "blade-grip",
-      "typeId": "rekall.modeling.primitive.frustum",
-      "typeVersion": 1,
-      "parameters": {
-        "radiusBottom": 0.105,
-        "radiusTop": 0.105,
-        "depth": 0.68,
-        "segments": 20,
-        "capBottom": true,
-        "capTop": true
-      }
-    },
-    {
-      "nodeId": "blade-grip-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": {
-        "translation": [
-          1.67,
-          2.42,
-          0
-        ],
-        "rotation": [
-          0,
-          0,
-          -13
-        ]
-      }
-    },
-    {
-      "nodeId": "blade-pommel",
-      "typeId": "rekall.modeling.primitive.sphere",
-      "typeVersion": 1,
-      "parameters": {
-        "radius": 0.16,
-        "segments": 14,
-        "rings": 8
-      }
-    },
-    {
-      "nodeId": "blade-pommel-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": {
-        "translation": [
-          1.8,
-          2.76,
-          0
-        ],
-        "scale": [
-          0.75,
-          1.15,
-          0.75
-        ]
-      }
-    },
-    {
       "nodeId": "belt-buckle",
       "typeId": "rekall.modeling.primitive.box",
       "typeVersion": 1,
@@ -835,7 +524,7 @@
       "typeVersion": 1,
       "parameters": {
         "width": 0.04,
-        "segments": 3,
+        "segments": 7,
         "profile": 0.5,
         "clampOverlap": true,
         "hardenNormals": true
@@ -901,92 +590,6 @@
         "hemisphereRings": 6,
         "segments": 24,
         "depth": 1.72
-      }
-    },
-    {
-      "nodeId": "elbow-guard",
-      "typeId": "rekall.modeling.primitive.sphere",
-      "typeVersion": 1,
-      "parameters": {
-        "radius": 0.34,
-        "segments": 24,
-        "rings": 14
-      }
-    },
-    {
-      "nodeId": "elbow-guard-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": {
-        "scale": [
-          0.7,
-          0.38,
-          0.92
-        ],
-        "rotation": [
-          0,
-          0,
-          -14
-        ],
-        "translation": [
-          -1.12,
-          1.72,
-          -0.18
-        ]
-      }
-    },
-    {
-      "nodeId": "elbow-guards",
-      "typeId": "rekall.modeling.mirror",
-      "typeVersion": 1,
-      "parameters": {
-        "bisect": false,
-        "origin": 0,
-        "axis": "x",
-        "mergeDistance": 0
-      }
-    },
-    {
-      "nodeId": "knee-guard",
-      "typeId": "rekall.modeling.primitive.sphere",
-      "typeVersion": 1,
-      "parameters": {
-        "radius": 0.34,
-        "segments": 24,
-        "rings": 14
-      }
-    },
-    {
-      "nodeId": "knee-guard-x",
-      "typeId": "rekall.modeling.transform",
-      "typeVersion": 1,
-      "parameters": {
-        "scale": [
-          0.82,
-          0.68,
-          0.35
-        ],
-        "rotation": [
-          -12,
-          0,
-          0
-        ],
-        "translation": [
-          -0.42,
-          -0.62,
-          -0.3
-        ]
-      }
-    },
-    {
-      "nodeId": "knee-guards",
-      "typeId": "rekall.modeling.mirror",
-      "typeVersion": 1,
-      "parameters": {
-        "bisect": false,
-        "origin": 0,
-        "axis": "x",
-        "mergeDistance": 0
       }
     },
     {
@@ -1064,7 +667,7 @@
         "profile": 0.5,
         "hardenNormals": true,
         "width": 0.04,
-        "segments": 3
+        "segments": 5
       }
     },
     {
@@ -1522,6 +1125,18 @@
         "slotName": "Restrained Aether",
         "materialAssetId": "aetherfall.warden-aether.material"
       }
+    },
+    {
+      "nodeId": "body-skin",
+      "typeId": "rekall.modeling.skin.linear_weights",
+      "typeVersion": 1,
+      "parameters": {
+        "jointB": 1,
+        "jointA": 0,
+        "maximum": 3.05,
+        "minimum": 0.45,
+        "axis": "y"
+      }
     }
   ],
   "links": [
@@ -1540,13 +1155,6 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "tx3",
-      "fromNodeId": "hood",
-      "fromPortId": "geometry",
-      "toNodeId": "hood-x",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "tx4",
       "fromNodeId": "coat-l",
       "fromPortId": "geometry",
@@ -1558,20 +1166,6 @@
       "fromNodeId": "coat-r",
       "fromPortId": "geometry",
       "toNodeId": "coat-r-x",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "tx6",
-      "fromNodeId": "shoulders",
-      "fromPortId": "geometry",
-      "toNodeId": "shoulders-x",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "tx9",
-      "fromNodeId": "blade",
-      "fromPortId": "geometry",
-      "toNodeId": "blade-x",
       "toPortId": "geometry"
     },
     {
@@ -1596,31 +1190,10 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "tx12",
-      "fromNodeId": "pauldron-l",
-      "fromPortId": "geometry",
-      "toNodeId": "pauldron-l-x",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "pauldron-mirror",
-      "fromNodeId": "pauldron-l-x",
-      "fromPortId": "geometry",
-      "toNodeId": "pauldron-pair",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "tx14",
       "fromNodeId": "gorget",
       "fromPortId": "geometry",
       "toNodeId": "gorget-x",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "tx15",
-      "fromNodeId": "blade-guard",
-      "fromPortId": "geometry",
-      "toNodeId": "blade-guard-x",
       "toPortId": "geometry"
     },
     {
@@ -1638,20 +1211,6 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "cloak-solid",
-      "fromNodeId": "cloak",
-      "fromPortId": "geometry",
-      "toNodeId": "cloak-solid",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "cloak-x",
-      "fromNodeId": "cloak-solid",
-      "fromPortId": "geometry",
-      "toNodeId": "cloak-x",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "faceplate-inset",
       "fromNodeId": "faceplate",
       "fromPortId": "geometry",
@@ -1663,27 +1222,6 @@
       "fromNodeId": "faceplate-inset",
       "fromPortId": "geometry",
       "toNodeId": "faceplate-x",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "helmet-crest-x",
-      "fromNodeId": "helmet-crest",
-      "fromPortId": "geometry",
-      "toNodeId": "helmet-crest-x",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "pauldron-spike-x",
-      "fromNodeId": "pauldron-spike",
-      "fromPortId": "geometry",
-      "toNodeId": "pauldron-spike-x",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "pauldron-spikes",
-      "fromNodeId": "pauldron-spike-x",
-      "fromPortId": "geometry",
-      "toNodeId": "pauldron-spikes",
       "toPortId": "geometry"
     },
     {
@@ -1729,20 +1267,6 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "blade-grip-x",
-      "fromNodeId": "blade-grip",
-      "fromPortId": "geometry",
-      "toNodeId": "blade-grip-x",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "blade-pommel-x",
-      "fromNodeId": "blade-pommel",
-      "fromPortId": "geometry",
-      "toNodeId": "blade-pommel-x",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "belt-buckle-inset",
       "fromNodeId": "belt-buckle",
       "fromPortId": "geometry",
@@ -1764,13 +1288,6 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "cloth-hood",
-      "fromNodeId": "hood-x",
-      "fromPortId": "geometry",
-      "toNodeId": "cloth-join",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "cloth-coat-l",
       "fromNodeId": "coat-l-x",
       "fromPortId": "geometry",
@@ -1782,27 +1299,6 @@
       "fromNodeId": "coat-r-x",
       "fromPortId": "geometry",
       "toNodeId": "cloth-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "cloth-cloak",
-      "fromNodeId": "cloak-x",
-      "fromPortId": "geometry",
-      "toNodeId": "cloth-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "armor-shoulders",
-      "fromNodeId": "shoulders-x",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "armor-blade",
-      "fromNodeId": "blade-x",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-join",
       "toPortId": "geometry"
     },
     {
@@ -1820,29 +1316,8 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "armor-guard",
-      "fromNodeId": "blade-guard-x",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-join",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "armor-faceplate",
       "fromNodeId": "faceplate-x",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "armor-crest",
-      "fromNodeId": "helmet-crest-x",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "armor-spikes",
-      "fromNodeId": "pauldron-spikes",
       "fromPortId": "geometry",
       "toNodeId": "armor-join",
       "toPortId": "geometry"
@@ -1897,13 +1372,6 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "out",
-      "fromNodeId": "uv",
-      "fromPortId": "geometry",
-      "toNodeId": "output",
-      "toPortId": "input"
-    },
-    {
       "linkId": "tx7",
       "fromNodeId": "arm-l",
       "fromPortId": "geometry",
@@ -1915,34 +1383,6 @@
       "fromNodeId": "arm-r",
       "fromPortId": "geometry",
       "toNodeId": "arm-r-x",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "elbow-guard-x",
-      "fromNodeId": "elbow-guard",
-      "fromPortId": "geometry",
-      "toNodeId": "elbow-guard-x",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "elbow-guards",
-      "fromNodeId": "elbow-guard-x",
-      "fromPortId": "geometry",
-      "toNodeId": "elbow-guards",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "knee-guard-x",
-      "fromNodeId": "knee-guard",
-      "fromPortId": "geometry",
-      "toNodeId": "knee-guard-x",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "knee-guards",
-      "fromNodeId": "knee-guard-x",
-      "fromPortId": "geometry",
-      "toNodeId": "knee-guards",
       "toPortId": "geometry"
     },
     {
@@ -2016,13 +1456,6 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "armor-pauldrons-smooth",
-      "fromNodeId": "pauldron-pair",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-smooth-join",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "armor-gorget-smooth",
       "fromNodeId": "gorget-x",
       "fromPortId": "geometry",
@@ -2032,34 +1465,6 @@
     {
       "linkId": "armor-rivets-smooth",
       "fromNodeId": "rivet-array",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-smooth-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "armor-grip-smooth",
-      "fromNodeId": "blade-grip-x",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-smooth-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "armor-pommel-smooth",
-      "fromNodeId": "blade-pommel-x",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-smooth-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "armor-elbows-smooth",
-      "fromNodeId": "elbow-guards",
-      "fromPortId": "geometry",
-      "toNodeId": "armor-smooth-join",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "armor-knees-smooth",
-      "fromNodeId": "knee-guards",
       "fromPortId": "geometry",
       "toNodeId": "armor-smooth-join",
       "toPortId": "geometry"
@@ -2224,6 +1629,20 @@
       "fromPortId": "geometry",
       "toNodeId": "join",
       "toPortId": "geometry"
+    },
+    {
+      "linkId": "uv-body-skin",
+      "fromNodeId": "uv",
+      "fromPortId": "geometry",
+      "toNodeId": "body-skin",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "body-skin-out",
+      "fromNodeId": "body-skin",
+      "fromPortId": "geometry",
+      "toNodeId": "output",
+      "toPortId": "input"
     }
   ],
   "outputs": [

@@ -202,6 +202,19 @@ public sealed partial class RekallAgeModelingGraphEvaluator
                     ["centerY"] = ReadVector3(node, "center", new(0, 0, 0)).Y,
                     ["centerZ"] = ReadVector3(node, "center", new(0, 0, 0)).Z
                 }, RekallAgeGeometryDomain.Point),
+            "rekall.modeling.deform.bend" => ApplySemanticOperation(
+                graph, node, InputGeometry(node, "geometry", incoming, values), "bend_points",
+                new JsonObject
+                {
+                    ["axis"] = ReadString(node, "axis", "y"),
+                    ["bendAxis"] = ReadString(node, "bendAxis", "z"),
+                    ["minimum"] = ReadNumber(node, "minimum", 0),
+                    ["maximum"] = ReadNumber(node, "maximum", 1),
+                    ["angleDegrees"] = ReadNumber(node, "angleDegrees", 45),
+                    ["centerX"] = ReadVector3(node, "origin", new(0, 0, 0)).X,
+                    ["centerY"] = ReadVector3(node, "origin", new(0, 0, 0)).Y,
+                    ["centerZ"] = ReadVector3(node, "origin", new(0, 0, 0)).Z
+                }, RekallAgeGeometryDomain.Point),
             "rekall.modeling.scatter.area" => ScatterAreaGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.join" => JoinGeometry(graph, node, incoming, values),
             "rekall.modeling.boolean" => BooleanGeometry(

@@ -102,6 +102,17 @@ public sealed class RekallAgeModelingNodeCatalog
                 Vector3("center", "Center", "world-unit"),
                 Text("selectionSet", "Selection Set", "")
             ]),
+        Node("rekall.modeling.deform.bend", "Bend Deform", "Curves geometry through an authored angle and axis range while rotating cross-sections around an origin, inspired by non-destructive simple-deform workflows.",
+            [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)],
+            [
+                Text("axis", "Axis", "y", ["x", "y", "z"]),
+                Text("bendAxis", "Bend Axis", "z", ["x", "y", "z"]),
+                Number("minimum", "Minimum", 0, -1_000_000, 1_000_000, "world-unit"),
+                Number("maximum", "Maximum", 1, -1_000_000, 1_000_000, "world-unit"),
+                Number("angleDegrees", "Angle", 45, -36_000, 36_000, "degree"),
+                Vector3("origin", "Origin", "world-unit"),
+                Text("selectionSet", "Selection Set", "")
+            ]),
         Node("rekall.modeling.scatter.area", "Scatter Area", "Creates deterministic transformed copies across a bounded horizontal area for reusable environmental dressing.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)],
             [

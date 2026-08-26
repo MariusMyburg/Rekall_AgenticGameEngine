@@ -572,6 +572,18 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   rig documents, bind-pose generation, constraints, richer weighting tools,
   Studio visualization, and a production-quality full character remain open.
 
+  2026-08-26 native-rig/bend checkpoint: AGE now stores validated named-joint
+  hierarchy and bind matrices in a versioned rig asset, evaluates bind-global,
+  pose-global, and skin matrices deterministically, exposes revision-safe rig
+  commands, and resolves generic `Rekall.RigPose` state in the renderer with
+  typed observations. Generic bend deformation is available as a semantic mesh
+  operation, modeling node, and modifier. Aetherfall proves delta-time-driven
+  named chest motion changes actual runtime vertices and uses bend on its
+  mantle. Modeling passes 257 tests and Aetherfall high-fidelity acceptance
+  passes 24 tests. This advances Wave 3 but does not close it: multi-joint
+  weighting, constraints/IK, retargeting, Studio rig tools, and a genuinely
+  production-quality character remain open.
+
 - [ ] **Step 3: Execute Wave 4 as an independently accepted tranche**
 
   Complete bounded sculpt/paint/retopology/advanced proceduralism with compact

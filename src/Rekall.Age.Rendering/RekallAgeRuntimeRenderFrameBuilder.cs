@@ -9,6 +9,7 @@ namespace Rekall.Age.Rendering;
 public sealed class RekallAgeRuntimeRenderFrameBuilder
 {
     private readonly RekallAgeCompiledMeshResolver _compiledMeshResolver = new();
+    private readonly RekallAgeRigPoseResolver _rigPoseResolver = new();
 
     public RekallAgeRuntimeViewportFrame Build(
         RekallAgeRuntimeWorld world,
@@ -660,7 +661,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     ? ReadString(textLabelComponent, "facingMode") ?? ReadString(textLabelComponent, "FacingMode") ?? "world"
                     : "world",
                 VirtualGeometry: virtualGeometry,
-                Skin: ReadSkin(entity),
+                Skin: ReadSkin(world.ProjectRoot, entity, mesh.EntityName, meshObservations),
                 Morph: ReadMorph(entity));
 
             if (planetComponent is not null
@@ -1344,12 +1345,31 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             EmptyToNull(ReadString(component, "debugMode")) ?? "off");
     }
 
-    private static RekallAgeRuntimeViewportSkin? ReadSkin(RekallAgeRuntimeEntity? entity)
+    private RekallAgeRuntimeViewportSkin? ReadSkin(
+        string? projectRoot,
+        RekallAgeRuntimeEntity? entity,
+        string entityName,
+        ICollection<RekallAgeRuntimeViewportObservation> observations)
     {
         var pose = entity?.Components.FirstOrDefault(component =>
             component.Type.Equals("Rekall.SkeletonPose", StringComparison.Ordinal));
-        if (pose is null
-            || !TryGetPropertyValue(pose.Properties, "joints", out var node)
+        if (pose is null)
+        {
+            var rigPose = entity?.Components.FirstOrDefault(component =>
+                component.Type.Equals("Rekall.RigPose", StringComparison.Ordinal));
+            var resolution = _rigPoseResolver.Resolve(projectRoot, rigPose);
+            if (resolution.IssueCode is not null)
+            {
+                observations.Add(new RekallAgeRuntimeViewportObservation(
+                    resolution.IssueCode,
+                    "error",
+                    "rendering",
+                    entityName,
+                    resolution.IssueMessage ?? "Native rig pose could not be resolved."));
+            }
+            return resolution.Skin;
+        }
+        if (!TryGetPropertyValue(pose.Properties, "joints", out var node)
             || node is not JsonArray joints
             || joints.Count is 0 or > 4_096)
         {

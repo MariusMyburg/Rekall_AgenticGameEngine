@@ -262,6 +262,61 @@ public sealed class AetherfallHighFidelityAcceptanceTests
     }
 
     [Fact]
+    public async Task WardenBodyUsesNativeNamedRigAndRuntimePoseDeformation()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var rig = await new RekallAgeRigAssetStore().LoadAsync(
+            projectRoot, "aetherfall.warden.rig", CancellationToken.None);
+        Assert.Equal(["root", "chest"], rig.Joints.Select(joint => joint.JointId));
+
+        var graph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
+            projectRoot, "aetherfall.warden.graph", CancellationToken.None);
+        Assert.Contains(graph.Nodes, node => node.TypeId == "rekall.modeling.skin.linear_weights");
+        var mesh = await new RekallAgeMeshAssetStore().LoadAsync(
+            projectRoot, "aetherfall-warden-dark-mesh", CancellationToken.None);
+        Assert.Contains(mesh.Attributes, attribute => attribute.Semantic == "joint-indices-0");
+        Assert.Contains(mesh.Attributes, attribute => attribute.Semantic == "joint-weights-0");
+
+        var scene = await new RekallAgeSceneStore().LoadAsync(projectRoot, "Main", CancellationToken.None);
+        var warden = Assert.Single(scene.Entities, entity => entity.Name == "AetherWarden");
+        var pose = Assert.Single(warden.Components, component => component.Type == "Rekall.RigPose");
+        Assert.Equal("aetherfall.warden.rig", pose.Properties["assetId"]!.GetValue<string>());
+
+        var initial = new RekallAgeRuntimeWorldBuilder().Build(scene, projectRoot);
+        var loop = RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot);
+        var early = await loop.RunAsync(initial, 1, CancellationToken.None);
+        var later = await loop.RunAsync(initial, 30, CancellationToken.None);
+        var earlyPose = Assert.Single(
+            Assert.Single(early.World.Entities, entity => entity.Id == warden.Id).Components,
+            component => component.Type == "Rekall.RigPose");
+        var laterPose = Assert.Single(
+            Assert.Single(later.World.Entities, entity => entity.Id == warden.Id).Components,
+            component => component.Type == "Rekall.RigPose");
+        Assert.NotEqual(earlyPose.Properties.ToJsonString(), laterPose.Properties.ToJsonString());
+        var builder = new RekallAgeRuntimeRenderFrameBuilder();
+        var earlyFrame = builder.Build(early.World, 640, 360, false);
+        var laterFrame = builder.Build(later.World, 640, 360, false);
+        var earlyMeshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(earlyFrame)
+            .Where(item => item.EntityId == warden.Id)
+            .OrderBy(item => item.EntityName, StringComparer.Ordinal)
+            .ToArray();
+        var laterMeshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(laterFrame)
+            .Where(item => item.EntityId == warden.Id)
+            .OrderBy(item => item.EntityName, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.NotEmpty(earlyMeshes);
+        Assert.Equal(earlyMeshes.Select(item => item.EntityName), laterMeshes.Select(item => item.EntityName));
+        Assert.NotEmpty(Assert.Single(earlyFrame.Renderables, item => item.EntityId == warden.Id).GeometryMesh!.SkinBindings!);
+        Assert.Contains(earlyMeshes.Zip(laterMeshes), surfacePair =>
+            surfacePair.First.Vertices.Zip(surfacePair.Second.Vertices).Any(vertexPair =>
+                Math.Abs(vertexPair.First.X - vertexPair.Second.X) > 0.0001
+                || Math.Abs(vertexPair.First.Y - vertexPair.Second.Y) > 0.0001
+                || Math.Abs(vertexPair.First.Z - vertexPair.Second.Z) > 0.0001));
+        Assert.DoesNotContain(laterFrame.Observations, observation => observation.Target == warden.Name);
+    }
+
+    [Fact]
     public async Task WardenUsesModelBackedParentedArticulationThatFollowsGameplayRoot()
     {
         var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
@@ -636,8 +691,8 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         var modelingGraph = JsonNode.Parse(File.ReadAllText(Path.Combine(
             projectRoot, "Modeling", "Graphs", "aetherfall.warden.graph.age.modeling-graph.json")))!.AsObject();
         var modelingNodes = modelingGraph["nodes"]!.AsArray();
-        Assert.True(modelingNodes.Count >= 101,
-            $"Expected the Warden graph to retain its detailed authored construction, found {modelingNodes.Count} nodes.");
+        Assert.True(modelingNodes.Count >= 70,
+            $"Expected the Warden graph to retain its compact detailed authored construction, found {modelingNodes.Count} nodes.");
         Assert.Contains(modelingNodes, node =>
             node?["typeId"]?.GetValue<string>() == "rekall.modeling.primitive.capsule");
         Assert.Contains(modelingNodes, node =>
@@ -650,6 +705,14 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         })
         {
             Assert.Contains(modelingNodes, node => node?["nodeId"]?.GetValue<string>() == nodeId);
+        }
+        foreach (var obsoletePlaceholder in new[]
+        {
+            "pauldron-spike", "blade", "cloak"
+        })
+        {
+            Assert.DoesNotContain(modelingNodes, node =>
+                node?["nodeId"]?.GetValue<string>() == obsoletePlaceholder);
         }
         Assert.Equal(3, authoredSurfaces.Count);
         Assert.Equal(

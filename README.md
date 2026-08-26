@@ -126,6 +126,8 @@ Implemented foundations:
 - GLB import reports and scene export
 - Tripo3D text-to-model generation and GLB import through the generic asset pipeline
 - generated primitives, meshes, recipes, and extrusions
+- non-destructive taper and bend deformation through mesh operations, modeling graphs, and modifier stacks
+- versioned named-joint rig assets, bind-pose evaluation, runtime rig poses, and skinned Model Asset deformation
 - render layers and camera culling masks
 - runtime viewport capture
 - performance budget inspection
@@ -147,6 +149,8 @@ Important scope note:
 - Multiplayer is a generic authoritative-session foundation, not a finished matchmaking or internet transport product.
 - VR uses the windowed player as the playable path. Desktop keyboard/mouse input and OpenXR poses/actions share the same generic runtime input stream, while the direct OpenXR submitter remains a diagnostic path.
 - Tripo3D integration is an asset-pipeline bridge: it can request text-to-model generation, poll the provider task, download the returned GLB, and import it as an ordinary model asset. The engine does not use Tripo to author game behavior.
+- Native rigging currently provides generic named hierarchy/bind contracts and runtime matrix deformation. Constraint authoring, automatic/painted multi-joint weights, inverse kinematics, retargeting, Studio rig visualization, and production character tooling remain active modeling work.
+- Tripo and Meshy remain optional future providers behind a planned provider-neutral asynchronous asset-job contract. Neither is intended to bypass AGE's editable mesh, provenance, validation, cook, or packaging pipeline.
 
 ## Production Distribution
 

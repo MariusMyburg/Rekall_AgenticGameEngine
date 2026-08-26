@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.warden.rig",
+  "name": "Aetherfall Warden Native Rig",
+  "revision": 1,
+  "joints": [
+    {
+      "jointId": "root",
+      "name": "Root",
+      "parentIndex": null,
+      "bindLocalMatrix": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "jointId": "chest",
+      "name": "Chest",
+      "parentIndex": 0,
+      "bindLocalMatrix": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        1.45,
+        0,
+        1
+      ]
+    }
+  ]
+}

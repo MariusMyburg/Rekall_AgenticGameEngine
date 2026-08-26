@@ -1,6 +1,45 @@
 {
   "assets": [
     {
+      "id": "aetherfall-warden-idle",
+      "name": "aetherfall-warden-idle",
+      "displayName": "Aetherfall Warden Guarded Idle",
+      "kind": "animation",
+      "sourcePath": "Assets/animation/aetherfall-warden-idle.age.animation.json",
+      "importedPath": "Assets/animation/aetherfall-warden-idle.age.animation.json",
+      "contentHash": "beac6941b224257664157282c76f1345f664cfd291e4f29a1d9c6f1082d4ed32",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "aetherfall-warden-presentation",
+      "name": "aetherfall-warden-presentation",
+      "displayName": "Aetherfall Warden Presentation Motion",
+      "kind": "animation",
+      "sourcePath": "Assets/animation/aetherfall-warden-presentation.age.animation.json",
+      "importedPath": "Assets/animation/aetherfall-warden-presentation.age.animation.json",
+      "contentHash": "13cb06ca0c2b3de433185e7c7928b2b8c7931251f8f18e89b441885c9f0559b0",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "aetherfall-warden-walk",
+      "name": "aetherfall-warden-walk",
+      "displayName": "Aetherfall Warden Armored Walk",
+      "kind": "animation",
+      "sourcePath": "Assets/animation/aetherfall-warden-walk.age.animation.json",
+      "importedPath": "Assets/animation/aetherfall-warden-walk.age.animation.json",
+      "contentHash": "95238389afc055ebea6ca339c7305fcff8c9f0ce7ee075d08bcc55eb3b5fc64e",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
       "id": "aetherfall-ashen-processional-path-model",
       "name": "aetherfall-ashen-processional-path-model",
       "displayName": "Ashen Processional Path",
@@ -291,8 +330,8 @@
       "displayName": "Aetherfall Dark Warden",
       "kind": "model",
       "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-warden-dark-mesh.age.mesh.json",
-      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-dark-model\\2b032e298fa3491e24d969afd0289703f92b766cbb0a16ca9f04ae4b10b40f3d.age.compiled-mesh.json",
-      "contentHash": "2b032e298fa3491e24d969afd0289703f92b766cbb0a16ca9f04ae4b10b40f3d",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-dark-model\\0b7cc522cebde5e826b08594a4099246b639d9b61ffea28afb38dc21c39368a7.age.compiled-mesh.json",
+      "contentHash": "0b7cc522cebde5e826b08594a4099246b639d9b61ffea28afb38dc21c39368a7",
       "glbMetadata": null,
       "textureMetadata": null,
       "provenance": null,
@@ -300,8 +339,8 @@
         "modelDocumentPath": "Assets/Models/aetherfall-warden-dark-model.age.model.json",
         "sourceKind": "Mesh",
         "sourceAssetId": "aetherfall-warden-dark-mesh",
-        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-dark-model/2b032e298fa3491e24d969afd0289703f92b766cbb0a16ca9f04ae4b10b40f3d.age.compiled-mesh.json",
-        "compiledContentHash": "2b032e298fa3491e24d969afd0289703f92b766cbb0a16ca9f04ae4b10b40f3d"
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-dark-model/0b7cc522cebde5e826b08594a4099246b639d9b61ffea28afb38dc21c39368a7.age.compiled-mesh.json",
+        "compiledContentHash": "0b7cc522cebde5e826b08594a4099246b639d9b61ffea28afb38dc21c39368a7"
       }
     },
     {
@@ -417,6 +456,48 @@
         "compiledOutputPath": "Assets/Models/Compiled/aetherfall-wet-slate-terrain-model/05217ad245838581a8a0508058de76a67b05c899e35494f0364019308b207556.age.compiled-mesh.json",
         "compiledContentHash": "05217ad245838581a8a0508058de76a67b05c899e35494f0364019308b207556"
       }
+    },
+    {
+      "id": "asset_aetherfall-warden-blackened-steel-albedo-v1_38ff2b50",
+      "name": "aetherfall-warden-blackened-steel-albedo-v1",
+      "displayName": "Aetherfall Warden Blackened Steel Albedo V1",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\SourceTextures\\aetherfall-warden-blackened-steel-albedo-v1.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_aetherfall-warden-blackened-steel-albedo-v1_38ff2b50.png",
+      "contentHash": "38ff2b50827bb05241ac6e0905c6a06677868ba1eb1f6e46e246874c4f87ea2c",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_aetherfall-warden-blackened-steel-normal-v1_43104c91",
+      "name": "aetherfall-warden-blackened-steel-normal-v1",
+      "displayName": "Aetherfall Warden Blackened Steel Normal V1",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\SourceTextures\\aetherfall-warden-blackened-steel-normal-v1.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_aetherfall-warden-blackened-steel-normal-v1_43104c91.png",
+      "contentHash": "43104c918db65db5f3f850231ec5e44c8d7888bbc9f9592c7fca064cb398e6d5",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
     },
     {
       "id": "asset_aetherfall-weathered-masonry-albedo-v2_d174a66a",
@@ -643,45 +724,6 @@
         "supercompression": null,
         "gpuCompressed": false
       },
-      "provenance": null,
-      "modelAssetMetadata": null
-    },
-    {
-      "id": "aetherfall-warden-idle",
-      "name": "aetherfall-warden-idle",
-      "displayName": "Aetherfall Warden Guarded Idle",
-      "kind": "animation",
-      "sourcePath": "Assets/animation/aetherfall-warden-idle.age.animation.json",
-      "importedPath": "Assets/animation/aetherfall-warden-idle.age.animation.json",
-      "contentHash": "beac6941b224257664157282c76f1345f664cfd291e4f29a1d9c6f1082d4ed32",
-      "glbMetadata": null,
-      "textureMetadata": null,
-      "provenance": null,
-      "modelAssetMetadata": null
-    },
-    {
-      "id": "aetherfall-warden-presentation",
-      "name": "aetherfall-warden-presentation",
-      "displayName": "Aetherfall Warden Presentation Motion",
-      "kind": "animation",
-      "sourcePath": "Assets/animation/aetherfall-warden-presentation.age.animation.json",
-      "importedPath": "Assets/animation/aetherfall-warden-presentation.age.animation.json",
-      "contentHash": "13cb06ca0c2b3de433185e7c7928b2b8c7931251f8f18e89b441885c9f0559b0",
-      "glbMetadata": null,
-      "textureMetadata": null,
-      "provenance": null,
-      "modelAssetMetadata": null
-    },
-    {
-      "id": "aetherfall-warden-walk",
-      "name": "aetherfall-warden-walk",
-      "displayName": "Aetherfall Warden Armored Walk",
-      "kind": "animation",
-      "sourcePath": "Assets/animation/aetherfall-warden-walk.age.animation.json",
-      "importedPath": "Assets/animation/aetherfall-warden-walk.age.animation.json",
-      "contentHash": "95238389afc055ebea6ca339c7305fcff8c9f0ce7ee075d08bcc55eb3b5fc64e",
-      "glbMetadata": null,
-      "textureMetadata": null,
       "provenance": null,
       "modelAssetMetadata": null
     }

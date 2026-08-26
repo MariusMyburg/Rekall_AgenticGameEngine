@@ -70,7 +70,7 @@ AGE remains an independent C# implementation.
 | Box/cylindrical/spherical/camera projection | Partial | `project_uv` supports deterministic planar, box, cylindrical, and spherical corner projection with strict finite replay tests | Blender UV project/warp | Add camera projection and richer authored origins/orientations |
 | Seams/islands/unwrap/pack | Partial | `mark_uv_seams`, public island inspection, `unwrap_pack_uv`, and graph/lightmap nodes provide deterministic seam-bounded planar charts and bounded packing | UV parametrizer/pack sources | Add angle/conformal solvers, partial-island selection, texel-density policies, tangent regeneration command, and Studio UV mode |
 | Multi-material face assignment | Implemented foundation | material slots/assign node | Blender face material indices | Preserve across every new operation/modifier |
-| Semantic material graphs | Implemented foundation | material graph catalogs/compilers | Blender shader nodes; Godot materials | Expand physically based node library and layered materials later |
+| Semantic material graphs | Implemented foundation; Aetherfall now proves graph-owned albedo and tangent-space normal dependencies bind on a real multi-surface compiled model | material graph catalogs/compilers, imported texture dependency expansion, runtime PBR surface binding | Blender shader nodes; Godot materials | Add multiply/tint, packed metallic-roughness-occlusion authoring, procedural/layered materials, baking, and Studio node previews |
 
 ## Deformation, characters, sculpting, and cooking
 

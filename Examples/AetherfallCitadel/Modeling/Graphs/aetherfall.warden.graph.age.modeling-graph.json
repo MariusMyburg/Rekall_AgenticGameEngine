@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.warden.graph",
   "name": "Aetherfall Warden Silhouette",
-  "revision": 23,
+  "revision": 24,
   "nodes": [
     {
       "nodeId": "torso",
@@ -1446,6 +1446,100 @@
       }
     },
     {
+      "nodeId": "cuirass-flute",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.038, "depth": 1.05, "segments": 18, "hemisphereRings": 5 }
+    },
+    {
+      "nodeId": "cuirass-flute-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.34, 2.03, -0.665],
+        "rotation": [-4, 0, 0],
+        "scale": [0.72, 1, 0.5]
+      }
+    },
+    {
+      "nodeId": "cuirass-flutes",
+      "typeId": "rekall.modeling.array",
+      "typeVersion": 1,
+      "parameters": { "count": 5, "offset": [0.17, 0, 0], "relativeOffset": false, "instanceMode": false }
+    },
+    {
+      "nodeId": "mail-ring",
+      "typeId": "rekall.modeling.primitive.torus",
+      "typeVersion": 1,
+      "parameters": { "majorRadius": 0.065, "minorRadius": 0.014, "majorSegments": 16, "minorSegments": 5 }
+    },
+    {
+      "nodeId": "mail-ring-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.48, 0.78, -0.58],
+        "rotation": [90, 0, 0],
+        "scale": [1, 1, 1]
+      }
+    },
+    {
+      "nodeId": "mail-row",
+      "typeId": "rekall.modeling.array",
+      "typeVersion": 1,
+      "parameters": { "count": 7, "offset": [0.16, 0, 0], "relativeOffset": false, "instanceMode": false }
+    },
+    {
+      "nodeId": "mail-field",
+      "typeId": "rekall.modeling.array",
+      "typeVersion": 1,
+      "parameters": { "count": 4, "offset": [0, -0.15, 0.015], "relativeOffset": false, "instanceMode": false }
+    },
+    {
+      "nodeId": "helmet-rivet",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.038, "segments": 16, "rings": 9 }
+    },
+    {
+      "nodeId": "helmet-rivet-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.25, 3.45, -0.47],
+        "rotation": [0, 0, 0],
+        "scale": [1, 0.72, 0.72]
+      }
+    },
+    {
+      "nodeId": "helmet-rivets",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
+      "nodeId": "greave-ridge",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.045, "depth": 0.68, "segments": 18, "hemisphereRings": 5 }
+    },
+    {
+      "nodeId": "greave-ridge-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.42, -0.66, -0.43],
+        "rotation": [-5, 0, 0],
+        "scale": [0.72, 1, 0.52]
+      }
+    },
+    {
+      "nodeId": "greave-ridges",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
       "nodeId": "body-skin",
       "typeId": "rekall.modeling.skin.envelope_weights",
       "typeVersion": 1,
@@ -2231,6 +2325,97 @@
     {
       "linkId": "sternum-ridge-smooth",
       "fromNodeId": "sternum-ridge-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cuirass-flute-x",
+      "fromNodeId": "cuirass-flute",
+      "fromPortId": "geometry",
+      "toNodeId": "cuirass-flute-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cuirass-flute-array",
+      "fromNodeId": "cuirass-flute-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cuirass-flutes",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cuirass-flute-smooth",
+      "fromNodeId": "cuirass-flutes",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "mail-ring-x",
+      "fromNodeId": "mail-ring",
+      "fromPortId": "geometry",
+      "toNodeId": "mail-ring-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "mail-row-array",
+      "fromNodeId": "mail-ring-x",
+      "fromPortId": "geometry",
+      "toNodeId": "mail-row",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "mail-field-array",
+      "fromNodeId": "mail-row",
+      "fromPortId": "geometry",
+      "toNodeId": "mail-field",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "mail-field-smooth",
+      "fromNodeId": "mail-field",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-rivet-x",
+      "fromNodeId": "helmet-rivet",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-rivet-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-rivet-mirror",
+      "fromNodeId": "helmet-rivet-x",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-rivets",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-rivet-smooth",
+      "fromNodeId": "helmet-rivets",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "greave-ridge-x",
+      "fromNodeId": "greave-ridge",
+      "fromPortId": "geometry",
+      "toNodeId": "greave-ridge-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "greave-ridge-mirror",
+      "fromNodeId": "greave-ridge-x",
+      "fromPortId": "geometry",
+      "toNodeId": "greave-ridges",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "greave-ridge-smooth",
+      "fromNodeId": "greave-ridges",
       "fromPortId": "geometry",
       "toNodeId": "armor-smooth-join",
       "toPortId": "geometry"

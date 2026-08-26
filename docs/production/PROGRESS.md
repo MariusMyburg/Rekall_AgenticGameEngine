@@ -4,10 +4,34 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 15:48 Africa/Johannesburg
+Last verified: 2026-08-26 16:24 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
+
+The current Warden material/form slice resolves the washed-out hero response
+from evidence rather than global exposure changes. Controlled Vulkan captures
+showed the unshadowed 4.2 Warden softbox was not the primary source; the nearby
+8.5 Arrival Hearth practical dominated and clipped the dark steel. The authored
+scene now uses a restrained 2.1 practical plus 0.8 readability fill. AGE's
+ordinary image import and material-graph pipeline binds a new blackened-steel
+albedo and tangent-space normal source end to end; executable acceptance loads
+both graph dependencies and verifies their binding on the real compiled Warden
+steel surface. The editable Warden graph advances to revision 24 / 128 reachable
+nodes with array-authored cuirass fluting, a 28-ring mail field, mirrored helmet
+rivets, and mirrored greave ridges. It bakes 22,396 points / 25,282 faces /
+95,036 corners and rebuilds the stable live-linked model at revision 29. The
+hero is scaled from 0.58 to 0.68 for gameplay readability. Aetherfall passes
+46/46; project/scene validation report zero issues; both modules are restricted-
+host ready. High 2560x1440 `desktop60` passes at 8.546048 ms with 99 draws,
+221,394 triangles, 1,172,208 vertices, and 11 textures. Native proof is
+`Proof/Captures/WardenMaterialFormFinal/vulkan-scene-1280x720-20260826141949883.png`:
+320 draws, four dispatches, 65 renderables, 10,532 colors, luminance 0.080, and
+zero missing assets, fallbacks, or observations. This materially improves the
+previous white procedural read but is not final visual acceptance: anatomy and
+armor remain visibly constructed from simple masses, the mail grid is coarse at
+gameplay distance, and the environment still needs richer coherent assets,
+ability animation, combat encounters, IK/foot planting, and stronger composition.
 
 The current Godot/Blender-informed animation slice connects AGE's existing
 generic animation ecosystem to its native named-joint rigs. Ordinary animation

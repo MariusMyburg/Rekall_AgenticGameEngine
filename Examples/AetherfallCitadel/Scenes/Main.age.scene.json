@@ -1109,9 +1109,9 @@
             "y": 0.8,
             "z": -12,
             "pitch": 0,
-            "scaleX": 0.58,
-            "scaleY": 0.58,
-            "scaleZ": 0.58
+            "scaleX": 0.68,
+            "scaleY": 0.68,
+            "scaleZ": 0.68
           }
         }
       ],
@@ -1215,7 +1215,7 @@
           "type": "Rekall.PointLight",
           "properties": {
             "color": "#d18442",
-            "intensity": 8.5,
+            "intensity": 2.1,
             "range": 14,
             "priority": 70,
             "shadowPriority": 70,
@@ -10626,7 +10626,7 @@
             "priority": 90,
             "shadowPriority": 90,
             "castShadows": false,
-            "intensity": 4.2,
+            "intensity": 0.8,
             "color": "#806f5f"
           }
         },

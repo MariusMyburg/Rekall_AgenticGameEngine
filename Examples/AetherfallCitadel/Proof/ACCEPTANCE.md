@@ -972,3 +972,35 @@ the new background is an explicit fallback, not a claim that sky assets render.
   procedurally modeled, and too small in the composition. Ability clips,
   constraints/IK, foot planting, root-motion extraction, Studio curve editing,
   fitted armor/cloth, surface detail, and lighting/material restraint remain.
+
+## Restrained lighting and authored Warden surface/form checkpoint
+
+- Controlled native Vulkan comparisons isolated the washed-out Warden response:
+  removing the unshadowed 4.2 softbox barely changed the hero, while removing
+  the nearby 8.5 Arrival Hearth practical restored the dark material response.
+  The final scene retains readable local illumination at 2.1 for the practical
+  and 0.8 for the softbox instead of applying a global exposure workaround.
+- The Warden aged-steel graph now consumes imported blackened-steel albedo and
+  tangent-space normal sources. Acceptance resolves the actual scene frame,
+  loads both graph-owned image dependencies, builds the real compiled Warden
+  steel surface, and verifies both textures and the restrained 0.55 normal
+  strength are bound.
+- The editable Warden graph is revision 24 with 128 reachable nodes. Existing
+  generic capsule, torus, array, mirror, join, material, UV, normal, and skin
+  primitives author five cuirass flutes, a 28-ring mail field, mirrored helmet
+  rivets, and mirrored greave ridges. The bake contains 22,396 points, 25,282
+  faces, and 95,036 corners; live-linked model revision 29 references the new
+  content-addressed compiled output. Hero presentation scale is 0.68.
+- Aetherfall acceptance passes 46/46. Project and Main scene validation have
+  zero issues, and both modules are ready under
+  `windows-appcontainer-restricted`. High 2560x1440 `desktop60` passes at
+  8.546048 ms with 99 draws, 221,394 triangles, 1,172,208 vertices, and 11
+  textures.
+- Native proof is
+  `Proof/Captures/WardenMaterialFormFinal/vulkan-scene-1280x720-20260826141949883.png`:
+  RTX 5090 High Vulkan, 320 draws, four dispatches, 65 renderables, 10,532
+  distinct colors, luminance 0.080, and zero observations, missing assets, or
+  fallbacks. This closes the washed-out material regression and proves a richer
+  AGE-authored character consumer; it does not claim final Diablo-grade visual
+  quality. More fitted anatomy/armor, less grid-like mail, cloth tailoring,
+  combat/ability animation, IK/foot planting, and environment composition remain.

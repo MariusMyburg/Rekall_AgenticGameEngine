@@ -18,6 +18,38 @@ namespace Rekall.Age.Tests.Examples;
 public sealed class AetherfallHighFidelityAcceptanceTests
 {
     [Fact]
+    public async Task WardenSteelBindsAuthoredHighFrequencySurfaceTextureEndToEnd()
+    {
+        const string materialAssetId = "aetherfall.warden-steel.material";
+        const string textureAssetIdPrefix = "asset_aetherfall-warden-blackened-steel-albedo-v1_";
+        const string normalAssetIdPrefix = "asset_aetherfall-warden-blackened-steel-normal-v1_";
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var scene = await new RekallAgeSceneStore().LoadAsync(projectRoot, "Main", CancellationToken.None);
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene, projectRoot);
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 640, 360, false);
+
+        var assets = await new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(
+            projectRoot,
+            frame,
+            CancellationToken.None);
+        var material = Assert.Contains(materialAssetId, assets.Materials);
+        var textureAssetId = Assert.IsType<string>(material.BaseColorTextureAssetId);
+        Assert.StartsWith(textureAssetIdPrefix, textureAssetId, StringComparison.Ordinal);
+        Assert.Contains(textureAssetId, assets.Images);
+        var normalAssetId = Assert.IsType<string>(material.NormalTextureAssetId);
+        Assert.StartsWith(normalAssetIdPrefix, normalAssetId, StringComparison.Ordinal);
+        Assert.Contains(normalAssetId, assets.Images);
+        Assert.InRange(material.NormalScale, 0.3f, 0.8f);
+
+        var steelSurface = Assert.Single(
+            new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets),
+            mesh => mesh.EntityName == "AetherWarden Surface 0");
+        Assert.Equal(materialAssetId, steelSurface.MaterialAssetId);
+        Assert.Equal(textureAssetId, steelSurface.BaseColorTexture?.Id);
+        Assert.Equal(normalAssetId, steelSurface.NormalTexture?.Id);
+    }
+
+    [Fact]
     public async Task StaticArchitectureUsesTopologySafeVirtualGeometryWithMeasuredReduction()
     {
         var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
@@ -822,7 +854,7 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             projectRoot, "Modeling", "Graphs", "aetherfall.warden.graph.age.modeling-graph.json")))!.AsObject();
         var modelingNodes = modelingGraph["nodes"]!.AsArray();
         var modelingLinks = modelingGraph["links"]!.AsArray();
-        Assert.True(modelingNodes.Count >= 112,
+        Assert.True(modelingNodes.Count >= 128,
             $"Expected the Warden graph to retain its layered detailed authored construction, found {modelingNodes.Count} nodes.");
         Assert.Contains(modelingNodes, node =>
             node?["typeId"]?.GetValue<string>() == "rekall.modeling.primitive.capsule");
@@ -835,7 +867,8 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             "thigh-guards", "bracers", "gauntlets", "eye-slit-x", "aether-material", "coat-tail", "coat-tails",
             "shoulder-shells", "abdomen-plates", "knee-cops", "helmet-crest-x", "breastplates",
             "forearm-body-l", "forearm-body-r", "thigh-underlayers", "shin-underlayers",
-            "helmet-crown-x", "helmet-cheeks", "helmet-nose-x", "sternum-ridge-x", "shoulder-lamellas"
+            "helmet-crown-x", "helmet-cheeks", "helmet-nose-x", "sternum-ridge-x", "shoulder-lamellas",
+            "cuirass-flutes", "mail-field", "helmet-rivets", "greave-ridges"
         })
         {
             Assert.Contains(modelingNodes, node => node?["nodeId"]?.GetValue<string>() == nodeId);

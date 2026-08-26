@@ -23,8 +23,8 @@ public sealed partial class RekallAgeModelingGraphEvaluator
 
         try
         {
-            var csgA = ToCsg(meshA, "a");
-            var csgB = ToCsg(meshB, "b");
+            var csgA = RekallAgeMeshCsgKernel.ToCsg(meshA, "a");
+            var csgB = RekallAgeMeshCsgKernel.ToCsg(meshB, "b");
             var result = operation switch
             {
                 "union" => csgA.Union(csgB),
@@ -81,28 +81,6 @@ public sealed partial class RekallAgeModelingGraphEvaluator
     private static bool IsBooleanProvenance(RekallAgeGeometryAttribute attribute) =>
         attribute.Name is "boolean.sourceOperand" or "boolean.sourceFaceId";
 
-    private static Csg.CSG ToCsg(RekallAgeMeshAsset source, string operand)
-    {
-        var compiled = new RekallAgeMeshCompiler().Compile(source);
-        var polygons = new List<Csg.Polygon>(compiled.Triangles.Count);
-        for (var triangle = 0; triangle < compiled.Triangles.Count; triangle++)
-        {
-            var indices = compiled.Indices.Skip(triangle * 3).Take(3).Select(index => checked((int)index)).ToArray();
-            var p0 = compiled.Vertices[indices[0]].Position;
-            var p1 = compiled.Vertices[indices[1]].Position;
-            var p2 = compiled.Vertices[indices[2]].Position;
-            var normal = Unit(Cross(Subtract(p1, p0), Subtract(p2, p0)));
-            polygons.Add(new(
-                indices.Select(index => new Csg.Vertex(ToCsgVector(compiled.Vertices[index].Position), ToCsgVector(normal))).ToArray(),
-                new BooleanFaceSource(
-                    operand,
-                    compiled.Triangles[triangle].SourceFaceId,
-                    compiled.Triangles[triangle].SourceCornerIds.ToArray(),
-                    [p0, p1, p2])));
-        }
-        return Csg.CSG.FromPolygons(polygons.ToArray());
-    }
-
     private static RekallAgeMeshAsset FromCsg(
         RekallAgeModelingGraphAsset graph,
         RekallAgeModelingGraphNode node,
@@ -122,7 +100,7 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         var pointMap = new Dictionary<(long X, long Y, long Z), int>();
         var positions = new List<RekallAgeGeometryVector3>();
         var faces = new List<int[]>();
-        var sources = new List<BooleanFaceSource>();
+        var sources = new List<RekallAgeMeshCsgFaceSource>();
         foreach (var polygon in polygons)
         {
             var face = polygon.Vertices.Select(vertex => Point(vertex.Pos)).ToList();
@@ -132,7 +110,7 @@ public sealed partial class RekallAgeModelingGraphEvaluator
             if (face.Count >= 3)
             {
                 faces.Add(face.ToArray());
-                sources.Add(polygon.Shared as BooleanFaceSource
+                sources.Add(polygon.Shared as RekallAgeMeshCsgFaceSource
                     ?? throw new EvaluationException("REKALL_MODELING_BOOLEAN_PROVENANCE_MISSING", "Boolean kernel output lost source-face provenance.", node.NodeId));
             }
         }
@@ -268,19 +246,10 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         }
     }
 
-    private static Csg.Vector ToCsgVector(RekallAgeGeometryVector3 value) => new(value.X, value.Y, value.Z);
-    private static RekallAgeGeometryVector3 Subtract(RekallAgeGeometryVector3 a, RekallAgeGeometryVector3 b) => new(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
-    private static RekallAgeGeometryVector3 Cross(RekallAgeGeometryVector3 a, RekallAgeGeometryVector3 b) => new(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
-    private static RekallAgeGeometryVector3 Unit(RekallAgeGeometryVector3 value)
-    {
-        var length = Math.Sqrt(value.X * value.X + value.Y * value.Y + value.Z * value.Z);
-        return new(value.X / length, value.Y / length, value.Z / length);
-    }
-
     private static JsonElement InterpolateCorner(
         RekallAgeGeometryAttribute schema,
         RekallAgeGeometryAttribute sourceAttribute,
-        BooleanFaceSource source,
+        RekallAgeMeshCsgFaceSource source,
         RekallAgeGeometryVector3 position,
         IReadOnlyDictionary<ulong, int> cornerIndices)
     {
@@ -320,9 +289,9 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         RekallAgeGeometryVector3 b,
         RekallAgeGeometryVector3 c)
     {
-        var v0 = Subtract(b, a); var v1 = Subtract(c, a); var v2 = Subtract(point, a);
-        var d00 = Dot(v0, v0); var d01 = Dot(v0, v1); var d11 = Dot(v1, v1);
-        var d20 = Dot(v2, v0); var d21 = Dot(v2, v1);
+        var v0 = RekallAgeMeshCsgKernel.Subtract(b, a); var v1 = RekallAgeMeshCsgKernel.Subtract(c, a); var v2 = RekallAgeMeshCsgKernel.Subtract(point, a);
+        var d00 = RekallAgeMeshCsgKernel.Dot(v0, v0); var d01 = RekallAgeMeshCsgKernel.Dot(v0, v1); var d11 = RekallAgeMeshCsgKernel.Dot(v1, v1);
+        var d20 = RekallAgeMeshCsgKernel.Dot(v2, v0); var d21 = RekallAgeMeshCsgKernel.Dot(v2, v1);
         var denominator = d00 * d11 - d01 * d01;
         if (Math.Abs(denominator) <= 1e-20)
             throw new EvaluationException("REKALL_MODELING_BOOLEAN_PROVENANCE_DEGENERATE", "Boolean source triangle is degenerate during corner interpolation.");
@@ -331,13 +300,6 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         return [1 - v - w, v, w];
     }
 
-    private static double Dot(RekallAgeGeometryVector3 a, RekallAgeGeometryVector3 b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z;
-
-    private sealed record BooleanFaceSource(
-        string Operand,
-        ulong FaceId,
-        IReadOnlyList<ulong> SourceCornerIds,
-        IReadOnlyList<RekallAgeGeometryVector3> TrianglePositions);
     private sealed record BooleanAttributePlan(
         IReadOnlyList<RekallAgeGeometryAttribute> Schemas,
         IReadOnlyList<RekallAgeMaterialSlot> MaterialSlots,

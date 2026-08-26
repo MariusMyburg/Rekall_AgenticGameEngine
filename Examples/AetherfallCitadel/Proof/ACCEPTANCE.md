@@ -448,3 +448,44 @@ the new background is an explicit fallback, not a claim that sky assets render.
   fidelity target. Custom-normal editing/transfer, richer high-resolution
   geometry, production materials, denser world dressing, animation, and final
   composition remain substantial visible work.
+
+## Typed curve-revolve authoring checkpoint
+
+- AGE now publishes `rekall.modeling.curve.revolve@1` as a typed Curve-to-
+  Geometry authoring node. It supports X/Y/Z axes, arbitrary origins, partial
+  and full angles, bounded segment counts, axis-pole welding, material slots,
+  seam-correct corner `uv.generated`, point `curve.source.span` and
+  `revolve.angle` provenance, and face `normal.smooth`. Deterministic tests also
+  compile the result through auto-smooth and weighted split normals and verify
+  finite unit normal/tangent frames.
+- Aetherfall consumes the primitive through ordinary graph patch, evaluate,
+  bake, and Model Asset rebuild commands. The Warden has a ten-control-point,
+  40-segment layered cuirass; the weathered ruin has paired closed 14-control-
+  point, 32-segment crown capitals. Both remain editable source graphs and
+  retain UV, provenance, material, and authored-normal evidence in their baked
+  meshes.
+- The first ruin composition placed the capital before the existing whole-mesh
+  bevel. Because the model is instanced 30 times, that expanded the scene to
+  2,799,400 vertices and correctly failed `desktop60`. Joining the already-
+  smooth capital after the legacy bevel reduced the evaluated ruin from 12,612
+  to 3,012 points while preserving the visible profile; the final budget is
+  91 scene draws, 224,564 triangles, 1,158,440 vertices, seven textures, and
+  6.374784 ms measured GPU time with no blockers or warnings.
+- The retained RTX 5090 High Vulkan frame is
+  `Proof/Captures/CurveRevolve/vulkan-scene-1280x720-20260826043723828.png`.
+  Frame 30 is informative with 11,725 distinct colors, 17.0% dominant-color
+  share, mean luminance 0.100, 64 renderables, 282 render-work draws, four
+  dispatches, and zero observations, missing assets, unsupported assets, or
+  fallbacks. Visual comparison with the split-normal frame shows the Warden's
+  block torso replaced by a rounded layered armor volume while the dark,
+  restrained composition and clean SSAO remain stable.
+- The final consolidated curve/modeling/compiler/command/Aetherfall selection
+  passes 85/85. Movement, combat, progression, and reset pass all 2/4/4/5
+  strict executable assertions; the progression route respects the authored
+  0.1-second delta clamp and proves two shards plus conduit activation. Project
+  and scene validators report zero issues.
+- This is an honest generic authoring milestone, not final Diablo/Alan Wake
+  fidelity. Screw/helix pitch, explicit cap policies, fields, multi-spline
+  output, mesh-selection Spin, a modifier form, Studio profile/axis editing,
+  higher-resolution production assets, richer materials, animation, world
+  dressing, and composition remain substantial work.

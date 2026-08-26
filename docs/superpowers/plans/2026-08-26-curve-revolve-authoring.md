@@ -225,13 +225,13 @@ assets, xUnit, native Vulkan capture.
 - Produces: retained visual/playable/performance evidence and pushed commit
   identity.
 
-- [ ] **Step 1: Run consolidated tests**
+- [x] **Step 1: Run consolidated tests**
 
   Run revolve, curve, graph, compiler, catalog, command-schema, and complete
   Aetherfall high-fidelity selections. Record exact pass/fail counts; repair
   every failure in scope.
 
-- [ ] **Step 2: Capture and inspect High Vulkan output**
+- [x] **Step 2: Capture and inspect High Vulkan output**
 
   Capture frame 30 at 1280x720 High into
   `Examples/AetherfallCitadel/Proof/Captures/CurveRevolve`. Inspect the original
@@ -240,21 +240,21 @@ assets, xUnit, native Vulkan capture.
   and zero observations, missing/unsupported assets, fallbacks, or black-dot
   noise. If form detail is not legible, revise the profiles and recapture.
 
-- [ ] **Step 3: Re-run playable and performance gates**
+- [x] **Step 3: Re-run playable and performance gates**
 
   Run the checked-in movement/combat/progression/reset inputs and assertions,
   requiring 2/4/4/5. Run project and scene validation, requiring zero issues.
   Run High `desktop60` at 1280x720 with GPU timings and require no blockers or
   warnings and every configured limit to pass.
 
-- [ ] **Step 4: Record exact evidence**
+- [x] **Step 4: Record exact evidence**
 
   Update the acceptance ledger, capability matrix, progress ledger, and this
   checklist with actual node/mesh/capture/test/gameplay/validation/timing facts.
   Mark revolve partial and list screw/helix, caps, fields, multi-spline, mesh
   Spin, modifier, and Studio gizmo gaps explicitly.
 
-- [ ] **Step 5: Verify, commit, and push**
+- [x] **Step 5: Verify, commit, and push**
 
   Run `git diff --check`, the final focused test selection, and clean-status
   checks. Commit documentation as `docs: record curve revolve acceptance`,

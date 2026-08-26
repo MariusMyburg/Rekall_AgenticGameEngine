@@ -249,10 +249,15 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         var compiledMesh = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(projectRoot, compiledRelativePath)))!.AsObject();
         var surfaces = compiledMesh["surfaces"]!.AsArray();
 
-        Assert.Equal(2, surfaces.Count);
+        Assert.Equal(3, surfaces.Count);
         Assert.Equal(
-            ["aetherfall.ruin-mass.material", "aetherfall.ruin-trim.material"],
+            [
+                "aetherfall.ruin-trim.material",
+                "aetherfall.ruin-mass.material",
+                "aetherfall.ruin-trim.material"
+            ],
             surfaces.Select(surface => surface!["materialAssetId"]!.GetValue<string>()).ToArray());
+        Assert.All(surfaces, surface => Assert.True(surface!["indexCount"]!.GetValue<int>() > 0));
     }
 
     [Fact]

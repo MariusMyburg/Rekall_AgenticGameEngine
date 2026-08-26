@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Rekall.Age.Rendering;
 using Rekall.Age.World;
 using Rekall.Age.Runtime;
+using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Contracts;
 
@@ -11,6 +12,65 @@ namespace Rekall.Age.Tests.Examples;
 
 public sealed class AetherfallHighFidelityAcceptanceTests
 {
+    [Fact]
+    public async Task WardenUsesModelBackedParentedArticulationThatFollowsGameplayRoot()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var scene = await new RekallAgeSceneStore().LoadAsync(projectRoot, "Main", CancellationToken.None);
+        var authoredWarden = Assert.Single(scene.Entities, entity => entity.Name == "AetherWarden");
+        var attachments = scene.Entities
+            .Where(entity => entity.ParentId == authoredWarden.Id
+                && entity.Visible
+                && entity.Tags.Contains("character-articulation", StringComparer.Ordinal)
+                && entity.Components.Any(component => component.Type == "Rekall.ModelAssetReference")
+                && entity.Components.Any(component => component.Type == "Rekall.AnimationPlayer")
+                && entity.Components.Any(component => component.Type == "Rekall.AnimationClip"))
+            .OrderBy(entity => entity.Name, StringComparer.Ordinal)
+            .ToArray();
+        Assert.True(attachments.Length >= 2,
+            $"Expected at least two visible model-backed Warden attachments, found {attachments.Length}.");
+
+        var runeblade = Assert.Single(attachments, entity => entity.Name == "Warden Runeblade");
+        var modelReference = Assert.Single(runeblade.Components, component => component.Type == "Rekall.ModelAssetReference");
+        Assert.Equal("aetherfall-warden-runeblade-model", modelReference.Properties["assetId"]!.GetValue<string>());
+        var bladeGraph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
+            projectRoot, "aetherfall.warden-runeblade.graph", CancellationToken.None);
+        Assert.Contains(bladeGraph.Nodes, node => node.TypeId == "rekall.modeling.bevel");
+        Assert.Contains(bladeGraph.Nodes, node => node.TypeId == "rekall.modeling.primitive.capsule");
+
+        var initialWorld = new RekallAgeRuntimeWorldBuilder().Build(scene, projectRoot);
+        var animated = await RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot)
+            .RunAsync(initialWorld, 30, CancellationToken.None);
+        var animatedBlade = Assert.Single(animated.World.Entities, entity => entity.Name == "Warden Runeblade");
+        var authoredBladeTransform = Assert.Single(runeblade.Components, component => component.Type == "Rekall.Transform3D");
+        Assert.NotEqual(
+            authoredBladeTransform.Properties["roll"]!.GetValue<double>(),
+            animatedBlade.Transform.Rotation3D.Z);
+
+        var beforeFrame = new RekallAgeRuntimeRenderFrameBuilder().Build(animated.World, 640, 360, false);
+        var beforeBlade = Assert.Single(beforeFrame.Renderables, item => item.EntityName == "Warden Runeblade");
+        var movedWorld = animated.World with
+        {
+            Entities = animated.World.Entities.Select(entity => entity.Name == "AetherWarden"
+                ? entity with
+                {
+                    Transform = entity.Transform with
+                    {
+                        Position3D = new RekallAgeRuntimeVector3(
+                            entity.Transform.Position3D.X + 2.5,
+                            entity.Transform.Position3D.Y,
+                            entity.Transform.Position3D.Z)
+                    }
+                }
+                : entity).ToArray()
+        };
+        var afterFrame = new RekallAgeRuntimeRenderFrameBuilder().Build(movedWorld, 640, 360, false);
+        var afterBlade = Assert.Single(afterFrame.Renderables, item => item.EntityName == "Warden Runeblade");
+
+        Assert.Equal(2.5, afterBlade.X - beforeBlade.X, precision: 4);
+        Assert.DoesNotContain(afterFrame.Observations, item => item.Target == "Warden Runeblade");
+    }
+
     [Theory]
     [InlineData("aetherfall.weathered-ruin.graph")]
     [InlineData("aetherfall.broken-arch.graph")]

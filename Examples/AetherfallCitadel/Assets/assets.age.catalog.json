@@ -324,6 +324,44 @@
       }
     },
     {
+      "id": "aetherfall-warden-pauldron-model",
+      "name": "aetherfall-warden-pauldron-model",
+      "displayName": "Aetherfall Warden Articulated Pauldron",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-warden-pauldron-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-pauldron-model\\3a70594050f75fd7b9e323c5cdffb0a4e060aad27ca2dc5b7b55980decc7dba2.age.compiled-mesh.json",
+      "contentHash": "3a70594050f75fd7b9e323c5cdffb0a4e060aad27ca2dc5b7b55980decc7dba2",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-warden-pauldron-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-warden-pauldron-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-pauldron-model/3a70594050f75fd7b9e323c5cdffb0a4e060aad27ca2dc5b7b55980decc7dba2.age.compiled-mesh.json",
+        "compiledContentHash": "3a70594050f75fd7b9e323c5cdffb0a4e060aad27ca2dc5b7b55980decc7dba2"
+      }
+    },
+    {
+      "id": "aetherfall-warden-runeblade-model",
+      "name": "aetherfall-warden-runeblade-model",
+      "displayName": "Aetherfall Warden Runeblade",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-warden-runeblade-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-runeblade-model\\bc732ef0a3fe79f9b3498428e9631b6209bee4d36e834e36e82e7eff09acf49e.age.compiled-mesh.json",
+      "contentHash": "bc732ef0a3fe79f9b3498428e9631b6209bee4d36e834e36e82e7eff09acf49e",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-warden-runeblade-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-warden-runeblade-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-runeblade-model/bc732ef0a3fe79f9b3498428e9631b6209bee4d36e834e36e82e7eff09acf49e.age.compiled-mesh.json",
+        "compiledContentHash": "bc732ef0a3fe79f9b3498428e9631b6209bee4d36e834e36e82e7eff09acf49e"
+      }
+    },
+    {
       "id": "aetherfall-weathered-ruin-model",
       "name": "aetherfall-weathered-ruin-model",
       "displayName": "Weathered Ruin Wall",

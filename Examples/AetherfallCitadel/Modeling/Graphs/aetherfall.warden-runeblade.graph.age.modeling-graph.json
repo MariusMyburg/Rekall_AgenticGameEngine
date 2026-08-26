@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.warden-runeblade.graph",
+  "name": "Aetherfall Warden Runeblade",
+  "revision": 1,
+  "nodes": [
+    {
+      "nodeId": "blade",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": { "sizeX": 0.18, "sizeY": 2.45, "sizeZ": 0.46 }
+    },
+    {
+      "nodeId": "blade-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": { "translation": [0, 1.62, 0] }
+    },
+    {
+      "nodeId": "tip",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": { "radiusBottom": 0.34, "radiusTop": 0.025, "depth": 0.82, "segments": 4, "capBottom": true, "capTop": true }
+    },
+    {
+      "nodeId": "tip-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": { "translation": [0, 3.25, 0], "rotation": [0, 45, 0], "scale": [0.7, 1, 1] }
+    },
+    {
+      "nodeId": "guard",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": { "sizeX": 1.25, "sizeY": 0.16, "sizeZ": 0.32 }
+    },
+    {
+      "nodeId": "guard-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": { "translation": [0, 0.34, 0] }
+    },
+    {
+      "nodeId": "quillon",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": { "radiusBottom": 0.12, "radiusTop": 0.025, "depth": 0.68, "segments": 12, "capBottom": true, "capTop": true }
+    },
+    {
+      "nodeId": "quillon-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": { "translation": [0.72, 0.3, 0], "rotation": [0, 0, 90] }
+    },
+    {
+      "nodeId": "quillons",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "bisect": false, "mergeDistance": 0 }
+    },
+    {
+      "nodeId": "grip",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.115, "depth": 0.68, "segments": 24, "hemisphereRings": 6 }
+    },
+    {
+      "nodeId": "grip-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": { "translation": [0, -0.08, 0], "scale": [1, 1, 0.88] }
+    },
+    {
+      "nodeId": "pommel",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.2, "segments": 24, "rings": 14 }
+    },
+    {
+      "nodeId": "pommel-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": { "translation": [0, -0.55, 0], "scale": [0.8, 1.25, 0.8] }
+    },
+    {
+      "nodeId": "rune-stud",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.075, "segments": 18, "rings": 10 }
+    },
+    {
+      "nodeId": "rune-stud-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": { "translation": [0, 0.88, 0.27], "scale": [0.55, 1.25, 0.45] }
+    },
+    {
+      "nodeId": "rune-studs",
+      "typeId": "rekall.modeling.array",
+      "typeVersion": 1,
+      "parameters": { "count": 5, "offset": [0, 0.48, 0], "relativeOffset": false, "instanceMode": false }
+    },
+    {
+      "nodeId": "hard-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "bevel",
+      "typeId": "rekall.modeling.bevel",
+      "typeVersion": 1,
+      "parameters": { "width": 0.035, "segments": 3, "profile": 0.5, "clampOverlap": true, "hardenNormals": true }
+    },
+    {
+      "nodeId": "smooth-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "post-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": { "materialAssetId": "aetherfall.warden-steel.material", "slotName": "Runed Steel" }
+    },
+    {
+      "nodeId": "weather",
+      "typeId": "rekall.modeling.deform.noise",
+      "typeVersion": 1,
+      "parameters": { "amplitude": 0.006, "frequency": 8.5, "seed": 1401, "axis": "z" }
+    },
+    {
+      "nodeId": "normals",
+      "typeId": "rekall.modeling.weighted_normals",
+      "typeVersion": 1,
+      "parameters": { "attribute": "normal.weighted", "faceAreaWeight": 1.0 }
+    },
+    {
+      "nodeId": "uv",
+      "typeId": "rekall.modeling.project_uv",
+      "typeVersion": 1,
+      "parameters": { "projection": "box", "axis": "xy", "scaleU": 0.65, "scaleV": 0.32 }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    { "linkId": "blade-x", "fromNodeId": "blade", "fromPortId": "geometry", "toNodeId": "blade-x", "toPortId": "geometry" },
+    { "linkId": "tip-x", "fromNodeId": "tip", "fromPortId": "geometry", "toNodeId": "tip-x", "toPortId": "geometry" },
+    { "linkId": "guard-x", "fromNodeId": "guard", "fromPortId": "geometry", "toNodeId": "guard-x", "toPortId": "geometry" },
+    { "linkId": "quillon-x", "fromNodeId": "quillon", "fromPortId": "geometry", "toNodeId": "quillon-x", "toPortId": "geometry" },
+    { "linkId": "quillons", "fromNodeId": "quillon-x", "fromPortId": "geometry", "toNodeId": "quillons", "toPortId": "geometry" },
+    { "linkId": "grip-x", "fromNodeId": "grip", "fromPortId": "geometry", "toNodeId": "grip-x", "toPortId": "geometry" },
+    { "linkId": "pommel-x", "fromNodeId": "pommel", "fromPortId": "geometry", "toNodeId": "pommel-x", "toPortId": "geometry" },
+    { "linkId": "rune-stud-x", "fromNodeId": "rune-stud", "fromPortId": "geometry", "toNodeId": "rune-stud-x", "toPortId": "geometry" },
+    { "linkId": "rune-studs", "fromNodeId": "rune-stud-x", "fromPortId": "geometry", "toNodeId": "rune-studs", "toPortId": "geometry" },
+    { "linkId": "hard-blade", "fromNodeId": "blade-x", "fromPortId": "geometry", "toNodeId": "hard-join", "toPortId": "geometry" },
+    { "linkId": "hard-tip", "fromNodeId": "tip-x", "fromPortId": "geometry", "toNodeId": "hard-join", "toPortId": "geometry" },
+    { "linkId": "hard-guard", "fromNodeId": "guard-x", "fromPortId": "geometry", "toNodeId": "hard-join", "toPortId": "geometry" },
+    { "linkId": "hard-quillons", "fromNodeId": "quillons", "fromPortId": "geometry", "toNodeId": "hard-join", "toPortId": "geometry" },
+    { "linkId": "hard-bevel", "fromNodeId": "hard-join", "fromPortId": "geometry", "toNodeId": "bevel", "toPortId": "geometry" },
+    { "linkId": "smooth-grip", "fromNodeId": "grip-x", "fromPortId": "geometry", "toNodeId": "smooth-join", "toPortId": "geometry" },
+    { "linkId": "smooth-pommel", "fromNodeId": "pommel-x", "fromPortId": "geometry", "toNodeId": "smooth-join", "toPortId": "geometry" },
+    { "linkId": "smooth-runes", "fromNodeId": "rune-studs", "fromPortId": "geometry", "toNodeId": "smooth-join", "toPortId": "geometry" },
+    { "linkId": "post-hard", "fromNodeId": "bevel", "fromPortId": "geometry", "toNodeId": "post-join", "toPortId": "geometry" },
+    { "linkId": "post-smooth", "fromNodeId": "smooth-join", "fromPortId": "geometry", "toNodeId": "post-join", "toPortId": "geometry" },
+    { "linkId": "material", "fromNodeId": "post-join", "fromPortId": "geometry", "toNodeId": "material", "toPortId": "geometry" },
+    { "linkId": "weather", "fromNodeId": "material", "fromPortId": "geometry", "toNodeId": "weather", "toPortId": "geometry" },
+    { "linkId": "normals", "fromNodeId": "weather", "fromPortId": "geometry", "toNodeId": "normals", "toPortId": "geometry" },
+    { "linkId": "uv", "fromNodeId": "normals", "fromPortId": "geometry", "toNodeId": "uv", "toPortId": "geometry" },
+    { "linkId": "output", "fromNodeId": "uv", "fromPortId": "geometry", "toNodeId": "output", "toPortId": "input" }
+  ],
+  "outputs": [
+    { "name": "mesh", "nodeId": "output", "portId": "geometry" }
+  ],
+  "exposedParameters": []
+}

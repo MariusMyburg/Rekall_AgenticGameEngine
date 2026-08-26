@@ -4,10 +4,46 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 10:20 Africa/Johannesburg
+Last verified: 2026-08-26 11:08 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
+
+The current Blender/Godot-informed modeling tranche removes AGE's complete-edge
+bevel restriction. `bevel_edges` now accepts arbitrary selected two-face
+manifold edges, closes neighboring transition regions and affected vertex caps,
+preserves typed point/edge/face/corner attributes and provenance, scales widths
+from an optional edge-domain Float weight, supports an explicit generated-face
+material slot, and makes `hardenNormals` author smooth bevel faces while source
+planes retain their hard policy. The same parameters are published through the
+canonical operation, procedural-node, modifier, agent, and Studio descriptor
+surfaces. A new generic `select_edges_by_angle` operation and
+`rekall.modeling.selection.edge_angle` node create reusable named selections
+from adjacent-face angle, so agents can construct useful bevel selections
+inside ordinary graphs instead of hand-authoring topology IDs. Aetherfall's
+runeblade is the first live consumer: its 26-node graph selects hard edges before
+a three-segment bevel, bakes cleanly to 2,048 points / 2,422 faces, and compiles
+to 8,892 vertices / 4,048 triangles. The fresh High Vulkan proof is informative
+with 11,681 colors, mean luminance 0.100, 65 renderables, 301 render-work draws,
+and zero observations or fallbacks; original-size review finds no cracks or
+exploded topology. Focused bevel/normal/modifier/Aetherfall evidence is green.
+The review-driven closure now also derives strip winding from incident source
+faces, traces cap cycles from actual topology rather than geometric sorting,
+keeps representative selected-edge subsets closed and consistently wound,
+preserves the implicit smooth default across joins, canonicalizes production
+`normal.smooth` semantics, and reports attribute invalidation when bevel creates
+new smoothing or material data. Incompatible same-name smoothing attributes
+now fail closed, and source-edge/cap-boundary indexes keep the operation linear
+in ordinary topology traversal. Focused modeling evidence passes 78/78 and the
+complete Aetherfall selection passes 42/42; project and scene validation are
+clean. High `desktop60` passes at 97 draws, 193,570 triangles, 833,144 vertices,
+nine textures, and 5.548224 ms measured GPU time.
+This is a substantial production bevel foundation, not Blender parity: custom
+profiles, offset modes, vertex-only bevel, miter policies, exact independent
+corner treatment for unequal incident weights, broader non-manifold policy,
+interactive edit-mode preview, and a full Studio selection overlay remain.
+The frame also remains visually prototype-grade; split/skinned anatomy and
+deformable clothing are still the next character-fidelity milestone.
 
 The current animation checkpoint makes an ordinary authored timeline capable
 of driving a complete entity hierarchy instead of forcing every attachment to

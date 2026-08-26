@@ -1,30 +1,66 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Rekall.Age.Modeling.Contracts;
 
 namespace Rekall.Age.Modeling;
 
 public sealed partial class RekallAgeMeshOperationExecutor
 {
-    private sealed record BevelFace(int[] Points, int SourceFace, int?[] CornerSources);
+    private sealed record BevelFace(
+        int[] Points,
+        int SourceFace,
+        int?[] CornerSources,
+        int? MaterialIndex = null,
+        bool Generated = false);
 
     private static RekallAgeMeshOperationResult BevelEdges(RekallAgeMeshAsset source, RekallAgeMeshOperationRequest request)
     {
         RequireDomain(request, RekallAgeGeometryDomain.Edge);
         var topology = source.Topology;
-        var selected = request.ElementIds.Order().ToArray();
-        if (!selected.SequenceEqual(topology.EdgeIds.Order()))
-            throw Failure("REKALL_MESH_BEVEL_PARTIAL_UNSUPPORTED", "The current deterministic bevel requires every mesh edge; use a complete edge selection.");
+        var requestedEdgeIndices = ResolveIndices(topology.EdgeIds, request.ElementIds, "edge");
+        var sourceEdgeByPoints = topology.EdgePointIndices
+            .Select((edge, index) => (Key: edge.A < edge.B ? (edge.A, edge.B) : (edge.B, edge.A), Index: index))
+            .ToDictionary(item => item.Key, item => item.Index);
 
         var width = ReadFiniteDouble(request.Parameters, "width");
         var segments = ReadBoundedInt(request.Parameters, "segments", 1, 1, 64);
         var profile = ReadFiniteDouble(request.Parameters, "profile", 0.5);
         var clampOverlap = ReadBoolean(request.Parameters, "clampOverlap", true);
-        _ = ReadBoolean(request.Parameters, "hardenNormals", false);
+        var hardenNormals = ReadBoolean(request.Parameters, "hardenNormals", false);
         if (width <= 0 || profile is < 0.01 or > 0.99)
             throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", "Bevel width must be positive and profile must be between 0.01 and 0.99.");
+        var weightAttributeName = ReadOptionalString(request.Parameters, "weightAttribute");
+        var weightAttribute = weightAttributeName is null
+            ? null
+            : source.Attributes.SingleOrDefault(attribute =>
+                attribute.Name.Equals(weightAttributeName, StringComparison.Ordinal)
+                && attribute.Domain == RekallAgeGeometryDomain.Edge
+                && attribute.ValueType == RekallAgeGeometryValueType.Float)
+                ?? throw Failure(
+                    "REKALL_MESH_BEVEL_WEIGHT_ATTRIBUTE_INVALID",
+                    $"Bevel weight attribute '{weightAttributeName}' must be an edge-domain Float attribute.");
+        var edgeWeights = requestedEdgeIndices.ToDictionary(
+            index => index,
+            index => weightAttribute is null ? 1d : Math.Clamp(weightAttribute.Values[index].GetDouble(), 0, 1));
+        var selectedEdgeIndices = edgeWeights
+            .Where(item => item.Value > 1e-9)
+            .Select(item => item.Key)
+            .ToHashSet();
+        if (selectedEdgeIndices.Count == 0)
+            throw Failure("REKALL_MESH_BEVEL_SELECTION_EMPTY", "Bevel selection has no edges with a positive effective weight.");
+        var materialIndex = ReadBoundedInt(request.Parameters, "materialIndex", -1, -1, 65_535);
+        if (materialIndex >= source.MaterialSlots.Count)
+            throw Failure("REKALL_MESH_BEVEL_MATERIAL_INVALID", "Bevel materialIndex must reference an existing material slot or be -1 to inherit source faces.");
+        int? generatedMaterialIndex = materialIndex >= 0 ? materialIndex : null;
+        var affectedPoints = selectedEdgeIndices
+            .SelectMany(index => new[] { topology.EdgePointIndices[index].A, topology.EdgePointIndices[index].B })
+            .ToHashSet();
 
         var positions = new List<RekallAgeGeometryVector3>();
         var sourcePointByOutput = new List<int>();
         var insetByCorner = new Dictionary<int, int>();
+        var originalOutputBySourcePoint = new Dictionary<int, int>();
+        var firstFaceByPoint = new Dictionary<int, int>();
         var faces = new List<BevelFace>();
         for (var faceIndex = 0; faceIndex < topology.FaceIds.Count; faceIndex++)
         {
@@ -41,15 +77,30 @@ public sealed partial class RekallAgeMeshOperationExecutor
             {
                 var corner = start + local;
                 var sourcePoint = topology.CornerPointIndices[corner];
+                firstFaceByPoint.TryAdd(sourcePoint, faceIndex);
                 var point = topology.Positions[sourcePoint];
+                var previousCorner = local == 0 ? end - 1 : corner - 1;
+                var currentEdge = topology.CornerEdgeIndices[corner];
+                var previousEdge = topology.CornerEdgeIndices[previousCorner];
+                var cornerWeight = Math.Max(
+                    selectedEdgeIndices.Contains(currentEdge) ? edgeWeights[currentEdge] : 0,
+                    selectedEdgeIndices.Contains(previousEdge) ? edgeWeights[previousEdge] : 0);
+                if (cornerWeight <= 1e-9)
+                {
+                    inset[local] = OriginalOutput(sourcePoint);
+                    insetByCorner[corner] = inset[local];
+                    insetCornerSources[local] = corner;
+                    continue;
+                }
                 var towardCenter = Subtract(center, point);
                 var available = Math.Sqrt(Dot(towardCenter, towardCenter));
                 if (available <= 1e-9)
                     throw Failure("REKALL_MESH_BEVEL_FACE_DEGENERATE", "Bevel cannot inset a face corner at its centroid.");
+                var requestedWidth = width * cornerWeight;
                 var safeWidth = available * 0.45;
-                if (!clampOverlap && width > safeWidth)
+                if (!clampOverlap && requestedWidth > safeWidth)
                     throw Failure("REKALL_MESH_BEVEL_OVERLAP", "Bevel width overlaps an inset face; reduce width or enable clampOverlap.");
-                var insetWidth = Math.Min(width, safeWidth);
+                var insetWidth = Math.Min(requestedWidth, safeWidth);
                 var scale = insetWidth / available;
                 inset[local] = positions.Count;
                 positions.Add(BevelAdd(point, BevelScale(towardCenter, scale)));
@@ -72,7 +123,11 @@ public sealed partial class RekallAgeMeshOperationExecutor
         foreach (var (edgeIndex, uses) in edgeCorners.OrderBy(item => item.Key))
         {
             if (uses.Count != 2)
-                throw Failure("REKALL_MESH_BEVEL_NON_MANIFOLD", "Bevel requires a closed two-face manifold edge set.");
+            {
+                if (selectedEdgeIndices.Contains(edgeIndex))
+                    throw Failure("REKALL_MESH_BEVEL_NON_MANIFOLD", "Selected bevel edges must each have exactly two incident faces.");
+                continue;
+            }
             var edge = topology.EdgePointIndices[edgeIndex];
             var first = uses[0];
             var second = uses[1];
@@ -82,30 +137,69 @@ public sealed partial class RekallAgeMeshOperationExecutor
             var firstB = firstA == first.Corner ? firstNext : first.Corner;
             var secondA = topology.CornerPointIndices[second.Corner] == edge.A ? second.Corner : secondNext;
             var secondB = secondA == second.Corner ? secondNext : second.Corner;
-            var chainA = BuildProfileChain(edge.A, insetByCorner[firstA], insetByCorner[secondA]);
-            var chainB = BuildProfileChain(edge.B, insetByCorner[firstB], insetByCorner[secondB]);
-            for (var segment = 0; segment < segments; segment++)
-                faces.Add(new([chainA[segment], chainB[segment], chainB[segment + 1], chainA[segment + 1]], first.Face, [firstA, firstB, secondB, secondA]));
+            var firstTraversesAToB = firstA == first.Corner;
+            if (selectedEdgeIndices.Contains(edgeIndex))
+            {
+                var chainA = BuildProfileChain(edge.A, insetByCorner[firstA], insetByCorner[secondA]);
+                var chainB = BuildProfileChain(edge.B, insetByCorner[firstB], insetByCorner[secondB]);
+                for (var segment = 0; segment < segments; segment++)
+                {
+                    var points = firstTraversesAToB
+                        ? new[] { chainB[segment], chainA[segment], chainA[segment + 1], chainB[segment + 1] }
+                        : new[] { chainA[segment], chainB[segment], chainB[segment + 1], chainA[segment + 1] };
+                    var profileCornerSources = firstTraversesAToB
+                        ? new int?[] { firstB, firstA, secondA, secondB }
+                        : [firstA, firstB, secondB, secondA];
+                    faces.Add(new(points, first.Face, profileCornerSources, generatedMaterialIndex, true));
+                }
+            }
+            else
+            {
+                var transitionPoints = firstTraversesAToB
+                    ? new[] { insetByCorner[firstB], insetByCorner[firstA], insetByCorner[secondA], insetByCorner[secondB] }
+                    : [insetByCorner[firstA], insetByCorner[firstB], insetByCorner[secondB], insetByCorner[secondA]];
+                var transitionSources = firstTraversesAToB
+                    ? new int?[] { firstB, firstA, secondA, secondB }
+                    : [firstA, firstB, secondB, secondA];
+                AddTransitionFace(
+                    transitionPoints,
+                    first.Face,
+                    transitionSources);
+            }
         }
 
-        for (var pointIndex = 0; pointIndex < topology.PointIds.Count; pointIndex++)
+        var capBoundaryUses = new Dictionary<int, Dictionary<(int A, int B), (int Count, int A, int B)>>();
+        foreach (var face in faces)
         {
-            var incident = sourcePointByOutput.Select((sourcePoint, outputPoint) => (sourcePoint, outputPoint))
-                .Where(item => item.sourcePoint == pointIndex).Select(item => item.outputPoint).Distinct().ToArray();
-            if (incident.Length < 3) continue;
-            var sourcePosition = topology.Positions[pointIndex];
-            var axis = Normalize(new(
-                incident.Sum(index => positions[index].X - sourcePosition.X),
-                incident.Sum(index => positions[index].Y - sourcePosition.Y),
-                incident.Sum(index => positions[index].Z - sourcePosition.Z)));
-            var reference = Normalize(Subtract(positions[incident[0]], sourcePosition));
-            var tangent = Normalize(Cross(axis, reference));
-            var ordered = incident.OrderBy(index => Math.Atan2(Dot(Subtract(positions[index], sourcePosition), tangent), Dot(Subtract(positions[index], sourcePosition), reference))).ToArray();
-            var capFace = Enumerable.Range(0, topology.FaceIds.Count)
-                .First(face => FaceCornerSourceIndices(face, topology).Any(corner => topology.CornerPointIndices[corner] == pointIndex));
+            for (var index = 0; index < face.Points.Length; index++)
+            {
+                var a = face.Points[index];
+                var b = face.Points[(index + 1) % face.Points.Length];
+                var sourcePoint = sourcePointByOutput[a];
+                if (sourcePoint != sourcePointByOutput[b] || !affectedPoints.Contains(sourcePoint))
+                    continue;
+                if (!capBoundaryUses.TryGetValue(sourcePoint, out var uses))
+                    capBoundaryUses[sourcePoint] = uses = [];
+                var key = a < b ? (a, b) : (b, a);
+                uses[key] = uses.TryGetValue(key, out var existing)
+                    ? (existing.Count + 1, existing.A, existing.B)
+                    : (1, a, b);
+            }
+        }
+
+        foreach (var pointIndex in affectedPoints.Order())
+        {
+            var ordered = BuildCapBoundary(pointIndex);
+            if (ordered.Length < 3) continue;
+            var capFace = firstFaceByPoint[pointIndex];
             if (segments == 1)
             {
-                faces.Add(new(ordered, capFace, ordered.Select(index => (int?)FindCorner(sourcePointByOutput[index], capFace)).ToArray()));
+                faces.Add(new(
+                    ordered,
+                    capFace,
+                    ordered.Select(index => (int?)FindCorner(sourcePointByOutput[index], capFace)).ToArray(),
+                    generatedMaterialIndex,
+                    true));
             }
             else
             {
@@ -121,12 +215,45 @@ public sealed partial class RekallAgeMeshOperationExecutor
                 for (var index = 0; index < ordered.Length; index++)
                 {
                     var next = (index + 1) % ordered.Length;
-                    faces.Add(new(
-                        [capCenter, ordered[index], ordered[next]],
-                        capFace,
-                        [FindCorner(pointIndex, capFace), FindCorner(sourcePointByOutput[ordered[index]], capFace), FindCorner(sourcePointByOutput[ordered[next]], capFace)]));
+                    var capTriangle = new[] { capCenter, ordered[index], ordered[next] };
+                    if (HasArea(capTriangle))
+                        faces.Add(new(
+                            capTriangle,
+                            capFace,
+                            [FindCorner(pointIndex, capFace), FindCorner(sourcePointByOutput[ordered[index]], capFace), FindCorner(sourcePointByOutput[ordered[next]], capFace)],
+                            generatedMaterialIndex,
+                            true));
                 }
             }
+        }
+
+        int[] BuildCapBoundary(int sourcePoint)
+        {
+            var directedUses = capBoundaryUses.GetValueOrDefault(sourcePoint)?.Values
+                .Where(use => use.Count == 1)
+                .Select(use => (A: use.A, B: use.B))
+                .ToArray() ?? [];
+            if (directedUses.Length < 3)
+                return [];
+
+            // Every existing boundary A->B must be met by the cap as B->A.
+            var next = new Dictionary<int, int>();
+            foreach (var edge in directedUses)
+                if (!next.TryAdd(edge.B, edge.A))
+                    return [];
+            var start = next.Keys.Min();
+            var ordered = new List<int> { start };
+            var current = start;
+            while (next.TryGetValue(current, out var following) && following != start)
+            {
+                if (ordered.Contains(following))
+                    return [];
+                ordered.Add(following);
+                current = following;
+            }
+            return next.TryGetValue(current, out var close) && close == start && ordered.Count == directedUses.Length
+                ? ordered.ToArray()
+                : [];
         }
 
         var edgeMap = new Dictionary<(int, int), int>();
@@ -165,10 +292,59 @@ public sealed partial class RekallAgeMeshOperationExecutor
         {
             RekallAgeGeometryDomain.Point => attribute with { Values = sourcePointByOutput.Select(index => attribute.Values[index]).ToArray() },
             RekallAgeGeometryDomain.Edge => attribute with { Values = outputEdgeSources.Select(index => index.HasValue ? attribute.Values[index.Value] : DefaultValue(attribute)).ToArray() },
-            RekallAgeGeometryDomain.Face => attribute with { Values = faces.Select(face => attribute.Values[face.SourceFace]).ToArray() },
+            RekallAgeGeometryDomain.Face => attribute with
+            {
+                Values = faces.Select(face =>
+                    face.MaterialIndex.HasValue && IsMaterialIndex(attribute)
+                        ? JsonSerializer.SerializeToElement(face.MaterialIndex.Value)
+                        : attribute.Values[face.SourceFace]).ToArray()
+            },
             RekallAgeGeometryDomain.Corner => attribute with { Values = cornerSources.Select(index => index.HasValue ? attribute.Values[index.Value] : DefaultValue(attribute)).ToArray() },
             _ => attribute
-        }).ToArray();
+        }).ToList();
+        if (generatedMaterialIndex.HasValue && !attributes.Any(IsMaterialIndex))
+        {
+            attributes.Add(new RekallAgeGeometryAttribute(
+                "material.index",
+                RekallAgeGeometryDomain.Face,
+                RekallAgeGeometryValueType.Int32,
+                faces.Select(face => JsonSerializer.SerializeToElement(
+                    face.Generated ? generatedMaterialIndex.Value : 0)).ToArray(),
+                "material-index",
+                RekallAgeGeometryInterpolation.Nearest,
+                JsonSerializer.SerializeToElement(0)));
+        }
+        if (hardenNormals)
+        {
+            var namedSmooth = source.Attributes.FirstOrDefault(attribute =>
+                attribute.Name.Equals("normal.smooth", StringComparison.Ordinal));
+            if (namedSmooth is not null
+                && (namedSmooth.Domain != RekallAgeGeometryDomain.Face
+                    || namedSmooth.ValueType != RekallAgeGeometryValueType.Bool))
+                throw Failure(
+                    "REKALL_MESH_OPERATION_ATTRIBUTE_CONFLICT",
+                    "Attribute 'normal.smooth' exists with an incompatible domain or type.");
+            var existingSmooth = namedSmooth;
+            var smoothValues = faces.Select(face => JsonSerializer.SerializeToElement(
+                face.Generated
+                || (existingSmooth is not null && existingSmooth.Values[face.SourceFace].GetBoolean()))).ToArray();
+            var authoredSmooth = existingSmooth is null
+                ? new RekallAgeGeometryAttribute(
+                    "normal.smooth",
+                    RekallAgeGeometryDomain.Face,
+                    RekallAgeGeometryValueType.Bool,
+                    smoothValues,
+                    "normal-smooth",
+                    RekallAgeGeometryInterpolation.Nearest,
+                    JsonSerializer.SerializeToElement(true))
+                : existingSmooth with { Values = smoothValues };
+            var smoothIndex = attributes.FindIndex(attribute =>
+                attribute.Name.Equals("normal.smooth", StringComparison.Ordinal));
+            if (smoothIndex >= 0)
+                attributes[smoothIndex] = authoredSmooth;
+            else
+                attributes.Add(authoredSmooth);
+        }
         var mesh = source with
         {
             Revision = checked(source.Revision + 1),
@@ -177,22 +353,26 @@ public sealed partial class RekallAgeMeshOperationExecutor
             SelectionSets = []
         };
 
+        var pointOutputs = GroupOutputIds(topology.PointIds.Count, pointIds.Count, output => sourcePointByOutput[output], pointIds);
+        var edgeOutputs = GroupOutputIds(topology.EdgeIds.Count, edgeIds.Count, output => outputEdgeSources[output], edgeIds);
+        var faceOutputs = GroupOutputIds(topology.FaceIds.Count, faceIds.Count, output => faces[output].SourceFace, faceIds);
+        var cornerOutputs = GroupOutputIds(topology.CornerIds.Count, cornerIds.Count, output => cornerSources[output], cornerIds);
         var provenance = new List<RekallAgeMeshElementProvenance>();
-        provenance.AddRange(topology.PointIds.Select((id, index) => new RekallAgeMeshElementProvenance(RekallAgeGeometryDomain.Point, id,
-            sourcePointByOutput.Select((sourceIndex, outputIndex) => (sourceIndex, outputIndex)).Where(item => item.sourceIndex == index).Select(item => pointIds[item.outputIndex]).ToArray())));
-        provenance.AddRange(topology.EdgeIds.Select((id, index) => new RekallAgeMeshElementProvenance(RekallAgeGeometryDomain.Edge, id,
-            outputEdgeSources.Select((sourceIndex, outputIndex) => (sourceIndex, outputIndex)).Where(item => item.sourceIndex == index).Select(item => edgeIds[item.outputIndex]).ToArray())));
-        provenance.AddRange(topology.FaceIds.Select((id, index) => new RekallAgeMeshElementProvenance(RekallAgeGeometryDomain.Face, id,
-            faces.Select((face, outputIndex) => (face, outputIndex)).Where(item => item.face.SourceFace == index).Select(item => faceIds[item.outputIndex]).ToArray())));
-        provenance.AddRange(topology.CornerIds.Select((id, index) => new RekallAgeMeshElementProvenance(RekallAgeGeometryDomain.Corner, id,
-            cornerSources.Select((sourceIndex, outputIndex) => (sourceIndex, outputIndex)).Where(item => item.sourceIndex == index).Select(item => cornerIds[item.outputIndex]).ToArray())));
+        provenance.AddRange(topology.PointIds.Select((id, index) => new RekallAgeMeshElementProvenance(
+            RekallAgeGeometryDomain.Point, id, pointOutputs[index])));
+        provenance.AddRange(topology.EdgeIds.Select((id, index) => new RekallAgeMeshElementProvenance(
+            RekallAgeGeometryDomain.Edge, id, edgeOutputs[index])));
+        provenance.AddRange(topology.FaceIds.Select((id, index) => new RekallAgeMeshElementProvenance(
+            RekallAgeGeometryDomain.Face, id, faceOutputs[index])));
+        provenance.AddRange(topology.CornerIds.Select((id, index) => new RekallAgeMeshElementProvenance(
+            RekallAgeGeometryDomain.Corner, id, cornerOutputs[index])));
         return Result(source, mesh, ChangeSet(
             RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions
-            | (source.Attributes.Count > 0 ? RekallAgeMeshChangeKind.Attributes : RekallAgeMeshChangeKind.None)
+            | (attributes.Count > 0 ? RekallAgeMeshChangeKind.Attributes : RekallAgeMeshChangeKind.None)
             | (source.SelectionSets.Count > 0 ? RekallAgeMeshChangeKind.Selection : RekallAgeMeshChangeKind.None),
             createdPoints: pointIds, createdEdges: edgeIds, createdFaces: faceIds, createdCorners: cornerIds,
             deletedPoints: topology.PointIds, deletedEdges: topology.EdgeIds, deletedFaces: topology.FaceIds, deletedCorners: topology.CornerIds,
-            changedAttributes: source.Attributes.Select(item => item.Name).Order(StringComparer.Ordinal).ToArray(),
+            changedAttributes: attributes.Select(item => item.Name).Order(StringComparer.Ordinal).ToArray(),
             affectedBounds: Bounds(topology.Positions.Concat(positions))), provenance);
 
         int[] BuildProfileChain(int sourcePoint, int firstOutput, int secondOutput)
@@ -210,17 +390,74 @@ public sealed partial class RekallAgeMeshOperationExecutor
             return chain;
         }
 
+        int OriginalOutput(int sourcePoint)
+        {
+            if (originalOutputBySourcePoint.TryGetValue(sourcePoint, out var output))
+                return output;
+            output = positions.Count;
+            originalOutputBySourcePoint[sourcePoint] = output;
+            positions.Add(topology.Positions[sourcePoint]);
+            sourcePointByOutput.Add(sourcePoint);
+            return output;
+        }
+
+        void AddTransitionFace(int[] candidatePoints, int sourceFace, int?[] cornerSourceCandidates)
+        {
+            var points = new List<int>(candidatePoints.Length);
+            var cornerSources = new List<int?>(candidatePoints.Length);
+            for (var index = 0; index < candidatePoints.Length; index++)
+            {
+                if (points.Count > 0 && points[^1] == candidatePoints[index])
+                    continue;
+                points.Add(candidatePoints[index]);
+                cornerSources.Add(cornerSourceCandidates[index]);
+            }
+            if (points.Count > 1 && points[0] == points[^1])
+            {
+                points.RemoveAt(points.Count - 1);
+                cornerSources.RemoveAt(cornerSources.Count - 1);
+            }
+            if (points.Distinct().Count() >= 3 && HasArea(points))
+                faces.Add(new(points.ToArray(), sourceFace, cornerSources.ToArray(), generatedMaterialIndex, true));
+        }
+
+        bool HasArea(IReadOnlyList<int> pointIndices)
+        {
+            if (pointIndices.Count < 3)
+                return false;
+            var origin = positions[pointIndices[0]];
+            var doubledArea = 0d;
+            for (var index = 1; index + 1 < pointIndices.Count; index++)
+            {
+                var first = Subtract(positions[pointIndices[index]], origin);
+                var second = Subtract(positions[pointIndices[index + 1]], origin);
+                var cross = Cross(first, second);
+                doubledArea += Math.Sqrt(Dot(cross, cross));
+            }
+            return doubledArea > 1e-10;
+        }
+
         int? FindSourceEdge(int firstPoint, int secondPoint)
         {
             if (firstPoint == secondPoint) return null;
             var key = firstPoint < secondPoint ? (firstPoint, secondPoint) : (secondPoint, firstPoint);
-            for (var index = 0; index < topology.EdgePointIndices.Count; index++)
+            return sourceEdgeByPoints.TryGetValue(key, out var index) ? index : null;
+        }
+
+        static IReadOnlyList<ulong>[] GroupOutputIds(
+            int sourceCount,
+            int outputCount,
+            Func<int, int?> sourceIndexAt,
+            IReadOnlyList<ulong> outputIds)
+        {
+            var result = Enumerable.Range(0, sourceCount).Select(_ => new List<ulong>()).ToArray();
+            for (var output = 0; output < outputCount; output++)
             {
-                var edge = topology.EdgePointIndices[index];
-                var candidate = edge.A < edge.B ? (edge.A, edge.B) : (edge.B, edge.A);
-                if (candidate == key) return index;
+                var sourceIndex = sourceIndexAt(output);
+                if (sourceIndex.HasValue)
+                    result[sourceIndex.Value].Add(outputIds[output]);
             }
-            return null;
+            return result;
         }
 
         int FindCorner(int sourcePoint, int preferredFace)
@@ -232,6 +469,21 @@ public sealed partial class RekallAgeMeshOperationExecutor
             return 0;
         }
     }
+
+    private static string? ReadOptionalString(JsonObject parameters, string name)
+    {
+        if (!parameters.TryGetPropertyValue(name, out var node) || node is null)
+            return null;
+        if (node is not JsonValue value || !value.TryGetValue<string>(out var text) || text.Length > 128)
+            throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", $"Parameter '{name}' must be a string of at most 128 characters.");
+        return string.IsNullOrWhiteSpace(text) ? null : text;
+    }
+
+    private static bool IsMaterialIndex(RekallAgeGeometryAttribute attribute) =>
+        attribute.Domain == RekallAgeGeometryDomain.Face
+        && attribute.ValueType == RekallAgeGeometryValueType.Int32
+        && (attribute.Name.Equals("material.index", StringComparison.Ordinal)
+            || string.Equals(attribute.Semantic, "material-index", StringComparison.Ordinal));
 
     private static int NextCorner(RekallAgeMeshTopology topology, int corner, int face) =>
         corner + 1 == topology.FaceOffsets[face + 1] ? topology.FaceOffsets[face] : corner + 1;

@@ -83,7 +83,9 @@ public sealed class RekallAgeModifierStackEvaluator
                 {
                     ["width"] = ReadNumber(modifier.Parameters, "width", 0.05), ["segments"] = ReadInteger(modifier.Parameters, "segments", 1),
                     ["profile"] = ReadNumber(modifier.Parameters, "profile", 0.5), ["clampOverlap"] = ReadBoolean(modifier.Parameters, "clampOverlap", true),
-                    ["hardenNormals"] = ReadBoolean(modifier.Parameters, "hardenNormals", false)
+                    ["hardenNormals"] = ReadBoolean(modifier.Parameters, "hardenNormals", false),
+                    ["weightAttribute"] = ReadString(modifier.Parameters, "weightAttribute", ""),
+                    ["materialIndex"] = ReadInteger(modifier.Parameters, "materialIndex", -1)
                 })).Mesh,
             "rekall.modifier.solidify" => _executor.Execute(source, new("solidify", RekallAgeGeometryDomain.Face,
                 Select(source, RekallAgeGeometryDomain.Face, selection), new JsonObject

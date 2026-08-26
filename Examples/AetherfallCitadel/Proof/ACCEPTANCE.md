@@ -522,6 +522,45 @@ the new background is an explicit fallback, not a claim that sky assets render.
   Character anatomy, clothing, animation, architectural density, materials,
   and composition also remain visibly below the requested final fidelity.
 
+## Selection- and weight-aware bevel checkpoint
+
+- `bevel_edges` no longer requires the complete mesh edge set. It reconstructs
+  selected two-face manifold edges with bounded profile rings, transition faces
+  along affected neighboring edges, and vertex caps; zero-area transition
+  wedges are removed before strict mesh validation rather than weakening the
+  validator. Typed domain attributes and stable source provenance survive.
+- Optional edge-domain Float weights scale selected widths and filter zero
+  weights; `materialIndex` assigns generated bevel faces without flattening
+  source materials; and `hardenNormals` authors bevel faces as smooth while
+  retaining hard source planes. Operations, graph nodes, and modifiers publish
+  the same parameters through their canonical descriptors.
+- Generic `select_edges_by_angle` and
+  `rekall.modeling.selection.edge_angle` author a reusable named edge selection
+  from adjacent-face angle. Aetherfall's Warden runeblade now uses this node to
+  select `runeblade-hard-edges` before its three-segment bevel. The ordinary
+  graph bake produces 2,048 points, 4,446 edges, 2,422 faces, and 8,892 corners;
+  the live-linked Model Asset compiles to 8,892 vertices and 4,048 triangles in
+  one runed-steel surface.
+- The installed RTX 5090 High Vulkan frame is
+  `Proof/Captures/SelectiveBevel/vulkan-scene-1280x720-20260826084700066.png`.
+  It is informative with 11,681 distinct colors, 16.9% dominant-color share,
+  mean luminance 0.100, 65 renderables, 301 render-work draws, four dispatches,
+  and zero observations, missing assets, or fallbacks. Original-size review
+  finds no cracks or exploded topology. The frame remains prototype-grade:
+  selective hard-edge rounding improves authoring control, but the Warden still
+  needs split/skinned anatomy, deformable clothing, richer materials, and a
+  stronger silhouette before it approaches the requested reference quality.
+- Review-driven topology regressions now prove representative selected box-edge
+  subsets remain closed, manifold, and oppositely wound across every shared
+  edge. Bevel cap cycles follow their actual topological boundary; smoothing
+  defaults survive joins into weighted normals; and new smoothing/material
+  attributes publish invalidation metadata. Incompatible same-name smoothing
+  attributes fail closed, while indexed edge/cap lookups avoid quadratic scans
+  on production meshes. Focused modeling passes 78/78,
+  complete Aetherfall acceptance passes 42/42, and both project and scene
+  validators are clean. High `desktop60` passes at 97 draws, 193,570 triangles,
+  833,144 vertices, nine textures, and 5.548224 ms measured GPU time.
+
 ## Hierarchy-targeted animation checkpoint
 
 - Generic `Rekall.AnimationClip` tracks may now omit a target to animate their

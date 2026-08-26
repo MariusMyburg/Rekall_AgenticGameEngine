@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall-warden-runeblade-model",
   "displayName": "Aetherfall Warden Runeblade",
-  "revision": 1,
+  "revision": 4,
   "source": {
     "kind": "Mesh",
     "assetId": "aetherfall-warden-runeblade-mesh",
@@ -10,12 +10,12 @@
   },
   "buildState": 0,
   "lastSuccessfulBuild": {
-    "sourceFileRevision": "11a676c60553c8e808ad521251430c8546b66941c2f07ff9cb3a95358e505c4b",
-    "sourceLogicalRevision": 1,
-    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-warden-runeblade-model/bc732ef0a3fe79f9b3498428e9631b6209bee4d36e834e36e82e7eff09acf49e.age.compiled-mesh.json",
-    "compiledContentHash": "bc732ef0a3fe79f9b3498428e9631b6209bee4d36e834e36e82e7eff09acf49e",
+    "sourceFileRevision": "1157bb799a55cc93b7d56ebaffc56ae8e38ef56019efb50fbf27c7921abaeb35",
+    "sourceLogicalRevision": 4,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-warden-runeblade-model/b018795467694fefffd2e1cad368d3558f57926b0c8e5010c8b739d96af58438.age.compiled-mesh.json",
+    "compiledContentHash": "b018795467694fefffd2e1cad368d3558f57926b0c8e5010c8b739d96af58438",
     "compilerVersion": "rekall-age-model-compiler-v1",
-    "builtAtUtc": "2026-08-26T02:25:51.7541232+00:00",
+    "builtAtUtc": "2026-08-26T09:07:10.8436528+00:00",
     "diagnostics": []
   },
   "frozen": false

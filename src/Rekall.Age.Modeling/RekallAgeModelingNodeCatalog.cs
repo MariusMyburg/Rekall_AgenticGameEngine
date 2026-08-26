@@ -138,14 +138,25 @@ public sealed class RekallAgeModelingNodeCatalog
         Node("rekall.modeling.subdivide_smooth", "Smooth Subdivision", "Applies bounded crease-aware Catmull-Clark-style levels to a complete manifold or boundary surface.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)],
             [Integer("levels", "Levels", 1, 1, 6), Text("creaseAttribute", "Crease Attribute", "crease.edge")]),
-        Node("rekall.modeling.bevel", "Bevel", "Rounds a complete manifold edge set with deterministic profile-controlled transition rings, inset faces, and vertex caps.",
+        Node("rekall.modeling.bevel", "Bevel", "Rounds selected two-face manifold edges with deterministic weighted profile rings, neighboring transition faces, vertex caps, and generated-face material policy.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)],
             [
                 Number("width", "Width", 0.05, 0.000001, 1_000_000, "world-unit"),
                 Integer("segments", "Segments", 1, 1, 64),
                 Number("profile", "Profile", 0.5, 0.01, 0.99),
                 Boolean("clampOverlap", "Clamp Overlap", true),
-                Boolean("hardenNormals", "Harden Normals", false)
+                Boolean("hardenNormals", "Harden Normals", false),
+                Text("selectionSet", "Selection Set", ""),
+                Text("weightAttribute", "Weight Attribute", ""),
+                Integer("materialIndex", "Generated Material Index", -1, -1, 65_535)
+            ]),
+        Node("rekall.modeling.selection.edge_angle", "Select Edges by Angle", "Creates a reusable named edge selection from adjacent-face angle for bevel, sharp-edge, crease, UV, and other generic consumers.",
+            [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Output("geometry", RekallAgeModelingValueType.Geometry)],
+            [
+                Text("name", "Selection Name", "angle-edges"),
+                Number("minimumAngleDegrees", "Minimum Angle", 30, 0, 180, "degree"),
+                Number("maximumAngleDegrees", "Maximum Angle", 180, 0, 180, "degree"),
+                Boolean("includeBoundary", "Include Boundary", false)
             ]),
         Node("rekall.modeling.inset", "Inset Faces", "Builds deterministic recessed or raised face panels with explicit border topology.",
             [Input("geometry", RekallAgeModelingValueType.Geometry, required: true), Input("selection", RekallAgeModelingValueType.Selection), Output("geometry", RekallAgeModelingValueType.Geometry)],

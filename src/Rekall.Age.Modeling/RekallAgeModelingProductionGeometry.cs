@@ -397,7 +397,7 @@ public sealed partial class RekallAgeModelingGraphEvaluator
                 new("revolve.angle", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.Float, angleValues, "revolve-angle"),
                 new("revolve.axial_offset", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.Float, axialOffsetValues, "revolve-axial-offset"),
                 new("material.index", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.Int32, materialValues, "material-index", RekallAgeGeometryInterpolation.Nearest, JsonSerializer.SerializeToElement(0)),
-                new("normal.smooth", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.Bool, smoothValues, "smooth-shading", RekallAgeGeometryInterpolation.Nearest, JsonSerializer.SerializeToElement(true))
+                new("normal.smooth", RekallAgeGeometryDomain.Face, RekallAgeGeometryValueType.Bool, smoothValues, "normal-smooth", RekallAgeGeometryInterpolation.Nearest, JsonSerializer.SerializeToElement(true))
             ]
         };
 

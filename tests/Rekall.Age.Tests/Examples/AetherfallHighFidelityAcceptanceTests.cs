@@ -283,7 +283,12 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         Assert.Equal("aetherfall-warden-runeblade-model", modelReference.Properties["assetId"]!.GetValue<string>());
         var bladeGraph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
             projectRoot, "aetherfall.warden-runeblade.graph", CancellationToken.None);
-        Assert.Contains(bladeGraph.Nodes, node => node.TypeId == "rekall.modeling.bevel");
+        Assert.Contains(bladeGraph.Nodes, node =>
+            node.NodeId == "hard-edge-selection"
+            && node.TypeId == "rekall.modeling.selection.edge_angle");
+        Assert.Contains(bladeGraph.Nodes, node =>
+            node.TypeId == "rekall.modeling.bevel"
+            && node.Parameters["selectionSet"]?.GetValue<string>() == "runeblade-hard-edges");
         Assert.Contains(bladeGraph.Nodes, node => node.TypeId == "rekall.modeling.primitive.capsule");
 
         var initialWorld = new RekallAgeRuntimeWorldBuilder().Build(scene, projectRoot);

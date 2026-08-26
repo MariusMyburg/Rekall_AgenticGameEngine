@@ -107,10 +107,16 @@
       "parameters": {}
     },
     {
+      "nodeId": "hard-edge-selection",
+      "typeId": "rekall.modeling.selection.edge_angle",
+      "typeVersion": 1,
+      "parameters": { "name": "runeblade-hard-edges", "minimumAngleDegrees": 35, "maximumAngleDegrees": 140, "includeBoundary": false }
+    },
+    {
       "nodeId": "bevel",
       "typeId": "rekall.modeling.bevel",
       "typeVersion": 1,
-      "parameters": { "width": 0.035, "segments": 3, "profile": 0.5, "clampOverlap": true, "hardenNormals": true }
+      "parameters": { "width": 0.035, "segments": 3, "profile": 0.5, "clampOverlap": true, "hardenNormals": true, "selectionSet": "runeblade-hard-edges" }
     },
     {
       "nodeId": "smooth-join",
@@ -169,7 +175,8 @@
     { "linkId": "hard-tip", "fromNodeId": "tip-x", "fromPortId": "geometry", "toNodeId": "hard-join", "toPortId": "geometry" },
     { "linkId": "hard-guard", "fromNodeId": "guard-x", "fromPortId": "geometry", "toNodeId": "hard-join", "toPortId": "geometry" },
     { "linkId": "hard-quillons", "fromNodeId": "quillons", "fromPortId": "geometry", "toNodeId": "hard-join", "toPortId": "geometry" },
-    { "linkId": "hard-bevel", "fromNodeId": "hard-join", "fromPortId": "geometry", "toNodeId": "bevel", "toPortId": "geometry" },
+    { "linkId": "hard-select", "fromNodeId": "hard-join", "fromPortId": "geometry", "toNodeId": "hard-edge-selection", "toPortId": "geometry" },
+    { "linkId": "hard-bevel", "fromNodeId": "hard-edge-selection", "fromPortId": "geometry", "toNodeId": "bevel", "toPortId": "geometry" },
     { "linkId": "smooth-grip", "fromNodeId": "grip-x", "fromPortId": "geometry", "toNodeId": "smooth-join", "toPortId": "geometry" },
     { "linkId": "smooth-pommel", "fromNodeId": "pommel-x", "fromPortId": "geometry", "toNodeId": "smooth-join", "toPortId": "geometry" },
     { "linkId": "smooth-runes", "fromNodeId": "rune-studs", "fromPortId": "geometry", "toNodeId": "smooth-join", "toPortId": "geometry" },

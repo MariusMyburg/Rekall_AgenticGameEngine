@@ -282,7 +282,22 @@ public sealed partial class RekallAgeModelingGraphEvaluator
                     ["segments"] = ReadInteger(node, "segments", 1, 1, 64),
                     ["profile"] = ReadNumber(node, "profile", 0.5),
                     ["clampOverlap"] = ReadBoolean(node, "clampOverlap", true),
-                    ["hardenNormals"] = ReadBoolean(node, "hardenNormals", false)
+                    ["hardenNormals"] = ReadBoolean(node, "hardenNormals", false),
+                    ["weightAttribute"] = ReadString(node, "weightAttribute", ""),
+                    ["materialIndex"] = ReadInteger(node, "materialIndex", -1, -1, 65_535)
+                },
+                RekallAgeGeometryDomain.Edge),
+            "rekall.modeling.selection.edge_angle" => ApplySemanticOperation(
+                graph,
+                node,
+                InputGeometry(node, "geometry", incoming, values),
+                "select_edges_by_angle",
+                new JsonObject
+                {
+                    ["name"] = ReadString(node, "name", "angle-edges"),
+                    ["minimumAngleDegrees"] = ReadNumber(node, "minimumAngleDegrees", 30),
+                    ["maximumAngleDegrees"] = ReadNumber(node, "maximumAngleDegrees", 180),
+                    ["includeBoundary"] = ReadBoolean(node, "includeBoundary", false)
                 },
                 RekallAgeGeometryDomain.Edge),
             "rekall.modeling.inset" => ApplySemanticOperation(

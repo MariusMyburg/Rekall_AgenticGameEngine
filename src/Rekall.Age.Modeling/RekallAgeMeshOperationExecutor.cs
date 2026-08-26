@@ -129,7 +129,20 @@ public sealed partial class RekallAgeMeshOperationExecutor
                 new("segments", RekallAgeGeometryValueType.Int32, false, JsonSerializer.SerializeToElement(1), "Bounded transition segment count from 1 through 64."),
                 new("profile", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(0.5), "Transition profile from 0.01 through 0.99; 0.5 is circular."),
                 new("clampOverlap", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Clamp width locally before inset regions overlap."),
-                new("hardenNormals", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(false), "Preserve hard face transitions for the normal-authoring stage.")
+                new("hardenNormals", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(false), "Preserve hard face transitions for the normal-authoring stage."),
+                StringParameter("weightAttribute", "", "Optional edge-domain Float attribute that scales selected bevel widths from zero through one."),
+                new("materialIndex", RekallAgeGeometryValueType.Int32, false, JsonSerializer.SerializeToElement(-1), "Material slot for generated bevel faces, or -1 to inherit adjacent source faces.")
+            ]),
+        new(
+            "select_edges_by_angle",
+            "Creates or replaces a named edge selection from adjacent-face angle without changing geometry.",
+            RekallAgeGeometryDomain.Edge,
+            RekallAgeMeshChangeKind.Selection,
+            [
+                StringParameter("name", "angle-edges", "Stable selection-set name."),
+                new("minimumAngleDegrees", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(30.0), "Inclusive minimum adjacent-face angle from zero through 180 degrees."),
+                new("maximumAngleDegrees", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(180.0), "Inclusive maximum adjacent-face angle from zero through 180 degrees."),
+                new("includeBoundary", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(false), "Include one-face boundary edges.")
             ]),
         new(
             "mark_uv_seams",
@@ -236,6 +249,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
             "set_edge_crease" => SetEdgeCrease(source, request),
             "merge_by_distance" => MergeByDistance(source, request),
             "bevel_edges" => BevelEdges(source, request),
+            "select_edges_by_angle" => SelectEdgesByAngle(source, request),
             "inset_faces" => InsetFaces(source, request),
             "solidify" => Solidify(source, request),
             "weighted_normals" => WeightedNormals(source, request),

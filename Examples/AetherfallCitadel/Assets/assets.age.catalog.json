@@ -367,8 +367,8 @@
       "displayName": "Aetherfall Warden Runeblade",
       "kind": "model",
       "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-warden-runeblade-mesh.age.mesh.json",
-      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-runeblade-model\\bc732ef0a3fe79f9b3498428e9631b6209bee4d36e834e36e82e7eff09acf49e.age.compiled-mesh.json",
-      "contentHash": "bc732ef0a3fe79f9b3498428e9631b6209bee4d36e834e36e82e7eff09acf49e",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-runeblade-model\\b018795467694fefffd2e1cad368d3558f57926b0c8e5010c8b739d96af58438.age.compiled-mesh.json",
+      "contentHash": "b018795467694fefffd2e1cad368d3558f57926b0c8e5010c8b739d96af58438",
       "glbMetadata": null,
       "textureMetadata": null,
       "provenance": null,
@@ -376,8 +376,8 @@
         "modelDocumentPath": "Assets/Models/aetherfall-warden-runeblade-model.age.model.json",
         "sourceKind": "Mesh",
         "sourceAssetId": "aetherfall-warden-runeblade-mesh",
-        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-runeblade-model/bc732ef0a3fe79f9b3498428e9631b6209bee4d36e834e36e82e7eff09acf49e.age.compiled-mesh.json",
-        "compiledContentHash": "bc732ef0a3fe79f9b3498428e9631b6209bee4d36e834e36e82e7eff09acf49e"
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-runeblade-model/b018795467694fefffd2e1cad368d3558f57926b0c8e5010c8b739d96af58438.age.compiled-mesh.json",
+        "compiledContentHash": "b018795467694fefffd2e1cad368d3558f57926b0c8e5010c8b739d96af58438"
       }
     },
     {

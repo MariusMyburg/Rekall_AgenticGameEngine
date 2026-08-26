@@ -7,6 +7,34 @@ namespace Rekall.Age.Tests.Modeling;
 public sealed class HardSurfaceModifierStackTests
 {
     [Fact]
+    public async Task BevelModifierConsumesANamedPartialEdgeSelection()
+    {
+        var source = await Primitive("rekall.modeling.primitive.box");
+        source = source with
+        {
+            SelectionSets =
+            [
+                new("hero-edges", RekallAgeGeometryDomain.Edge, [source.Topology.EdgeIds[0]])
+            ]
+        };
+        var stack = Stack(
+        [
+            new("bevel", "rekall.modifier.bevel", 1, true, new()
+            {
+                ["width"] = 0.08,
+                ["segments"] = 2,
+                ["selection"] = "hero-edges"
+            })
+        ]);
+
+        var result = await new RekallAgeModifierStackEvaluator().EvaluateAsync(
+            stack, source, RekallAgeModelingEvaluationBudget.Default, default);
+
+        Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Diagnostics.Select(item => item.Message)));
+        Assert.True(result.Mesh!.Topology.FaceIds.Count > source.Topology.FaceIds.Count);
+    }
+
+    [Fact]
     public async Task BevelAndWeightedNormalsExecuteWithPreservedAttributes()
     {
         var source = await Primitive("rekall.modeling.primitive.box");

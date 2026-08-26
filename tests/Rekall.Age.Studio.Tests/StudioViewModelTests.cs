@@ -1281,6 +1281,46 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task ModalDragAppliesTheOperationThroughTheRealPreviewApplyPipeline()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-modal-drag-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Modal Drag Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.SelectedMeshPrimitive = "box";
+            viewModel.MeshPrimitiveAssetIdInput = "hero-box";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            var beforeRevision = (await new RekallAgeMeshAssetStore().LoadAsync(root, "hero-box", CancellationToken.None)).Revision;
+
+            viewModel.MeshEditDomain = RekallAgeGeometryDomain.Face;
+            viewModel.SelectedMeshElementId = viewModel.MeshElementIds[0];
+            await ExecuteAsync(viewModel.SelectMeshElementCommand);
+            viewModel.SelectedMeshOperationId = "extrude_faces";
+
+            Assert.True(viewModel.BeginModalMeshOperationDrag(0.5));
+            await viewModel.UpdateModalMeshOperationDragAsync(0.65);
+            Assert.True(viewModel.MeshSummary.Contains("PREVIEW", StringComparison.Ordinal));
+            await viewModel.CompleteModalMeshOperationDragAsync(0.65);
+
+            var afterRevision = (await new RekallAgeMeshAssetStore().LoadAsync(root, "hero-box", CancellationToken.None)).Revision;
+            Assert.True(afterRevision > beforeRevision);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task TwoPortClicksOnTheNodeGraphCanvasCreateALinkThroughTheRealPatchPipeline()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-graph-canvas-" + Guid.NewGuid().ToString("N"));

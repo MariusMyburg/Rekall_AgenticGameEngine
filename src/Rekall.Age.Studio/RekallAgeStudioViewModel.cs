@@ -100,6 +100,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private System.Windows.Point _modelingGraphDragOrigin;
     private System.Windows.Point _modelingGraphDragStart;
     private RekallAgeStudioModelingGraphPortKey? _modelingGraphPendingLinkPort;
+    private RekallAgeStudioMeshParameterModel? _modalDragParameter;
+    private double _modalDragOriginalValue;
+    private double _modalDragStartNormalizedX;
     private readonly RekallAgeAsyncCommand _refreshMeshAssetsCommand;
     private readonly RekallAgeAsyncCommand _createMeshPrimitiveCommand;
     private readonly RekallAgeAsyncCommand _openMeshAssetCommand;
@@ -1848,6 +1851,59 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         _modeling.CancelPreview(); RefreshMeshEditingState(); return Task.CompletedTask;
     });
+
+    /// <summary>
+    /// One normalized-width viewport drag maps to this many world units for the modal operation
+    /// parameter drag (Alt+drag) — chosen so a comfortable half-viewport drag produces a readable
+    /// few-unit extrude/inset/bevel amount rather than requiring pixel-precise typing.
+    /// </summary>
+    private const double ModalDragWorldUnitsPerNormalizedWidth = 6.0;
+
+    /// <summary>
+    /// Starts a Blender-style modal drag (Alt+left-drag in the mesh viewport) that live-previews
+    /// the selected operation's first numeric (Float) parameter as the mouse moves, reusing the
+    /// existing Preview/Apply pipeline exactly as the typed-parameter form does — this is an
+    /// alternate input path onto the same operation, not a parallel one. Returns false (and starts
+    /// nothing) when the selected operation has no numeric parameter to drive.
+    /// </summary>
+    public bool BeginModalMeshOperationDrag(double normalizedX)
+    {
+        var parameter = MeshParameterEditors.FirstOrDefault(editor => editor.Descriptor.ValueType == RekallAgeGeometryValueType.Float);
+        if (parameter is null) return false;
+        _modalDragOriginalValue = double.TryParse(parameter.ValueText, NumberStyles.Float, CultureInfo.InvariantCulture, out var current) ? current : 0;
+        _modalDragParameter = parameter;
+        _modalDragStartNormalizedX = normalizedX;
+        return true;
+    }
+
+    public Task UpdateModalMeshOperationDragAsync(double normalizedX)
+    {
+        if (_modalDragParameter is null) return Task.CompletedTask;
+        SetModalDragValue(normalizedX);
+        return PreviewMeshOperationAsync();
+    }
+
+    public async Task CompleteModalMeshOperationDragAsync(double normalizedX)
+    {
+        if (_modalDragParameter is null) return;
+        SetModalDragValue(normalizedX);
+        await ApplyMeshOperationAsync();
+        _modalDragParameter = null;
+    }
+
+    public void CancelModalMeshOperationDrag()
+    {
+        if (_modalDragParameter is null) return;
+        _modalDragParameter.ValueText = _modalDragOriginalValue.ToString("0.###", CultureInfo.InvariantCulture);
+        _modalDragParameter = null;
+        _ = CancelMeshPreviewAsync();
+    }
+
+    private void SetModalDragValue(double normalizedX)
+    {
+        var value = _modalDragOriginalValue + (normalizedX - _modalDragStartNormalizedX) * ModalDragWorldUnitsPerNormalizedWidth;
+        _modalDragParameter!.ValueText = value.ToString("0.###", CultureInfo.InvariantCulture);
+    }
 
     private Task RefreshModelingGraphsAsync() => RunGraphModelingAsync(() =>
     {

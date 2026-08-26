@@ -133,6 +133,15 @@ public sealed class RekallAgeRigPoseComponent : RekallAgeComponent
     public object[] JointDeltas { get; init; } = [];
 }
 
+[RekallAgeComponent("Rig Attachment", Description = "Composes this parented entity through a stable named joint from the parent entity's native AGE rig pose.")]
+public sealed class RekallAgeRigAttachmentComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Description = "Stable joint ID from the parent entity's Rekall.RigPose asset.")]
+    public string JointId { get; init; } = string.Empty;
+    [RekallAgeProperty(Description = "When false, this entity uses ordinary parent transform composition.")]
+    public bool Enabled { get; init; } = true;
+}
+
 [RekallAgeComponent("Morph Weights", Description = "Supplies a complete generic morph-target weight array for the Rekall.MeshRenderer on the same entity. The existing AnimationClip, AnimationMixer, cubic interpolation, and AnimationStateGraph contracts can animate Weights.")]
 public sealed class RekallAgeMorphWeightsComponent : RekallAgeComponent
 {

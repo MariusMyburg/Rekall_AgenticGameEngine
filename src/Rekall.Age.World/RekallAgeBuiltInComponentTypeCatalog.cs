@@ -75,6 +75,7 @@ public static class RekallAgeBuiltInComponentTypeCatalog
         "Rekall.SkeletalAnimator",
         "Rekall.SkeletonPose",
         "Rekall.RigPose",
+        "Rekall.RigAttachment",
         "Rekall.MorphWeights",
         "Rekall.UiCanvas",
         "Rekall.UiElement",

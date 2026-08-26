@@ -27,7 +27,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             throw new ArgumentOutOfRangeException(nameof(height), "Viewport height must be greater than zero.");
         }
 
-        var transformResolver = new RekallAgeRuntimeWorldTransformResolver(world);
+        var transformResolver = new RekallAgeRuntimeWorldTransformResolver(world, _rigPoseResolver);
         var cameras = world.Subsystems.Rendering.Cameras
             .Select(camera =>
             {

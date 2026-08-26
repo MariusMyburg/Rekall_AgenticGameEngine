@@ -1,5 +1,7 @@
 using System.Text.Json.Nodes;
 using Rekall.Age.Editor;
+using Rekall.Age.Modeling;
+using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime;
@@ -10,6 +12,175 @@ namespace Rekall.Age.Tests.Rendering;
 
 public sealed class ViewportContractTests
 {
+    [Fact]
+    public async Task RuntimeFrameComposesNamedRigAttachment()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var identity = new double[]
+        {
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
+        };
+        await new RekallAgeRigAssetStore().SaveAsync(root, RekallAgeRigAsset.Create(
+            "rig.attachment",
+            "Attachment Rig",
+            [
+                new("root", "Root", null, identity),
+                new("chest", "Chest", 0, new double[]
+                {
+                    1, 0, 0, 0,
+                    0, 1, 0, 0,
+                    0, 0, 1, 0,
+                    0, 2, 0, 1
+                })
+            ]), CancellationToken.None);
+
+        var before = new RekallAgeRuntimeRenderFrameBuilder().Build(World(identity), 320, 180, false);
+        var quarterTurn = new double[]
+        {
+            0, 1, 0, 0,
+            -1, 0, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
+        };
+        var afterWorld = World(quarterTurn);
+        var after = new RekallAgeRuntimeRenderFrameBuilder().Build(afterWorld, 320, 180, false);
+
+        var beforeAttachment = Assert.Single(before.Renderables, item => item.EntityName == "Joint Attachment");
+        var afterAttachment = Assert.Single(after.Renderables, item => item.EntityName == "Joint Attachment");
+        Assert.Equal(11, beforeAttachment.X, precision: 5);
+        Assert.Equal(2, beforeAttachment.Y, precision: 5);
+        Assert.Equal(10, afterAttachment.X, precision: 5);
+        Assert.Equal(3, afterAttachment.Y, precision: 5);
+        Assert.Equal(1, Assert.Single(afterWorld.Entities, item => item.Name == "Joint Attachment").Transform.Position3D.X);
+        Assert.True(RekallAgeBuiltInComponentTypeCatalog.IsKnown("Rekall.RigAttachment"));
+        Assert.DoesNotContain(after.Observations, item => item.Subsystem == "transform");
+
+        RekallAgeRuntimeWorld World(IReadOnlyList<double> chestDelta)
+        {
+            var parent = RekallAgeEntityDocument.Create("Rig Parent", ["rig"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["x"] = 10 }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RigPose", new JsonObject
+                {
+                    ["assetId"] = "rig.attachment",
+                    ["skinIndex"] = 0,
+                    ["jointDeltas"] = new JsonArray(new JsonObject
+                    {
+                        ["jointId"] = "chest",
+                        ["matrix"] = new JsonArray(chestDelta
+                            .Select(value => (JsonNode?)JsonValue.Create(value))
+                            .ToArray())
+                    })
+                }));
+            var child = RekallAgeEntityDocument.Create("Joint Attachment", ["attachment"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer", new JsonObject()))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.RigAttachment", new JsonObject
+                {
+                    ["jointId"] = "chest",
+                    ["enabled"] = true
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["x"] = 1 })) with
+            {
+                ParentId = parent.Id
+            };
+            return new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+                    .AddEntity(parent)
+                    .AddEntity(child),
+                root);
+        }
+    }
+
+    [Theory]
+    [InlineData("blank", "runtime.transform.rig_attachment_joint_missing")]
+    [InlineData("missing-pose", "runtime.transform.rig_attachment_pose_missing")]
+    [InlineData("invalid-rig", "runtime.transform.rig_attachment_pose_invalid")]
+    [InlineData("unknown-joint", "runtime.transform.rig_attachment_joint_unknown")]
+    public async Task RuntimeFrameReportsInvalidRigAttachmentAndUsesOrdinaryParentTransform(
+        string scenario,
+        string expectedCode)
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var identity = new double[]
+        {
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
+        };
+        await new RekallAgeRigAssetStore().SaveAsync(root, RekallAgeRigAsset.Create(
+            "rig.valid", "Valid Rig", [new("root", "Root", null, identity)]), CancellationToken.None);
+        var parent = RekallAgeEntityDocument.Create("Rig Parent", ["rig"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["x"] = 5 }));
+        if (scenario != "missing-pose")
+        {
+            parent = parent.AddComponent(RekallAgeComponentDocument.Create("Rekall.RigPose", new JsonObject
+            {
+                ["assetId"] = scenario == "invalid-rig" ? "rig.missing" : "rig.valid",
+                ["jointDeltas"] = new JsonArray()
+            }));
+        }
+        var child = RekallAgeEntityDocument.Create("Invalid Attachment", ["attachment"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.RigAttachment", new JsonObject
+            {
+                ["jointId"] = scenario switch
+                {
+                    "blank" => " ",
+                    "unknown-joint" => "missing",
+                    _ => "root"
+                }
+            }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["x"] = 2 })) with
+        {
+            ParentId = parent.Id
+        };
+        var world = new RekallAgeRuntimeWorldBuilder().Build(
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+                .AddEntity(parent)
+                .AddEntity(child),
+            root);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, false);
+
+        var rendered = Assert.Single(frame.Renderables, item => item.EntityName == "Invalid Attachment");
+        Assert.Equal(7, rendered.X, precision: 5);
+        Assert.Equal(0, rendered.Y, precision: 5);
+        Assert.Single(frame.Observations, item => item.Code == expectedCode && item.Target == "Invalid Attachment");
+    }
+
+    [Fact]
+    public void RuntimeFrameTreatsDisabledRigAttachmentAsOrdinaryParenting()
+    {
+        var parent = RekallAgeEntityDocument.Create("Plain Parent", ["parent"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["x"] = 5 }));
+        var child = RekallAgeEntityDocument.Create("Disabled Attachment", ["attachment"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "cube" }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.RigAttachment", new JsonObject
+            {
+                ["jointId"] = "root",
+                ["enabled"] = false
+            }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["x"] = 2 })) with
+        {
+            ParentId = parent.Id
+        };
+        var world = new RekallAgeRuntimeWorldBuilder().Build(
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+                .AddEntity(parent)
+                .AddEntity(child));
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, false);
+
+        Assert.Equal(7, Assert.Single(frame.Renderables, item => item.EntityName == "Disabled Attachment").X, precision: 5);
+        Assert.DoesNotContain(frame.Observations, item => item.Target == "Disabled Attachment");
+    }
+
     [Fact]
     public void RuntimeFrameComposesParented3DTransforms()
     {

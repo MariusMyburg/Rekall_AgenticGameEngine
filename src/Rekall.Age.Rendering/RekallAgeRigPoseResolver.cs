@@ -9,7 +9,11 @@ namespace Rekall.Age.Rendering;
 public sealed record RekallAgeRigPoseResolution(
     RekallAgeRuntimeViewportSkin? Skin,
     string? IssueCode = null,
-    string? IssueMessage = null);
+    string? IssueMessage = null)
+{
+    public IReadOnlyDictionary<string, IReadOnlyList<double>> JointPoseMatrices { get; init; } =
+        new Dictionary<string, IReadOnlyList<double>>(StringComparer.OrdinalIgnoreCase);
+}
 
 public sealed class RekallAgeRigPoseResolver
 {
@@ -32,7 +36,12 @@ public sealed class RekallAgeRigPoseResolver
             var deltas = ReadDeltas(component.Properties);
             var evaluated = new RekallAgeRigEvaluator().Evaluate(rig, deltas);
             var skinIndex = Math.Max(0, (int)Math.Round(ReadNumber(component.Properties, "skinIndex", 0)));
-            return new(new(skinIndex, evaluated.JointMatrices));
+            return new(new(skinIndex, evaluated.JointMatrices))
+            {
+                JointPoseMatrices = evaluated.JointIds
+                    .Select((jointId, index) => (jointId, matrix: evaluated.PoseGlobalMatrices[index]))
+                    .ToDictionary(item => item.jointId, item => item.matrix, StringComparer.OrdinalIgnoreCase)
+            };
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException or System.Text.Json.JsonException)
         {

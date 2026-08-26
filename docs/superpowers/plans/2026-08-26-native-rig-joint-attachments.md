@@ -56,6 +56,7 @@ Expected: all tests pass and existing skin-matrix assertions remain unchanged.
 **Files:**
 - Modify: `src/Rekall.Age.Modules/BuiltIns/RekallAgeInteractiveSubsystemComponents.cs`
 - Modify: `src/Rekall.Age.Modules/BuiltIns/RekallAgeBuiltInModule.cs`
+- Modify: `src/Rekall.Age.World/RekallAgeBuiltInComponentTypeCatalog.cs`
 - Modify: `src/Rekall.Age.Rendering/RekallAgeRigPoseResolver.cs`
 - Modify: `src/Rekall.Age.Rendering/RekallAgeRuntimeWorldTransformResolver.cs`
 - Modify: `src/Rekall.Age.Rendering/RekallAgeRuntimeRenderFrameBuilder.cs`
@@ -66,33 +67,33 @@ Expected: all tests pass and existing skin-matrix assertions remain unchanged.
 - Consumes: parent `Rekall.RigPose`, child `Rekall.RigAttachment { jointId, enabled }`, existing `parentId`, and Task 1 pose globals.
 - Produces: generic render-frame world transform `local * jointPoseGlobal * parentWorld` plus `runtime.transform.rig_attachment_*` observations.
 
-- [ ] **Step 1: Write a failing render-frame attachment test**
+- [x] **Step 1: Write a failing render-frame attachment test**
 
 Create a temporary two-joint rig, a parent with `Rekall.RigPose`, and a mesh child with `Rekall.RigAttachment { jointId: "chest" }`. Build a frame before and after changing only the chest delta. Assert the child renderable moves/rotates while its runtime local transform remains identical and the parent world offset is still included.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~RuntimeFrameComposesNamedRigAttachment`
 
 Expected: the child retains ordinary parent composition and does not include the chest bind/pose matrix.
 
-- [ ] **Step 3: Register the inspectable built-in component**
+- [x] **Step 3: Register the inspectable built-in component**
 
 Add `RekallAgeRigAttachmentComponent` with `JointId` and default-true `Enabled`; register it next to `RekallAgeRigPoseComponent`. Assert the built-in catalog recognizes `Rekall.RigAttachment` in the focused test.
 
-- [ ] **Step 4: Expose resolved pose matrices by joint ID**
+- [x] **Step 4: Expose resolved pose matrices by joint ID**
 
 Extend `RekallAgeRigPoseResolution` with an init-only case-insensitive joint-pose dictionary. Populate it from `evaluated.JointIds.Zip(evaluated.PoseGlobalMatrices)` while preserving existing skin and issue behavior.
 
-- [ ] **Step 5: Compose attachments in the shared transform resolver**
+- [x] **Step 5: Compose attachments in the shared transform resolver**
 
 Pass the frame builder's existing rig resolver into `RekallAgeRuntimeWorldTransformResolver`. Cache each parent rig resolution per frame. For enabled attachment children, validate the joint ID, parent pose, pose resolution, and named joint; on success decompose `childLocal * jointPoseGlobal * parentWorld`. On failure call the existing bounded `Report` path with the spec's exact code and compose `childLocal * parentWorld`.
 
-- [ ] **Step 6: Add diagnostic fallback tests**
+- [x] **Step 6: Add diagnostic fallback tests**
 
 Add one theory covering blank joint, missing parent pose, invalid rig asset, and unknown joint. Each case must keep the child renderable at its ordinary parented position and emit exactly the expected typed transform warning.
 
-- [ ] **Step 7: Run viewport, rig, and project-validator selections green**
+- [x] **Step 7: Run viewport, rig, and project-validator selections green**
 
 Run the three relevant test classes and confirm existing hierarchy, component-catalog, and rig-skin behavior remains green.
 

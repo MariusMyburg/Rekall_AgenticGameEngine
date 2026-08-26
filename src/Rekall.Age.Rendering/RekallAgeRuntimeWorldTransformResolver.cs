@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Text.Json.Nodes;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime.Abstractions;
 
@@ -8,15 +9,22 @@ internal sealed class RekallAgeRuntimeWorldTransformResolver
 {
     private const int MaximumObservations = 256;
     private readonly IReadOnlyDictionary<string, RekallAgeRuntimeEntity> _entities;
+    private readonly string? _projectRoot;
+    private readonly RekallAgeRigPoseResolver _rigPoseResolver;
+    private readonly Dictionary<string, RekallAgeRigPoseResolution> _rigResolutions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Resolution> _cache = new(StringComparer.Ordinal);
     private readonly HashSet<string> _reported = new(StringComparer.Ordinal);
     private readonly List<RekallAgeRuntimeViewportObservation> _observations = [];
     private readonly HashSet<string> _resolving = new(StringComparer.Ordinal);
 
-    public RekallAgeRuntimeWorldTransformResolver(RekallAgeRuntimeWorld world)
+    public RekallAgeRuntimeWorldTransformResolver(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRigPoseResolver? rigPoseResolver = null)
     {
         ArgumentNullException.ThrowIfNull(world);
         _entities = world.Entities.ToDictionary(entity => entity.Id, StringComparer.Ordinal);
+        _projectRoot = world.ProjectRoot;
+        _rigPoseResolver = rigPoseResolver ?? new RekallAgeRigPoseResolver();
     }
 
     public IReadOnlyList<RekallAgeRuntimeViewportObservation> Observations => _observations;
@@ -69,7 +77,16 @@ internal sealed class RekallAgeRuntimeWorldTransformResolver
                 return Cache(entity.Id, new Resolution(entity.Transform, false));
             }
 
-            var worldMatrix = ToMatrix(entity.Transform) * ToMatrix(parentResolution.Transform);
+            var localMatrix = ToMatrix(entity.Transform);
+            var attachment = entity.Components.FirstOrDefault(component =>
+                component.Type.Equals("Rekall.RigAttachment", StringComparison.Ordinal));
+            if (attachment is not null
+                && ReadBoolean(attachment.Properties, "enabled", true)
+                && TryResolveJointPose(entity, parent, attachment, out var jointPose))
+            {
+                localMatrix *= jointPose;
+            }
+            var worldMatrix = localMatrix * ToMatrix(parentResolution.Transform);
             if (!Matrix4x4.Decompose(worldMatrix, out var scale, out var rotation, out var translation)
                 || !Finite(scale)
                 || !Finite(rotation)
@@ -111,6 +128,58 @@ internal sealed class RekallAgeRuntimeWorldTransformResolver
         return resolution;
     }
 
+    private bool TryResolveJointPose(
+        RekallAgeRuntimeEntity entity,
+        RekallAgeRuntimeEntity parent,
+        RekallAgeRuntimeComponent attachment,
+        out Matrix4x4 jointPose)
+    {
+        jointPose = Matrix4x4.Identity;
+        var jointId = ReadString(attachment.Properties, "jointId");
+        if (string.IsNullOrWhiteSpace(jointId))
+        {
+            Report(
+                "runtime.transform.rig_attachment_joint_missing",
+                entity,
+                $"Entity '{entity.Name}' has an enabled rig attachment without a jointId; ordinary parent composition is used.");
+            return false;
+        }
+
+        var pose = parent.Components.FirstOrDefault(component =>
+            component.Type.Equals("Rekall.RigPose", StringComparison.Ordinal));
+        if (pose is null)
+        {
+            Report(
+                "runtime.transform.rig_attachment_pose_missing",
+                entity,
+                $"Parent entity '{parent.Name}' has no Rekall.RigPose for attached joint '{jointId}'; ordinary parent composition is used.");
+            return false;
+        }
+
+        if (!_rigResolutions.TryGetValue(parent.Id, out var resolution))
+        {
+            resolution = _rigPoseResolver.Resolve(_projectRoot, pose);
+            _rigResolutions[parent.Id] = resolution;
+        }
+        if (resolution.IssueCode is not null)
+        {
+            Report(
+                "runtime.transform.rig_attachment_pose_invalid",
+                entity,
+                $"Parent rig pose for '{parent.Name}' could not resolve attached joint '{jointId}': {resolution.IssueMessage}");
+            return false;
+        }
+        if (!resolution.JointPoseMatrices.TryGetValue(jointId, out var values) || !TryMatrix(values, out jointPose))
+        {
+            Report(
+                "runtime.transform.rig_attachment_joint_unknown",
+                entity,
+                $"Parent rig pose for '{parent.Name}' has no finite joint '{jointId}'; ordinary parent composition is used.");
+            return false;
+        }
+        return true;
+    }
+
     private void Report(string code, RekallAgeRuntimeEntity entity, string message)
     {
         var key = $"{code}:{entity.Id}";
@@ -139,6 +208,42 @@ internal sealed class RekallAgeRuntimeWorldTransformResolver
             (float)transform.Position3D.X,
             (float)transform.Position3D.Y,
             (float)transform.Position3D.Z);
+
+    private static bool TryMatrix(IReadOnlyList<double> values, out Matrix4x4 matrix)
+    {
+        if (values.Count != 16 || values.Any(value => !double.IsFinite(value)))
+        {
+            matrix = default;
+            return false;
+        }
+        matrix = new Matrix4x4(
+            (float)values[0], (float)values[1], (float)values[2], (float)values[3],
+            (float)values[4], (float)values[5], (float)values[6], (float)values[7],
+            (float)values[8], (float)values[9], (float)values[10], (float)values[11],
+            (float)values[12], (float)values[13], (float)values[14], (float)values[15]);
+        return true;
+    }
+
+    private static string? ReadString(JsonObject properties, string name) =>
+        TryGet(properties, name, out var node)
+        && node is JsonValue value
+        && value.TryGetValue<string>(out var text)
+            ? text?.Trim()
+            : null;
+
+    private static bool ReadBoolean(JsonObject properties, string name, bool fallback) =>
+        TryGet(properties, name, out var node)
+        && node is JsonValue value
+        && value.TryGetValue<bool>(out var result)
+            ? result
+            : fallback;
+
+    private static bool TryGet(JsonObject properties, string name, out JsonNode? value)
+    {
+        var match = properties.FirstOrDefault(item => item.Key.Equals(name, StringComparison.OrdinalIgnoreCase));
+        value = match.Value;
+        return match.Key is not null;
+    }
 
     private static Vector3 ToEulerDegrees(Quaternion quaternion)
     {

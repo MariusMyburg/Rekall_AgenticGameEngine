@@ -217,6 +217,29 @@ public sealed class CurveRevolveTests
     }
 
     [Fact]
+    public async Task AnyFiniteNonzeroPitchProducesOpenFullTurnTopology()
+    {
+        const double tinyPitch = 1e-13;
+        var result = await EvaluateProfileAsync(
+            [new(1, 0, 0), new(1, 1, 0)],
+            cyclic: false,
+            new JsonObject
+            {
+                ["axis"] = "y",
+                ["angleDegrees"] = 360.0,
+                ["segments"] = 8,
+                ["pitchPerTurn"] = tinyPitch
+            });
+
+        Assert.True(result.Succeeded, Diagnostics(result));
+        var mesh = result.Outputs["mesh"];
+        Assert.Equal(18, mesh.Topology.PointIds.Count);
+        Assert.Equal(18, new RekallAgeMeshValidator().Validate(mesh).Summary.BoundaryEdgeCount);
+        var offsets = Attribute(mesh, "revolve.axial_offset", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.Float);
+        Assert.InRange(offsets.Values[^1].GetDouble(), tinyPitch - 1e-28, tinyPitch + 1e-28);
+    }
+
+    [Fact]
     public async Task MultiTurnZeroPitchRejectsOverlappingRevolution()
     {
         var result = await EvaluateProfileAsync(

@@ -190,22 +190,22 @@ public sealed class ModelingProductionContractMatrixTests
     public void ProductionMatricesExactlyCoverThePublishedOperationAndModifierCatalogs()
     {
         var operationIds = new RekallAgeMeshOperationExecutor().Descriptors.Select(item => item.OperationId).ToArray();
-        Assert.Equal(22, operationIds.Length);
+        Assert.Equal(25, operationIds.Length);
         Assert.All(new[]
         {
             "transform", "reverse_faces", "triangulate_faces", "extrude_faces", "delete",
-            "generate_normals", "project_uv", "mark_uv_seams", "unwrap_pack_uv", "subdivide_faces", "subdivide_smooth", "set_edge_crease", "merge_by_distance",
+            "generate_normals", "shade_faces", "mark_sharp", "auto_smooth", "project_uv", "mark_uv_seams", "unwrap_pack_uv", "subdivide_faces", "subdivide_smooth", "set_edge_crease", "merge_by_distance",
             "bevel_edges", "inset_faces", "solidify", "weighted_normals",
             "fill_holes", "bridge_edge_loops", "poke_faces", "dissolve_edges", "bisect_plane"
         }, expected => Assert.Contains(expected, operationIds));
 
         var modifierIds = RekallAgeModifierCatalog.CreateDefault().Descriptors.Select(item => item.TypeId).ToArray();
-        Assert.Equal(11, modifierIds.Length);
+        Assert.Equal(12, modifierIds.Length);
         Assert.All(new[]
         {
             "rekall.modifier.transform", "rekall.modifier.triangulate", "rekall.modifier.extrude",
             "rekall.modifier.subdivide", "rekall.modifier.subdivide_smooth", "rekall.modifier.merge_by_distance",
-            "rekall.modifier.bevel", "rekall.modifier.solidify", "rekall.modifier.mirror", "rekall.modifier.array",
+            "rekall.modifier.bevel", "rekall.modifier.solidify", "rekall.modifier.mirror", "rekall.modifier.array", "rekall.modifier.auto_smooth",
             "rekall.modifier.weighted_normals"
         }, expected => Assert.Contains(expected, modifierIds));
     }

@@ -277,13 +277,13 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         var pitchPerTurn = ReadNumber(node, "pitchPerTurn", 0);
         if (!double.IsFinite(pitchPerTurn) || pitchPerTurn < -1_000_000 || pitchPerTurn > 1_000_000)
             throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Curve revolve pitchPerTurn must be finite and from -1000000 through 1000000 world units.", node.NodeId);
-        if (angleDegrees > 360 && Math.Abs(pitchPerTurn) <= 1e-12)
+        if (angleDegrees > 360 && pitchPerTurn == 0)
             throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Curve revolve angleDegrees above 360 requires a nonzero pitchPerTurn to avoid overlapping revolutions.", node.NodeId);
         var segments = ReadInteger(node, "segments", 32, 3, 4096);
         var weldDistance = ReadNumber(node, "weldDistance", 0.000001);
         if (weldDistance < 0 || weldDistance > 1)
             throw new EvaluationException("REKALL_MODELING_EVALUATION_PARAMETER_INVALID", "Curve revolve weldDistance must be from zero through one world unit.", node.NodeId);
-        var pitched = Math.Abs(pitchPerTurn) > 1e-12;
+        var pitched = pitchPerTurn != 0;
         var wraps = !pitched && Math.Abs(angleDegrees - 360) <= 1e-9;
         var ringCount = wraps ? segments : segments + 1;
         var profileSpanCount = profile.Cyclic ? profile.Points.Count : profile.Points.Count - 1;

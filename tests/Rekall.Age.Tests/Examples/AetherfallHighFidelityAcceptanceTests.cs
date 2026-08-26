@@ -115,6 +115,7 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             var entity = Assert.Single(scene.Entities, item => item.Name == name);
             var reference = Assert.Single(entity.Components, component => component.Type == "Rekall.ModelAssetReference");
             Assert.Equal("aetherfall-conduit-model", reference.Properties["assetId"]!.GetValue<string>());
+            Assert.Single(entity.Components, component => component.Type == "Rekall.MeshRenderer");
             var transform = Assert.Single(entity.Components, component => component.Type == "Rekall.Transform3D");
             Assert.True(transform.Properties["scaleY"]!.GetValue<double>() >= 0.8,
                 $"{name} must present the authored helix at a readable world scale.");

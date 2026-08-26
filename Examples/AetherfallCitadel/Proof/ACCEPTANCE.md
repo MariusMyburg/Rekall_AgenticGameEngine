@@ -505,17 +505,17 @@ the new background is an explicit fallback, not a claim that sky assets render.
   live conduit entities through ordinary AGE commands; the old ruin proxies are
   gone.
 - The retained RTX 5090 High Vulkan frame is
-  `Proof/Captures/CurveScrew/vulkan-scene-1280x720-20260826045904181.png`.
+  `Proof/Captures/CurveScrew/vulkan-scene-1280x720-20260826051445564.png`.
   Frame 30 is informative with 11,735 distinct colors, 16.9% dominant-color
-  share, mean luminance 0.101, 64 renderables, 285 render-work draws, four
+  share, mean luminance 0.101, 65 renderables, 297 render-work draws, four
   dispatches, and zero observations, missing assets, unsupported assets, or
   fallbacks. Visual inspection confirms that the left conduit reads as a tall
   authored device with an elevated core and helical cage.
 - All 22 Aetherfall high-fidelity acceptance tests pass. Movement, combat,
   progression, and reset retain all 2/4/4/5 strict executable assertions, and
   project plus scene validation report zero issues. High `desktop60` passes at
-  92 scene draw calls, 224,496 triangles, 1,165,544 vertices, seven textures,
-  and 5.545472 ms measured GPU time.
+  96 scene draw calls, 230,332 triangles, 1,214,504 vertices, nine textures,
+  and 6.656480 ms measured GPU time.
 - The source-detail increase is intentionally retained, but the scene is now
   near its 1,250,000-vertex desktop60 limit. Automatic generated LOD variants
   and distance selection are therefore the next scalability requirement.

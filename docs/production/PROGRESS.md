@@ -21,8 +21,8 @@ Model Asset path. The retained RTX 5090 High frame is clean and informative
 with 11,735 distinct colors and zero observations, missing assets, unsupported
 assets, fallbacks, or black-dot noise. All 22 Aetherfall high-fidelity tests
 pass; strict movement/combat/progression/reset proofs pass 2/4/4/5; both
-validators report zero issues; and High desktop60 passes at 92 scene draws,
-224,496 triangles, 1,165,544 vertices, seven textures, and 5.545472 ms measured
+validators report zero issues; and High desktop60 passes at 96 scene draws,
+230,332 triangles, 1,214,504 vertices, nine textures, and 6.656480 ms measured
 GPU time. This closes screw/helix pitch, not final visual acceptance: automatic
 LOD generation is now urgent because source detail is near the 1,250,000-
 vertex budget, while explicit cap policies, fields, multi-spline output, mesh
@@ -3148,11 +3148,11 @@ behavior.
   compile through the standard curve/graph/mesh/Model Asset path. Aetherfall's
   two live conduits replace ruin proxies with a raised core and counter-wound
   1,080-degree coils. The retained native High frame is
-  `Examples/AetherfallCitadel/Proof/Captures/CurveScrew/vulkan-scene-1280x720-20260826045904181.png`;
+  `Examples/AetherfallCitadel/Proof/Captures/CurveScrew/vulkan-scene-1280x720-20260826051445564.png`;
   all 22 high-fidelity tests pass, gameplay remains 2/4/4/5, validation is
-  clean, and `desktop60` passes at 5.545472 ms. Generated LOD variants are now
+  clean, and `desktop60` passes at 6.656480 ms. Generated LOD variants are now
   the immediate scalability requirement because the detailed source scene is
-  at 1,165,544 of 1,250,000 allowed vertices. Tripo/Meshy generation/import
+  at 1,214,504 of 1,250,000 allowed vertices. Tripo/Meshy generation/import
   remains researched and queued behind the native Aetherfall milestone through
   the documented provider-neutral asynchronous job boundary.
 

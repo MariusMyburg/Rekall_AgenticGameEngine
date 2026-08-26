@@ -9175,6 +9175,10 @@
           }
         },
         {
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
+        },
+        {
           "type": "Rekall.ModelAssetReference",
           "properties": {
             "assetId": "aetherfall-conduit-model"

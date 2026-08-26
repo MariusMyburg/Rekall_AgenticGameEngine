@@ -217,6 +217,8 @@ public sealed class CraterFieldRulesSystem : IRekallAgeRuntimeModuleSystem
                 .WithPosition3D(new RekallAgeRuntimeVector3(x, spawnHeight, z))
                 .UpsertComponent("Rekall.MeshAssetReference", new JsonObject { ["assetId"] = "grenade-body" })
                 .UpsertComponent("Rekall.MeshRenderer", new JsonObject())
+                .UpsertComponent("Rekall.MeshCollider", new JsonObject { ["convex"] = true })
+                .UpsertComponent("Rekall.Rigidbody3D", new JsonObject { ["mass"] = 1.0 })
                 .UpsertComponent(FuseComponentType, new JsonObject
                 {
                     ["remainingSeconds"] = fuseSeconds,

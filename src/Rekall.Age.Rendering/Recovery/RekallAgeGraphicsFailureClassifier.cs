@@ -23,7 +23,11 @@ public sealed class RekallAgeGraphicsFailureClassifier
                 }
 
                 if (ContainsExactSignature(current.Message, "VK_ERROR_OUT_OF_DATE_KHR") ||
-                    ContainsExactSignature(current.Message, "VK_ERROR_SURFACE_LOST_KHR"))
+                    ContainsExactSignature(current.Message, "VK_ERROR_SURFACE_LOST_KHR") ||
+                    // Veldrid's own swapchain-recreation path raises this human-readable message
+                    // (not the raw Vulkan error code) when the OS reports the surface lost --
+                    // observed in production after a live player session ran for a while.
+                    ContainsExactSignature(current.Message, "Swapchain's underlying surface has been lost"))
                 {
                     return Recoverable(RekallAgeGraphicsFailureKinds.SwapchainInvalid, current);
                 }

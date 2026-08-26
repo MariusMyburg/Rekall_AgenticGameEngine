@@ -25,6 +25,14 @@ public sealed class PlayerSessionSupervisorTests
         Assert.Equal(
             RekallAgeGraphicsFailureKinds.SwapchainInvalid,
             classifier.Classify(new Veldrid.VeldridException("vkAcquireNextImageKHR failed: VK_ERROR_OUT_OF_DATE_KHR")).Kind);
+        // Veldrid's own swapchain-recreation code raises this human-readable message (not the
+        // raw VK_ERROR_SURFACE_LOST_KHR code) when the OS reports the surface lost -- observed
+        // in production after ~110s of a live player session. Must classify as recoverable the
+        // same as the raw error-code form, or a routine, recoverable OS/GPU event crashes the
+        // player outright instead of recreating the swapchain.
+        Assert.Equal(
+            RekallAgeGraphicsFailureKinds.SwapchainInvalid,
+            classifier.Classify(new Veldrid.VeldridException("The Swapchain's underlying surface has been lost.")).Kind);
 
         Assert.False(classifier.Classify(new InvalidOperationException("VK_ERROR_DEVICE_LOST")).IsRecoverable);
         Assert.False(classifier.Classify(new InvalidOperationException(

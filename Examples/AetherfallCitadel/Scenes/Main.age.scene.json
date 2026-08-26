@@ -4469,10 +4469,29 @@
       ],
       "components": [
         {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#505552",
+            "metallicFactor": 0.05,
+            "roughnessFactor": 0.86,
+            "emissiveColor": "#5d625e",
+            "emissiveStrength": 0.015,
+            "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
+            "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+          }
+        },
+        {
           "type": "Rekall.MeshRenderer",
           "properties": {
             "castShadows": true,
             "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
           }
         },
         {
@@ -4488,22 +4507,14 @@
           }
         },
         {
-          "type": "Rekall.ModelAssetReference",
+          "type": "Rekall.VirtualGeometry",
           "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
-          }
-        },
-        {
-          "type": "Rekall.Material",
-          "properties": {
-            "baseColor": "#505552",
-            "metallicFactor": 0.05,
-            "roughnessFactor": 0.86,
-            "emissiveColor": "#5d625e",
-            "emissiveStrength": 0.015,
-            "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
-            "normalScale": 0.35,
-            "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -4727,19 +4738,6 @@
       ],
       "components": [
         {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
-          "type": "Rekall.ModelAssetReference",
-          "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
-          }
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#454a48",
@@ -4753,6 +4751,19 @@
           }
         },
         {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
+          }
+        },
+        {
           "type": "Rekall.Transform3D",
           "properties": {
             "x": 7.3,
@@ -4762,6 +4773,17 @@
             "scaleY": 0.7,
             "scaleZ": 0.6,
             "yaw": -58
+          }
+        },
+        {
+          "type": "Rekall.VirtualGeometry",
+          "properties": {
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -4780,10 +4802,29 @@
       ],
       "components": [
         {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#505552",
+            "metallicFactor": 0.05,
+            "roughnessFactor": 0.86,
+            "emissiveColor": "#5d625e",
+            "emissiveStrength": 0.015,
+            "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
+            "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+          }
+        },
+        {
           "type": "Rekall.MeshRenderer",
           "properties": {
             "castShadows": true,
             "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
           }
         },
         {
@@ -4799,22 +4840,14 @@
           }
         },
         {
-          "type": "Rekall.ModelAssetReference",
+          "type": "Rekall.VirtualGeometry",
           "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
-          }
-        },
-        {
-          "type": "Rekall.Material",
-          "properties": {
-            "baseColor": "#505552",
-            "metallicFactor": 0.05,
-            "roughnessFactor": 0.86,
-            "emissiveColor": "#5d625e",
-            "emissiveStrength": 0.015,
-            "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
-            "normalScale": 0.35,
-            "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -4889,13 +4922,6 @@
       ],
       "components": [
         {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#454a47",
@@ -4906,6 +4932,19 @@
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70",
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
           }
         },
         {
@@ -4921,9 +4960,14 @@
           }
         },
         {
-          "type": "Rekall.ModelAssetReference",
+          "type": "Rekall.VirtualGeometry",
           "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -5198,19 +5242,6 @@
       ],
       "components": [
         {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
-          "type": "Rekall.ModelAssetReference",
-          "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
-          }
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#454a48",
@@ -5224,6 +5255,19 @@
           }
         },
         {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
+          }
+        },
+        {
           "type": "Rekall.Transform3D",
           "properties": {
             "x": 18,
@@ -5233,6 +5277,17 @@
             "scaleY": 1.3,
             "scaleZ": 1.1,
             "yaw": -65
+          }
+        },
+        {
+          "type": "Rekall.VirtualGeometry",
+          "properties": {
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -5252,19 +5307,6 @@
       ],
       "components": [
         {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
-          "type": "Rekall.ModelAssetReference",
-          "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
-          }
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#454a48",
@@ -5278,6 +5320,19 @@
           }
         },
         {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
+          }
+        },
+        {
           "type": "Rekall.Transform3D",
           "properties": {
             "x": -18,
@@ -5287,6 +5342,17 @@
             "scaleY": 1.35,
             "scaleZ": 1.1,
             "yaw": 65
+          }
+        },
+        {
+          "type": "Rekall.VirtualGeometry",
+          "properties": {
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -6123,19 +6189,6 @@
       ],
       "components": [
         {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
-          "type": "Rekall.ModelAssetReference",
-          "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
-          }
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#454a48",
@@ -6149,6 +6202,19 @@
           }
         },
         {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
+          }
+        },
+        {
           "type": "Rekall.Transform3D",
           "properties": {
             "x": 20,
@@ -6158,6 +6224,17 @@
             "scaleY": 1.0,
             "scaleZ": 1.0,
             "yaw": -82
+          }
+        },
+        {
+          "type": "Rekall.VirtualGeometry",
+          "properties": {
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -6177,19 +6254,6 @@
       ],
       "components": [
         {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
-          "type": "Rekall.ModelAssetReference",
-          "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
-          }
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#454a48",
@@ -6203,6 +6267,19 @@
           }
         },
         {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
+          }
+        },
+        {
           "type": "Rekall.Transform3D",
           "properties": {
             "x": -20,
@@ -6212,6 +6289,17 @@
             "scaleY": 1.0,
             "scaleZ": 1.0,
             "yaw": 82
+          }
+        },
+        {
+          "type": "Rekall.VirtualGeometry",
+          "properties": {
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -6808,13 +6896,6 @@
       ],
       "components": [
         {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#404542",
@@ -6825,6 +6906,19 @@
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
             "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
           }
         },
         {
@@ -6840,9 +6934,14 @@
           }
         },
         {
-          "type": "Rekall.ModelAssetReference",
+          "type": "Rekall.VirtualGeometry",
           "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -6967,13 +7066,6 @@
       ],
       "components": [
         {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#404542",
@@ -6984,6 +7076,19 @@
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
             "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
           }
         },
         {
@@ -6999,9 +7104,14 @@
           }
         },
         {
-          "type": "Rekall.ModelAssetReference",
+          "type": "Rekall.VirtualGeometry",
           "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -7126,13 +7236,6 @@
       ],
       "components": [
         {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#404542",
@@ -7143,6 +7246,19 @@
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
             "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
           }
         },
         {
@@ -7158,9 +7274,14 @@
           }
         },
         {
-          "type": "Rekall.ModelAssetReference",
+          "type": "Rekall.VirtualGeometry",
           "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -7285,13 +7406,6 @@
       ],
       "components": [
         {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#404542",
@@ -7302,6 +7416,19 @@
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
             "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
           }
         },
         {
@@ -7317,9 +7444,14 @@
           }
         },
         {
-          "type": "Rekall.ModelAssetReference",
+          "type": "Rekall.VirtualGeometry",
           "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -7444,13 +7576,6 @@
       ],
       "components": [
         {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#404542",
@@ -7461,6 +7586,19 @@
             "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
             "normalScale": 0.35,
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
           }
         },
         {
@@ -7476,9 +7614,14 @@
           }
         },
         {
-          "type": "Rekall.ModelAssetReference",
+          "type": "Rekall.VirtualGeometry",
           "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -10909,10 +11052,29 @@
       ],
       "components": [
         {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#505552",
+            "metallicFactor": 0.05,
+            "roughnessFactor": 0.86,
+            "emissiveColor": "#5d625e",
+            "emissiveStrength": 0.015,
+            "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
+            "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+          }
+        },
+        {
           "type": "Rekall.MeshRenderer",
           "properties": {
             "castShadows": true,
             "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
           }
         },
         {
@@ -10928,22 +11090,14 @@
           }
         },
         {
-          "type": "Rekall.ModelAssetReference",
+          "type": "Rekall.VirtualGeometry",
           "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
-          }
-        },
-        {
-          "type": "Rekall.Material",
-          "properties": {
-            "baseColor": "#505552",
-            "metallicFactor": 0.05,
-            "roughnessFactor": 0.86,
-            "emissiveColor": "#5d625e",
-            "emissiveStrength": 0.015,
-            "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
-            "normalScale": 0.35,
-            "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -11167,19 +11321,6 @@
       ],
       "components": [
         {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
-          "type": "Rekall.ModelAssetReference",
-          "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
-          }
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#454a48",
@@ -11193,6 +11334,19 @@
           }
         },
         {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
+          }
+        },
+        {
           "type": "Rekall.Transform3D",
           "properties": {
             "x": -7.2,
@@ -11202,6 +11356,17 @@
             "scaleY": 0.72,
             "scaleZ": 0.62,
             "yaw": 62
+          }
+        },
+        {
+          "type": "Rekall.VirtualGeometry",
+          "properties": {
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -11220,10 +11385,29 @@
       ],
       "components": [
         {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#505552",
+            "metallicFactor": 0.05,
+            "roughnessFactor": 0.86,
+            "emissiveColor": "#5d625e",
+            "emissiveStrength": 0.015,
+            "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.35,
+            "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+          }
+        },
+        {
           "type": "Rekall.MeshRenderer",
           "properties": {
             "castShadows": true,
             "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
           }
         },
         {
@@ -11239,22 +11423,14 @@
           }
         },
         {
-          "type": "Rekall.ModelAssetReference",
+          "type": "Rekall.VirtualGeometry",
           "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
-          }
-        },
-        {
-          "type": "Rekall.Material",
-          "properties": {
-            "baseColor": "#505552",
-            "metallicFactor": 0.05,
-            "roughnessFactor": 0.86,
-            "emissiveColor": "#5d625e",
-            "emissiveStrength": 0.015,
-            "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
-            "normalScale": 0.35,
-            "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],
@@ -11329,13 +11505,6 @@
       ],
       "components": [
         {
-          "type": "Rekall.MeshRenderer",
-          "properties": {
-            "castShadows": true,
-            "receiveShadows": true
-          }
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#454a47",
@@ -11346,6 +11515,19 @@
             "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70",
             "emissiveColor": "#5d625e",
             "emissiveStrength": 0.015
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-weathered-ruin-model"
           }
         },
         {
@@ -11361,9 +11543,14 @@
           }
         },
         {
-          "type": "Rekall.ModelAssetReference",
+          "type": "Rekall.VirtualGeometry",
           "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
+            "enabled": true,
+            "targetPixelError": 1.5,
+            "clusterTriangleCount": 128,
+            "maxSelectedTriangles": 5228,
+            "maxLodLevel": 4,
+            "debugMode": "off"
           }
         }
       ],

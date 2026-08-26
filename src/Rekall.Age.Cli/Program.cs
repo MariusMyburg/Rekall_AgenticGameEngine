@@ -897,7 +897,7 @@ internal static class RekallAgeCli
         foreach (var renderable in result.Value.Renderables)
         {
             Console.WriteLine(
-                $"Virtual geometry: {renderable.EntityName}; enabled: {renderable.Enabled}; meshes: {renderable.MeshCount}; source: {renderable.SourceTriangles}; selected: {renderable.SelectedTriangles}; reduced: {renderable.ReducedTriangles}; lod: {renderable.SelectedLodLevel}; max selected: {renderable.MaxSelectedTriangles}; cluster triangles: {renderable.ClusterTriangleCount}; pixel error: {renderable.TargetPixelError:F3}");
+                $"Virtual geometry: {renderable.EntityName}; enabled: {renderable.Enabled}; meshes: {renderable.MeshCount}; source: {renderable.SourceTriangles}; selected: {renderable.SelectedTriangles}; reduced: {renderable.ReducedTriangles}; lod: {renderable.SelectedLodLevel}; max selected: {renderable.MaxSelectedTriangles}; budget satisfied: {renderable.BudgetSatisfied}; cluster triangles: {renderable.ClusterTriangleCount}; pixel error: {renderable.TargetPixelError:F3}");
         }
 
         foreach (var recommendation in result.Value.Recommendations)

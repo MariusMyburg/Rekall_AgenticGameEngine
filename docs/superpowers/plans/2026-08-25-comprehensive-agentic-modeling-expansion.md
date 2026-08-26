@@ -634,6 +634,36 @@ AGE already has a working slice; Meshy is the strongest second-adapter test
 because its preview/refine, remesh, PBR, rigging, animation, SSE, and cancellation
 surface exercises more of the generic contract.
 
+**Preliminary provider assessment (official APIs checked 2026-08-26):**
+
+- **Tripo should be migrated first, not chosen as the permanent default.** AGE
+  already proves its basic submit/poll/download/GLB-import loop, while Tripo's
+  current v3 API adds single-image and labeled multi-view generation, detailed
+  geometry/PBR options, retopology, format conversion, biped and creature
+  auto-rigging, and animation retargeting. Its published API pricing is
+  pay-as-you-go, which is well suited to an explicit per-job cost ceiling.
+- **Meshy should be the second adapter and breadth benchmark.** Its official API
+  currently covers text, single-image and multi-image generation plus remesh,
+  UV unwrap, conversion, retexture, rigging, animation, webhooks/SSE, and several
+  game-oriented output formats. Its official open-source MCP server is useful
+  reference material for agent tool shape, but AGE should integrate through its
+  own provider-neutral command/job contract so Studio, CLI, MCP, Codex, and
+  other LLM backends all receive the same inspectable behavior.
+- **GLB is the preferred first normalized interchange format.** Both providers
+  return it and AGE already imports it. FBX/OBJ/USDZ/STL remain optional source
+  or export formats; they must not become parallel hidden asset systems.
+- **Neither service removes the need for AGE modeling.** Generated meshes must
+  remain editable, reimportable source assets that pass topology, scale, UV,
+  PBR, skeleton, animation, license/provenance, cook, package, and fixed-camera
+  visual checks. Provider output quality and terms can change, so the final
+  recommendation requires the paid same-fixture comparison in Step 6.
+
+Current official references:
+https://developers.tripo3d.com/en/docs/quick-start,
+https://developers.tripo3d.com/en/pricing,
+https://docs.meshy.ai/en/api/quick-start, and
+https://docs.meshy.ai/en/api/ai.
+
 - [ ] **Step 1: Define a provider-neutral generation contract**
 
   Specify prompt/reference inputs, target purpose and polycount, topology/UV/PBR/

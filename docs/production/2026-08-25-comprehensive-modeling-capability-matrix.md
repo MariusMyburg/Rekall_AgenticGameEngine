@@ -80,7 +80,7 @@ AGE remains an independent C# implementation.
 | Sculpt/attribute/weight paint | Planned | Wave 4 | Blender sculpt BVH/stroke cache | Deterministic brush stamps, local dirtiness, compact undo |
 | Multires/dynamic topology/retopology | Planned | Wave 4 | Blender multires/sculpt/retopo concepts | Explicit lossy policy and attribute-transfer report |
 | GLB/OBJ/PLY/STL import and reimport | Partial | Wave 2 | Blender import nodes; Godot resource importers | Normalize into AGE source docs with hashes/settings/license/dependencies |
-| Render/collision/nav/LOD/meshlet cooking | Partial | Waves 2–3 | Godot importer mesh and renderer mesh storage | Independent staged cook service and package/round-trip evidence |
+| Render/collision/nav/LOD/meshlet cooking | Partial: static CPU LOD selection now compacts per-surface inputs, preserves seams and coincident disconnected components, apportions whole-renderable triangle budgets with truthful unsatisfied diagnostics, caches stable reductions across runtime consumers, and has an accepted 17-consumer Aetherfall slice; skinned/morph payloads deliberately remain at source resolution | Waves 2–3 | Godot importer mesh and renderer mesh storage | Add cooked authored LOD artifacts, skinned/morph remapping, collision/nav derivation, GPU meshlets/page streaming, package round-trip, and broader fixed-camera quality evidence |
 
 ## Optional external mesh generation
 

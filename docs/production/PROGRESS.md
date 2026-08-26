@@ -4,31 +4,34 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 07:02 Africa/Johannesburg
+Last verified: 2026-08-26 09:28 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
 
-The current Aetherfall engine-driven milestone extends generic typed curve
-revolution into signed multi-turn screw/helix authoring. The same
-`rekall.modeling.curve.revolve@1` node now accepts bounded `pitchPerTurn`, angles
-up to 36,000 degrees, open whole-turn topology, and signed
-`revolve.axial_offset` provenance while preserving its zero-pitch partial/full
-revolution behavior. Aetherfall's rebuilt conduit publishes counter-wound
-1,080-degree coils, a beveled obsidian body, and a raised aether core, then
-replaces both old ruin-proxy scene instances through the ordinary graph/bake/
-Model Asset path. The retained RTX 5090 High frame is clean and informative
-with 11,735 distinct colors and zero observations, missing assets, unsupported
-assets, fallbacks, or black-dot noise. All 22 Aetherfall high-fidelity tests
-pass; strict movement/combat/progression/reset proofs pass 2/4/4/5; both
-validators report zero issues; and High desktop60 passes at 96 scene draws,
-230,332 triangles, 1,214,504 vertices, nine textures, and 6.656480 ms measured
-GPU time. This closes screw/helix pitch, not final visual acceptance: automatic
-LOD generation is now urgent because source detail is near the 1,250,000-
-vertex budget, while explicit cap policies, fields, multi-spline output, mesh
-Spin, modifier and Studio gizmo workflows, custom-normal transfer,
-substantially richer production assets/materials, native rig authoring,
-animation, and final composition remain in progress.
+The current Aetherfall engine-driven milestone replaces unsafe triangle-stride
+virtual geometry with topology-checked connected clustering. Material surfaces
+are compacted to referenced vertices; render seams retain distinct normal/UV
+payloads; coincident disconnected open and closed components remain separate;
+and candidates are rejected when component, boundary, or edge-use topology
+worsens. Cluster size and pixel error now affect actual output through maximum
+distance LOD. Whole-renderable triangle budgets are apportioned across material
+surfaces and report explicit unsatisfied state when no safe result fits. Stable
+source reductions are cached before material color materialization for repeated
+assets, Web, OpenXR, and Windows. Seventeen static Aetherfall ruins consume the
+generic component; fresh frame-30 inspection selects 62,202 of 100,368 source
+triangles, reducing 38,166, and all 17 satisfy their 5,228 cap. A fresh native
+High Vulkan capture after the final reducer mutation is informative, visually
+topology-clean, and pixel-identical to the preceding 62,202-selection frame.
+High `desktop60` passes at 96 draws, 192,166 triangles, 778,804 vertices, nine
+textures, and 5.009344 ms measured GPU time. Focused virtual-geometry evidence
+passes 30/30, renderer/Web/OpenXR/cache integration passes 110/110, combined
+Aetherfall acceptance passes 42/42, gameplay remains 2/4/4/5 with Warden
+movement at `0.506840`, and both validators report zero issues. This closes safe
+static CPU LOD selection, cache reuse, and multi-surface budgeting, not GPU page
+streaming, skinned/morph LOD remapping, or final visual acceptance; the recovered
+budget is next allocated to richer characters, clothing, ruins, props,
+materials, animation, and composition.
 
 Current execution order is governed by
 [`STRATEGIC-PRIORITIES.md`](STRATEGIC-PRIORITIES.md). The immediate acceptance

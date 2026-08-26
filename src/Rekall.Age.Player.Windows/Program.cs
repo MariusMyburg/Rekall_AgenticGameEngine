@@ -2629,6 +2629,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private GeometryCacheKey CreateGeometryCacheKey(Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame)
     {
         var hash = new HashCode();
+        hash.Add(RekallAgeVirtualGeometrySelectionSignature.Compute(frame));
         var meshRenderableCount = 0;
         foreach (var renderable in frame.Renderables)
         {

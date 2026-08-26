@@ -6,6 +6,13 @@ namespace Rekall.Age.Rendering;
 
 public sealed class RekallAgeVulkanSceneMeshBuilder
 {
+    private const int MaximumVirtualGeometryCacheEntries = 512;
+    private readonly Dictionary<VirtualGeometryCacheKey, CachedVirtualGeometry> _virtualGeometryCache = [];
+
+    public long VirtualGeometryCacheHits { get; private set; }
+
+    public long VirtualGeometryCacheMisses { get; private set; }
+
     public IReadOnlyList<RekallAgeVulkanSceneMesh> BuildMeshes(RekallAgeRuntimeViewportFrame frame)
     {
         return BuildMeshes(frame, RekallAgeRuntimeViewportAssetSet.Empty);
@@ -60,22 +67,34 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             || TryGetSupportedPrimitive(renderable) is not null;
     }
 
-    private static IEnumerable<RekallAgeVulkanSceneMesh> BuildMeshes(
+    private IEnumerable<RekallAgeVulkanSceneMesh> BuildMeshes(
         RekallAgeRuntimeViewportRenderable renderable,
         RekallAgeRuntimeViewportAssetSet assets,
         RekallAgeRuntimeViewportCamera? activeCamera)
     {
         if (HasValidViewportLineSegments(renderable))
         {
-            yield return ApplyVirtualGeometry(BindRenderableMaterial(BuildViewportLineSegments(renderable), renderable, assets), renderable, activeCamera);
+            foreach (var mesh in ApplyVirtualGeometry(
+                [BuildViewportLineSegments(renderable)],
+                renderable,
+                activeCamera,
+                ComputeGeneratedSourceSignature(renderable, "line-segments")))
+            {
+                yield return BindRenderableMaterial(mesh, renderable, assets);
+            }
             yield break;
         }
 
         if (HasValidAuthoredGeometryMesh(renderable))
         {
-            foreach (var mesh in BuildAuthoredGeometryMeshes(renderable))
+            var authoredMeshes = BuildAuthoredGeometryMeshes(renderable).ToArray();
+            foreach (var mesh in ApplyVirtualGeometry(
+                authoredMeshes,
+                renderable,
+                activeCamera,
+                ComputeGeneratedSourceSignature(renderable, "authored-geometry")))
             {
-                yield return ApplyVirtualGeometry(BindRenderableMaterial(mesh, renderable, assets), renderable, activeCamera);
+                yield return BindRenderableMaterial(mesh, renderable, assets);
             }
             yield break;
         }
@@ -97,7 +116,14 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
                 "octahedron" => BuildOctahedron(renderable, primitive),
                 _ => throw new InvalidOperationException($"Unsupported primitive '{primitive}'.")
             };
-            yield return ApplyVirtualGeometry(BindRenderableMaterial(mesh, renderable, assets), renderable, activeCamera);
+            foreach (var selected in ApplyVirtualGeometry(
+                [mesh],
+                renderable,
+                activeCamera,
+                ComputeGeneratedSourceSignature(renderable, primitive)))
+            {
+                yield return BindRenderableMaterial(selected, renderable, assets);
+            }
             yield break;
         }
 
@@ -107,14 +133,16 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             yield break;
         }
 
-        foreach (var mesh in modelMeshes)
-        {
-            var instance = ApplySkin(ApplyMorph(mesh with
+        var instances = modelMeshes
+            .Select(mesh => ApplySkin(ApplyMorph(mesh with
             {
                 EntityId = renderable.EntityId,
                 EntityName = renderable.EntityName
-            }, renderable.Morph), renderable.Skin);
-            yield return ApplyVirtualGeometry(BindRenderableMaterial(instance, renderable, assets), renderable, activeCamera);
+            }, renderable.Morph), renderable.Skin))
+            .ToArray();
+        foreach (var mesh in ApplyVirtualGeometry(instances, renderable, activeCamera))
+        {
+            yield return BindRenderableMaterial(mesh, renderable, assets);
         }
     }
 
@@ -272,12 +300,147 @@ public sealed class RekallAgeVulkanSceneMeshBuilder
             (float)values[12], (float)values[13], (float)values[14], (float)values[15]);
     }
 
-    private static RekallAgeVulkanSceneMesh ApplyVirtualGeometry(
+    private RekallAgeVulkanSceneMesh ApplyVirtualGeometry(
         RekallAgeVulkanSceneMesh mesh,
         RekallAgeRuntimeViewportRenderable renderable,
-        RekallAgeRuntimeViewportCamera? activeCamera)
+        RekallAgeRuntimeViewportCamera? activeCamera,
+        int? stableSourceSignature = null,
+        int surfaceIndex = 0)
     {
-        return RekallAgeVirtualGeometryReducer.Reduce(mesh, renderable, activeCamera);
+        if (renderable.VirtualGeometry is not { Enabled: true } settings
+            || mesh.SkinBindings.Count > 0
+            || mesh.MorphTargets.Count > 0)
+        {
+            return RekallAgeVirtualGeometryReducer.Reduce(mesh, renderable, activeCamera);
+        }
+
+        var key = new VirtualGeometryCacheKey(
+            stableSourceSignature.HasValue ? null : mesh.Vertices,
+            stableSourceSignature.HasValue ? null : mesh.Indices,
+            stableSourceSignature,
+            surfaceIndex,
+            settings,
+            RekallAgeVirtualGeometryReducer.ResolveDistanceLodLevel(renderable, activeCamera));
+        if (_virtualGeometryCache.TryGetValue(key, out var cached))
+        {
+            VirtualGeometryCacheHits++;
+            return cached.ApplyTo(mesh);
+        }
+
+        VirtualGeometryCacheMisses++;
+        var reduced = RekallAgeVirtualGeometryReducer.Reduce(mesh, renderable, activeCamera);
+        if (_virtualGeometryCache.Count >= MaximumVirtualGeometryCacheEntries)
+        {
+            _virtualGeometryCache.Clear();
+        }
+        _virtualGeometryCache[key] = CachedVirtualGeometry.From(reduced);
+        return reduced;
+    }
+
+    private IReadOnlyList<RekallAgeVulkanSceneMesh> ApplyVirtualGeometry(
+        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes,
+        RekallAgeRuntimeViewportRenderable renderable,
+        RekallAgeRuntimeViewportCamera? activeCamera,
+        int? stableSourceSignature = null)
+    {
+        var settings = renderable.VirtualGeometry;
+        if (meshes.Count <= 1
+            || settings is not { Enabled: true, MaxSelectedTriangles: > 0 })
+        {
+            return meshes
+                .Select((mesh, index) => ApplyVirtualGeometry(
+                    mesh, renderable, activeCamera, stableSourceSignature, index))
+                .ToArray();
+        }
+
+        var triangleCounts = meshes.Select(mesh => mesh.Indices.Count / 3).ToArray();
+        var totalTriangles = triangleCounts.Sum();
+        if (totalTriangles <= settings.MaxSelectedTriangles || totalTriangles <= 0)
+        {
+            return meshes
+                .Select((mesh, index) => ApplyVirtualGeometry(
+                    mesh, renderable, activeCamera, stableSourceSignature, index))
+                .ToArray();
+        }
+
+        var effectiveBudget = Math.Max(settings.MaxSelectedTriangles, meshes.Count);
+        var distributableBudget = effectiveBudget - meshes.Count;
+        var cumulativeTriangles = 0;
+        var cumulativeAdditionalBudget = 0;
+        var selected = new RekallAgeVulkanSceneMesh[meshes.Count];
+        for (var index = 0; index < meshes.Count; index++)
+        {
+            cumulativeTriangles += triangleCounts[index];
+            var nextCumulativeAdditionalBudget = index == meshes.Count - 1
+                ? distributableBudget
+                : checked((int)((long)distributableBudget * cumulativeTriangles / totalTriangles));
+            var surfaceBudget = 1 + nextCumulativeAdditionalBudget - cumulativeAdditionalBudget;
+            cumulativeAdditionalBudget = nextCumulativeAdditionalBudget;
+            var surfaceRenderable = renderable with
+            {
+                VirtualGeometry = settings with { MaxSelectedTriangles = surfaceBudget }
+            };
+            selected[index] = ApplyVirtualGeometry(
+                meshes[index], surfaceRenderable, activeCamera, stableSourceSignature, index);
+        }
+
+        var budgetSatisfied = selected.Sum(mesh => mesh.Indices.Count / 3) <= settings.MaxSelectedTriangles;
+        return selected
+            .Select(mesh => mesh with { VirtualGeometryBudgetSatisfied = budgetSatisfied })
+            .ToArray();
+    }
+
+    private readonly record struct VirtualGeometryCacheKey(
+        IReadOnlyList<RekallAgeVulkanSceneVertex>? Vertices,
+        IReadOnlyList<uint>? Indices,
+        int? StableSourceSignature,
+        int SurfaceIndex,
+        RekallAgeRuntimeViewportVirtualGeometry Settings,
+        int DistanceLodLevel);
+
+    private static int ComputeGeneratedSourceSignature(
+        RekallAgeRuntimeViewportRenderable renderable,
+        string geometryKind)
+    {
+        var hash = new HashCode();
+        hash.Add(geometryKind, StringComparer.Ordinal);
+        hash.Add(renderable.MaterialColor, StringComparer.Ordinal);
+        hash.Add(renderable.MeshSlices);
+        hash.Add(renderable.MeshStacks);
+        if (renderable.GeometryMesh is { } geometry)
+        {
+            hash.Add(RekallAgeRuntimeGeometrySignature.For(geometry));
+        }
+        if (renderable.LineSegments is { } lines)
+        {
+            hash.Add(RekallAgeRuntimeGeometrySignature.For(lines));
+        }
+        return hash.ToHashCode();
+    }
+
+    private sealed record CachedVirtualGeometry(
+        IReadOnlyList<RekallAgeVulkanSceneVertex> Vertices,
+        IReadOnlyList<uint> Indices,
+        int? SourceTriangleCount,
+        int LodLevel,
+        bool BudgetSatisfied)
+    {
+        public static CachedVirtualGeometry From(RekallAgeVulkanSceneMesh mesh) =>
+            new(
+                mesh.Vertices,
+                mesh.Indices,
+                mesh.VirtualGeometrySourceTriangleCount,
+                mesh.VirtualGeometryLodLevel,
+                mesh.VirtualGeometryBudgetSatisfied);
+
+        public RekallAgeVulkanSceneMesh ApplyTo(RekallAgeVulkanSceneMesh mesh) => mesh with
+        {
+            Vertices = Vertices,
+            Indices = Indices,
+            VirtualGeometrySourceTriangleCount = SourceTriangleCount,
+            VirtualGeometryLodLevel = LodLevel,
+            VirtualGeometryBudgetSatisfied = BudgetSatisfied
+        };
     }
 
     private static int ResolveSlices(RekallAgeRuntimeViewportRenderable renderable, int fallback)

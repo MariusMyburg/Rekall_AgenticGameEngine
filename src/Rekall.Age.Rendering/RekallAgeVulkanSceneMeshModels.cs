@@ -52,6 +52,8 @@ public sealed record RekallAgeVulkanSceneMesh(
     public RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline { get; init; }
 
     public string? MaterialAssetId { get; init; }
+
+    public bool VirtualGeometryBudgetSatisfied { get; init; } = true;
 }
 
 public sealed record RekallAgeVulkanSceneMorphTarget(

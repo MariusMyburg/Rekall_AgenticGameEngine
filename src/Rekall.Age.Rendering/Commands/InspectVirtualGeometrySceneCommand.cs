@@ -36,7 +36,8 @@ public sealed record InspectVirtualGeometryRenderable(
     int SourceTriangles,
     int SelectedTriangles,
     int ReducedTriangles,
-    int SelectedLodLevel);
+    int SelectedLodLevel,
+    bool BudgetSatisfied);
 
 public sealed class InspectVirtualGeometrySceneCommand
     : IRekallAgeCommand<InspectVirtualGeometrySceneRequest, InspectVirtualGeometrySceneResult>
@@ -115,7 +116,10 @@ public sealed class InspectVirtualGeometrySceneCommand
                     sourceTriangles,
                     selectedTriangles,
                     Math.Max(0, sourceTriangles - selectedTriangles),
-                    renderableMeshes.Length == 0 ? 0 : renderableMeshes.Max(mesh => mesh.VirtualGeometryLodLevel));
+                    renderableMeshes.Length == 0 ? 0 : renderableMeshes.Max(mesh => mesh.VirtualGeometryLodLevel),
+                    !settings.Enabled
+                        || (renderableMeshes.Length > 0
+                            && renderableMeshes.All(mesh => mesh.VirtualGeometryBudgetSatisfied)));
             })
             .ToArray();
         var source = renderables.Sum(renderable => renderable.SourceTriangles);
@@ -156,6 +160,11 @@ public sealed class InspectVirtualGeometrySceneCommand
         if (renderables.Any(renderable => !renderable.Enabled))
         {
             recommendations.Add("Some Rekall.VirtualGeometry components are disabled and do not affect selected triangle counts.");
+        }
+
+        if (renderables.Any(renderable => renderable.Enabled && !renderable.BudgetSatisfied))
+        {
+            recommendations.Add("Some topology-safe selections could not satisfy maxSelectedTriangles; inspection reports their submitted counts above the requested cap instead of hiding the mismatch.");
         }
 
         return recommendations;

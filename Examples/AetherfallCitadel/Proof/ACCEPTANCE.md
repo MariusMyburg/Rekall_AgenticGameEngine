@@ -521,3 +521,51 @@ the new background is an explicit fallback, not a claim that sky assets render.
   and distance selection are therefore the next scalability requirement.
   Character anatomy, clothing, animation, architectural density, materials,
   and composition also remain visibly below the requested final fidelity.
+
+## Topology-safe virtual geometry checkpoint
+
+- AGE's CPU virtual-geometry path no longer retains every Nth triangle. It now
+  compacts material surfaces to referenced vertices, recognizes geometric
+  connectivity across duplicated normal/UV seam vertices, preserves coincident
+  disconnected open and closed components, clusters only connected source
+  edges, removes collapsed and duplicate faces, and accepts a candidate only
+  when boundary and maximum edge-use metrics do not worsen. Cluster size and
+  pixel error affect actual output, including maximum-distance LOD. Skinned and
+  morph-target meshes remain at source resolution until their vertex-indexed
+  deformation payloads can be remapped safely.
+- `MaxSelectedTriangles` now applies to the complete renderable as documented.
+  Multi-material model budgets are apportioned deterministically across their
+  surfaces instead of being independently granted in full to every surface;
+  diagnostics explicitly report an unsatisfied cap, including when reduction is
+  disabled or deformation payloads prevent safe remapping. Stable source
+  geometry is cached before material color materialization and reused by Web,
+  OpenXR, repeated asset instances, and the Windows static-scene cache.
+  Seventeen static ruin consumers use the generic `Rekall.VirtualGeometry`
+  component; animated Warden, enemy, weapon, and pauldron meshes are excluded.
+- Fresh frame-30 inspection at 1280x720 selects 62,202 of 100,368 source
+  triangles, reducing 38,166. Every consumer selects 3,416–3,904 triangles
+  against its authored 5,228 cap and reports `BudgetSatisfied=True`. The native
+  RTX 5090 High Vulkan frame captured after the final reducer mutation is
+  `Proof/Captures/VirtualGeometryFinal/vulkan-scene-1280x720-20260826072813552.png`.
+  It is informative with 11,670 distinct colors, 16.9% dominant-color share,
+  mean luminance 0.101, 65 renderables, 297 render-work draws, four dispatches,
+  and zero observations or asset fallbacks. Original-image review finds no new
+  holes, seam tearing, silhouette loss, or reduction-attributable black-dot
+  noise; it is pixel-identical to the immediately preceding 62,202-selection
+  capture despite the later topology/cache hardening.
+- High `desktop60` passes at 96 scene draws, 192,166 triangles, 778,804
+  vertices, nine textures, and 5.009344 ms measured GPU frame time. Relative to
+  the pre-LOD curve-screw checkpoint, this removes 38,166 submitted triangles
+  and 435,700 vertices while retaining the visible composition.
+- The focused virtual-geometry/static-architecture selection passes 30/30, a
+  renderer/Web/OpenXR/cache integration selection passes 110/110, and the
+  combined Aetherfall acceptance selection passes 42/42 after rebuilding the
+  canonical gameplay-module receipt. After the final scene mutation, the public
+  deterministic movement/combat/progression/reset proofs pass all 2/4/4/5
+  strict assertions, including Warden X movement of `0.506840`; project and
+  scene validation report zero issues.
+- This closes topology-safe static generated LOD selection and multi-surface
+  budget semantics, not GPU meshlet streaming or final art fidelity. Disk-page
+  streaming, hierarchical occlusion, skinned/morph LOD remapping, authored LOD
+  variants, and visibly richer characters, clothing, ruins, props, materials,
+  animation, and composition remain in progress.

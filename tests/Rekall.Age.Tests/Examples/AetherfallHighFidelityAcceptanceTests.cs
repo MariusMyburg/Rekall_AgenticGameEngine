@@ -1,7 +1,10 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Transactions;
 using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Commands;
 using Rekall.Age.World;
 using Rekall.Age.Runtime;
 using Rekall.Age.Runtime.Abstractions;
@@ -12,6 +15,44 @@ namespace Rekall.Age.Tests.Examples;
 
 public sealed class AetherfallHighFidelityAcceptanceTests
 {
+    [Fact]
+    public async Task StaticArchitectureUsesTopologySafeVirtualGeometryWithMeasuredReduction()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var scene = await new RekallAgeSceneStore().LoadAsync(projectRoot, "Main", CancellationToken.None);
+        var consumers = scene.Entities
+            .Where(entity => entity.Components.Any(component => component.Type == "Rekall.VirtualGeometry"))
+            .ToArray();
+
+        Assert.True(consumers.Length >= 12);
+        Assert.DoesNotContain(consumers, entity => entity.Name is
+            "AetherWarden" or "CitadelGuardian" or "CourtLancer" or
+            "CourtOrbiterEnemy" or "TrainingSentinel" or "Warden Articulated Pauldron");
+
+        var result = await new InspectVirtualGeometrySceneCommand().ExecuteAsync(
+            new InspectVirtualGeometrySceneRequest(projectRoot, "Main", Frames: 30, Width: 1280, Height: 720),
+            new RekallAgeCommandContext(
+                "acceptance",
+                RekallAgeTransaction.Begin("inspect aetherfall virtual geometry"),
+                CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal(consumers.Length, result.Value.VirtualGeometryRenderableCount);
+        Assert.True(result.Value.SourceTriangles > result.Value.SelectedTriangles);
+        Assert.True(result.Value.ReducedTriangles >= 10_000);
+        Assert.All(result.Value.Renderables, renderable =>
+        {
+            Assert.True(renderable.BudgetSatisfied, $"{renderable.EntityName} did not satisfy its virtual-geometry budget.");
+            Assert.InRange(renderable.SelectedTriangles, 1, renderable.SourceTriangles);
+            if (renderable.MaxSelectedTriangles > 0)
+            {
+                Assert.True(
+                    renderable.SelectedTriangles <= renderable.MaxSelectedTriangles,
+                    $"{renderable.EntityName} selected {renderable.SelectedTriangles} triangles above its {renderable.MaxSelectedTriangles} cap.");
+            }
+        });
+    }
+
     [Theory]
     [InlineData("aetherfall.warden.graph", "aetherfall-warden-dark-mesh", "aetherfall-warden-dark-model.age.model.json", 6, 32, "aetherfall.warden-steel.material")]
     [InlineData("aetherfall.weathered-ruin.graph", "aetherfall-weathered-ruin-mesh", "aetherfall-weathered-ruin-model.age.model.json", 8, 24, "aetherfall.ruin-trim.material")]

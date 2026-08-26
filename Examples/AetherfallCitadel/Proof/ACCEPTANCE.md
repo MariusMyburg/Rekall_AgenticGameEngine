@@ -909,3 +909,37 @@ the new background is an explicit fallback, not a claim that sky assets render.
   not the promised final character. The silhouette, armor anatomy, authored
   wear/normal detail, cloth construction, and animation still need substantial
   work.
+
+## Warden anatomy and lower-limb articulation checkpoint
+
+- The Warden's generic editable graph advances to revision 23 with 115 reachable
+  nodes. It replaces long single-piece limb forms with upper/forearm and
+  thigh/shin construction, adds cloth underlayers, layered shoulder lamellae,
+  a shaped torso, helmet crown/cheeks/nose guard, and a sternum ridge. The
+  standard graph bake produces 18,622 points, 21,368 faces, and 79,696 corners.
+- Rig revision 3 preserves the original ten stable indices and appends
+  `shin_l`, `foot_l`, `shin_r`, and `foot_r` as two named lower-limb chains.
+  The agent-authored movement pose emits 13 joint deltas and deterministic
+  semantic-input acceptance proves readable hip, knee, and foot rotation.
+- This real detailed model exposed a generic AGE limit: compiled artifacts were
+  incorrectly constrained by the 64 MiB budget intended for ordinary editable
+  JSON documents. The content-addressed compiled-mesh store now has its own
+  bounded 256 MiB budget. Ordinary project, scene, catalog, and authoring
+  documents retain the original bound. The previously rejected 83,574,368-byte
+  artifact publishes as `aetherfall-warden-dark-model` revision 28.
+- Moving native proof is
+  `Proof/Captures/WardenAnatomy/vulkan-scene-1280x720-20260826131526154.png`:
+  RTX 5090 High Vulkan, 325 draws, four dispatches, 66 renderables, 12,734
+  distinct colors, luminance 0.110, and zero observations, missing assets, or
+  fallbacks. `Proof/Captures/WardenAnatomyStatic` retains the direct rest-pose
+  comparison.
+- Aetherfall acceptance passes 45/45; project and scene validation have zero
+  issues; both modules are restricted-host ready. High 2560x1440 `desktop60`
+  passes at 6.753984 ms GPU time, 99 draws, 213,882 triangles, 1,095,508
+  vertices, and nine textures, with the vertex count truthfully near budget.
+- Original-size review finds stable deformation and a more humanoid layered
+  construction, but it is still a procedural intermediate—not the requested
+  production-quality hero. High-frequency authored shapes, fitted armor and
+  cloth transitions, texture/normal wear, animation clips, IK/foot planting,
+  and a closer gameplay composition remain active work. Compact binary compiled
+  meshes are also queued to remove the current pretty-JSON size inflation.

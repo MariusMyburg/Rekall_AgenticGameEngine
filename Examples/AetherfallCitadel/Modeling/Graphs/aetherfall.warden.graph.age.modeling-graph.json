@@ -2,17 +2,17 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.warden.graph",
   "name": "Aetherfall Warden Silhouette",
-  "revision": 22,
+  "revision": 23,
   "nodes": [
     {
       "nodeId": "torso",
       "typeId": "rekall.modeling.primitive.frustum",
       "typeVersion": 1,
       "parameters": {
-        "radiusBottom": 0.78,
-        "radiusTop": 0.52,
-        "depth": 2.5,
-        "segments": 20,
+        "radiusBottom": 0.52,
+        "radiusTop": 0.66,
+        "depth": 2.35,
+        "segments": 28,
         "capBottom": true,
         "capTop": true
       }
@@ -24,7 +24,7 @@
       "parameters": {
         "translation": [
           0,
-          1.8,
+          1.82,
           0
         ],
         "rotation": [
@@ -35,7 +35,7 @@
         "scale": [
           1,
           1,
-          0.72
+          0.68
         ]
       }
     },
@@ -107,14 +107,14 @@
       "typeVersion": 1,
       "parameters": {
         "translation": [
-          -1,
-          1.9,
+          -0.9,
+          2.15,
           0
         ],
         "rotation": [
           6,
           8,
-          16
+          18
         ]
       }
     },
@@ -124,14 +124,14 @@
       "typeVersion": 1,
       "parameters": {
         "translation": [
-          1,
-          1.9,
+          0.9,
+          2.15,
           0
         ],
         "rotation": [
           6,
           -8,
-          -16
+          -18
         ]
       }
     },
@@ -618,10 +618,10 @@
       "typeId": "rekall.modeling.primitive.capsule",
       "typeVersion": 1,
       "parameters": {
-        "radius": 0.27,
-        "hemisphereRings": 6,
-        "segments": 24,
-        "depth": 1.72
+        "radius": 0.28,
+        "hemisphereRings": 7,
+        "segments": 28,
+        "depth": 0.92
       }
     },
     {
@@ -629,10 +629,52 @@
       "typeId": "rekall.modeling.primitive.capsule",
       "typeVersion": 1,
       "parameters": {
-        "radius": 0.27,
-        "hemisphereRings": 6,
-        "segments": 24,
-        "depth": 1.72
+        "radius": 0.28,
+        "hemisphereRings": 7,
+        "segments": 28,
+        "depth": 0.92
+      }
+    },
+    {
+      "nodeId": "forearm-body-l",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.245,
+        "depth": 0.82,
+        "segments": 28,
+        "hemisphereRings": 7
+      }
+    },
+    {
+      "nodeId": "forearm-body-l-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-1.19, 1.42, -0.01],
+        "rotation": [6, 7, 12],
+        "scale": [0.92, 1, 0.82]
+      }
+    },
+    {
+      "nodeId": "forearm-body-r",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.245,
+        "depth": 0.82,
+        "segments": 28,
+        "hemisphereRings": 7
+      }
+    },
+    {
+      "nodeId": "forearm-body-r-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [1.19, 1.42, -0.01],
+        "rotation": [6, -7, -12],
+        "scale": [0.92, 1, 0.82]
       }
     },
     {
@@ -1045,6 +1087,50 @@
       }
     },
     {
+      "nodeId": "thigh-underlayer",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.29, "depth": 0.92, "segments": 28, "hemisphereRings": 7 }
+    },
+    {
+      "nodeId": "thigh-underlayer-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.42, 0.18, 0.03],
+        "rotation": [0, 0, -2],
+        "scale": [0.88, 1, 0.72]
+      }
+    },
+    {
+      "nodeId": "thigh-underlayers",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
+      "nodeId": "shin-underlayer",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.245, "depth": 0.88, "segments": 28, "hemisphereRings": 7 }
+    },
+    {
+      "nodeId": "shin-underlayer-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.42, -0.74, 0.04],
+        "rotation": [0, 0, -2],
+        "scale": [0.82, 1, 0.68]
+      }
+    },
+    {
+      "nodeId": "shin-underlayers",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
       "nodeId": "bracer",
       "typeId": "rekall.modeling.primitive.frustum",
       "typeVersion": 1,
@@ -1156,6 +1242,28 @@
       "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
     },
     {
+      "nodeId": "shoulder-lamella",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.43, "segments": 32, "rings": 18 }
+    },
+    {
+      "nodeId": "shoulder-lamella-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.87, 2.37, -0.04],
+        "rotation": [0, 0, -5],
+        "scale": [1.03, 0.28, 0.82]
+      }
+    },
+    {
+      "nodeId": "shoulder-lamellas",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
       "nodeId": "abdomen-plate",
       "typeId": "rekall.modeling.primitive.box",
       "typeVersion": 1,
@@ -1232,6 +1340,76 @@
       }
     },
     {
+      "nodeId": "helmet-crown",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.5, "segments": 36, "rings": 22 }
+    },
+    {
+      "nodeId": "helmet-crown-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [0, 3.29, 0.03],
+        "rotation": [0, 0, 0],
+        "scale": [0.84, 0.88, 0.92]
+      }
+    },
+    {
+      "nodeId": "helmet-cheek",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.08, "depth": 0.42, "segments": 24, "hemisphereRings": 6 }
+    },
+    {
+      "nodeId": "helmet-cheek-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.26, 3.15, -0.45],
+        "rotation": [-6, 0, -8],
+        "scale": [0.75, 1, 0.55]
+      }
+    },
+    {
+      "nodeId": "helmet-cheeks",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
+      "nodeId": "helmet-nose",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": { "sizeX": 0.11, "sizeY": 0.42, "sizeZ": 0.1 }
+    },
+    {
+      "nodeId": "helmet-nose-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [0, 3.18, -0.54],
+        "rotation": [-6, 0, 0],
+        "scale": [1, 1, 1]
+      }
+    },
+    {
+      "nodeId": "sternum-ridge",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.085, "depth": 0.95, "segments": 24, "hemisphereRings": 6 }
+    },
+    {
+      "nodeId": "sternum-ridge-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [0, 2.03, -0.62],
+        "rotation": [-5, 0, 0],
+        "scale": [0.75, 1, 0.55]
+      }
+    },
+    {
       "nodeId": "eye-slit",
       "typeId": "rekall.modeling.primitive.box",
       "typeVersion": 1,
@@ -1283,8 +1461,12 @@
           { "jointIndex": 5, "head": [-1.0, 1.78, 0], "tail": [-1.43, 0.95, 0], "headRadius": 0.35, "tailRadius": 0.38, "falloff": 0.3, "weight": 1.35 },
           { "jointIndex": 6, "head": [0.52, 2.52, 0], "tail": [1.06, 1.72, 0], "headRadius": 0.48, "tailRadius": 0.34, "falloff": 0.34, "weight": 1.3 },
           { "jointIndex": 7, "head": [1.0, 1.78, 0], "tail": [1.43, 0.95, 0], "headRadius": 0.35, "tailRadius": 0.38, "falloff": 0.3, "weight": 1.35 },
-          { "jointIndex": 8, "head": [-0.42, 0.72, 0], "tail": [-0.42, -1.62, 0], "headRadius": 0.5, "tailRadius": 0.4, "falloff": 0.36, "weight": 1.25 },
-          { "jointIndex": 9, "head": [0.42, 0.72, 0], "tail": [0.42, -1.62, 0], "headRadius": 0.5, "tailRadius": 0.4, "falloff": 0.36, "weight": 1.25 }
+          { "jointIndex": 8, "head": [-0.42, 0.72, 0], "tail": [-0.42, -0.24, 0], "headRadius": 0.5, "tailRadius": 0.38, "falloff": 0.32, "weight": 1.3 },
+          { "jointIndex": 9, "head": [0.42, 0.72, 0], "tail": [0.42, -0.24, 0], "headRadius": 0.5, "tailRadius": 0.38, "falloff": 0.32, "weight": 1.3 },
+          { "jointIndex": 10, "head": [-0.42, -0.18, 0], "tail": [-0.42, -1.08, 0], "headRadius": 0.39, "tailRadius": 0.32, "falloff": 0.3, "weight": 1.38 },
+          { "jointIndex": 11, "head": [-0.42, -1.02, 0], "tail": [-0.42, -1.5, -0.24], "headRadius": 0.34, "tailRadius": 0.31, "falloff": 0.26, "weight": 1.42 },
+          { "jointIndex": 12, "head": [0.42, -0.18, 0], "tail": [0.42, -1.08, 0], "headRadius": 0.39, "tailRadius": 0.32, "falloff": 0.3, "weight": 1.38 },
+          { "jointIndex": 13, "head": [0.42, -1.02, 0], "tail": [0.42, -1.5, -0.24], "headRadius": 0.34, "tailRadius": 0.31, "falloff": 0.26, "weight": 1.42 }
         ]
       }
     }
@@ -1585,6 +1767,20 @@
       "toPortId": "geometry"
     },
     {
+      "linkId": "forearm-body-l-x",
+      "fromNodeId": "forearm-body-l",
+      "fromPortId": "geometry",
+      "toNodeId": "forearm-body-l-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "forearm-body-r-x",
+      "fromNodeId": "forearm-body-r",
+      "fromPortId": "geometry",
+      "toNodeId": "forearm-body-r-x",
+      "toPortId": "geometry"
+    },
+    {
       "linkId": "back-ridge-x",
       "fromNodeId": "back-ridge",
       "fromPortId": "geometry",
@@ -1622,6 +1818,20 @@
     {
       "linkId": "cloth-arm-r-smooth",
       "fromNodeId": "arm-r-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-forearm-l-smooth",
+      "fromNodeId": "forearm-body-l-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-forearm-r-smooth",
+      "fromNodeId": "forearm-body-r-x",
       "fromPortId": "geometry",
       "toNodeId": "cloth-smooth-join",
       "toPortId": "geometry"
@@ -1767,6 +1977,48 @@
       "toPortId": "geometry"
     },
     {
+      "linkId": "thigh-underlayer-x",
+      "fromNodeId": "thigh-underlayer",
+      "fromPortId": "geometry",
+      "toNodeId": "thigh-underlayer-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "thigh-underlayer-mirror",
+      "fromNodeId": "thigh-underlayer-x",
+      "fromPortId": "geometry",
+      "toNodeId": "thigh-underlayers",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "thigh-underlayer-cloth",
+      "fromNodeId": "thigh-underlayers",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shin-underlayer-x",
+      "fromNodeId": "shin-underlayer",
+      "fromPortId": "geometry",
+      "toNodeId": "shin-underlayer-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shin-underlayer-mirror",
+      "fromNodeId": "shin-underlayer-x",
+      "fromPortId": "geometry",
+      "toNodeId": "shin-underlayers",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shin-underlayer-cloth",
+      "fromNodeId": "shin-underlayers",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
       "linkId": "bracer-x",
       "fromNodeId": "bracer",
       "fromPortId": "geometry",
@@ -1825,6 +2077,27 @@
     {
       "linkId": "shoulder-shell-smooth",
       "fromNodeId": "shoulder-shells",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shoulder-lamella-x",
+      "fromNodeId": "shoulder-lamella",
+      "fromPortId": "geometry",
+      "toNodeId": "shoulder-lamella-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shoulder-lamella-mirror",
+      "fromNodeId": "shoulder-lamella-x",
+      "fromPortId": "geometry",
+      "toNodeId": "shoulder-lamellas",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shoulder-lamella-smooth",
+      "fromNodeId": "shoulder-lamellas",
       "fromPortId": "geometry",
       "toNodeId": "armor-smooth-join",
       "toPortId": "geometry"
@@ -1897,6 +2170,69 @@
       "fromNodeId": "helmet-brow-x",
       "fromPortId": "geometry",
       "toNodeId": "trim-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-crown-x",
+      "fromNodeId": "helmet-crown",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-crown-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-crown-smooth",
+      "fromNodeId": "helmet-crown-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-cheek-x",
+      "fromNodeId": "helmet-cheek",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-cheek-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-cheek-mirror",
+      "fromNodeId": "helmet-cheek-x",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-cheeks",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-cheek-smooth",
+      "fromNodeId": "helmet-cheeks",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-nose-x",
+      "fromNodeId": "helmet-nose",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-nose-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-nose-hard",
+      "fromNodeId": "helmet-nose-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "sternum-ridge-x",
+      "fromNodeId": "sternum-ridge",
+      "fromPortId": "geometry",
+      "toNodeId": "sternum-ridge-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "sternum-ridge-smooth",
+      "fromNodeId": "sternum-ridge-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
       "toPortId": "geometry"
     },
     {

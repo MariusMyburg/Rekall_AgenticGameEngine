@@ -111,6 +111,10 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
         var walkPhase = time * 7.5;
         var legSwing = Math.Sin(walkPhase) * 0.48 * movement;
         var armSwing = Math.Sin(walkPhase) * 0.34 * movement;
+        var kneeBendL = 0.08 + Math.Max(0, Math.Sin(walkPhase)) * 0.58 * movement;
+        var kneeBendR = 0.08 + Math.Max(0, -Math.Sin(walkPhase)) * 0.58 * movement;
+        var footPitchL = -kneeBendL * 0.48 - legSwing * 0.18;
+        var footPitchR = -kneeBendR * 0.48 + legSwing * 0.18;
         var stepBob = (0.5 - 0.5 * Math.Cos(walkPhase * 2)) * 0.045 * movement;
         var pulseBlend = Math.Sin(Math.Clamp(
             warden.ComponentNumber(AetherfallConstants.WardenStateType, "pulseCooldown")
@@ -148,7 +152,11 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
                 Pose("leg_l", System.Numerics.Matrix4x4.CreateRotationX((float)legSwing)
                     * System.Numerics.Matrix4x4.CreateRotationZ((float)(-weightShift * 0.22))),
                 Pose("leg_r", System.Numerics.Matrix4x4.CreateRotationX((float)-legSwing)
-                    * System.Numerics.Matrix4x4.CreateRotationZ((float)(-weightShift * 0.22))));
+                    * System.Numerics.Matrix4x4.CreateRotationZ((float)(-weightShift * 0.22))),
+                Pose("shin_l", System.Numerics.Matrix4x4.CreateRotationX((float)kneeBendL)),
+                Pose("foot_l", System.Numerics.Matrix4x4.CreateRotationX((float)footPitchL)),
+                Pose("shin_r", System.Numerics.Matrix4x4.CreateRotationX((float)kneeBendR)),
+                Pose("foot_r", System.Numerics.Matrix4x4.CreateRotationX((float)footPitchR)));
             return properties;
         }));
 

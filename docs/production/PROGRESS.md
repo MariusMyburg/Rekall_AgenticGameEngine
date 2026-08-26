@@ -4,10 +4,32 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 14:55 Africa/Johannesburg
+Last verified: 2026-08-26 15:19 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
+
+The current Warden anatomy slice expands the generic editable character graph
+to revision 23 / 115 reachable nodes and its native rig to 14 stable named
+joints. Segmented forearms, thigh/shin underlayers, shoulder lamellae, shaped
+torso and helmet construction now bake to 18,622 points / 21,368 faces / 79,696
+corners. Agent-authored semantic movement emits 13 pose deltas with real knee
+and foot rotation. The resulting 83,574,368-byte compiled artifact exposed a
+generic category error: compiled meshes reused the 64 MiB limit for ordinary
+editable JSON. The content-addressed compiled store now has a separate bounded
+256 MiB budget; ordinary documents remain at 64 MiB, and the stable Warden
+publishes as model revision 28. Native moving High Vulkan evidence has 12,734
+colors, luminance 0.110, 325 draws, four dispatches, 66 renderables, and zero
+fallbacks or observations. Aetherfall passes 45/45, validation/trust are clean,
+and 2560x1440 High `desktop60` passes at 6.753984 ms with 99 draws, 213,882
+triangles and 1,095,508 vertices. Original-size review confirms stable,
+materially richer construction but also that it is still a procedural
+intermediate. Production anatomy, fitted armor/cloth, high-frequency surface
+detail, authored animation/IK, and more revealing composition remain active.
+A versioned binary compiled-mesh format is queued to remove pretty-JSON size
+inflation without delaying current playable work. Provider-neutral Tripo/Meshy
+generation and normalized GLB import remain explicitly queued after the native
+Aetherfall milestone.
 
 The current Aetherfall fidelity slice separates the Warden's equipment into
 five inspectable authored surfaces. Graph revision 22 routes belt, tassets, and

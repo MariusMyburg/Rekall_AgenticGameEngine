@@ -269,8 +269,16 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         var rig = await new RekallAgeRigAssetStore().LoadAsync(
             projectRoot, "aetherfall.warden.rig", CancellationToken.None);
         Assert.Equal(
-            ["root", "pelvis", "chest", "head", "upper_arm_l", "forearm_l", "upper_arm_r", "forearm_r", "leg_l", "leg_r"],
+            [
+                "root", "pelvis", "chest", "head",
+                "upper_arm_l", "forearm_l", "upper_arm_r", "forearm_r",
+                "leg_l", "leg_r", "shin_l", "foot_l", "shin_r", "foot_r"
+            ],
             rig.Joints.Select(joint => joint.JointId));
+        Assert.Equal(8, rig.Joints[10].ParentIndex);
+        Assert.Equal(10, rig.Joints[11].ParentIndex);
+        Assert.Equal(9, rig.Joints[12].ParentIndex);
+        Assert.Equal(12, rig.Joints[13].ParentIndex);
 
         var graph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
             projectRoot, "aetherfall.warden.graph", CancellationToken.None);
@@ -279,8 +287,11 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             projectRoot, "aetherfall-warden-dark-mesh", CancellationToken.None);
         var joints = Assert.Single(mesh.Attributes, attribute => attribute.Semantic == "joint-indices-0");
         var weights = Assert.Single(mesh.Attributes, attribute => attribute.Semantic == "joint-weights-0");
-        Assert.True(joints.Values.SelectMany(value => value.EnumerateArray())
-            .Select(value => value.GetInt32()).Distinct().Count() >= 6);
+        var weightedJointIndices = joints.Values.SelectMany(value => value.EnumerateArray())
+            .Select(value => value.GetInt32()).Distinct().Order().ToArray();
+        Assert.True(weightedJointIndices.Length >= 10);
+        Assert.All(new[] { 10, 11, 12, 13 }, jointIndex =>
+            Assert.Contains(jointIndex, weightedJointIndices));
         Assert.All(weights.Values, value =>
             Assert.Equal(1, value.EnumerateArray().Sum(item => item.GetDouble()), 8));
 
@@ -300,7 +311,7 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             Assert.Single(later.World.Entities, entity => entity.Id == warden.Id).Components,
             component => component.Type == "Rekall.RigPose");
         Assert.NotEqual(earlyPose.Properties.ToJsonString(), laterPose.Properties.ToJsonString());
-        Assert.True(laterPose.Properties["jointDeltas"]!.AsArray().Count >= 8);
+        Assert.True(laterPose.Properties["jointDeltas"]!.AsArray().Count >= 13);
         var builder = new RekallAgeRuntimeRenderFrameBuilder();
         var earlyFrame = builder.Build(early.World, 640, 360, false);
         var laterFrame = builder.Build(later.World, 640, 360, false);
@@ -344,9 +355,19 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         var leg = Assert.Single(pose.Properties["jointDeltas"]!.AsArray(), delta =>
             delta!["jointId"]!.GetValue<string>() == "leg_l")!.AsObject();
         var matrix = leg["matrix"]!.AsArray().Select(value => value!.GetValue<float>()).ToArray();
+        var shin = Assert.Single(pose.Properties["jointDeltas"]!.AsArray(), delta =>
+            delta!["jointId"]!.GetValue<string>() == "shin_l")!.AsObject();
+        var shinMatrix = shin["matrix"]!.AsArray().Select(value => value!.GetValue<float>()).ToArray();
+        var foot = Assert.Single(pose.Properties["jointDeltas"]!.AsArray(), delta =>
+            delta!["jointId"]!.GetValue<string>() == "foot_l")!.AsObject();
+        var footMatrix = foot["matrix"]!.AsArray().Select(value => value!.GetValue<float>()).ToArray();
 
         Assert.True(Math.Abs(matrix[6]) > 0.15,
             $"Expected a readable movement-driven leg swing, found matrix[6]={matrix[6]:F6}.");
+        Assert.True(Math.Abs(shinMatrix[6]) > 0.12,
+            $"Expected a readable movement-driven knee bend, found matrix[6]={shinMatrix[6]:F6}.");
+        Assert.True(Math.Abs(footMatrix[6]) > 0.05,
+            $"Expected readable movement-driven foot compensation, found matrix[6]={footMatrix[6]:F6}.");
     }
 
     [Fact]
@@ -801,7 +822,7 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             projectRoot, "Modeling", "Graphs", "aetherfall.warden.graph.age.modeling-graph.json")))!.AsObject();
         var modelingNodes = modelingGraph["nodes"]!.AsArray();
         var modelingLinks = modelingGraph["links"]!.AsArray();
-        Assert.True(modelingNodes.Count >= 83,
+        Assert.True(modelingNodes.Count >= 112,
             $"Expected the Warden graph to retain its layered detailed authored construction, found {modelingNodes.Count} nodes.");
         Assert.Contains(modelingNodes, node =>
             node?["typeId"]?.GetValue<string>() == "rekall.modeling.primitive.capsule");
@@ -812,7 +833,9 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         foreach (var nodeId in new[]
         {
             "thigh-guards", "bracers", "gauntlets", "eye-slit-x", "aether-material", "coat-tail", "coat-tails",
-            "shoulder-shells", "abdomen-plates", "knee-cops", "helmet-crest-x", "breastplates"
+            "shoulder-shells", "abdomen-plates", "knee-cops", "helmet-crest-x", "breastplates",
+            "forearm-body-l", "forearm-body-r", "thigh-underlayers", "shin-underlayers",
+            "helmet-crown-x", "helmet-cheeks", "helmet-nose-x", "sternum-ridge-x", "shoulder-lamellas"
         })
         {
             Assert.Contains(modelingNodes, node => node?["nodeId"]?.GetValue<string>() == nodeId);

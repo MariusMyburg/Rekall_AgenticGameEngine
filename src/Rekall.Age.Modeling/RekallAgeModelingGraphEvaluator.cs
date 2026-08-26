@@ -306,9 +306,38 @@ public sealed partial class RekallAgeModelingGraphEvaluator
                 }),
             "rekall.modeling.mirror" => MirrorGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
             "rekall.modeling.array" => ArrayGeometry(graph, node, InputGeometry(node, "geometry", incoming, values)),
+            "rekall.modeling.shade_faces" => ApplySemanticOperation(
+                graph, node, InputGeometry(node, "geometry", incoming, values), "shade_faces",
+                new JsonObject
+                {
+                    ["smooth"] = ReadBoolean(node, "smooth", true),
+                    ["attribute"] = ReadString(node, "attribute", "normal.smooth")
+                }),
+            "rekall.modeling.mark_sharp" => ApplySemanticOperation(
+                graph, node, InputGeometry(node, "geometry", incoming, values), "mark_sharp",
+                new JsonObject
+                {
+                    ["sharp"] = ReadBoolean(node, "sharp", true),
+                    ["attribute"] = ReadString(node, "attribute", "normal.sharp")
+                },
+                RekallAgeGeometryDomain.Edge),
+            "rekall.modeling.auto_smooth" => ApplySemanticOperation(
+                graph, node, InputGeometry(node, "geometry", incoming, values), "auto_smooth",
+                new JsonObject
+                {
+                    ["angleDegrees"] = ReadNumber(node, "angleDegrees", 60),
+                    ["sharpAttribute"] = ReadString(node, "sharpAttribute", "normal.sharp")
+                }),
             "rekall.modeling.weighted_normals" => ApplySemanticOperation(
                 graph, node, InputGeometry(node, "geometry", incoming, values), "weighted_normals",
-                new JsonObject { ["attribute"] = ReadString(node, "attribute", "normal.weighted"), ["faceAreaWeight"] = ReadNumber(node, "faceAreaWeight", 1) }),
+                new JsonObject
+                {
+                    ["attribute"] = ReadString(node, "attribute", "normal.authored"),
+                    ["faceAreaWeight"] = ReadNumber(node, "faceAreaWeight", 1),
+                    ["cornerAngleWeight"] = ReadNumber(node, "cornerAngleWeight", 1),
+                    ["smoothAttribute"] = ReadString(node, "smoothAttribute", "normal.smooth"),
+                    ["sharpAttribute"] = ReadString(node, "sharpAttribute", "normal.sharp")
+                }),
             "rekall.modeling.merge_by_distance" => ApplySemanticOperation(
                 graph,
                 node,

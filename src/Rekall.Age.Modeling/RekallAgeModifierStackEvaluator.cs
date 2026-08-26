@@ -102,10 +102,20 @@ public sealed class RekallAgeModifierStackEvaluator
                     ["offset"] = new JsonArray(ReadNumber(modifier.Parameters, "x", 1), ReadNumber(modifier.Parameters, "y", 0), ReadNumber(modifier.Parameters, "z", 0)),
                     ["relativeOffset"] = ReadBoolean(modifier.Parameters, "relativeOffset", false), ["instanceMode"] = ReadBoolean(modifier.Parameters, "instanceMode", false)
                 }),
+            "rekall.modifier.auto_smooth" => _executor.Execute(source, new("auto_smooth", RekallAgeGeometryDomain.Face,
+                source.Topology.FaceIds, new JsonObject
+                {
+                    ["angleDegrees"] = ReadNumber(modifier.Parameters, "angleDegrees", 60),
+                    ["sharpAttribute"] = ReadString(modifier.Parameters, "sharpAttribute", "normal.sharp")
+                })).Mesh,
             "rekall.modifier.weighted_normals" => _executor.Execute(source, new("weighted_normals", RekallAgeGeometryDomain.Face,
                 Select(source, RekallAgeGeometryDomain.Face, selection), new JsonObject
                 {
-                    ["attribute"] = ReadString(modifier.Parameters, "attribute", "normal.weighted"), ["faceAreaWeight"] = ReadNumber(modifier.Parameters, "faceAreaWeight", 1)
+                    ["attribute"] = ReadString(modifier.Parameters, "attribute", "normal.authored"),
+                    ["faceAreaWeight"] = ReadNumber(modifier.Parameters, "faceAreaWeight", 1),
+                    ["cornerAngleWeight"] = ReadNumber(modifier.Parameters, "cornerAngleWeight", 1),
+                    ["smoothAttribute"] = ReadString(modifier.Parameters, "smoothAttribute", "normal.smooth"),
+                    ["sharpAttribute"] = ReadString(modifier.Parameters, "sharpAttribute", "normal.sharp")
                 })).Mesh,
             _ => throw new RekallAgeMeshOperationException("REKALL_MODIFIER_TYPE_UNKNOWN", $"Modifier type '{modifier.TypeId}' is not executable.")
         };

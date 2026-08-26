@@ -209,6 +209,53 @@ public sealed class MeshNormalAuthoringTests
     }
 
     [Fact]
+    public async Task GraphAutoSmoothFeedsPolicyAwareWeightedNormals()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "split-normal-graph",
+            "Split Normal Graph",
+            [
+                new("box", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("smooth", "rekall.modeling.auto_smooth", 1, new JsonObject { ["angleDegrees"] = 89.0 }),
+                new("normals", "rekall.modeling.weighted_normals", 1, new JsonObject
+                {
+                    ["attribute"] = "normal.authored",
+                    ["faceAreaWeight"] = 1.0,
+                    ["cornerAngleWeight"] = 1.0,
+                    ["smoothAttribute"] = "normal.smooth",
+                    ["sharpAttribute"] = "normal.sharp"
+                }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("box-smooth", "box", "geometry", "smooth", "geometry"),
+                new("smooth-normals", "smooth", "geometry", "normals", "geometry"),
+                new("normals-output", "normals", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var report = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph,
+            ["mesh"],
+            RekallAgeModelingEvaluationBudget.Default,
+            new(1, 0, "tests", "desktop"),
+            CancellationToken.None);
+
+        Assert.True(report.Succeeded, string.Join(Environment.NewLine, report.Diagnostics.Select(item => item.Message)));
+        var mesh = report.Outputs["mesh"];
+        Assert.All(Attribute(mesh, "normal.sharp").Values, value => Assert.True(value.GetBoolean()));
+        Assert.All(Attribute(mesh, "normal.authored").Values, AssertUnit);
+
+        var catalog = RekallAgeModelingNodeCatalog.CreateDefault();
+        var auto = Assert.Single(catalog.Descriptors, item => item.TypeId == "rekall.modeling.auto_smooth");
+        Assert.Contains(auto.Parameters, item => item.ParameterId == "angleDegrees" && item.Minimum == 0 && item.Maximum == 180);
+        var weighted = Assert.Single(catalog.Descriptors, item => item.TypeId == "rekall.modeling.weighted_normals");
+        Assert.Equal(
+            ["attribute", "faceAreaWeight", "cornerAngleWeight", "smoothAttribute", "sharpAttribute"],
+            weighted.Parameters.Select(item => item.ParameterId));
+    }
+
+    [Fact]
     public async Task WeightedNormalsShadeSegmentedBevelWithFiniteUnitCornerVectors()
     {
         var graph = RekallAgeModelingGraphAsset.Create("weighted-normal-proof", "Weighted Normal Proof",

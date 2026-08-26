@@ -22,6 +22,9 @@ public sealed class ComprehensiveModelingCatalogTests
             "inset_faces",
             "solidify",
             "weighted_normals",
+            "shade_faces",
+            "mark_sharp",
+            "auto_smooth",
             "set_edge_crease");
         AssertContainsAll(nodes,
             "rekall.modeling.bevel",
@@ -29,6 +32,9 @@ public sealed class ComprehensiveModelingCatalogTests
             "rekall.modeling.mirror",
             "rekall.modeling.array",
             "rekall.modeling.edge_crease",
+            "rekall.modeling.shade_faces",
+            "rekall.modeling.mark_sharp",
+            "rekall.modeling.auto_smooth",
             "rekall.modeling.curve.profile_sweep",
             "rekall.modeling.primitive.plane",
             "rekall.modeling.primitive.disc",
@@ -41,6 +47,7 @@ public sealed class ComprehensiveModelingCatalogTests
             "rekall.modifier.solidify",
             "rekall.modifier.mirror",
             "rekall.modifier.array",
+            "rekall.modifier.auto_smooth",
             "rekall.modifier.weighted_normals");
     }
 

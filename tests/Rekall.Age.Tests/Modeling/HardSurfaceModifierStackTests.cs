@@ -22,6 +22,41 @@ public sealed class HardSurfaceModifierStackTests
     }
 
     [Fact]
+    public async Task AutoSmoothAndWeightedNormalModifiersShareTheSemanticPolicyContract()
+    {
+        var source = await Primitive("rekall.modeling.primitive.box");
+        var stack = Stack([
+            new("smooth", "rekall.modifier.auto_smooth", 1, true, new() { ["angleDegrees"] = 89.0, ["sharpAttribute"] = "normal.sharp" }),
+            new("normals", "rekall.modifier.weighted_normals", 1, true, new()
+            {
+                ["attribute"] = "normal.authored",
+                ["faceAreaWeight"] = 1.0,
+                ["cornerAngleWeight"] = 1.0,
+                ["smoothAttribute"] = "normal.smooth",
+                ["sharpAttribute"] = "normal.sharp"
+            })]);
+
+        var result = await new RekallAgeModifierStackEvaluator().EvaluateAsync(
+            stack,
+            source,
+            RekallAgeModelingEvaluationBudget.Default,
+            default);
+
+        Assert.True(result.Succeeded, string.Join(Environment.NewLine, result.Diagnostics.Select(item => item.Message)));
+        var sharp = Assert.Single(result.Mesh!.Attributes, item => item.Name == "normal.sharp");
+        Assert.All(sharp.Values, value => Assert.True(value.GetBoolean()));
+        var normals = Assert.Single(result.Mesh.Attributes, item => item.Name == "normal.authored");
+        Assert.All(normals.Values, value =>
+        {
+            var length = Math.Sqrt(
+                Math.Pow(value[0].GetDouble(), 2)
+                + Math.Pow(value[1].GetDouble(), 2)
+                + Math.Pow(value[2].GetDouble(), 2));
+            Assert.InRange(length, 0.999999, 1.000001);
+        });
+    }
+
+    [Fact]
     public async Task SolidifyMirrorAndArrayExecuteAsAnOrderedStack()
     {
         var source = await Primitive("rekall.modeling.primitive.plane");

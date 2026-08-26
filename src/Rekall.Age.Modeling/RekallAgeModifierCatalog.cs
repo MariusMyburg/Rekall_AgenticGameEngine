@@ -45,15 +45,19 @@ public sealed class RekallAgeModifierCatalog
             new("rekall.modifier.array", 1, "Array", "Creates deterministic realized offset copies.",
                 RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes,
                 [Integer("count", 2, 1, 4_096), Number("x", 1), Number("y", 0), Number("z", 0), Boolean("relativeOffset", false), Boolean("instanceMode", false)], preserve),
-            new("rekall.modifier.weighted_normals", 1, "Weighted Normals", "Authors finite area-weighted corner normals.",
+            new("rekall.modifier.auto_smooth", 1, "Auto Smooth", "Classifies sharp normal-fan boundaries from adjacent face angles.",
                 RekallAgeMeshChangeKind.Attributes,
-                [Text("attribute", "normal.weighted"), PositiveOrZero("faceAreaWeight", 1), Text("selection", "")], preserve)
+                [BoundedNumber("angleDegrees", 60, 0, 180), Text("sharpAttribute", "normal.sharp")], preserve),
+            new("rekall.modifier.weighted_normals", 1, "Weighted Normals", "Authors finite policy-aware area- and corner-angle-weighted normals.",
+                RekallAgeMeshChangeKind.Attributes,
+                [Text("attribute", "normal.authored"), BoundedNumber("faceAreaWeight", 1, 0, 4), BoundedNumber("cornerAngleWeight", 1, 0, 4), Text("smoothAttribute", "normal.smooth"), Text("sharpAttribute", "normal.sharp"), Text("selection", "")], preserve)
         ]);
     }
     private static RekallAgeModelingParameterDescriptor Number(string id, double value) => new(id, id, RekallAgeModelingValueType.Scalar, JsonValue.Create(value), -1_000_000, 1_000_000);
     private static RekallAgeModelingParameterDescriptor Integer(string id, int value, int minimum, int maximum) => new(id, id, RekallAgeModelingValueType.Integer, JsonValue.Create(value), minimum, maximum);
     private static RekallAgeModelingParameterDescriptor PositiveNumber(string id, double value) => new(id, id, RekallAgeModelingValueType.Scalar, JsonValue.Create(value), 0.000000001, 1_000_000);
     private static RekallAgeModelingParameterDescriptor PositiveOrZero(string id, double value) => new(id, id, RekallAgeModelingValueType.Scalar, JsonValue.Create(value), 0, 1_000_000);
+    private static RekallAgeModelingParameterDescriptor BoundedNumber(string id, double value, double minimum, double maximum) => new(id, id, RekallAgeModelingValueType.Scalar, JsonValue.Create(value), minimum, maximum);
     private static RekallAgeModelingParameterDescriptor Boolean(string id, bool value) => new(id, id, RekallAgeModelingValueType.Boolean, JsonValue.Create(value));
     private static RekallAgeModelingParameterDescriptor Text(string id, string value) => new(id, id, RekallAgeModelingValueType.String, JsonValue.Create(value));
 }

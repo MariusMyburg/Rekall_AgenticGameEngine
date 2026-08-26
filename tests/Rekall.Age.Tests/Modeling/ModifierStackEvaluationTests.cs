@@ -60,9 +60,10 @@ public sealed class ModifierStackEvaluationTests
     {
         var catalog = RekallAgeModifierCatalog.CreateDefault();
 
-        Assert.Equal(11, catalog.Descriptors.Count);
+        Assert.Equal(12, catalog.Descriptors.Count);
         Assert.All(catalog.Descriptors, descriptor => Assert.NotNull(descriptor.AttributePolicy));
         Assert.Contains(catalog.Descriptors, item => item.TypeId == "rekall.modifier.triangulate" && item.AttributePolicy.PreservesUnknownAttributes);
+        Assert.Contains(catalog.Descriptors, item => item.TypeId == "rekall.modifier.auto_smooth" && item.AttributePolicy.PreservesUnknownAttributes);
     }
 
     private static async ValueTask<RekallAgeMeshAsset> Box()

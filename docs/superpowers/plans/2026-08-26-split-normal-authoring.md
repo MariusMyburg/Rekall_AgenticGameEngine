@@ -156,25 +156,25 @@ JSON modeling graphs, native Vulkan capture.
 - Produces modifier: `rekall.modifier.auto_smooth` and extends
   `rekall.modifier.weighted_normals` identically.
 
-- [ ] **Step 1: Write failing descriptor and evaluation tests**
+- [x] **Step 1: Write failing descriptor and evaluation tests**
 
   Assert exact stable IDs, parameter names/types/defaults/ranges, graph
   evaluation order `box -> auto_smooth -> weighted_normals -> output`, and
   modifier order `auto_smooth -> weighted_normals`. Assert both paths emit the
   same sharp-edge and corner-normal values.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
   Run the three focused classes. Expected: missing descriptor and evaluator
   routing failures.
 
-- [ ] **Step 3: Route descriptors through the semantic executor**
+- [x] **Step 3: Route descriptors through the semantic executor**
 
   Add typed catalog entries. Use complete face or edge domain IDs through
   `ApplySemanticOperation`; pass all parameters without reimplementing normal
   calculations. Add modifier routing with the same defaults.
 
-- [ ] **Step 4: Run GREEN and commit**
+- [x] **Step 4: Run GREEN and commit**
 
   Run focused normal, graph, modifier, catalog, compiler, and command schema
   tests. Commit as `feat: expose split normal authoring`.

@@ -13,6 +13,7 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor;
 using Rekall.Age.Modeling;
+using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.Project;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
@@ -1272,6 +1273,249 @@ public sealed class StudioViewModelTests
             var mesh = await new RekallAgeMeshAssetStore().LoadAsync(root, "hero-box", CancellationToken.None);
             Assert.Equal("hero-box", mesh.AssetId);
             Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task OpeningAnEntitysAnimationMixerAddingALayerThroughTheUiAndApplyingPersistsToTheScene()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-animation-mixer-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Animation Mixer Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+            var entity = Assert.Single(viewModel.EntityNodes);
+            viewModel.ComponentTypeInput = "Rekall.AnimationMixer";
+            await ExecuteAsync(viewModel.AddComponentCommand);
+            await viewModel.SelectEntityAsync(entity);
+
+            await ExecuteAsync(viewModel.OpenAnimationMixerCommand);
+            Assert.True(viewModel.AnimationMixerIsOpen);
+            Assert.Empty(viewModel.AnimationMixerLayers);
+
+            await ExecuteAsync(viewModel.AddAnimationMixerLayerCommand);
+            var layer = Assert.Single(viewModel.AnimationMixerLayers);
+            layer.Name = "idle";
+            layer.Clip = "hero-idle";
+            layer.Weight = "1";
+            await ExecuteAsync(viewModel.ApplyAnimationMixerLayersCommand);
+
+            var persisted = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            var mixer = persisted.Entities.Single(item => item.Id == entity.EntityId)
+                .Components.Single(component => component.Type == "Rekall.AnimationMixer");
+            var persistedLayer = Assert.Single(((JsonArray)mixer.Properties["layers"]!).OfType<JsonObject>());
+            Assert.Equal("idle", persistedLayer["name"]!.GetValue<string>());
+            Assert.Equal("hero-idle", persistedLayer["clip"]!.GetValue<string>());
+            Assert.Equal(1, persistedLayer["weight"]!.GetValue<double>(), precision: 6);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task OpeningAMaterialGraphExposesNodesAndAppliesAColorParameterEditThroughTheRealPatchPipeline()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-material-graph-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var nodes = new[]
+            {
+                new RekallAgeMaterialGraphNode("emissive", "rekall.material.surface.emissive", 1, new JsonObject()),
+                new RekallAgeMaterialGraphNode("output", "rekall.material.output", 1, new JsonObject())
+            };
+            var graph = RekallAgeMaterialGraphAsset.Create(
+                "glow-material",
+                "Glow Material",
+                nodes,
+                [new RekallAgeMaterialGraphLink("emissive-output", "emissive", "surface", "output", "surface")],
+                new RekallAgeMaterialGraphOutput("surface", "output", "surface"));
+
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Material Graph Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await new RekallAgeMaterialGraphAssetStore().SaveIfRevisionAsync(
+                root, graph, Rekall.Age.Core.Persistence.RekallAgeDocumentRevision.Missing, CancellationToken.None);
+            viewModel.SelectedMaterialGraphAssetId = "glow-material";
+            await ExecuteAsync(viewModel.OpenMaterialGraphCommand);
+
+            Assert.Equal(2, viewModel.MaterialGraphNodes.Count);
+            viewModel.SelectedMaterialGraphNode = viewModel.MaterialGraphNodes.Single(node => node.NodeId == "emissive");
+            var colorEditor = Assert.Single(viewModel.MaterialGraphParameterEditors, editor => editor.ParameterId == "color");
+            Assert.Equal("#ffffff", colorEditor.ValueText);
+            colorEditor.ValueText = "#ff8800";
+            Assert.True(colorEditor.IsValid);
+            Assert.True(colorEditor.IsModified);
+
+            await ExecuteAsync(viewModel.ApplyMaterialGraphParametersCommand);
+
+            var persisted = await new RekallAgeMaterialGraphAssetStore().LoadAsync(root, "glow-material", CancellationToken.None);
+            var emissiveNode = Assert.Single(persisted.Nodes, node => node.NodeId == "emissive");
+            Assert.Equal("#ff8800", emissiveNode.Parameters["color"]!.GetValue<string>());
+            Assert.Equal(2, persisted.Revision);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task OpeningAMeshExposesItsNamedAttributesAndMaterialSlots()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-uv-attributes-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "UV Attributes Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.SelectedMeshPrimitive = "box";
+            viewModel.MeshPrimitiveAssetIdInput = "hero-box";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+
+            // A freshly authored primitive genuinely has no named attributes or material slots yet
+            // - the inspector must reflect that honestly rather than showing placeholder rows.
+            Assert.Empty(viewModel.MeshAttributeSummaries);
+            Assert.Empty(viewModel.MeshMaterialSlotSummaries);
+
+            viewModel.MeshEditDomain = RekallAgeGeometryDomain.Face;
+            viewModel.SelectedMeshElementId = viewModel.MeshElementIds[0];
+            await ExecuteAsync(viewModel.SelectMeshElementCommand);
+            viewModel.SelectedMeshOperationId = "generate_normals";
+            await ExecuteAsync(viewModel.ApplyMeshOperationCommand);
+
+            Assert.Contains(viewModel.MeshAttributeSummaries, line => line.Contains("normal.generated", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ModalDragAppliesTheOperationThroughTheRealPreviewApplyPipeline()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-modal-drag-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Modal Drag Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.SelectedMeshPrimitive = "box";
+            viewModel.MeshPrimitiveAssetIdInput = "hero-box";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            var beforeRevision = (await new RekallAgeMeshAssetStore().LoadAsync(root, "hero-box", CancellationToken.None)).Revision;
+
+            viewModel.MeshEditDomain = RekallAgeGeometryDomain.Face;
+            viewModel.SelectedMeshElementId = viewModel.MeshElementIds[0];
+            await ExecuteAsync(viewModel.SelectMeshElementCommand);
+            viewModel.SelectedMeshOperationId = "extrude_faces";
+
+            Assert.True(viewModel.BeginModalMeshOperationDrag(0.5));
+            await viewModel.UpdateModalMeshOperationDragAsync(0.65);
+            Assert.True(viewModel.MeshSummary.Contains("PREVIEW", StringComparison.Ordinal));
+            await viewModel.CompleteModalMeshOperationDragAsync(0.65);
+
+            var afterRevision = (await new RekallAgeMeshAssetStore().LoadAsync(root, "hero-box", CancellationToken.None)).Revision;
+            Assert.True(afterRevision > beforeRevision);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task TwoPortClicksOnTheNodeGraphCanvasCreateALinkThroughTheRealPatchPipeline()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-graph-canvas-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            // "join" accepts multiple linked geometry inputs, so box1->join->output is already a
+            // complete, valid, savable graph and box2 can sit unlinked (a box has no required
+            // input of its own) without failing strict save/patch validation. That lets the test
+            // add a *second* real link (box2 -> join) rather than needing an incomplete graph.
+            var nodes = new[]
+            {
+                new RekallAgeModelingGraphNode("box1", "rekall.modeling.primitive.box", 1, new JsonObject { ["sizeX"] = 2.0 }),
+                new RekallAgeModelingGraphNode("box2", "rekall.modeling.primitive.box", 1, new JsonObject { ["sizeX"] = 1.0 }),
+                new RekallAgeModelingGraphNode("join", "rekall.modeling.join", 1, new JsonObject()),
+                new RekallAgeModelingGraphNode("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            };
+            var links = new[]
+            {
+                new RekallAgeModelingGraphLink("box1-join", "box1", "geometry", "join", "geometry"),
+                new RekallAgeModelingGraphLink("join-output", "join", "geometry", "output", "input")
+            };
+            var graph = RekallAgeModelingGraphAsset.Create(
+                "link-test-graph", "Link Test Graph", nodes, links, [new("mesh", "output", "geometry")]);
+
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Graph Canvas Link Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await new RekallAgeModelingGraphAssetStore().SaveAsync(root, graph, CancellationToken.None);
+            viewModel.SelectedModelingGraphAssetId = "link-test-graph";
+            await ExecuteAsync(viewModel.OpenModelingGraphCommand);
+
+            // Recompute the exact same layout/render the view model just produced internally, so the
+            // port click coordinates below are derived rather than guessed against a private frame.
+            var catalog = RekallAgeModelingNodeCatalog.CreateDefault();
+            var positions = RekallAgeStudioModelingGraphLayout.ComputeDefaultPositions(nodes, links);
+            var renderer = new RekallAgeStudioModelingGraphCanvasRenderer();
+            var frame = renderer.Render(nodes, links, positions, catalog, "box2", 640, 360);
+            var box2Output = frame.PortPoints[new RekallAgeStudioModelingGraphPortKey("box2", "geometry", true)];
+            var joinInput = frame.PortPoints[new RekallAgeStudioModelingGraphPortKey("join", "geometry", false)];
+
+            await viewModel.ClickModelingGraphCanvasAsync(box2Output.X / 640, box2Output.Y / 360);
+            await viewModel.ClickModelingGraphCanvasAsync(joinInput.X / 640, joinInput.Y / 360);
+
+            var persisted = await new RekallAgeModelingGraphAssetStore().LoadAsync(root, "link-test-graph", CancellationToken.None);
+            Assert.Contains(persisted.Links, link =>
+                link.FromNodeId == "box2" && link.FromPortId == "geometry"
+                && link.ToNodeId == "join" && link.ToPortId == "geometry");
         }
         finally
         {

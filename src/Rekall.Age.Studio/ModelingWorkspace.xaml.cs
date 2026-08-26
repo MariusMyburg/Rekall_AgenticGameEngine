@@ -8,6 +8,7 @@ public partial class ModelingWorkspace : UserControl
     private bool _dragging;
     private bool _orbiting;
     private bool _panning;
+    private bool _modalOperationDragging;
     private System.Windows.Point _lastNavigationPoint;
 
     public ModelingWorkspace()
@@ -29,14 +30,22 @@ public partial class ModelingWorkspace : UserControl
     {
         if (ViewModel is null || sender is not Image image || image.ActualWidth <= 0 || image.ActualHeight <= 0) return;
         var point = e.GetPosition(image);
-        if (ViewModel.BeginMeshViewportTransform(point.X / image.ActualWidth, point.Y / image.ActualHeight))
+        var modifiers = Keyboard.Modifiers;
+        if (modifiers.HasFlag(ModifierKeys.Alt) && ViewModel.BeginModalMeshOperationDrag(point.X / image.ActualWidth))
+        {
+            // Blender-style modal parameter drag (Alt+left-drag): live-previews the selected
+            // operation's numeric parameter as the mouse moves instead of gizmo-dragging a point
+            // or selecting an element, so it must claim the gesture before either of those do.
+            _modalOperationDragging = true;
+            image.CaptureMouse();
+        }
+        else if (ViewModel.BeginMeshViewportTransform(point.X / image.ActualWidth, point.Y / image.ActualHeight))
         {
             _dragging = true;
             image.CaptureMouse();
         }
         else
         {
-            var modifiers = Keyboard.Modifiers;
             ViewModel.SelectMeshViewportElement(
                 point.X / image.ActualWidth,
                 point.Y / image.ActualHeight,
@@ -46,19 +55,35 @@ public partial class ModelingWorkspace : UserControl
         e.Handled = true;
     }
 
-    private void OnMeshMouseMove(object sender, MouseEventArgs e)
+    private async void OnMeshMouseMove(object sender, MouseEventArgs e)
     {
-        if (_orbiting || _panning || !_dragging || ViewModel is null || sender is not Image image) return;
+        if (_orbiting || _panning || ViewModel is null || sender is not Image image) return;
         var point = e.GetPosition(image);
+        if (_modalOperationDragging)
+        {
+            await ViewModel.UpdateModalMeshOperationDragAsync(point.X / image.ActualWidth);
+            e.Handled = true;
+            return;
+        }
+        if (!_dragging) return;
         ViewModel.UpdateMeshViewportTransform(point.X / image.ActualWidth, point.Y / image.ActualHeight);
         e.Handled = true;
     }
 
     private async void OnMeshMouseUp(object sender, MouseButtonEventArgs e)
     {
-        if (!_dragging || ViewModel is null || sender is not Image image) return;
-        _dragging = false;
+        if (ViewModel is null || sender is not Image image) return;
         var point = e.GetPosition(image);
+        if (_modalOperationDragging)
+        {
+            _modalOperationDragging = false;
+            image.ReleaseMouseCapture();
+            await ViewModel.CompleteModalMeshOperationDragAsync(point.X / image.ActualWidth);
+            e.Handled = true;
+            return;
+        }
+        if (!_dragging) return;
+        _dragging = false;
         image.ReleaseMouseCapture();
         await ViewModel.CompleteMeshViewportTransformAsync(point.X / image.ActualWidth, point.Y / image.ActualHeight);
         e.Handled = true;
@@ -66,6 +91,12 @@ public partial class ModelingWorkspace : UserControl
 
     private void OnMeshLostCapture(object sender, MouseEventArgs e)
     {
+        if (_modalOperationDragging)
+        {
+            _modalOperationDragging = false;
+            ViewModel?.CancelModalMeshOperationDrag();
+            return;
+        }
         if (!_dragging || ViewModel is null) return;
         _dragging = false;
         ViewModel.CancelMeshViewportTransform();
@@ -109,5 +140,42 @@ public partial class ModelingWorkspace : UserControl
         if (ViewModel is null) return;
         ViewModel.ZoomMeshViewport(e.Delta > 0 ? 1.1 : 1 / 1.1);
         e.Handled = true;
+    }
+
+    private bool _draggingGraphNode;
+
+    /// <summary>A port hit arms/completes a link; a node-body hit selects and begins a drag; empty space clears both.</summary>
+    private async void OnModelingGraphCanvasMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (ViewModel is null || sender is not Image image || image.ActualWidth <= 0 || image.ActualHeight <= 0) return;
+        var point = e.GetPosition(image);
+        image.CaptureMouse();
+        _draggingGraphNode = true;
+        await ViewModel.ClickModelingGraphCanvasAsync(point.X / image.ActualWidth, point.Y / image.ActualHeight);
+        e.Handled = true;
+    }
+
+    private void OnModelingGraphCanvasMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_draggingGraphNode || ViewModel is null || sender is not Image image) return;
+        var point = e.GetPosition(image);
+        ViewModel.UpdateModelingGraphNodeDrag(point.X / image.ActualWidth, point.Y / image.ActualHeight);
+        e.Handled = true;
+    }
+
+    private void OnModelingGraphCanvasMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_draggingGraphNode || sender is not Image image) return;
+        _draggingGraphNode = false;
+        image.ReleaseMouseCapture();
+        ViewModel?.CompleteModelingGraphNodeDrag();
+        e.Handled = true;
+    }
+
+    private void OnModelingGraphCanvasLostCapture(object sender, MouseEventArgs e)
+    {
+        if (!_draggingGraphNode) return;
+        _draggingGraphNode = false;
+        ViewModel?.CompleteModelingGraphNodeDrag();
     }
 }

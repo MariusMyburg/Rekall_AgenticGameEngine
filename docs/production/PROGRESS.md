@@ -3182,15 +3182,25 @@ behavior.
   animation, TANGENT/sparse/quantized morph accessors, broader complex
   transform fixtures, richer graph curves, and interruptible or hierarchical
   graph policies.
-- Studio has no animation-authoring surface: creating or editing a
-  `Rekall.RigPose`-track clip asset, previewing a rig, or composing
-  `Rekall.AnimationMixer` layers is engine/JSON-only today (proven by the
-  ability-driven authored rig animation checkpoint below, which only exists as
-  hand-authored clip JSON and CLI/runtime acceptance). Every engine capability
-  that reaches gameplay should also reach Studio's editing surface; the next
-  Studio slice should add a rig/clip preview and a mixer-layer editor to the
-  3D workspace (or a dedicated animation workspace) so this is not left as a
-  standing engine/tooling gap.
+- Studio's animation-authoring surface is now the friendly `Rekall.AnimationMixer`
+  layer editor described in the "Studio 3D-modeling-parity program" checkpoint
+  below (open an entity's mixer, edit name/clip/weight/loopMode/speed per
+  layer, apply through the real scene-document pipeline). Still missing:
+  creating or editing a `Rekall.RigPose`-track *clip asset* itself (no
+  keyframe timeline yet - clips remain hand-authored JSON), a rendered rig/
+  pose preview inside the editor (Studio's live preview session already runs
+  the full animated runtime loop for Play mode, but the Animation tab does not
+  yet embed it), and any gizmo-based interactive posing. Tracked as the next
+  animation-workspace increment.
+- Procedural destruction is not yet an engine capability: no destructible-mesh
+  fracture/chunking, no terrain deformation (e.g. explosion craters), and no
+  runtime module support for spawning transient destructible props. Requested
+  follow-up: build procedural destruction, then build a visually impressive
+  original game (grenades spawn every few seconds at random and explode,
+  breaking geometry apart and cratering the terrain) as its proof, authored
+  the same way every other Aetherfall-style example in this repo is meant to
+  be proven - through the CLI/MCP authoring surface as an external client
+  would use it, not by hand-editing engine internals to fake the result.
 - Expand Studio asset/module workflows and run broader installed game-creation
   benchmarks beyond the fixed gauntlet. Deterministic WPF automation,
   schema-guided editing, transactional undo/redo, embedded Ollama authoring,
@@ -5854,6 +5864,66 @@ environmental-gate chronology, raw artifact hashes, and residue audit:
   issues, and both modules are restricted-host ready. High 2560x1440
   `desktop60` passes at 8.642528 ms GPU time, 203,638 triangles, 873,116
   vertices, 97 scene draws, and nine textures.
+
+## Studio 3D-modeling-parity program: node canvas, modal tools, materials/UV, animation
+
+Sub-project 2's remaining three items from the 2026-08-26 audit, all delivered
+in one continuous session on `codex/studio-modeling-parity` (branched from
+`master` after merging `codex/high-fidelity-forward-plus`), each with its own
+TDD cycle and commit:
+
+- **Visual node-graph canvas.** The "Procedural Geometry" panel's topology was
+  previously invisible (a flat parameter-form list with raw link counts).
+  `RekallAgeStudioModelingGraphLayout` auto-lays-out nodes by dependency depth
+  (pure/testable); `RekallAgeStudioModelingGraphCanvasRenderer` draws them as
+  boxes with port dots and real link lines, following the mesh viewport's
+  raster-renderer-plus-hit-testing shape. Click selects a node (drives the
+  existing parameter panel unchanged), drag repositions (session-local only,
+  never persisted), and click-port-then-click-port adds a real link through
+  the existing `AddLink` patch pipeline. Node add/remove and link deletion by
+  clicking a line remain follow-ups.
+- **Modal parameter drag for mesh operations.** Mesh operations were only
+  reachable as combo-box + typed-parameter-form + Preview/Apply. Alt+left-drag
+  in the mesh viewport now live-previews the selected operation's first
+  numeric (Float) parameter as the mouse moves and applies on release, reusing
+  the exact same Preview/Apply pipeline the form already used. Deliberately
+  generic (drives whichever Float parameter is first) rather than hardcoding
+  per-operation axis semantics; per-operation-tuned mapping is a follow-up.
+- **Materials and UV/Attributes tabs.** Both were 100% placeholder text
+  despite the engine having a full material graph contract/store/patch-
+  service/node-catalog parallel to the procedural geometry one.
+  `RekallAgeStudioMaterialGraphSession` mirrors the modeling graph session
+  (asset browser, node list, typed parameter editors, apply through the real
+  patch pipeline); there is no material-to-pixel evaluator in the engine yet,
+  so the panel says so explicitly rather than faking a preview. UV/Attributes
+  reads the currently-open mesh's real `Attributes`/`MaterialSlots` into
+  read-only inspector lists - no new session needed, since that data already
+  sits on the loaded `RekallAgeMeshAsset`. Caught and fixed a real bug before
+  it shipped: the material catalog authors Color defaults as a hex string
+  (`"#ffffff"`), not a numeric array, so the first parameter-model draft
+  parsed Color with the wrong branch and would have rejected every default
+  Color value as invalid.
+- **Animation mixer layer editor.** A new "Animation" tab:
+  `RekallAgeStudioAnimationMixerSession` opens the selected scene entity's
+  `Rekall.AnimationMixer` component and exposes its layers (name/clip/weight/
+  loopMode/speed) as editable rows, applying edits through the same revision-
+  safe scene-document pipeline (`RekallAgeSceneDocument.UpdateEntity`/
+  `UpdateComponent`) every other Studio scene edit already uses. This edits
+  the entity's *authored initial* mixer state; gameplay modules may still
+  overwrite it every frame at runtime, exactly as an authored Transform can
+  be. Proven end-to-end: add an entity, add an empty `Rekall.AnimationMixer`
+  via the existing generic component command, open it in the new tab, add a
+  layer through the "+ Layer" button, edit its fields, apply, and read the
+  persisted scene JSON back. Rig/clip preview and clip-asset (keyframe)
+  authoring remain tracked follow-ups (see "Current gaps").
+
+Verified: full `Rekall.Age.Studio.Tests` suite 109/109 (was 98 before this
+program; 92 before the viewport-camera slice), solution builds Release with 0
+warnings/errors throughout. Specs/plans:
+`docs/superpowers/specs/2026-08-26-studio-node-graph-canvas-design.md`;
+the other three items skipped separate spec ceremony (each mirrors an
+already-approved pattern from a prior slice in the same session) and are
+recorded here and in their commit messages instead.
 
 ## Studio orbit/pan/zoom viewport camera checkpoint
 

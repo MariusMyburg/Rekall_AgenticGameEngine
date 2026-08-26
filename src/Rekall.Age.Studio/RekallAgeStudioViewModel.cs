@@ -92,6 +92,17 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
     private RekallAgeStudioViewportCamera _meshViewportCamera = RekallAgeStudioViewportCamera.Identity;
+    private readonly RekallAgeStudioModelingGraphCanvasRenderer _modelingGraphCanvasRenderer = new();
+    private readonly RekallAgeModelingNodeCatalog _modelingGraphCatalog = RekallAgeModelingNodeCatalog.CreateDefault();
+    private readonly Dictionary<string, System.Windows.Point> _modelingGraphNodePositions = new(StringComparer.Ordinal);
+    private RekallAgeStudioModelingGraphCanvasFrame? _modelingGraphCanvasFrame;
+    private string? _modelingGraphDragNodeId;
+    private System.Windows.Point _modelingGraphDragOrigin;
+    private System.Windows.Point _modelingGraphDragStart;
+    private RekallAgeStudioModelingGraphPortKey? _modelingGraphPendingLinkPort;
+    private RekallAgeStudioMeshParameterModel? _modalDragParameter;
+    private double _modalDragOriginalValue;
+    private double _modalDragStartNormalizedX;
     private readonly RekallAgeAsyncCommand _refreshMeshAssetsCommand;
     private readonly RekallAgeAsyncCommand _createMeshPrimitiveCommand;
     private readonly RekallAgeAsyncCommand _openMeshAssetCommand;
@@ -109,6 +120,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _openModelingGraphCommand;
     private readonly RekallAgeAsyncCommand _evaluateModelingGraphCommand;
     private readonly RekallAgeAsyncCommand _applyModelingGraphParametersCommand;
+    private readonly RekallAgeStudioMaterialGraphSession _materialGraph = new();
+    private readonly RekallAgeAsyncCommand _refreshMaterialGraphsCommand;
+    private readonly RekallAgeAsyncCommand _openMaterialGraphCommand;
+    private readonly RekallAgeAsyncCommand _applyMaterialGraphParametersCommand;
+    private readonly RekallAgeStudioAnimationMixerSession _animationMixer = new();
+    private readonly RekallAgeAsyncCommand _openAnimationMixerCommand;
+    private readonly RekallAgeAsyncCommand _applyAnimationMixerLayersCommand;
+    private readonly RekallAgeAsyncCommand _addAnimationMixerLayerCommand;
     private Process? _player;
     private CancellationTokenSource? _agentCancellation;
     private RekallAgeLanguageModelProviderLease? _languageModelProviderLease;
@@ -185,6 +204,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _modelingGraphSummary = "Open a procedural graph to inspect its nodes and evaluation evidence.";
     private BitmapSource? _modelingGraphViewportImage;
     private RekallAgeStudioModelingGraphNodeView? _selectedModelingGraphNode;
+    private string? _selectedMaterialGraphAssetId;
+    private string _materialGraphSummary = "Open a material graph to inspect its node contracts.";
+    private RekallAgeStudioMaterialGraphNodeView? _selectedMaterialGraphNode;
+    private bool _animationMixerIsOpen;
+    private string _animationMixerSummary = "Select a scene entity, then open its Rekall.AnimationMixer component.";
     private string? _lastPackagePath;
     private string? _lastPackageOutputDirectory;
     private string? _lastPackageLaunchPath;
@@ -389,6 +413,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _openModelingGraphCommand = CreateAsyncCommand(OpenModelingGraphAsync, CanOpenModelingGraph);
         _evaluateModelingGraphCommand = CreateAsyncCommand(EvaluateModelingGraphAsync, CanEvaluateModelingGraph);
         _applyModelingGraphParametersCommand = CreateAsyncCommand(ApplyModelingGraphParametersAsync, CanApplyModelingGraphParameters);
+        _refreshMaterialGraphsCommand = CreateAsyncCommand(RefreshMaterialGraphsAsync, HasOpenProject);
+        _openMaterialGraphCommand = CreateAsyncCommand(OpenMaterialGraphAsync, CanOpenMaterialGraph);
+        _applyMaterialGraphParametersCommand = CreateAsyncCommand(ApplyMaterialGraphParametersAsync, CanApplyMaterialGraphParameters);
+        _openAnimationMixerCommand = CreateAsyncCommand(OpenAnimationMixerAsync, CanOpenAnimationMixer);
+        _applyAnimationMixerLayersCommand = CreateAsyncCommand(ApplyAnimationMixerLayersAsync, CanApplyAnimationMixerLayers);
+        _addAnimationMixerLayerCommand = CreateAsyncCommand(
+            () => { AnimationMixerLayers.Add(new RekallAgeStudioAnimationMixerLayerModel("new-layer", string.Empty, "1", "loop", "1")); RefreshCommands(); return Task.CompletedTask; },
+            () => AnimationMixerIsOpen);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -422,6 +454,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<RekallAgeStudioModelingGraphNodeView> ModelingGraphNodes { get; } = [];
     public ObservableCollection<string> ModelingGraphDiagnosticLines { get; } = [];
     public ObservableCollection<RekallAgeStudioModelingGraphParameterModel> ModelingGraphParameterEditors { get; } = [];
+    public ObservableCollection<string> MaterialGraphAssetIds { get; } = [];
+    public ObservableCollection<RekallAgeStudioMaterialGraphNodeView> MaterialGraphNodes { get; } = [];
+    public ObservableCollection<RekallAgeStudioMaterialGraphParameterModel> MaterialGraphParameterEditors { get; } = [];
+    public ObservableCollection<string> MeshAttributeSummaries { get; } = [];
+    public ObservableCollection<string> MeshMaterialSlotSummaries { get; } = [];
+    public ObservableCollection<RekallAgeStudioAnimationMixerLayerModel> AnimationMixerLayers { get; } = [];
+    public IReadOnlyList<string> AnimationMixerLoopModes { get; } = ["loop", "pingpong", "clamp"];
     public IReadOnlyList<RekallAgeGeometryDomain> MeshEditDomains { get; } =
         [RekallAgeGeometryDomain.Point, RekallAgeGeometryDomain.Edge, RekallAgeGeometryDomain.Face, RekallAgeGeometryDomain.Corner];
     public IReadOnlyList<RekallAgeLanguageModelToolExecution> LastAgentToolExecutions => _lastAgentToolExecutions;
@@ -498,6 +537,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand OpenModelingGraphCommand => _openModelingGraphCommand;
     public ICommand EvaluateModelingGraphCommand => _evaluateModelingGraphCommand;
     public ICommand ApplyModelingGraphParametersCommand => _applyModelingGraphParametersCommand;
+    public ICommand RefreshMaterialGraphsCommand => _refreshMaterialGraphsCommand;
+    public ICommand OpenMaterialGraphCommand => _openMaterialGraphCommand;
+    public ICommand ApplyMaterialGraphParametersCommand => _applyMaterialGraphParametersCommand;
+    public ICommand OpenAnimationMixerCommand => _openAnimationMixerCommand;
+    public ICommand ApplyAnimationMixerLayersCommand => _applyAnimationMixerLayersCommand;
+    public ICommand AddAnimationMixerLayerCommand => _addAnimationMixerLayerCommand;
 
     public string SelectedQualityPreset
     {
@@ -990,6 +1035,40 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             if (!Set(ref _selectedModelingGraphNode, value)) return;
             RefreshModelingGraphParameterEditors();
         }
+    }
+
+    public string? SelectedMaterialGraphAssetId
+    {
+        get => _selectedMaterialGraphAssetId;
+        set { if (Set(ref _selectedMaterialGraphAssetId, value)) RefreshCommands(); }
+    }
+
+    public string MaterialGraphSummary
+    {
+        get => _materialGraphSummary;
+        private set => Set(ref _materialGraphSummary, value);
+    }
+
+    public RekallAgeStudioMaterialGraphNodeView? SelectedMaterialGraphNode
+    {
+        get => _selectedMaterialGraphNode;
+        set
+        {
+            if (!Set(ref _selectedMaterialGraphNode, value)) return;
+            RefreshMaterialGraphParameterEditors();
+        }
+    }
+
+    public bool AnimationMixerIsOpen
+    {
+        get => _animationMixerIsOpen;
+        private set { if (Set(ref _animationMixerIsOpen, value)) RefreshCommands(); }
+    }
+
+    public string AnimationMixerSummary
+    {
+        get => _animationMixerSummary;
+        private set => Set(ref _animationMixerSummary, value);
     }
 
     public void SelectMeshViewportElement(double normalizedX, double normalizedY, bool extend, bool toggle)
@@ -1841,6 +1920,59 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _modeling.CancelPreview(); RefreshMeshEditingState(); return Task.CompletedTask;
     });
 
+    /// <summary>
+    /// One normalized-width viewport drag maps to this many world units for the modal operation
+    /// parameter drag (Alt+drag) — chosen so a comfortable half-viewport drag produces a readable
+    /// few-unit extrude/inset/bevel amount rather than requiring pixel-precise typing.
+    /// </summary>
+    private const double ModalDragWorldUnitsPerNormalizedWidth = 6.0;
+
+    /// <summary>
+    /// Starts a Blender-style modal drag (Alt+left-drag in the mesh viewport) that live-previews
+    /// the selected operation's first numeric (Float) parameter as the mouse moves, reusing the
+    /// existing Preview/Apply pipeline exactly as the typed-parameter form does — this is an
+    /// alternate input path onto the same operation, not a parallel one. Returns false (and starts
+    /// nothing) when the selected operation has no numeric parameter to drive.
+    /// </summary>
+    public bool BeginModalMeshOperationDrag(double normalizedX)
+    {
+        var parameter = MeshParameterEditors.FirstOrDefault(editor => editor.Descriptor.ValueType == RekallAgeGeometryValueType.Float);
+        if (parameter is null) return false;
+        _modalDragOriginalValue = double.TryParse(parameter.ValueText, NumberStyles.Float, CultureInfo.InvariantCulture, out var current) ? current : 0;
+        _modalDragParameter = parameter;
+        _modalDragStartNormalizedX = normalizedX;
+        return true;
+    }
+
+    public Task UpdateModalMeshOperationDragAsync(double normalizedX)
+    {
+        if (_modalDragParameter is null) return Task.CompletedTask;
+        SetModalDragValue(normalizedX);
+        return PreviewMeshOperationAsync();
+    }
+
+    public async Task CompleteModalMeshOperationDragAsync(double normalizedX)
+    {
+        if (_modalDragParameter is null) return;
+        SetModalDragValue(normalizedX);
+        await ApplyMeshOperationAsync();
+        _modalDragParameter = null;
+    }
+
+    public void CancelModalMeshOperationDrag()
+    {
+        if (_modalDragParameter is null) return;
+        _modalDragParameter.ValueText = _modalDragOriginalValue.ToString("0.###", CultureInfo.InvariantCulture);
+        _modalDragParameter = null;
+        _ = CancelMeshPreviewAsync();
+    }
+
+    private void SetModalDragValue(double normalizedX)
+    {
+        var value = _modalDragOriginalValue + (normalizedX - _modalDragStartNormalizedX) * ModalDragWorldUnitsPerNormalizedWidth;
+        _modalDragParameter!.ValueText = value.ToString("0.###", CultureInfo.InvariantCulture);
+    }
+
     private Task RefreshModelingGraphsAsync() => RunGraphModelingAsync(() =>
     {
         if (_session.ProjectRoot is null) throw new InvalidOperationException("Open a project before browsing procedural graphs.");
@@ -1863,6 +1995,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         ModelingGraphViewportImage = null;
         ModelingGraphSummary = _modelingGraph.EvaluationSummary;
         SelectedModelingGraphNode = ModelingGraphNodes.FirstOrDefault();
+        _modelingGraphNodePositions.Clear();
+        _modelingGraphPendingLinkPort = null;
+        RefreshModelingGraphCanvas();
     });
 
     private Task EvaluateModelingGraphAsync() => RunGraphModelingAsync(async () =>
@@ -1881,6 +2016,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 640,
                 360,
                 preview: false).Image;
+        RefreshModelingGraphCanvas();
     });
 
     private Task ApplyModelingGraphParametersAsync() => RunGraphModelingAsync(async () =>
@@ -1915,7 +2051,99 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                     360,
                     preview: false).Image;
         }
+        RefreshModelingGraphCanvas();
     });
+
+    /// <summary>Re-renders the node-graph canvas from the current graph, auto-laying-out any node without a remembered position.</summary>
+    private void RefreshModelingGraphCanvas()
+    {
+        var graph = _modelingGraph.Graph;
+        if (graph is null)
+        {
+            _modelingGraphCanvasFrame = null;
+            OnPropertyChanged(nameof(ModelingGraphCanvasImage));
+            return;
+        }
+        var liveNodeIds = graph.Nodes.Select(node => node.NodeId).ToHashSet(StringComparer.Ordinal);
+        foreach (var staleId in _modelingGraphNodePositions.Keys.Where(id => !liveNodeIds.Contains(id)).ToArray())
+            _modelingGraphNodePositions.Remove(staleId);
+        foreach (var (nodeId, position) in RekallAgeStudioModelingGraphLayout.ComputeDefaultPositions(graph.Nodes, graph.Links))
+            _modelingGraphNodePositions.TryAdd(nodeId, position);
+        _modelingGraphCanvasFrame = _modelingGraphCanvasRenderer.Render(
+            graph.Nodes, graph.Links, _modelingGraphNodePositions, _modelingGraphCatalog,
+            SelectedModelingGraphNode?.NodeId, 640, 360);
+        OnPropertyChanged(nameof(ModelingGraphCanvasImage));
+    }
+
+    public BitmapSource? ModelingGraphCanvasImage => _modelingGraphCanvasFrame?.Image;
+
+    /// <summary>
+    /// Handles a mouse-down on the node-graph canvas: a port hit arms or completes a link
+    /// (a second click on a compatible-direction port issues an AddLink patch), a node-body hit
+    /// selects that node (driving the existing parameter panel) and begins a reposition drag, and
+    /// an empty-space hit clears the current selection and any pending link.
+    /// </summary>
+    public async Task ClickModelingGraphCanvasAsync(double normalizedX, double normalizedY)
+    {
+        if (_modelingGraphCanvasFrame is null) return;
+        var (x, y) = DenormalizeGraphCanvasPoint(normalizedX, normalizedY);
+        var port = _modelingGraphCanvasRenderer.PickPort(_modelingGraphCanvasFrame, x, y);
+        if (port is { } hitPort)
+        {
+            if (_modelingGraphPendingLinkPort is { } pending && pending.IsOutput != hitPort.IsOutput
+                && !pending.Equals(hitPort))
+            {
+                var from = pending.IsOutput ? pending : hitPort;
+                var to = pending.IsOutput ? hitPort : pending;
+                _modelingGraphPendingLinkPort = null;
+                await AddModelingGraphLinkAsync(from, to);
+            }
+            else
+            {
+                _modelingGraphPendingLinkPort = hitPort;
+                RefreshModelingGraphCanvas();
+            }
+            return;
+        }
+
+        _modelingGraphPendingLinkPort = null;
+        var nodeId = _modelingGraphCanvasRenderer.PickNode(_modelingGraphCanvasFrame, x, y);
+        SelectedModelingGraphNode = ModelingGraphNodes.FirstOrDefault(node => node.NodeId == nodeId);
+        if (nodeId is not null)
+        {
+            _modelingGraphDragNodeId = nodeId;
+            _modelingGraphDragOrigin = _modelingGraphNodePositions[nodeId];
+            _modelingGraphDragStart = new System.Windows.Point(x, y);
+        }
+        RefreshModelingGraphCanvas();
+    }
+
+    public void UpdateModelingGraphNodeDrag(double normalizedX, double normalizedY)
+    {
+        if (_modelingGraphDragNodeId is not { } nodeId) return;
+        var (x, y) = DenormalizeGraphCanvasPoint(normalizedX, normalizedY);
+        var delta = new System.Windows.Point(x, y) - _modelingGraphDragStart;
+        _modelingGraphNodePositions[nodeId] = _modelingGraphDragOrigin + delta;
+        RefreshModelingGraphCanvas();
+    }
+
+    public void CompleteModelingGraphNodeDrag() => _modelingGraphDragNodeId = null;
+
+    private (double X, double Y) DenormalizeGraphCanvasPoint(double normalizedX, double normalizedY) =>
+        (normalizedX * 640, normalizedY * 360);
+
+    private async Task AddModelingGraphLinkAsync(RekallAgeStudioModelingGraphPortKey from, RekallAgeStudioModelingGraphPortKey to)
+    {
+        var link = new RekallAgeModelingGraphLink($"link-{Guid.NewGuid():N}", from.NodeId, from.PortId, to.NodeId, to.PortId);
+        var operation = new RekallAgeModelingGraphPatchOperation(RekallAgeModelingGraphPatchKind.AddLink, Link: link);
+        await RunGraphModelingAsync(async () =>
+        {
+            await _modelingGraph.ApplyPatchAsync(new([operation]), "studio", _lifecycleCancellation.Token);
+            Replace(ModelingGraphNodes, _modelingGraph.Nodes);
+            ModelingGraphSummary = _modelingGraph.EvaluationSummary;
+            RefreshModelingGraphCanvas();
+        });
+    }
 
     private async Task RunModelingAsync(Func<Task> operation)
     {
@@ -1953,6 +2181,90 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         finally { IsBusy = false; }
     }
 
+    private async Task RunMaterialGraphAsync(Func<Task> operation)
+    {
+        if (IsBusy) return;
+        IsBusy = true;
+        try { await operation(); StatusText = MaterialGraphSummary; }
+        catch (Exception exception) when (exception is IOException
+                                            or InvalidOperationException
+                                            or InvalidDataException
+                                            or ArgumentException
+                                            or JsonException
+                                            or RekallAgeDocumentRevisionException)
+        {
+            StatusText = exception.Message;
+        }
+        finally { IsBusy = false; }
+    }
+
+    private Task RefreshMaterialGraphsAsync() => RunMaterialGraphAsync(() =>
+    {
+        if (_session.ProjectRoot is null) throw new InvalidOperationException("Open a project before browsing material graphs.");
+        Replace(MaterialGraphAssetIds, _materialGraph.ListAssets(_session.ProjectRoot));
+        if (SelectedMaterialGraphAssetId is null || !MaterialGraphAssetIds.Contains(SelectedMaterialGraphAssetId))
+            SelectedMaterialGraphAssetId = MaterialGraphAssetIds.FirstOrDefault();
+        MaterialGraphSummary = MaterialGraphAssetIds.Count == 0
+            ? "No persisted material graphs are present in Materials/Graphs."
+            : $"{MaterialGraphAssetIds.Count} material graph asset(s) available.";
+        return Task.CompletedTask;
+    });
+
+    private Task OpenMaterialGraphAsync() => RunMaterialGraphAsync(async () =>
+    {
+        await _materialGraph.OpenAsync(_session.ProjectRoot!, SelectedMaterialGraphAssetId!, _lifecycleCancellation.Token);
+        Replace(MaterialGraphNodes, _materialGraph.Nodes);
+        MaterialGraphSummary = _materialGraph.EvaluationSummary;
+        SelectedMaterialGraphNode = MaterialGraphNodes.FirstOrDefault();
+    });
+
+    private Task ApplyMaterialGraphParametersAsync() => RunMaterialGraphAsync(async () =>
+    {
+        var selectedNodeId = SelectedMaterialGraphNode!.NodeId;
+        await _materialGraph.ApplyParameterEditsAsync(selectedNodeId, MaterialGraphParameterEditors, "studio", _lifecycleCancellation.Token);
+        Replace(MaterialGraphNodes, _materialGraph.Nodes);
+        SelectedMaterialGraphNode = MaterialGraphNodes.FirstOrDefault(item => item.NodeId == selectedNodeId);
+        MaterialGraphSummary = _materialGraph.EvaluationSummary;
+    });
+
+    private void RefreshMaterialGraphParameterEditors()
+    {
+        Replace(MaterialGraphParameterEditors, SelectedMaterialGraphNode is null
+            ? []
+            : _materialGraph.CreateParameterEditors(SelectedMaterialGraphNode.NodeId));
+        foreach (var editor in MaterialGraphParameterEditors)
+            editor.PropertyChanged += (_, _) => RefreshCommands();
+        RefreshCommands();
+    }
+
+    private bool CanOpenMaterialGraph() => HasEditableProject() && !string.IsNullOrWhiteSpace(SelectedMaterialGraphAssetId);
+
+    private bool CanApplyMaterialGraphParameters() =>
+        HasEditableProject()
+        && SelectedMaterialGraphNode is not null
+        && MaterialGraphParameterEditors.Count > 0
+        && MaterialGraphParameterEditors.All(item => item.IsValid)
+        && MaterialGraphParameterEditors.Any(item => item.IsModified);
+
+    private bool CanOpenAnimationMixer() => HasEditableProject() && _session.SelectedEntityId is not null;
+    private bool CanApplyAnimationMixerLayers() => HasEditableProject() && AnimationMixerIsOpen && AnimationMixerLayers.Count > 0;
+
+    private Task OpenAnimationMixerAsync() => RunModelingAsync(async () =>
+    {
+        await _animationMixer.OpenAsync(_session.ProjectRoot!, _session.SceneName!, _session.SelectedEntityId!, _lifecycleCancellation.Token);
+        Replace(AnimationMixerLayers, _animationMixer.Layers);
+        AnimationMixerIsOpen = _animationMixer.HasMixer;
+        AnimationMixerSummary = _animationMixer.HasMixer
+            ? $"{_animationMixer.EntityName}: {AnimationMixerLayers.Count} layer(s) in its authored Rekall.AnimationMixer."
+            : $"{_animationMixer.EntityName} has no Rekall.AnimationMixer component to edit.";
+    });
+
+    private Task ApplyAnimationMixerLayersAsync() => RunModelingAsync(async () =>
+    {
+        await _animationMixer.ApplyAsync(AnimationMixerLayers, _lifecycleCancellation.Token);
+        AnimationMixerSummary = $"{_animationMixer.EntityName}: applied {AnimationMixerLayers.Count} layer(s).";
+    });
+
     private void RefreshModelingGraphParameterEditors()
     {
         Replace(ModelingGraphParameterEditors, SelectedModelingGraphNode is null
@@ -1988,9 +2300,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (_modeling.Mesh is null)
         {
             Replace(MeshElementIds, []); Replace(MeshOperationIds, []); Replace(MeshSelectionLines, []);
+            Replace(MeshAttributeSummaries, []); Replace(MeshMaterialSlotSummaries, []);
             _meshViewportFrame = null; MeshViewportImage = null; RefreshCommands(); return;
         }
         var mesh = _modeling.Preview?.Mesh ?? _modeling.Mesh;
+        Replace(MeshAttributeSummaries, mesh.Attributes.Select(attribute =>
+            $"{attribute.Name} · {attribute.Domain} · {attribute.ValueType}{(attribute.Semantic is null ? string.Empty : $" · {attribute.Semantic}")} · {attribute.Values.Count} value(s)"));
+        Replace(MeshMaterialSlotSummaries, mesh.MaterialSlots.Select(slot =>
+            $"{slot.Name} · {(slot.MaterialAssetId is null ? "(unassigned)" : slot.MaterialAssetId)}"));
         var ids = MeshEditDomain switch
         {
             RekallAgeGeometryDomain.Point => mesh.Topology.PointIds,
@@ -3799,6 +4116,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _openModelingGraphCommand.RaiseCanExecuteChanged();
         _evaluateModelingGraphCommand.RaiseCanExecuteChanged();
         _applyModelingGraphParametersCommand.RaiseCanExecuteChanged();
+        _refreshMaterialGraphsCommand.RaiseCanExecuteChanged();
+        _openMaterialGraphCommand.RaiseCanExecuteChanged();
+        _applyMaterialGraphParametersCommand.RaiseCanExecuteChanged();
+        _openAnimationMixerCommand.RaiseCanExecuteChanged();
+        _applyAnimationMixerLayersCommand.RaiseCanExecuteChanged();
+        _addAnimationMixerLayerCommand.RaiseCanExecuteChanged();
     }
 
     private RekallAgeAsyncCommand CreateAsyncCommand(Func<Task> execute, Func<bool> canExecute) =>

@@ -696,6 +696,13 @@ Use modeling graphs, mesh bake, model publish, material graphs, texture catalog 
 
 Configure a shadowed directional key, bounded accent lights, global height fog, local court fog volumes, conduit/projectile/impact/dash/mote/activation emitters, HDR emissive materials, bloom, tone map, and grade. Animation remains in agent-authored assets/modules and consumes `DeltaSeconds`.
 
+2026-08-26 playable finding: the native Vulkan shader currently selects only
+four point lights globally by authored priority. Aetherfall can use that contract
+for the current milestone, but lower-priority lights are omitted without an
+inspection fact. Add generic selected/dropped-light diagnostics and quality-tier
+active-light budgets; migrate the full path to clustered/Forward+ lighting so
+dense authored worlds do not require manual four-light tradeoffs.
+
 - [ ] **Step 5: Re-run strict gameplay assertions after the final mutation**
 
 Run all four checked-in proof matrices. If any assertion fails, repair the authored behavior; do not weaken it.

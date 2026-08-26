@@ -10733,6 +10733,300 @@
       "locked": true
     },
     {
+      "id": "dressing-near-west",
+      "name": "Near Western Ruin Dressing",
+      "tags": [
+        "prop",
+        "modeled",
+        "architecture",
+        "terrain-breakup",
+        "frame-edge-dressing",
+        "zone.arrival"
+      ],
+      "components": [
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-ruin-dressing-scatter-model"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#3d4442",
+            "metallicFactor": 0.03,
+            "roughnessFactor": 0.94,
+            "emissiveColor": "#48504d",
+            "emissiveStrength": 0.004,
+            "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.4,
+            "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -10.8,
+            "y": 0.1,
+            "z": -17.5,
+            "scaleX": 0.7,
+            "scaleY": 0.62,
+            "scaleZ": 0.78,
+            "yaw": -37
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": true
+    },
+    {
+      "id": "dressing-near-east",
+      "name": "Near Eastern Ruin Dressing",
+      "tags": [
+        "prop",
+        "modeled",
+        "architecture",
+        "terrain-breakup",
+        "frame-edge-dressing",
+        "zone.arrival"
+      ],
+      "components": [
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-ruin-dressing-scatter-model"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#444846",
+            "metallicFactor": 0.035,
+            "roughnessFactor": 0.91,
+            "emissiveColor": "#414a49",
+            "emissiveStrength": 0.004,
+            "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.38,
+            "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 10.7,
+            "y": 0.08,
+            "z": -16,
+            "scaleX": 0.68,
+            "scaleY": 0.58,
+            "scaleZ": 0.75,
+            "yaw": 49
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": true
+    },
+    {
+      "id": "dressing-approach-west",
+      "name": "Western Approach Ruin Dressing",
+      "tags": [
+        "prop",
+        "modeled",
+        "architecture",
+        "terrain-breakup",
+        "frame-edge-dressing",
+        "zone.arrival"
+      ],
+      "components": [
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-ruin-dressing-scatter-model"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#484640",
+            "metallicFactor": 0.025,
+            "roughnessFactor": 0.95,
+            "emissiveColor": "#504b42",
+            "emissiveStrength": 0.004,
+            "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.42,
+            "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -12.5,
+            "y": 0.08,
+            "z": -8.5,
+            "scaleX": 0.62,
+            "scaleY": 0.54,
+            "scaleZ": 0.7,
+            "yaw": 18
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": true
+    },
+    {
+      "id": "dressing-approach-east",
+      "name": "Eastern Approach Ruin Dressing",
+      "tags": [
+        "prop",
+        "modeled",
+        "architecture",
+        "terrain-breakup",
+        "frame-edge-dressing",
+        "zone.arrival"
+      ],
+      "components": [
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.ModelAssetReference",
+          "properties": {
+            "assetId": "aetherfall-ruin-dressing-scatter-model"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#394443",
+            "metallicFactor": 0.035,
+            "roughnessFactor": 0.92,
+            "emissiveColor": "#3e4d4c",
+            "emissiveStrength": 0.004,
+            "baseColorTexture": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+            "normalScale": 0.4,
+            "normalTexture": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 12.2,
+            "y": 0.1,
+            "z": -9,
+            "scaleX": 0.64,
+            "scaleY": 0.56,
+            "scaleZ": 0.72,
+            "yaw": -64
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": true
+    },
+    {
+      "id": "frame-edge-fill-west",
+      "name": "Western Near-Field Bounce",
+      "tags": [
+        "light",
+        "fill",
+        "frame-edge-fill",
+        "zone.arrival"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PointLight",
+          "properties": {
+            "color": "#80684f",
+            "intensity": 3.4,
+            "range": 16,
+            "priority": 85,
+            "shadowPriority": 20,
+            "castShadows": false
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -10,
+            "y": 2.4,
+            "z": -13
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": true
+    },
+    {
+      "id": "frame-edge-fill-east",
+      "name": "Eastern Near-Field Bounce",
+      "tags": [
+        "light",
+        "fill",
+        "frame-edge-fill",
+        "zone.arrival"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PointLight",
+          "properties": {
+            "color": "#526d77",
+            "intensity": 3.2,
+            "range": 16,
+            "priority": 84,
+            "shadowPriority": 20,
+            "castShadows": false
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 10,
+            "y": 2.3,
+            "z": -12.5
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": true
+    },
+    {
       "id": "arrival-practical",
       "name": "Arrival Amber Practical",
       "tags": [

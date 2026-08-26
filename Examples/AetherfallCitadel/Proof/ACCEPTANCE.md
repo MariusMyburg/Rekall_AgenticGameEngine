@@ -195,6 +195,23 @@ the accepted gameplay evidence above.
   triangles, and 637,600 vertices. This improves the gate's architectural
   hierarchy, but the surrounding negative space and broader prop density still
   fail final visual acceptance.
+- The arrival near field now places four additional instances of the ordinary
+  graph-authored `aetherfall-ruin-dressing-scatter-model` at asymmetric edge
+  transforms, outside the central gameplay lane. Two low-key authored bounce
+  lights reveal those shapes without raising global exposure. The accepted real
+  RTX 5090 High frame is
+  `Proof/Captures/NearFieldWideBounce/vulkan-scene-1280x720-20260826001720940.png`:
+  18,118 distinct colors, 68.1% dominant-color share, mean luminance 0.044,
+  213 render-work draws, and zero observations, missing assets, unsupported
+  assets, or fallbacks. The matching High `desktop60` inspection passes with 68
+  scene draw calls, 171,316 triangles, 656,080 vertices, and no warnings or
+  blockers. This is improved grounded density, not final visual acceptance.
+- This pass exposed a generic renderer limit: the current Vulkan forward shader
+  uploads only four point lights and selects them by `priority`, then intensity,
+  then stable entity ID. Lower-priority authored lights are silently omitted.
+  A future generic lighting tranche must make selection/drops inspectable and
+  scale the active-light budget by quality level (ultimately clustered/Forward+
+  rather than requiring scene authors to trade one practical against another).
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
 silhouettes remain too black, prop geometry remains visibly coarse, and the

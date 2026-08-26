@@ -177,6 +177,49 @@ public sealed class AetherfallHighFidelityAcceptanceTests
     }
 
     [Fact]
+    public void NearFieldEdgesUseReusableModeledDressingWithoutBlockingTheGameplayLane()
+    {
+        var entities = LoadMainScene()["entities"]!.AsArray();
+        var edgeDressing = entities.Where(entity =>
+            Bool(entity, "visible")
+            && HasTag(entity, "frame-edge-dressing"))
+            .ToArray();
+
+        Assert.True(edgeDressing.Length >= 4,
+            $"Expected at least four near-field edge dressing clusters, found {edgeDressing.Length}.");
+        Assert.All(edgeDressing, entity =>
+        {
+            var model = Component(entity, "Rekall.ModelAssetReference");
+            Assert.Equal("aetherfall-ruin-dressing-scatter-model", String(model?["properties"], "assetId"));
+
+            var transform = Component(entity, "Rekall.Transform3D");
+            Assert.True(Math.Abs(Number(transform?["properties"], "x")) >= 8,
+                $"Edge dressing '{String(entity, "name")}' obstructs the central gameplay lane.");
+            Assert.True(Number(transform?["properties"], "z") <= -8,
+                $"Edge dressing '{String(entity, "name")}' is outside the camera-visible near field.");
+        });
+        Assert.Contains(edgeDressing, entity => Number(Component(entity, "Rekall.Transform3D")?["properties"], "x") < 0);
+        Assert.Contains(edgeDressing, entity => Number(Component(entity, "Rekall.Transform3D")?["properties"], "x") > 0);
+
+        var edgeFillLights = entities.Where(entity =>
+            Bool(entity, "visible")
+            && HasTag(entity, "frame-edge-fill"))
+            .ToArray();
+        Assert.Equal(2, edgeFillLights.Length);
+        Assert.All(edgeFillLights, entity =>
+        {
+            var light = Component(entity, "Rekall.PointLight");
+            Assert.InRange(Number(light?["properties"], "intensity"), 1.0, 3.5);
+            Assert.True(Number(light?["properties"], "range") >= 10);
+            Assert.True(Number(light?["properties"], "priority") >= 84,
+                $"Edge fill '{String(entity, "name")}' is below Aetherfall's four-light forward budget cutoff.");
+            Assert.False(Bool(light?["properties"], "castShadows"));
+        });
+        Assert.Contains(edgeFillLights, entity => Number(Component(entity, "Rekall.Transform3D")?["properties"], "x") < 0);
+        Assert.Contains(edgeFillLights, entity => Number(Component(entity, "Rekall.Transform3D")?["properties"], "x") > 0);
+    }
+
+    [Fact]
     public async Task PublishedDarkWardenModelResolvesToItsAuthoredMeshInNativeRuntimeFrame()
     {
         var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");

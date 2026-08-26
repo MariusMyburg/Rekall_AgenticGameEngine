@@ -247,7 +247,36 @@ the accepted gameplay evidence above.
   assets, or fallbacks. After the scene and six-model mutation, movement,
   combat, progression, and reset still pass all 2/4/4/5 strict assertions;
   Warden movement remains exactly `0.506840` on X.
+- Visual inspection of that frame exposed another generic environment gap:
+  `backgroundPolicy` and the camera clear color reached runtime data, but the
+  native HDR target and standalone Windows player still cleared to unrelated
+  hard-coded colors. `Rekall.Environment3D.backgroundColor` is now a shared,
+  backward-compatible fallback for color backgrounds and for sky policies whose
+  sky asset is absent or not yet rendered; `camera`/`clear` policies retain the
+  camera's authored clear color. Native Vulkan and the Windows player use the
+  same resolver rather than Aetherfall-specific behavior.
+- Aetherfall now authors a blue-charcoal `#111a1d` background fallback and a
+  denser, slower-falling global mist (`0.006` density, `0.035` height falloff).
+  The real RTX 5090 High proof at
+  `Proof/Captures/EnvironmentBackgroundFog/vulkan-scene-1280x720-20260826011700840.png`
+  has 11,196 distinct colors, 14.5% dominant-color share, mean luminance 0.104,
+  213 draws, four dispatches, and zero observations, missing assets, unsupported
+  assets, or fallbacks. It makes the court read as continuous terrain rather
+  than geometry floating in a black void. After this scene mutation the strict
+  movement/combat/progression/reset proofs still pass 2/4/4/5 assertions, with
+  Warden X movement unchanged at `0.506840`.
+- The same checkpoint exposed schema/runtime drift in the generic authoring
+  surface: project validation rejected 288 properties and reserved component
+  uses that the high-fidelity runtime already consumed. AGE's built-in schema
+  module and reserved-type catalog now describe `Rekall.Environment3D`,
+  `Rekall.ShadowSettings`, `Rekall.FogVolume`, `Rekall.ParticleEmitter3D`, mesh
+  shadow flags, and point-light range/priority/shadow intent. `validation scene`
+  now reports status `ok` with zero issues, and agents/Studio can discover the
+  same production properties through component schemas instead of authoring
+  data that validation falsely calls invalid.
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
-silhouettes remain too black, prop geometry remains visibly coarse, and the
-composition is not yet at the requested Diablo/Alan Wake quality bar.
+silhouettes remain too black, the Warden/sentinel/rubble/ruin geometry remains
+visibly coarse, and the composition is not yet at the requested Diablo/Alan
+Wake quality bar. True authored sky/cubemap sampling is also still outstanding;
+the new background is an explicit fallback, not a claim that sky assets render.

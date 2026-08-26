@@ -132,10 +132,16 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         var environment = Assert.Single(components, component => Type(component) == "Rekall.Environment3D");
         Assert.Equal("#9fb3c2", String(environment?["properties"], "ambientSkyColor"));
         Assert.Equal("#795743", String(environment?["properties"], "ambientGroundColor"));
+        Assert.Equal("#111a1d", String(environment?["properties"], "backgroundColor"));
         Assert.InRange(Number(environment?["properties"], "ambientEnergy"), 1.5, 2.25);
         Assert.Single(components, component => Type(component) == "Rekall.ShadowSettings");
         Assert.True(Bool(Assert.Single(entities, entity => HasComponent(entity, "Rekall.UiCanvas")), "visible"));
         Assert.True(components.Count(component => Type(component) == "Rekall.FogVolume") >= 2);
+        var globalFog = Assert.Single(components, component =>
+            Type(component) == "Rekall.FogVolume"
+            && String(component?["properties"], "shape") == "global");
+        Assert.InRange(Number(globalFog?["properties"], "density"), 0.004, 0.012);
+        Assert.InRange(Number(globalFog?["properties"], "heightFalloff"), 0.01, 0.08);
 
         var emitters = components.Where(component => Type(component) == "Rekall.ParticleEmitter3D").ToArray();
         Assert.True(emitters.Length >= 6, $"Expected six purposeful authored emitters, found {emitters.Length}.");

@@ -239,6 +239,84 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneAcceptsHighFidelityRenderingComponentsAndShadowProperties()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Environment", ["rendering"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Environment3D", new JsonObject
+                {
+                    ["ambientEnergy"] = 2,
+                    ["ambientSkyColor"] = "#9fb3c2",
+                    ["ambientGroundColor"] = "#795743",
+                    ["backgroundColor"] = "#111a1d",
+                    ["backgroundPolicy"] = "skybox",
+                    ["exposure"] = -1.15,
+                    ["toneMapper"] = "agx",
+                    ["whitePoint"] = 11.2
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.ShadowSettings", new JsonObject
+                {
+                    ["cascadeCount"] = 3,
+                    ["atlasResolution"] = 2048,
+                    ["maximumDistance"] = 140,
+                    ["splitPolicy"] = "practical",
+                    ["bias"] = 0.0015,
+                    ["normalBias"] = 0.018,
+                    ["filter"] = "pcf",
+                    ["stabilization"] = true
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Mist", ["rendering"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.FogVolume", new JsonObject
+                {
+                    ["shape"] = "global",
+                    ["density"] = 0.006,
+                    ["albedo"] = "#374448",
+                    ["emission"] = "#050707",
+                    ["anisotropy"] = 0.25,
+                    ["heightFalloff"] = 0.035,
+                    ["blendDistance"] = 30,
+                    ["priority"] = 1
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Lit Mesh", ["rendering"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer", new JsonObject
+                {
+                    ["castShadows"] = true,
+                    ["receiveShadows"] = true
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Practical", ["rendering"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.PointLight", new JsonObject
+                {
+                    ["intensity"] = 12,
+                    ["color"] = "#ffcc88",
+                    ["range"] = 18,
+                    ["priority"] = 80,
+                    ["shadowPriority"] = 40,
+                    ["castShadows"] = true
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("Motes", ["rendering"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.ParticleEmitter3D", new JsonObject
+                {
+                    ["enabled"] = true,
+                    ["role"] = "ambient-motes",
+                    ["capacity"] = 256,
+                    ["spawnRate"] = 12,
+                    ["lifetime"] = 2,
+                    ["simulationSpace"] = "world",
+                    ["drawMode"] = "quad",
+                    ["blendMode"] = "alpha"
+                })));
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        Assert.DoesNotContain(report.Issues, issue =>
+            issue.Code is "REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN" or "REKALL_COMPONENT_PROPERTY_UNKNOWN");
+    }
+
+    [Fact]
     public async Task ValidateSceneRejectsNumericStringPropertiesOutsideSchemaBounds()
     {
         var root = TestPaths.CreateTempDirectory();

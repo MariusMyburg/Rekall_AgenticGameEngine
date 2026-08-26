@@ -1916,7 +1916,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _commands.SetFramebuffer(_sceneTarget.Framebuffer);
         _commands.SetFullViewports();
         _commands.SetFullScissorRects();
-        _commands.ClearColorTarget(0, new RgbaFloat(0.08f, 0.10f, 0.14f, 1f));
+        var background = RekallAgeEnvironmentBackgroundResolver.Resolve(frame);
+        _commands.ClearColorTarget(0, new RgbaFloat(background.X, background.Y, background.Z, background.W));
         _commands.ClearDepthStencil(1f);
         if (packet.Vertices.Length > 0)
         {

@@ -153,7 +153,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                         {
                             ProjectionSource = RekallAgeRuntimeProjectionSources.BuiltIn,
                             AmbientSkyColor = ReadString(component.Properties, "ambientSkyColor") ?? "#ffffff",
-                            AmbientGroundColor = ReadString(component.Properties, "ambientGroundColor") ?? "#ffffff"
+                            AmbientGroundColor = ReadString(component.Properties, "ambientGroundColor") ?? "#ffffff",
+                            BackgroundColor = ReadString(component.Properties, "backgroundColor")
                         });
                         break;
                     case "Rekall.ShadowSettings":

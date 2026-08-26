@@ -715,6 +715,21 @@ revision-checked commands. The accepted aligned capture is recorded in
 `Proof/ACCEPTANCE.md`; this improves material continuity and indirect form
 readability but does not complete the final visual bar.
 
+2026-08-26 background/fog result: environment authoring now carries an optional
+`backgroundColor` fallback through runtime and viewport contracts. One shared
+resolver drives both native Vulkan and the Windows player, removing their
+unrelated hard-coded scene clears while preserving camera-clear behavior for
+`camera`/`clear` policies and legacy scenes without the property. Aetherfall's
+authored fallback plus corrected global height-fog scale turns the opening frame
+from a black void into continuous terrain with atmospheric depth. The accepted
+capture and exact metrics are in `Proof/ACCEPTANCE.md`. True sky/cubemap sampling
+and the now-dominant coarse model silhouettes remain subsequent visible work.
+The playable validation gate also uncovered 288 false blockers caused by the
+built-in authoring schemas lagging the renderer. Environment, shadow, fog,
+particle, mesh-shadow, and point-light range/priority/shadow properties now have
+discoverable schemas and reserved-type catalog entries; Aetherfall validates
+with zero issues rather than teaching agents to delete functional render data.
+
 - [ ] **Step 5: Re-run strict gameplay assertions after the final mutation**
 
 Run all four checked-in proof matrices. If any assertion fails, repair the authored behavior; do not weaken it.

@@ -136,7 +136,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 environment.BackgroundPolicy)
             {
                 AmbientSkyColor = environment.AmbientSkyColor,
-                AmbientGroundColor = environment.AmbientGroundColor
+                AmbientGroundColor = environment.AmbientGroundColor,
+                BackgroundColor = environment.BackgroundColor
             };
     }
 

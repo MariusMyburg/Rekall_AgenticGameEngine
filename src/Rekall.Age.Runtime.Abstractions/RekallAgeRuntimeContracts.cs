@@ -459,6 +459,8 @@ public sealed record RekallAgeRuntimeEnvironment3D(
     public string AmbientSkyColor { get; init; } = "#ffffff";
 
     public string AmbientGroundColor { get; init; } = "#ffffff";
+
+    public string? BackgroundColor { get; init; }
 }
 
 public sealed record RekallAgeRuntimeShadowSettings(

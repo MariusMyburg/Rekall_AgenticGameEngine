@@ -248,6 +248,8 @@ public sealed record RekallAgeRuntimeViewportEnvironment(
     public string AmbientSkyColor { get; init; } = "#ffffff";
 
     public string AmbientGroundColor { get; init; } = "#ffffff";
+
+    public string? BackgroundColor { get; init; }
 }
 
 public sealed record RekallAgeRuntimeViewportParticleScalarKey(double NormalizedAge, double Value);

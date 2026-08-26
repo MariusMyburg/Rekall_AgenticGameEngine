@@ -4090,8 +4090,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 RecordTextureUploads(state);
             }
 
+            var background = RekallAgeEnvironmentBackgroundResolver.Resolve(commandPlan.PreparedFrame.Frame);
             var clearValues = stackalloc ClearValue[2];
-            clearValues[0].Color = new ClearColorValue(0.08f, 0.10f, 0.14f, 1f);
+            clearValues[0].Color = new ClearColorValue(background.X, background.Y, background.Z, background.W);
             clearValues[1].DepthStencil = new ClearDepthStencilValue(1f, 0);
             for (var passIndex = 0; passIndex < commandPlan.RenderPasses.Count; passIndex++)
             {
@@ -4156,8 +4157,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 gpuFrameQuery?.EndPass(state.CommandBuffer, "shadow-directional");
             }
 
+            var background = RekallAgeEnvironmentBackgroundResolver.Resolve(commandPlan.PreparedFrame.Frame);
             var sceneClears = stackalloc ClearValue[2];
-            sceneClears[0].Color = new ClearColorValue(0.006f, 0.01f, 0.018f, 1f);
+            sceneClears[0].Color = new ClearColorValue(background.X, background.Y, background.Z, background.W);
             sceneClears[1].DepthStencil = new ClearDepthStencilValue(1f, 0);
             var pass = commandPlan.RenderPasses[0];
             var scenePass = new RenderPassBeginInfo

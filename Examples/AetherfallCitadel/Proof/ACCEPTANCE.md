@@ -842,3 +842,45 @@ the new background is an explicit fallback, not a claim that sky assets render.
   Windows host posture. This materially improves gameplay motion, but it is
   still procedural locomotion rather than a captured or hand-authored
   production animation set.
+
+## Native rig joint-attachment checkpoint
+
+- AGE now publishes pose-global matrices alongside its unchanged skin
+  matrices and exposes the built-in `Rekall.RigAttachment` component. An
+  enabled parented entity resolves a stable named joint from the parent's
+  `Rekall.RigPose` and uses the shared row-vector composition
+  `local * jointPoseGlobal * parentWorld`. Because this happens in the common
+  world-transform resolver, the contract applies generically to meshes,
+  particles, lights, cameras, fog volumes, and later render-frame entity types.
+- The contract follows Godot `BoneAttachment3D` and Blender bone-parenting
+  principles without copying their scene models. Joint identity is authored
+  by stable ID rather than persisted index, ordinary local transforms remain
+  inspectable, and pose resolution is cached per parent rig entity per frame.
+  Blank joints, missing parent poses, invalid rig assets, and unknown joints
+  emit distinct `runtime.transform.rig_attachment_*` warnings while preserving
+  ordinary parent composition. Disabled attachments are exact ordinary
+  children.
+- Aetherfall consumes the public component rather than engine-special Warden
+  behavior. `Warden Runeblade` is rebased into `forearm_r` joint space and
+  `Warden Articulated Pauldron` into `upper_arm_l` space. Executable acceptance
+  changes only those named rig deltas and proves both rendered equipment
+  transforms move while their runtime local transforms remain identical; the
+  existing root-motion proof still carries the blade by exactly 2.5 units.
+- Native moving proof is
+  `Proof/Captures/RigAttachments/vulkan-scene-1280x720-20260826123348941.png`:
+  RTX 5090 High Vulkan at frame 30 after semantic movement, 12,771 distinct
+  colors, mean luminance 0.115, 313 render-work draws, four dispatches, 66
+  renderables, and zero observations, missing assets, or fallbacks. Original-
+  size comparison with the pre-attachment frame found no detached or exploded
+  equipment.
+- Release builds with zero warnings/errors. Rig/viewport/project-validator
+  contracts pass 82/82, combined Aetherfall acceptance passes 45/45, project
+  and scene validation report zero issues, and both modules pass the
+  `windows-appcontainer-restricted` trust posture. High 2560x1440 `desktop60`
+  passes at 6.860352 ms GPU time, 97 scene draws, 203,638 triangles, 873,116
+  vertices, and nine textures.
+- This proves generic rigid joint attachments, not a finished animation tool
+  chain. Studio socket/attachment visualization, imported glTF attachment
+  targets, IK/constraints, physics handoff, and production animation clips
+  remain open. The Warden's anatomy and materials also remain below the target
+  visual quality.

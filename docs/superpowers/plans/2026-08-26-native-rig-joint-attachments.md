@@ -136,14 +136,14 @@ Run combined Aetherfall gameplay/high-fidelity acceptance. Capture a High Vulkan
 - Consumes: verified generic and Aetherfall outputs.
 - Produces: reproducible evidence and a pushed content-addressed commit.
 
-- [ ] **Step 1: Run proportional final gates**
+- [x] **Step 1: Run proportional final gates**
 
 Run Release solution build, relevant rig/viewport/validation tests, combined Aetherfall acceptance, project and scene validation, module trust, and 2560x1440 High `desktop60` budget.
 
-- [ ] **Step 2: Record exact evidence and residual gaps**
+- [x] **Step 2: Record exact evidence and residual gaps**
 
 Document test counts, performance, capture path, Godot/Blender reference influence, diagnostic behavior, and that rigid joint attachment does not yet provide IK, sockets UI, or production animation clips.
 
-- [ ] **Step 3: Audit, commit, and push**
+- [x] **Step 3: Audit, commit, and push**
 
 Run `git diff --check`, inspect status for generated/transaction pollution, commit the exact intended files, push `codex/high-fidelity-forward-plus`, and verify local/remote commit identity plus a clean worktree.

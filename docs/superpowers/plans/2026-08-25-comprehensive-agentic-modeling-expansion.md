@@ -613,6 +613,17 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   weighting, constraints/IK, retargeting, Studio rig tools, and a genuinely
   production-quality character remain open.
 
+  2026-08-26 named-joint attachment checkpoint: native rig evaluation now
+  publishes pose-global matrices separately from skin matrices, and the
+  built-in `Rekall.RigAttachment` composes arbitrary child entities through a
+  stable named joint in the shared world-transform resolver. Godot-style
+  configuration warnings and Blender-style bone-parent dependency principles
+  inform four typed diagnostic fallbacks and ordinary-parent preservation.
+  Aetherfall's runeblade and pauldron now follow actual forearm/upper-arm pose;
+  renderer acceptance proves joint-only motion without local-transform
+  mutation. Studio attachment authoring, imported skeleton targets,
+  constraints/IK, physics handoff, and production clips remain open.
+
 - [ ] **Step 3: Execute Wave 4 as an independently accepted tranche**
 
   Complete bounded sculpt/paint/retopology/advanced proceduralism with compact
@@ -637,8 +648,8 @@ contracts.
   Studio task UI, explicit cost/consent preflight, durable provenance manifest,
   post-processing, rigging/animation, or provider-neutral abstraction.
 - The current Tripo adapter defaults to `Turbo-v1.0-20250506`. Tripo's current
-  v3 generation documentation now identifies `v3.1-20260211` as its latest
-  high-quality model and documents model-specific parameter compatibility.
+  generation documentation now exposes `P1-20260311` as its newest high-quality
+  tier alongside `v3.1-20260211`, with model-specific parameter compatibility.
   That concrete drift makes migration off the hard-coded model default part of
   the provider-contract work, not optional cleanup. Provider model IDs and
   supported options must be discovered/configured data rather than assumed to
@@ -680,6 +691,13 @@ contracts.
   dedicated conversion/resizing. These are strong capability matches for AGE,
   but they also confirm that a direct provider-specific Studio workflow would
   age badly.
+- Tripo's current rig schema covers biped, quadruped, hexapod, octopod, avian,
+  serpentine, and aquatic categories plus GLB/FBX animation retarget output.
+  Meshy's current programmatic rigging is explicitly aimed at textured standard
+  humanoids and accepts GLB input, with a 300,000-face ceiling before remeshing.
+  AGE must expose these as discovered adapter capabilities rather than promise a
+  least-common-denominator rig workflow that either overstates Meshy or hides
+  Tripo's broader creature support.
 - Both services meter work in credits, with cost depending on generation model
   and optional texture/topology/post-process stages. Prices are intentionally
   not frozen into this plan; AGE must fetch or accept a provider quote and show
@@ -689,7 +707,8 @@ contracts.
 - Provider retention and output rights are operational asset metadata, not a
   one-time account-selection concern. Meshy's current API documentation says
   non-Enterprise API outputs are retained for only three days, and its terms
-  distinguish free-plan CC BY 4.0 output from paid-plan rights. Tripo's current
+  distinguish free-plan CC BY 4.0 output from paid-plan rights; its current free
+  plan does not include API access or ordinary model downloads. Tripo's current
   terms likewise distinguish free and paid users and warn that generated output
   may not be exclusive. AGE must therefore copy completed artifacts immediately,
   record provider/plan/terms URL and retrieval timestamp, preserve attribution

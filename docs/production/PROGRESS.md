@@ -4,7 +4,7 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 13:57 Africa/Johannesburg
+Last verified: 2026-08-26 14:37 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
@@ -37,7 +37,25 @@ failed at 0.012555 and the new pose passes. Combined Aetherfall acceptance is
 45/45 and restricted module trust remains clean. This uses existing generic
 AGE contracts correctly and therefore does not add a genre-specific animation
 behavior to engine core. Production clips, foot planting, IK, bone
-attachments, and richer secondary motion remain open.
+attachment authoring UI, and richer secondary motion remain open.
+
+The current Godot/Blender-informed articulation slice adds generic named-joint
+attachments. Native rig evaluation now publishes pose-global matrices
+separately from skin matrices, and `Rekall.RigAttachment` composes any ordinary
+child entity as `local * jointPoseGlobal * parentWorld` in the shared world-
+transform resolver. Stable joint IDs, per-frame parent-pose caching, disabled
+passthrough, and four typed diagnostic fallbacks make the contract inspectable
+without adding humanoid or equipment behavior to engine core. Aetherfall binds
+its runeblade to `forearm_r` and pauldron to `upper_arm_l`; acceptance changes
+only joint deltas and proves rendered equipment motion with unchanged local
+transforms, while existing root motion still carries the blade exactly 2.5
+units. The moving RTX 5090 High Vulkan proof has 12,771 colors, luminance 0.115,
+313 draws, four dispatches, 66 renderables, and zero observations or asset
+fallbacks. Release is warning-free, affected contracts pass 82/82, Aetherfall
+passes 45/45, validation/trust are clean, and 2560x1440 High `desktop60`
+measures 6.860352 ms GPU time. Studio sockets, imported-skeleton targets,
+constraints/IK, physics handoff, production clips, and final character art
+remain open.
 
 The current deformation-authoring checkpoint adds two generic, inspectable
 modeling contracts. `assign_linear_skin_weights` and its graph/modifier

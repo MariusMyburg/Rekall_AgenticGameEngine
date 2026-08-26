@@ -605,6 +605,20 @@ contracts.
   origin placement. Its changelog demonstrates regular model and parameter
   churn, reinforcing the need for versioned provider capability snapshots:
   https://docs.meshy.ai/en/api/changelog.
+- The 2026-08-26 refresh also found capabilities that make Meshy a useful test
+  of a genuinely generic provider boundary rather than a second text-to-mesh
+  wrapper: Meshy-7/Ultra selection, adaptive decimation levels, UV unwrap,
+  lighting removal for relightable base color, emission maps, transparent
+  previews, text-to-motion, and separate convert/resize operations. None of
+  these belong in the AGE core as Meshy-specific concepts; adapters should map
+  them onto versioned topology, UV, material, preview, animation, conversion,
+  and transform capabilities where a portable AGE meaning exists, and retain
+  provider extensions as inspectable metadata otherwise.
+- Tripo's current P1 generation tier, detailed-geometry option, standard/
+  detailed/extreme texture tiers, image and ordered four-view generation, and
+  optional parts/quad output likewise reinforce runtime capability discovery.
+  The AGE adapter must not infer quality from a provider marketing label or
+  silently map AGE quality presets to paid remote operations.
 - Both services meter work in credits, with cost depending on generation model
   and optional texture/topology/post-process stages. Prices are intentionally
   not frozen into this plan; AGE must fetch or accept a provider quote and show
@@ -673,6 +687,12 @@ surface exercises more of the generic contract.
   terms permit redistribution. Promote capabilities from experimental only after
   a fresh official-API integration test and the editable packaged-game acceptance
   evidence above; otherwise retain local-file import as the reliable fallback.
+
+**Scheduling note (confirmed 2026-08-26):** retain this item on the post-
+Aetherfall list. Research and contract design may be refreshed without blocking
+the current playable milestone, but do not begin provider implementation or
+paid generation runs until Aetherfall's immediate modeling, animation, gameplay,
+and visual acceptance work is complete.
 
 ## Plan self-review
 

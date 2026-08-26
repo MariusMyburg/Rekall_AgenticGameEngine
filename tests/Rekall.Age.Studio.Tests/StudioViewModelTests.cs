@@ -1280,6 +1280,93 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task OrbitingMeshViewportChangesRenderedImageWithoutMutatingMeshData()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-orbit-camera-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Orbit Camera Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.SelectedMeshPrimitive = "box";
+            viewModel.MeshPrimitiveAssetIdInput = "hero-box";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            var before = viewModel.MeshViewportImage;
+            var mesh = await new RekallAgeMeshAssetStore().LoadAsync(root, "hero-box", CancellationToken.None);
+
+            viewModel.OrbitMeshViewport(0.4, 0.1);
+
+            Assert.NotSame(before, viewModel.MeshViewportImage);
+            var meshAfterOrbit = await new RekallAgeMeshAssetStore().LoadAsync(root, "hero-box", CancellationToken.None);
+            Assert.Equal(mesh.Revision, meshAfterOrbit.Revision);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task OpeningADifferentMeshAssetResetsCameraButReopeningSameMeshStartsFreshToo()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-orbit-reset-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Orbit Reset Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.SelectedMeshPrimitive = "box";
+            viewModel.MeshPrimitiveAssetIdInput = "box-a";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            viewModel.MeshPrimitiveAssetIdInput = "box-b";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            // box-b is now open at the identity camera (CreateMeshPrimitiveAsync opens what it creates).
+            var identityImageForBoxB = viewModel.MeshViewportImage;
+
+            viewModel.SelectedMeshAssetId = "box-a";
+            await ExecuteAsync(viewModel.OpenMeshAssetCommand);
+            viewModel.OrbitMeshViewport(0.6, 0.2);
+            var orbitedImageForBoxA = viewModel.MeshViewportImage;
+            Assert.NotSame(identityImageForBoxB, orbitedImageForBoxA);
+
+            viewModel.SelectedMeshAssetId = "box-b";
+            await ExecuteAsync(viewModel.OpenMeshAssetCommand);
+
+            // Re-opening box-b must start at the identity camera again, not inherit box-a's orbit.
+            var reopenedBoxBBytes = ToBytes(viewModel.MeshViewportImage!);
+            var identityBoxBBytes = ToBytes(identityImageForBoxB!);
+            Assert.Equal(identityBoxBBytes, reopenedBoxBBytes);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+
+        static byte[] ToBytes(System.Windows.Media.Imaging.BitmapSource image)
+        {
+            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
+            using var stream = new MemoryStream();
+            encoder.Save(stream);
+            return stream.ToArray();
+        }
+    }
+
+    [Fact]
     public async Task ViewModelExposesDistinctEditAndPersistentSimulateModes()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-mode-" + Guid.NewGuid().ToString("N"));

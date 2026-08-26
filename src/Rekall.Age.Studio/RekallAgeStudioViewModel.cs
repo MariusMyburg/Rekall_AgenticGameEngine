@@ -91,6 +91,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly Action<string> _openPackageFolder;
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
+    private RekallAgeStudioViewportCamera _meshViewportCamera = RekallAgeStudioViewportCamera.Identity;
     private readonly RekallAgeAsyncCommand _refreshMeshAssetsCommand;
     private readonly RekallAgeAsyncCommand _createMeshPrimitiveCommand;
     private readonly RekallAgeAsyncCommand _openMeshAssetCommand;
@@ -1045,6 +1046,53 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         StatusText = MeshSummary;
     }
 
+    /// <summary>Orbits the mesh viewport camera by the given yaw/pitch deltas, in radians.</summary>
+    public void OrbitMeshViewport(double deltaYaw, double deltaPitch)
+    {
+        _meshViewportCamera = _meshViewportCamera with
+        {
+            Yaw = _meshViewportCamera.Yaw + deltaYaw,
+            Pitch = Math.Clamp(_meshViewportCamera.Pitch + deltaPitch, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01)
+        };
+        RefreshMeshEditingState();
+    }
+
+    /// <summary>Pans the mesh viewport camera by the given screen-space pixel deltas.</summary>
+    public void PanMeshViewport(double deltaX, double deltaY)
+    {
+        _meshViewportCamera = _meshViewportCamera with
+        {
+            PanX = _meshViewportCamera.PanX + deltaX,
+            PanY = _meshViewportCamera.PanY + deltaY
+        };
+        RefreshMeshEditingState();
+    }
+
+    /// <summary>Multiplies the mesh viewport camera's zoom by <paramref name="factor"/> (greater than 1 zooms in).</summary>
+    public void ZoomMeshViewport(double factor)
+    {
+        if (!double.IsFinite(factor) || factor <= 0) return;
+        _meshViewportCamera = _meshViewportCamera with
+        {
+            Zoom = Math.Clamp(_meshViewportCamera.Zoom * factor, 0.05, 50)
+        };
+        RefreshMeshEditingState();
+    }
+
+    /// <summary>Toggles the mesh viewport camera between orthographic and perspective projection.</summary>
+    public void ToggleMeshViewportProjection()
+    {
+        _meshViewportCamera = _meshViewportCamera with { Orthographic = !_meshViewportCamera.Orthographic };
+        RefreshMeshEditingState();
+    }
+
+    /// <summary>Resets the mesh viewport camera's pan/zoom (keeping its current orbit angle), re-centering on the mesh.</summary>
+    public void FrameSelectedMeshViewport()
+    {
+        _meshViewportCamera = _meshViewportCamera with { PanX = 0, PanY = 0, Zoom = 1 };
+        RefreshMeshEditingState();
+    }
+
     public string? LastPackagePath
     {
         get => _lastPackagePath;
@@ -1619,6 +1667,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private Task OpenMeshAssetAsync() => RunModelingAsync(async () =>
     {
+        _meshViewportCamera = RekallAgeStudioViewportCamera.Identity;
         await _modeling.OpenAsync(_session.ProjectRoot!, SelectedMeshAssetId!, _lifecycleCancellation.Token);
         _modeling.SetDomain(MeshEditDomain);
         RefreshMeshEditingState();
@@ -1944,7 +1993,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (SelectedMeshElementId is null || !MeshElementIds.Contains(SelectedMeshElementId.Value)) SelectedMeshElementId = MeshElementIds.Count == 0 ? null : MeshElementIds[0];
         Replace(MeshSelectionLines, _modeling.SelectedElementIds.Select((id, index) => $"{index + 1}. {MeshEditDomain} {id}{(id == _modeling.ActiveElementId ? " (active)" : string.Empty)}"));
         MeshSummary = $"{mesh.Name} r{mesh.Revision} · {mesh.Topology.PointIds.Count} points · {mesh.Topology.EdgeIds.Count} edges · {mesh.Topology.FaceIds.Count} faces · {_modeling.SelectedElementIds.Count} selected{(_modeling.Preview is null ? string.Empty : " · PREVIEW")}";
-        _meshViewportFrame = _meshViewportRenderer.Render(mesh, MeshEditDomain, _modeling.SelectedElementIds, 640, 360, _modeling.Preview is not null);
+        _meshViewportFrame = _meshViewportRenderer.Render(mesh, MeshEditDomain, _modeling.SelectedElementIds, 640, 360, _modeling.Preview is not null, _meshViewportCamera);
         MeshViewportImage = _meshViewportFrame.Image;
         OnPropertyChanged(nameof(MeshEditDomain)); RefreshCommands();
     }

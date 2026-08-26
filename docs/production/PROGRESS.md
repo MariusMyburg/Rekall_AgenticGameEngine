@@ -4,25 +4,25 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 05:06 Africa/Johannesburg
+Last verified: 2026-08-26 05:31 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
 
-The current Aetherfall engine-driven milestone adds native weighted procedural
-mesh deformation. Point-domain joint indices and weights survive validation,
-ordinary semantic mesh edits, model compilation, runtime projection, and the
-existing generic skeleton-pose renderer. Aetherfall proves the contract with a
-public-command-authored, tapered and folded Warden mantle whose weighted vertex
-position changes between runtime frames. `Rekall.SkeletonPose` is now exposed
-through the ordinary built-in authoring schema. A real RTX 5090 High Vulkan
-capture succeeds with zero observations or asset fallbacks; the Aetherfall
-acceptance class passes 17/17, strict movement/combat/progression/reset proofs
-pass 2/4/4/5, validation reports zero issues, and the High desktop60 budget
-passes at 71 draws, 193,124 triangles, 748,520 vertices, and a measured 4.665
-ms GPU frame. This is a functional skin-binding milestone, not final visual
-acceptance: native armature documents, weight-paint tooling, constraints, and a
-major character/environment fidelity pass remain in progress.
+The current Aetherfall engine-driven milestone adds truthful native Vulkan
+screen-space ambient occlusion on top of native weighted procedural mesh
+deformation. High/Epic now execute a bounded depth-derived `ssao-resolve` pass
+between opaque HDR and volumetric fog instead of advertising a placeholder AO
+resource. A real RTX 5090 High capture succeeds with clean restrained contact
+darkening, zero observations or asset fallbacks, and no black-dot noise or
+newly crushed silhouettes. The consolidated selection passes 72/72; strict
+movement/combat/progression/reset proofs pass 2/4/4/5; both validators report
+zero issues; and the High desktop60 budget passes at 71 scene draws, 193,124
+triangles, 748,520 vertices, and a measured 4.810080 ms GPU frame. SSAO itself
+accounts for one render-work draw and 0.011712 ms. This is a functional
+depth-only SSAO and skin-binding milestone, not final visual acceptance:
+normal-aware denoising, native armature/weight-paint tooling, and a major
+character/environment fidelity pass remain in progress.
 
 Current execution order is governed by
 [`STRATEGIC-PRIORITIES.md`](STRATEGIC-PRIORITIES.md). The immediate acceptance
@@ -3136,6 +3136,20 @@ behavior.
   `0CD2E7AA3AB10D941004E455A69E6EEAF532E47425B5DA52417D89F73A50EE9B`.
 
 ## Recently completed
+
+- Native Vulkan SSAO now executes as a truthful graphics pass after opaque HDR
+  and before fog. High uses eight deterministic depth taps and Epic twelve,
+  with background rejection and a conservative occlusion floor. The RTX 5090
+  High Aetherfall capture at
+  `Examples/AetherfallCitadel/Proof/Captures/NativeSsao/vulkan-scene-1280x720-20260826032647150.png`
+  is clean and informative: 11,551 distinct colors, 17.0% dominant-color share,
+  mean luminance 0.100, 226 render-work draws, four dispatches, zero runtime or
+  asset diagnostics, and no black-dot noise. The focused consolidated suite is
+  72/72; gameplay remains 2/4/4/5; validation is clean; and High desktop60 is
+  within every configured budget at 4.810080 ms, including 0.011712 ms for
+  `ssao-resolve`. The remaining AO work is explicitly the higher-fidelity
+  normal-aware, half-resolution, bilateral/temporal path rather than more
+  hardening of this playable first slice.
 
 The native procedural skin-binding slice is acceptance-green. AGE now
 validates paired point-domain `Int4` joint indices and `Float4` weights,

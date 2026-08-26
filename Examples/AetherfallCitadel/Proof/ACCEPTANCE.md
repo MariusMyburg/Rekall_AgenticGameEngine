@@ -388,3 +388,33 @@ the new background is an explicit fallback, not a claim that sky assets render.
   production. Native armature assets, bind-pose/hierarchy editing, automatic
   and painted weight tools, constraints, Studio rig visualization, and a much
   larger character/environment fidelity pass remain outstanding.
+
+## Native Vulkan SSAO checkpoint
+
+- The High/Epic Vulkan graph now contains a truthful `ssao-resolve` graphics
+  pass after `opaque-hdr` and before volumetric fog. The old placeholder
+  `ssao-occlusion` resource and its false producer/consumer edges are gone.
+- The native pass samples the actual scene depth, rejects background pixels,
+  reconstructs view-space depth, and applies a deterministic rotated disk of
+  eight taps on High or twelve on Epic. It multiplicatively darkens loaded HDR
+  with a conservative `0.55` floor, then restores depth for later consumers.
+- The real RTX 5090 High Vulkan proof is
+  `Proof/Captures/NativeSsao/vulkan-scene-1280x720-20260826032647150.png`.
+  At frame 30 it records 11,551 distinct colors, 17.0% dominant-color share,
+  mean luminance 0.100, 226 render-work draws, four dispatches, and zero
+  observations, missing assets, unsupported assets, or fallbacks.
+- Visual inspection confirms a stable, clean result with restrained contact
+  darkening around the Warden, rubble, and architecture, without the earlier
+  black-dot noise, halos, banding, or newly crushed silhouettes.
+- The consolidated render-graph, planner, shader, native-executor, and
+  Aetherfall selection passes 72/72. Movement, combat, progression, and reset
+  still pass all 2/4/4/5 strict assertions with Warden X movement at
+  `0.506840`. Project and scene validation report zero issues.
+- High `desktop60` at 1280x720 passes at 71 scene draws, 193,124 triangles,
+  748,520 vertices, and a measured 4.810080 ms GPU frame. Native SSAO accounts
+  for one render-work draw and 0.011712 ms; the complete workload is 226 draws
+  and four dispatches.
+- This is a functional, bounded depth-only SSAO milestone. It is not yet the
+  deferred normal-aware, half-resolution, bilateral/temporal-denoised solution,
+  and it does not by itself close the remaining character, prop, environment,
+  material, composition, and animation fidelity gap.

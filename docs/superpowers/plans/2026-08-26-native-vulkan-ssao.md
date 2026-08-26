@@ -244,7 +244,7 @@ git commit -m "feat: execute native vulkan ssao"
 - Consumes: native `ssao-resolve` pass and unchanged Aetherfall High settings.
 - Produces: retained capture path/statistics, gameplay/validation/budget evidence, and explicit residual visual gaps.
 
-- [ ] **Step 1: Capture a real High Vulkan Aetherfall frame**
+- [x] **Step 1: Capture a real High Vulkan Aetherfall frame**
 
 ```powershell
 dotnet run --project src\Rekall.Age.Cli --no-build -- render viewport capture Examples\AetherfallCitadel Main 30 Examples\AetherfallCitadel\Proof\Captures\NativeSsao 1280 720 vulkan '[]' High '{}' true
@@ -253,14 +253,14 @@ dotnet run --project src\Rekall.Age.Cli --no-build -- render viewport capture Ex
 Expected: NVIDIA Vulkan, `ssao-resolve` reports one draw/timing, zero
 observations/missing/unsupported/fallback assets, informative PNG.
 
-- [ ] **Step 2: Inspect the PNG visually**
+- [x] **Step 2: Inspect the PNG visually**
 
 Use the local image viewer. Require stronger grounding at Warden feet, rubble,
 gate, and wall intersections without black dots, halos, banding, or large
 silhouette crushing. If the frame fails, repair generic radius/bias/strength
 and repeat the same capture; do not hide failure by disabling SSAO.
 
-- [ ] **Step 3: Run consolidated automated verification**
+- [x] **Step 3: Run consolidated automated verification**
 
 ```powershell
 dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~HighFidelityRenderGraphTests|FullyQualifiedName~InteractiveAmbientOcclusionPlannerTests|FullyQualifiedName~VulkanShaderCompilerTests|FullyQualifiedName~VulkanHighFidelityCaptureTests|FullyQualifiedName~VulkanSceneCommandPlanTests|FullyQualifiedName~AetherfallHighFidelityAcceptanceTests"
@@ -268,7 +268,7 @@ dotnet test tests\Rekall.Age.Tests\Rekall.Age.Tests.csproj --no-restore --filter
 
 Expected: zero failures.
 
-- [ ] **Step 4: Re-run gameplay, validation, and budget gates**
+- [x] **Step 4: Re-run gameplay, validation, and budget gates**
 
 Run all four checked-in proof payload pairs through `runtime inspect`, then:
 
@@ -280,14 +280,14 @@ dotnet run --project src\Rekall.Age.Cli --no-build -- render performance budget 
 
 Expected: gameplay assertions 2/4/4/5, zero validation issues, and within every desktop60 budget.
 
-- [ ] **Step 5: Record exact evidence and residual gaps**
+- [x] **Step 5: Record exact evidence and residual gaps**
 
 Append the capture path, distinct-color/luminance/draw/dispatch/timing facts,
 visual inspection outcome, test count, gameplay counts, validation status, and
 budget counts to Aetherfall acceptance and production progress. State plainly
 that native depth-only SSAO is not the deferred normal-aware denoised solution.
 
-- [ ] **Step 6: Verify, commit, and push**
+- [x] **Step 6: Verify, commit, and push**
 
 ```powershell
 git diff --check

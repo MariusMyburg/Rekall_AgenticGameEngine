@@ -120,6 +120,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _openModelingGraphCommand;
     private readonly RekallAgeAsyncCommand _evaluateModelingGraphCommand;
     private readonly RekallAgeAsyncCommand _applyModelingGraphParametersCommand;
+    private readonly RekallAgeStudioMaterialGraphSession _materialGraph = new();
+    private readonly RekallAgeAsyncCommand _refreshMaterialGraphsCommand;
+    private readonly RekallAgeAsyncCommand _openMaterialGraphCommand;
+    private readonly RekallAgeAsyncCommand _applyMaterialGraphParametersCommand;
     private Process? _player;
     private CancellationTokenSource? _agentCancellation;
     private RekallAgeLanguageModelProviderLease? _languageModelProviderLease;
@@ -196,6 +200,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _modelingGraphSummary = "Open a procedural graph to inspect its nodes and evaluation evidence.";
     private BitmapSource? _modelingGraphViewportImage;
     private RekallAgeStudioModelingGraphNodeView? _selectedModelingGraphNode;
+    private string? _selectedMaterialGraphAssetId;
+    private string _materialGraphSummary = "Open a material graph to inspect its node contracts.";
+    private RekallAgeStudioMaterialGraphNodeView? _selectedMaterialGraphNode;
     private string? _lastPackagePath;
     private string? _lastPackageOutputDirectory;
     private string? _lastPackageLaunchPath;
@@ -400,6 +407,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _openModelingGraphCommand = CreateAsyncCommand(OpenModelingGraphAsync, CanOpenModelingGraph);
         _evaluateModelingGraphCommand = CreateAsyncCommand(EvaluateModelingGraphAsync, CanEvaluateModelingGraph);
         _applyModelingGraphParametersCommand = CreateAsyncCommand(ApplyModelingGraphParametersAsync, CanApplyModelingGraphParameters);
+        _refreshMaterialGraphsCommand = CreateAsyncCommand(RefreshMaterialGraphsAsync, HasOpenProject);
+        _openMaterialGraphCommand = CreateAsyncCommand(OpenMaterialGraphAsync, CanOpenMaterialGraph);
+        _applyMaterialGraphParametersCommand = CreateAsyncCommand(ApplyMaterialGraphParametersAsync, CanApplyMaterialGraphParameters);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -433,6 +443,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<RekallAgeStudioModelingGraphNodeView> ModelingGraphNodes { get; } = [];
     public ObservableCollection<string> ModelingGraphDiagnosticLines { get; } = [];
     public ObservableCollection<RekallAgeStudioModelingGraphParameterModel> ModelingGraphParameterEditors { get; } = [];
+    public ObservableCollection<string> MaterialGraphAssetIds { get; } = [];
+    public ObservableCollection<RekallAgeStudioMaterialGraphNodeView> MaterialGraphNodes { get; } = [];
+    public ObservableCollection<RekallAgeStudioMaterialGraphParameterModel> MaterialGraphParameterEditors { get; } = [];
+    public ObservableCollection<string> MeshAttributeSummaries { get; } = [];
+    public ObservableCollection<string> MeshMaterialSlotSummaries { get; } = [];
     public IReadOnlyList<RekallAgeGeometryDomain> MeshEditDomains { get; } =
         [RekallAgeGeometryDomain.Point, RekallAgeGeometryDomain.Edge, RekallAgeGeometryDomain.Face, RekallAgeGeometryDomain.Corner];
     public IReadOnlyList<RekallAgeLanguageModelToolExecution> LastAgentToolExecutions => _lastAgentToolExecutions;
@@ -509,6 +524,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand OpenModelingGraphCommand => _openModelingGraphCommand;
     public ICommand EvaluateModelingGraphCommand => _evaluateModelingGraphCommand;
     public ICommand ApplyModelingGraphParametersCommand => _applyModelingGraphParametersCommand;
+    public ICommand RefreshMaterialGraphsCommand => _refreshMaterialGraphsCommand;
+    public ICommand OpenMaterialGraphCommand => _openMaterialGraphCommand;
+    public ICommand ApplyMaterialGraphParametersCommand => _applyMaterialGraphParametersCommand;
 
     public string SelectedQualityPreset
     {
@@ -1000,6 +1018,28 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             if (!Set(ref _selectedModelingGraphNode, value)) return;
             RefreshModelingGraphParameterEditors();
+        }
+    }
+
+    public string? SelectedMaterialGraphAssetId
+    {
+        get => _selectedMaterialGraphAssetId;
+        set { if (Set(ref _selectedMaterialGraphAssetId, value)) RefreshCommands(); }
+    }
+
+    public string MaterialGraphSummary
+    {
+        get => _materialGraphSummary;
+        private set => Set(ref _materialGraphSummary, value);
+    }
+
+    public RekallAgeStudioMaterialGraphNodeView? SelectedMaterialGraphNode
+    {
+        get => _selectedMaterialGraphNode;
+        set
+        {
+            if (!Set(ref _selectedMaterialGraphNode, value)) return;
+            RefreshMaterialGraphParameterEditors();
         }
     }
 
@@ -2113,6 +2153,71 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         finally { IsBusy = false; }
     }
 
+    private async Task RunMaterialGraphAsync(Func<Task> operation)
+    {
+        if (IsBusy) return;
+        IsBusy = true;
+        try { await operation(); StatusText = MaterialGraphSummary; }
+        catch (Exception exception) when (exception is IOException
+                                            or InvalidOperationException
+                                            or InvalidDataException
+                                            or ArgumentException
+                                            or JsonException
+                                            or RekallAgeDocumentRevisionException)
+        {
+            StatusText = exception.Message;
+        }
+        finally { IsBusy = false; }
+    }
+
+    private Task RefreshMaterialGraphsAsync() => RunMaterialGraphAsync(() =>
+    {
+        if (_session.ProjectRoot is null) throw new InvalidOperationException("Open a project before browsing material graphs.");
+        Replace(MaterialGraphAssetIds, _materialGraph.ListAssets(_session.ProjectRoot));
+        if (SelectedMaterialGraphAssetId is null || !MaterialGraphAssetIds.Contains(SelectedMaterialGraphAssetId))
+            SelectedMaterialGraphAssetId = MaterialGraphAssetIds.FirstOrDefault();
+        MaterialGraphSummary = MaterialGraphAssetIds.Count == 0
+            ? "No persisted material graphs are present in Materials/Graphs."
+            : $"{MaterialGraphAssetIds.Count} material graph asset(s) available.";
+        return Task.CompletedTask;
+    });
+
+    private Task OpenMaterialGraphAsync() => RunMaterialGraphAsync(async () =>
+    {
+        await _materialGraph.OpenAsync(_session.ProjectRoot!, SelectedMaterialGraphAssetId!, _lifecycleCancellation.Token);
+        Replace(MaterialGraphNodes, _materialGraph.Nodes);
+        MaterialGraphSummary = _materialGraph.EvaluationSummary;
+        SelectedMaterialGraphNode = MaterialGraphNodes.FirstOrDefault();
+    });
+
+    private Task ApplyMaterialGraphParametersAsync() => RunMaterialGraphAsync(async () =>
+    {
+        var selectedNodeId = SelectedMaterialGraphNode!.NodeId;
+        await _materialGraph.ApplyParameterEditsAsync(selectedNodeId, MaterialGraphParameterEditors, "studio", _lifecycleCancellation.Token);
+        Replace(MaterialGraphNodes, _materialGraph.Nodes);
+        SelectedMaterialGraphNode = MaterialGraphNodes.FirstOrDefault(item => item.NodeId == selectedNodeId);
+        MaterialGraphSummary = _materialGraph.EvaluationSummary;
+    });
+
+    private void RefreshMaterialGraphParameterEditors()
+    {
+        Replace(MaterialGraphParameterEditors, SelectedMaterialGraphNode is null
+            ? []
+            : _materialGraph.CreateParameterEditors(SelectedMaterialGraphNode.NodeId));
+        foreach (var editor in MaterialGraphParameterEditors)
+            editor.PropertyChanged += (_, _) => RefreshCommands();
+        RefreshCommands();
+    }
+
+    private bool CanOpenMaterialGraph() => HasEditableProject() && !string.IsNullOrWhiteSpace(SelectedMaterialGraphAssetId);
+
+    private bool CanApplyMaterialGraphParameters() =>
+        HasEditableProject()
+        && SelectedMaterialGraphNode is not null
+        && MaterialGraphParameterEditors.Count > 0
+        && MaterialGraphParameterEditors.All(item => item.IsValid)
+        && MaterialGraphParameterEditors.Any(item => item.IsModified);
+
     private void RefreshModelingGraphParameterEditors()
     {
         Replace(ModelingGraphParameterEditors, SelectedModelingGraphNode is null
@@ -2148,9 +2253,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (_modeling.Mesh is null)
         {
             Replace(MeshElementIds, []); Replace(MeshOperationIds, []); Replace(MeshSelectionLines, []);
+            Replace(MeshAttributeSummaries, []); Replace(MeshMaterialSlotSummaries, []);
             _meshViewportFrame = null; MeshViewportImage = null; RefreshCommands(); return;
         }
         var mesh = _modeling.Preview?.Mesh ?? _modeling.Mesh;
+        Replace(MeshAttributeSummaries, mesh.Attributes.Select(attribute =>
+            $"{attribute.Name} · {attribute.Domain} · {attribute.ValueType}{(attribute.Semantic is null ? string.Empty : $" · {attribute.Semantic}")} · {attribute.Values.Count} value(s)"));
+        Replace(MeshMaterialSlotSummaries, mesh.MaterialSlots.Select(slot =>
+            $"{slot.Name} · {(slot.MaterialAssetId is null ? "(unassigned)" : slot.MaterialAssetId)}"));
         var ids = MeshEditDomain switch
         {
             RekallAgeGeometryDomain.Point => mesh.Topology.PointIds,
@@ -3959,6 +4069,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _openModelingGraphCommand.RaiseCanExecuteChanged();
         _evaluateModelingGraphCommand.RaiseCanExecuteChanged();
         _applyModelingGraphParametersCommand.RaiseCanExecuteChanged();
+        _refreshMaterialGraphsCommand.RaiseCanExecuteChanged();
+        _openMaterialGraphCommand.RaiseCanExecuteChanged();
+        _applyMaterialGraphParametersCommand.RaiseCanExecuteChanged();
     }
 
     private RekallAgeAsyncCommand CreateAsyncCommand(Func<Task> execute, Func<bool> canExecute) =>

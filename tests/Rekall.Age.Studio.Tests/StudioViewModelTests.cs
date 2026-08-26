@@ -1281,6 +1281,99 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task OpeningAMaterialGraphExposesNodesAndAppliesAColorParameterEditThroughTheRealPatchPipeline()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-material-graph-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var nodes = new[]
+            {
+                new RekallAgeMaterialGraphNode("emissive", "rekall.material.surface.emissive", 1, new JsonObject()),
+                new RekallAgeMaterialGraphNode("output", "rekall.material.output", 1, new JsonObject())
+            };
+            var graph = RekallAgeMaterialGraphAsset.Create(
+                "glow-material",
+                "Glow Material",
+                nodes,
+                [new RekallAgeMaterialGraphLink("emissive-output", "emissive", "surface", "output", "surface")],
+                new RekallAgeMaterialGraphOutput("surface", "output", "surface"));
+
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Material Graph Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await new RekallAgeMaterialGraphAssetStore().SaveIfRevisionAsync(
+                root, graph, Rekall.Age.Core.Persistence.RekallAgeDocumentRevision.Missing, CancellationToken.None);
+            viewModel.SelectedMaterialGraphAssetId = "glow-material";
+            await ExecuteAsync(viewModel.OpenMaterialGraphCommand);
+
+            Assert.Equal(2, viewModel.MaterialGraphNodes.Count);
+            viewModel.SelectedMaterialGraphNode = viewModel.MaterialGraphNodes.Single(node => node.NodeId == "emissive");
+            var colorEditor = Assert.Single(viewModel.MaterialGraphParameterEditors, editor => editor.ParameterId == "color");
+            Assert.Equal("#ffffff", colorEditor.ValueText);
+            colorEditor.ValueText = "#ff8800";
+            Assert.True(colorEditor.IsValid);
+            Assert.True(colorEditor.IsModified);
+
+            await ExecuteAsync(viewModel.ApplyMaterialGraphParametersCommand);
+
+            var persisted = await new RekallAgeMaterialGraphAssetStore().LoadAsync(root, "glow-material", CancellationToken.None);
+            var emissiveNode = Assert.Single(persisted.Nodes, node => node.NodeId == "emissive");
+            Assert.Equal("#ff8800", emissiveNode.Parameters["color"]!.GetValue<string>());
+            Assert.Equal(2, persisted.Revision);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task OpeningAMeshExposesItsNamedAttributesAndMaterialSlots()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-uv-attributes-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "UV Attributes Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.SelectedMeshPrimitive = "box";
+            viewModel.MeshPrimitiveAssetIdInput = "hero-box";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+
+            // A freshly authored primitive genuinely has no named attributes or material slots yet
+            // - the inspector must reflect that honestly rather than showing placeholder rows.
+            Assert.Empty(viewModel.MeshAttributeSummaries);
+            Assert.Empty(viewModel.MeshMaterialSlotSummaries);
+
+            viewModel.MeshEditDomain = RekallAgeGeometryDomain.Face;
+            viewModel.SelectedMeshElementId = viewModel.MeshElementIds[0];
+            await ExecuteAsync(viewModel.SelectMeshElementCommand);
+            viewModel.SelectedMeshOperationId = "generate_normals";
+            await ExecuteAsync(viewModel.ApplyMeshOperationCommand);
+
+            Assert.Contains(viewModel.MeshAttributeSummaries, line => line.Contains("normal.generated", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ModalDragAppliesTheOperationThroughTheRealPreviewApplyPipeline()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-modal-drag-" + Guid.NewGuid().ToString("N"));

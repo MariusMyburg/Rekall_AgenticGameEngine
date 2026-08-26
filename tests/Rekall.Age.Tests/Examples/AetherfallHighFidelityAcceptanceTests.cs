@@ -60,6 +60,69 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             $"Compiled revolve consumer '{compiledPath}' must be retained with the project.");
     }
 
+    [Fact]
+    public async Task ConduitPublishesCounterWoundScrewGeometryAndReplacesRuinProxies()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var graph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
+            projectRoot, "aetherfall.conduit.graph", CancellationToken.None);
+        var screws = graph.Nodes
+            .Where(node => node.TypeId == "rekall.modeling.curve.revolve")
+            .OrderBy(node => node.NodeId, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(2, screws.Length);
+        Assert.Contains(screws, node => node.Parameters["pitchPerTurn"]!.GetValue<double>() > 0);
+        Assert.Contains(screws, node => node.Parameters["pitchPerTurn"]!.GetValue<double>() < 0);
+        Assert.All(screws, node =>
+        {
+            Assert.True(node.Parameters["angleDegrees"]!.GetValue<double>() >= 1_080);
+            Assert.True(node.Parameters["segments"]!.GetValue<int>() >= 72);
+        });
+        var raisedCore = Assert.Single(graph.Nodes, node =>
+            node.NodeId == "core-x" && node.TypeId == "rekall.modeling.transform");
+        Assert.True(raisedCore.Parameters["translation"]![1]!.GetValue<double>() >= 1.7);
+        Assert.Contains(graph.Links, link => link.FromNodeId == "core" && link.ToNodeId == raisedCore.NodeId);
+        Assert.Contains(graph.Links, link => link.FromNodeId == raisedCore.NodeId && link.ToNodeId == "core-material");
+
+        var evaluation = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default,
+            new(812, 0, "aetherfall-screw-acceptance", "desktop"), CancellationToken.None);
+        Assert.True(evaluation.Succeeded, string.Join(Environment.NewLine, evaluation.Diagnostics.Select(item => item.Message)));
+        var evaluatedOffsets = Assert.Single(
+            evaluation.Outputs["mesh"].Attributes,
+            attribute => attribute.Name == "revolve.axial_offset");
+        Assert.Contains(evaluatedOffsets.Values, value => value.GetDouble() >= 2.7 - 1e-9);
+        Assert.Contains(evaluatedOffsets.Values, value => value.GetDouble() <= -2.7 + 1e-9);
+
+        var baked = await new RekallAgeMeshAssetStore().LoadVersionedAsync(
+            projectRoot, "aetherfall-conduit-mesh", CancellationToken.None);
+        Assert.Contains(baked.Value.MaterialSlots, slot => slot.MaterialAssetId == "aetherfall.citadel-obsidian.material");
+        Assert.Contains(baked.Value.MaterialSlots, slot => slot.MaterialAssetId == "aetherfall.warden-steel.material");
+        Assert.Contains(baked.Value.Attributes, attribute => attribute.Name == "revolve.axial_offset");
+        Assert.Contains(baked.Value.Attributes, attribute =>
+            attribute.Name == "normal.authored" && attribute.Domain == RekallAgeGeometryDomain.Corner);
+
+        var model = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(
+            projectRoot, "Assets", "Models", "aetherfall-conduit-model.age.model.json")))!.AsObject();
+        Assert.Equal(baked.Revision, model["lastSuccessfulBuild"]!["sourceFileRevision"]!.GetValue<string>());
+        var compiledPath = model["lastSuccessfulBuild"]!["compiledMeshPath"]!.GetValue<string>();
+        Assert.True(File.Exists(Path.Combine(projectRoot, compiledPath)));
+
+        var scene = await new RekallAgeSceneStore().LoadAsync(projectRoot, "Main", CancellationToken.None);
+        foreach (var name in new[] { "ArrivalConduit", "ResonanceConduit" })
+        {
+            var entity = Assert.Single(scene.Entities, item => item.Name == name);
+            var reference = Assert.Single(entity.Components, component => component.Type == "Rekall.ModelAssetReference");
+            Assert.Equal("aetherfall-conduit-model", reference.Properties["assetId"]!.GetValue<string>());
+            var transform = Assert.Single(entity.Components, component => component.Type == "Rekall.Transform3D");
+            Assert.True(transform.Properties["scaleY"]!.GetValue<double>() >= 0.8,
+                $"{name} must present the authored helix at a readable world scale.");
+            Assert.True(transform.Properties["y"]!.GetValue<double>() >= 1.3,
+                $"{name} must place the centered conduit mesh above the ground plane.");
+        }
+    }
+
     [Theory]
     [InlineData("aetherfall.warden.graph", "aetherfall-warden-dark-mesh", "aetherfall-warden-dark-model.age.model.json", 55.0)]
     [InlineData("aetherfall.weathered-ruin.graph", "aetherfall-weathered-ruin-mesh", "aetherfall-weathered-ruin-model.age.model.json", 35.0)]

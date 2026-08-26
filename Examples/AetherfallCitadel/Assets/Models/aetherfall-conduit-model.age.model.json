@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall-conduit-model",
   "displayName": "Aether Conduit",
-  "revision": 1,
+  "revision": 3,
   "source": {
     "kind": "Mesh",
     "assetId": "aetherfall-conduit-mesh",
@@ -10,12 +10,12 @@
   },
   "buildState": 0,
   "lastSuccessfulBuild": {
-    "sourceFileRevision": "33bdcf495928a9e96f7a3c88f3872743d174ebaf6a255523eaddf79a21a28afe",
-    "sourceLogicalRevision": 1,
-    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-conduit-model/56aba95867bcec25a0358c7b586728e8d08c0e2ec038b000bd61584b286cb497.age.compiled-mesh.json",
-    "compiledContentHash": "56aba95867bcec25a0358c7b586728e8d08c0e2ec038b000bd61584b286cb497",
+    "sourceFileRevision": "edb8bcc1687841c5be50a78f84c0e088fed564cef9dfc9f1910c36b248409382",
+    "sourceLogicalRevision": 3,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-conduit-model/e93f633d2c40df10e08d28f65ee18c65d05ee699b59cc26637285c87c32e2130.age.compiled-mesh.json",
+    "compiledContentHash": "e93f633d2c40df10e08d28f65ee18c65d05ee699b59cc26637285c87c32e2130",
     "compilerVersion": "rekall-age-model-compiler-v1",
-    "builtAtUtc": "2026-08-24T14:45:06.0305965+00:00",
+    "builtAtUtc": "2026-08-26T04:55:43.7638761+00:00",
     "diagnostics": []
   },
   "frozen": false

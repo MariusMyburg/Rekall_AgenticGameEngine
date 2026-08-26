@@ -1242,10 +1242,6 @@
           }
         },
         {
-          "type": "Rekall.MeshRenderer",
-          "properties": {}
-        },
-        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#414844",
@@ -1260,20 +1256,24 @@
           }
         },
         {
-          "type": "Rekall.Transform3D",
-          "properties": {
-            "x": 3.1,
-            "y": 0,
-            "z": -1.8,
-            "scaleX": 0.3,
-            "scaleY": 0.42,
-            "scaleZ": 0.3
-          }
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
         },
         {
           "type": "Rekall.ModelAssetReference",
           "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
+            "assetId": "aetherfall-conduit-model"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 3.1,
+            "z": -1.8,
+            "scaleX": 0.9,
+            "scaleY": 0.9,
+            "scaleZ": 0.9,
+            "y": 1.55
           }
         }
       ],
@@ -9175,20 +9175,20 @@
           }
         },
         {
-          "type": "Rekall.Transform3D",
+          "type": "Rekall.ModelAssetReference",
           "properties": {
-            "x": 0,
-            "y": 0,
-            "z": 22,
-            "scaleX": 0.28,
-            "scaleY": 0.38,
-            "scaleZ": 0.28
+            "assetId": "aetherfall-conduit-model"
           }
         },
         {
-          "type": "Rekall.ModelAssetReference",
+          "type": "Rekall.Transform3D",
           "properties": {
-            "assetId": "aetherfall-weathered-ruin-model"
+            "x": 0,
+            "z": 22,
+            "scaleX": 0.95,
+            "scaleY": 0.95,
+            "scaleZ": 0.95,
+            "y": 1.65
           }
         }
       ],

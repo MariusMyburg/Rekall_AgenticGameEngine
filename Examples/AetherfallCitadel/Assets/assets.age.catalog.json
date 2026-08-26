@@ -62,9 +62,9 @@
       "name": "aetherfall-conduit-model",
       "displayName": "Aether Conduit",
       "kind": "model",
-      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-conduit-mesh.age.mesh.json",
-      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-conduit-model\\56aba95867bcec25a0358c7b586728e8d08c0e2ec038b000bd61584b286cb497.age.compiled-mesh.json",
-      "contentHash": "56aba95867bcec25a0358c7b586728e8d08c0e2ec038b000bd61584b286cb497",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-conduit-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-conduit-model\\e93f633d2c40df10e08d28f65ee18c65d05ee699b59cc26637285c87c32e2130.age.compiled-mesh.json",
+      "contentHash": "e93f633d2c40df10e08d28f65ee18c65d05ee699b59cc26637285c87c32e2130",
       "glbMetadata": null,
       "textureMetadata": null,
       "provenance": null,
@@ -72,8 +72,8 @@
         "modelDocumentPath": "Assets/Models/aetherfall-conduit-model.age.model.json",
         "sourceKind": "Mesh",
         "sourceAssetId": "aetherfall-conduit-mesh",
-        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-conduit-model/56aba95867bcec25a0358c7b586728e8d08c0e2ec038b000bd61584b286cb497.age.compiled-mesh.json",
-        "compiledContentHash": "56aba95867bcec25a0358c7b586728e8d08c0e2ec038b000bd61584b286cb497"
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-conduit-model/e93f633d2c40df10e08d28f65ee18c65d05ee699b59cc26637285c87c32e2130.age.compiled-mesh.json",
+        "compiledContentHash": "e93f633d2c40df10e08d28f65ee18c65d05ee699b59cc26637285c87c32e2130"
       }
     },
     {

@@ -56,6 +56,24 @@ public sealed partial class RekallAgeMeshOperationExecutor
             RekallAgeMeshChangeKind.Attributes,
             [StringParameter("attribute", "normal.generated", "Destination corner normal attribute name.")]),
         new(
+            "shade_faces",
+            "Authors smooth or flat shading policy on selected stable faces without changing topology.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Attributes,
+            [
+                new("smooth", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Whether selected faces participate in smooth normal fans."),
+                StringParameter("attribute", "normal.smooth", "Destination face-domain smoothing policy attribute.")
+            ]),
+        new(
+            "mark_sharp",
+            "Authors sharp or smooth fan boundaries on selected stable edges without changing topology.",
+            RekallAgeGeometryDomain.Edge,
+            RekallAgeMeshChangeKind.Attributes,
+            [
+                new("sharp", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Whether selected edges split adjacent normal fans."),
+                StringParameter("attribute", "normal.sharp", "Destination edge-domain sharpness policy attribute.")
+            ]),
+        new(
             "project_uv",
             "Projects selected face corners onto XY, XZ, or YZ and writes a named corner-domain Float2 texture-coordinate attribute.",
             RekallAgeGeometryDomain.Face,
@@ -195,6 +213,8 @@ public sealed partial class RekallAgeMeshOperationExecutor
             "extrude_faces" => ExtrudeFaces(source, request),
             "delete" => DeleteFaces(source, request),
             "generate_normals" => GenerateNormals(source, request),
+            "shade_faces" => ShadeFaces(source, request),
+            "mark_sharp" => MarkSharp(source, request),
             "project_uv" => ProjectUv(source, request),
             "mark_uv_seams" => MarkUvSeams(source, request),
             "unwrap_pack_uv" => UnwrapPackUv(source, request),

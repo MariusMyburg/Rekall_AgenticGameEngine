@@ -5,6 +5,94 @@ namespace Rekall.Age.Modeling;
 
 public sealed partial class RekallAgeMeshOperationExecutor
 {
+    private static RekallAgeMeshOperationResult ShadeFaces(
+        RekallAgeMeshAsset source,
+        RekallAgeMeshOperationRequest request)
+    {
+        RequireDomain(request, RekallAgeGeometryDomain.Face);
+        return SetBooleanPolicy(
+            source,
+            request,
+            source.Topology.FaceIds,
+            RekallAgeGeometryDomain.Face,
+            "face",
+            "normal.smooth",
+            "smooth",
+            defaultValue: true,
+            semantic: "normal-smooth");
+    }
+
+    private static RekallAgeMeshOperationResult MarkSharp(
+        RekallAgeMeshAsset source,
+        RekallAgeMeshOperationRequest request)
+    {
+        RequireDomain(request, RekallAgeGeometryDomain.Edge);
+        return SetBooleanPolicy(
+            source,
+            request,
+            source.Topology.EdgeIds,
+            RekallAgeGeometryDomain.Edge,
+            "edge",
+            "normal.sharp",
+            "sharp",
+            defaultValue: false,
+            semantic: "normal-sharp");
+    }
+
+    private static RekallAgeMeshOperationResult SetBooleanPolicy(
+        RekallAgeMeshAsset source,
+        RekallAgeMeshOperationRequest request,
+        IReadOnlyList<ulong> domainIds,
+        RekallAgeGeometryDomain domain,
+        string domainName,
+        string defaultAttributeName,
+        string valueParameter,
+        bool defaultValue,
+        string semantic)
+    {
+        var indices = ResolveIndices(domainIds, request.ElementIds, domainName);
+        var attributeName = ReadBoundedString(request.Parameters, "attribute", defaultAttributeName);
+        var value = ReadBoolean(request.Parameters, valueParameter, true);
+        var existing = source.Attributes.FirstOrDefault(item => item.Name == attributeName);
+        if (existing is not null
+            && (existing.Domain != domain || existing.ValueType != RekallAgeGeometryValueType.Bool))
+        {
+            throw Failure(
+                "REKALL_MESH_OPERATION_ATTRIBUTE_CONFLICT",
+                $"Attribute '{attributeName}' exists with an incompatible domain or type.");
+        }
+
+        var values = existing?.Values.ToArray()
+            ?? Enumerable.Repeat(JsonSerializer.SerializeToElement(defaultValue), domainIds.Count).ToArray();
+        foreach (var index in indices)
+        {
+            values[index] = JsonSerializer.SerializeToElement(value);
+        }
+
+        var attribute = new RekallAgeGeometryAttribute(
+            attributeName,
+            domain,
+            RekallAgeGeometryValueType.Bool,
+            values,
+            semantic,
+            RekallAgeGeometryInterpolation.Nearest,
+            JsonSerializer.SerializeToElement(defaultValue));
+        var mesh = source with
+        {
+            Revision = checked(source.Revision + 1),
+            Attributes = source.Attributes
+                .Where(item => item.Name != attributeName)
+                .Append(attribute)
+                .OrderBy(item => item.Name, StringComparer.Ordinal)
+                .ToArray()
+        };
+        var ids = request.ElementIds.Order().ToArray();
+        var changes = domain == RekallAgeGeometryDomain.Face
+            ? ChangeSet(RekallAgeMeshChangeKind.Attributes, modifiedFaces: ids, changedAttributes: [attributeName])
+            : ChangeSet(RekallAgeMeshChangeKind.Attributes, modifiedEdges: ids, changedAttributes: [attributeName]);
+        return Result(source, mesh, changes, ids.Select(id => Preserve(domain, id)).ToArray());
+    }
+
     private static RekallAgeMeshOperationResult WeightedNormals(RekallAgeMeshAsset source, RekallAgeMeshOperationRequest request)
     {
         RequireDomain(request, RekallAgeGeometryDomain.Face);

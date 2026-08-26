@@ -7,6 +7,80 @@ namespace Rekall.Age.Tests.Modeling;
 public sealed class MeshNormalAuthoringTests
 {
     [Fact]
+    public async Task PolicyShadeFacesPreservesUnselectedSmoothValuesAndTopology()
+    {
+        var source = await new RekallAgeMeshPrimitiveFactory().CreateAsync(
+            "box", "shade-policy", "Shade Policy", CancellationToken.None);
+        var executor = new RekallAgeMeshOperationExecutor();
+        var firstFace = source.Topology.FaceIds[0];
+        var secondFace = source.Topology.FaceIds[1];
+
+        var first = executor.Execute(source, new(
+            "shade_faces",
+            RekallAgeGeometryDomain.Face,
+            [firstFace],
+            new JsonObject { ["smooth"] = false }));
+        var second = executor.Execute(first.Mesh, new(
+            "shade_faces",
+            RekallAgeGeometryDomain.Face,
+            [secondFace],
+            new JsonObject { ["smooth"] = false }));
+        var restored = executor.Execute(second.Mesh, new(
+            "shade_faces",
+            RekallAgeGeometryDomain.Face,
+            [firstFace],
+            new JsonObject { ["smooth"] = true }));
+
+        var policy = Assert.Single(restored.Mesh.Attributes, item => item.Name == "normal.smooth");
+        Assert.Equal(RekallAgeGeometryDomain.Face, policy.Domain);
+        Assert.Equal(RekallAgeGeometryValueType.Bool, policy.ValueType);
+        Assert.True(policy.Values[0].GetBoolean());
+        Assert.False(policy.Values[1].GetBoolean());
+        Assert.All(policy.Values.Skip(2), value => Assert.True(value.GetBoolean()));
+        Assert.Equal(source.Topology, restored.Mesh.Topology);
+        Assert.Equal(source.Revision + 3, restored.Mesh.Revision);
+        Assert.Equal([firstFace], restored.Changes.ModifiedFaceIds);
+        Assert.Equal(["normal.smooth"], restored.Changes.ChangedAttributes);
+    }
+
+    [Fact]
+    public async Task PolicyMarkSharpPreservesUnselectedEdgeValuesAndSupportsUnmarking()
+    {
+        var source = await new RekallAgeMeshPrimitiveFactory().CreateAsync(
+            "box", "sharp-policy", "Sharp Policy", CancellationToken.None);
+        var executor = new RekallAgeMeshOperationExecutor();
+        var firstEdge = source.Topology.EdgeIds[0];
+        var secondEdge = source.Topology.EdgeIds[1];
+
+        var first = executor.Execute(source, new(
+            "mark_sharp",
+            RekallAgeGeometryDomain.Edge,
+            [firstEdge],
+            new JsonObject { ["sharp"] = true }));
+        var second = executor.Execute(first.Mesh, new(
+            "mark_sharp",
+            RekallAgeGeometryDomain.Edge,
+            [secondEdge],
+            new JsonObject { ["sharp"] = true }));
+        var restored = executor.Execute(second.Mesh, new(
+            "mark_sharp",
+            RekallAgeGeometryDomain.Edge,
+            [firstEdge],
+            new JsonObject { ["sharp"] = false }));
+
+        var policy = Assert.Single(restored.Mesh.Attributes, item => item.Name == "normal.sharp");
+        Assert.Equal(RekallAgeGeometryDomain.Edge, policy.Domain);
+        Assert.Equal(RekallAgeGeometryValueType.Bool, policy.ValueType);
+        Assert.False(policy.Values[0].GetBoolean());
+        Assert.True(policy.Values[1].GetBoolean());
+        Assert.All(policy.Values.Skip(2), value => Assert.False(value.GetBoolean()));
+        Assert.Equal(source.Topology, restored.Mesh.Topology);
+        Assert.Equal(source.Revision + 3, restored.Mesh.Revision);
+        Assert.Equal([firstEdge], restored.Changes.ModifiedEdgeIds);
+        Assert.Equal(["normal.sharp"], restored.Changes.ChangedAttributes);
+    }
+
+    [Fact]
     public async Task WeightedNormalsShadeSegmentedBevelWithFiniteUnitCornerVectors()
     {
         var graph = RekallAgeModelingGraphAsset.Create("weighted-normal-proof", "Weighted Normal Proof",

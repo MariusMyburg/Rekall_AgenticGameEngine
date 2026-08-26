@@ -44,4 +44,8 @@ public sealed record RekallAgeRigValidationReport(
 
 public sealed record RekallAgeEvaluatedRig(
     IReadOnlyList<string> JointIds,
-    IReadOnlyList<IReadOnlyList<double>> JointMatrices);
+    IReadOnlyList<IReadOnlyList<double>> JointMatrices)
+{
+    public IReadOnlyList<IReadOnlyList<double>> PoseGlobalMatrices { get; init; } =
+        Array.Empty<IReadOnlyList<double>>();
+}

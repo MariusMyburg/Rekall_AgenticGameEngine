@@ -44,7 +44,10 @@ public sealed class RekallAgeRigEvaluator
             _ = Matrix4x4.Invert(bindGlobals[index], out var inverseBind);
             skinMatrices[index] = Values(inverseBind * poseGlobals[index]);
         }
-        return new(rig.Joints.Select(joint => joint.JointId).ToArray(), skinMatrices);
+        return new(rig.Joints.Select(joint => joint.JointId).ToArray(), skinMatrices)
+        {
+            PoseGlobalMatrices = poseGlobals.Select(Values).ToArray()
+        };
     }
 
     internal static IReadOnlyList<double> Values(Matrix4x4 value) =>

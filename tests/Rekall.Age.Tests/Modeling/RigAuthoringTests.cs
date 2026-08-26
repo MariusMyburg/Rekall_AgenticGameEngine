@@ -159,6 +159,29 @@ public sealed class RigAuthoringTests
         Assert.Equal(2, transformed.Y, precision: 5);
     }
 
+    [Fact]
+    public void RigEvaluatorPublishesPoseGlobalsSeparatelyFromSkinMatrices()
+    {
+        var evaluated = new RekallAgeRigEvaluator().Evaluate(
+            HumanoidRig(),
+            new Dictionary<string, IReadOnlyList<double>>
+            {
+                ["chest"] = Values(
+                    0, 1, 0, 0,
+                    -1, 0, 0, 0,
+                    0, 0, 1, 0,
+                    0, 0, 0, 1)
+            });
+
+        Assert.Equal(2, evaluated.PoseGlobalMatrices.Count);
+        var chestPose = ToMatrix(evaluated.PoseGlobalMatrices[1]);
+        Assert.Equal(1, chestPose.M12, precision: 5);
+        Assert.Equal(1, chestPose.M42, precision: 5);
+        Assert.NotEqual(
+            string.Join(",", evaluated.JointMatrices[1]),
+            string.Join(",", evaluated.PoseGlobalMatrices[1]));
+    }
+
     private static RekallAgeRigAsset HumanoidRig() => RekallAgeRigAsset.Create(
         "rig.warden",
         "Warden Rig",

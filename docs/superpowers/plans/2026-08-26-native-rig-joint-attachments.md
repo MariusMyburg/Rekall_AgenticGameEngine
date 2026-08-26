@@ -31,21 +31,21 @@
 - Consumes: `RekallAgeRigAsset` plus named local delta matrices.
 - Produces: `RekallAgeEvaluatedRig.PoseGlobalMatrices` in the same order as `JointIds` and `JointMatrices`.
 
-- [ ] **Step 1: Write the failing evaluator test**
+- [x] **Step 1: Write the failing evaluator test**
 
 Add `RigEvaluatorPublishesPoseGlobalsSeparatelyFromSkinMatrices`. Evaluate the existing two-joint `HumanoidRig` with a chest rotation; assert `PoseGlobalMatrices.Count == 2`, that the chest pose global includes its bind translation, and that it differs from the chest skin matrix.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~RigEvaluatorPublishesPoseGlobalsSeparatelyFromSkinMatrices`
 
 Expected: compile failure because `RekallAgeEvaluatedRig` has no `PoseGlobalMatrices` member.
 
-- [ ] **Step 3: Implement pose-global publication**
+- [x] **Step 3: Implement pose-global publication**
 
 Add an init-only `IReadOnlyList<IReadOnlyList<double>> PoseGlobalMatrices` property to `RekallAgeEvaluatedRig`, defaulting to an empty array for source compatibility. In `RekallAgeRigEvaluator.Evaluate`, serialize the already-computed `poseGlobals` array with the same finite row-major `Values` helper and set the property on the result.
 
-- [ ] **Step 4: Run the complete rig-authoring class green**
+- [x] **Step 4: Run the complete rig-authoring class green**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~RigAuthoringTests`
 

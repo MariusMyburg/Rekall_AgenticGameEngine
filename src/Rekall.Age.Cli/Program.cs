@@ -385,6 +385,10 @@ internal static class RekallAgeCli
                     await InstantiatePrefabAsync(registry, context, root, scene, prefabId, name),
                 ["level", "entity", "snap", var root, var scene, var entityId, var gridSize] =>
                     await SnapEntityAsync(registry, context, root, scene, entityId, gridSize),
+                ["camera", "aim-at", var root, var scene, var cameraEntityId, var targetEntityId] =>
+                    await AimCameraAtEntityAsync(registry, context, root, scene, cameraEntityId, targetEntityId),
+                ["camera", "aim-at-point", var root, var scene, var cameraEntityId, var x, var y, var z] =>
+                    await AimCameraAtPointAsync(registry, context, root, scene, cameraEntityId, x, y, z),
                 ["geometry", "primitive", "create", var root, var scene, var name, var primitive] =>
                     await CreateGeometryPrimitiveAsync(registry, context, root, scene, name, primitive, "0", "0", "0", "#8ab4f8"),
                 ["geometry", "primitive", "create", var root, var scene, var name, var primitive, var x, var y, var z] =>
@@ -1766,6 +1770,46 @@ internal static class RekallAgeCli
         var result = await registry.ExecuteAsync<ParentEntityRequest, ParentEntityResult>(
             "rekall.level.entity.parent",
             new ParentEntityRequest(root, scene, entityId, normalizedParent),
+            context);
+        Console.WriteLine(result.Summary);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> AimCameraAtEntityAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string cameraEntityId,
+        string targetEntityId)
+    {
+        var result = await registry.ExecuteAsync<AimCameraAtRequest, AimCameraAtResult>(
+            "rekall.level.camera.aim_at",
+            new AimCameraAtRequest(root, scene, cameraEntityId, TargetEntityId: targetEntityId),
+            context);
+        Console.WriteLine(result.Summary);
+        return result.Ok ? 0 : 1;
+    }
+
+    private static async Task<int> AimCameraAtPointAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string cameraEntityId,
+        string x,
+        string y,
+        string z)
+    {
+        var result = await registry.ExecuteAsync<AimCameraAtRequest, AimCameraAtResult>(
+            "rekall.level.camera.aim_at",
+            new AimCameraAtRequest(
+                root,
+                scene,
+                cameraEntityId,
+                TargetX: double.Parse(x, System.Globalization.CultureInfo.InvariantCulture),
+                TargetY: double.Parse(y, System.Globalization.CultureInfo.InvariantCulture),
+                TargetZ: double.Parse(z, System.Globalization.CultureInfo.InvariantCulture)),
             context);
         Console.WriteLine(result.Summary);
         return result.Ok ? 0 : 1;

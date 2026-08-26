@@ -1001,22 +1001,60 @@ public sealed class CaptureRuntimeViewportCommand
         }).ToArray();
         var near = Math.Min(camera.NearClip, camera.FarClip);
         var far = Math.Max(camera.NearClip, camera.FarClip);
-        if (depths.Any(item => item.Depth + item.Radius >= near && item.Depth - item.Radius <= far))
+        var inDepthRange = depths
+            .Where(item => item.Depth + item.Radius >= near && item.Depth - item.Radius <= far)
+            .ToArray();
+        if (inDepthRange.Length == 0)
+        {
+            if (depths.All(item => item.Depth + item.Radius < near))
+            {
+                warnings.Add("REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT");
+                var centroid = depths.Aggregate(Vector3.Zero, (sum, item) => sum + item.Center) / depths.Length;
+                hints.Add(
+                    $"Active Camera3D '{camera.EntityName}' has no spatial content in its +Z-forward depth range. "
+                    + $"Camera position=({camera.X:F2}, {camera.Y:F2}, {camera.Z:F2}), "
+                    + $"forward=({forward.X:F2}, {forward.Y:F2}, {forward.Z:F2}), "
+                    + $"content centroid=({centroid.X:F2}, {centroid.Y:F2}, {centroid.Z:F2}). "
+                    + "A camera on +Z looking toward lower Z normally needs yaw 180; author the intended rotation, then recapture.");
+            }
+
+            return;
+        }
+
+        // Depth-along-forward alone does not prove content is inside the view cone: a camera
+        // can be pitched so content sits at a valid depth while actually being well above or
+        // below the frustum. Cross-check the angle between forward and the direction to each
+        // in-range item against the camera's field of view before declaring visibility okay.
+        var halfFovRadians = (float)(Math.Clamp(camera.FieldOfViewDegrees, 1, 179) * 0.5 * Math.PI / 180.0);
+        var toleranceRadians = halfFovRadians * 1.6f;
+        var withinFieldOfView = inDepthRange.Any(item =>
+        {
+            var toCenter = item.Center - cameraPosition;
+            var distance = toCenter.Length();
+            if (distance <= 0.0001f)
+            {
+                return true;
+            }
+
+            var angularSlack = MathF.Atan((float)(item.Radius / distance));
+            var angle = MathF.Acos(Math.Clamp(Vector3.Dot(forward, toCenter / distance), -1f, 1f));
+            return angle - angularSlack <= toleranceRadians;
+        });
+        if (withinFieldOfView)
         {
             return;
         }
 
-        if (depths.All(item => item.Depth + item.Radius < near))
-        {
-            warnings.Add("REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT");
-            var centroid = depths.Aggregate(Vector3.Zero, (sum, item) => sum + item.Center) / depths.Length;
-            hints.Add(
-                $"Active Camera3D '{camera.EntityName}' has no spatial content in its +Z-forward depth range. "
-                + $"Camera position=({camera.X:F2}, {camera.Y:F2}, {camera.Z:F2}), "
-                + $"forward=({forward.X:F2}, {forward.Y:F2}, {forward.Z:F2}), "
-                + $"content centroid=({centroid.X:F2}, {centroid.Y:F2}, {centroid.Z:F2}). "
-                + "A camera on +Z looking toward lower Z normally needs yaw 180; author the intended rotation, then recapture.");
-        }
+        warnings.Add("REKALL_VIEWPORT_CAMERA_CONTENT_OUTSIDE_FIELD_OF_VIEW");
+        var offAxisCentroid = inDepthRange.Aggregate(Vector3.Zero, (sum, item) => sum + item.Center) / inDepthRange.Length;
+        hints.Add(
+            $"Active Camera3D '{camera.EntityName}' has spatial content at a valid depth but outside its "
+            + $"{camera.FieldOfViewDegrees:F0}-degree field of view. "
+            + $"Camera position=({camera.X:F2}, {camera.Y:F2}, {camera.Z:F2}), rotation=({camera.RotationX:F2}, {camera.RotationY:F2}, {camera.RotationZ:F2}), "
+            + $"forward=({forward.X:F2}, {forward.Y:F2}, {forward.Z:F2}), "
+            + $"content centroid=({offAxisCentroid.X:F2}, {offAxisCentroid.Y:F2}, {offAxisCentroid.Z:F2}). "
+            + "Rekall.Transform3D pitch tilts the view toward -Y as pitch increases and toward +Y as pitch decreases; "
+            + "adjust pitch (and yaw) so forward points toward the content centroid, then recapture.");
     }
 
     private static Vector3 RotateDirection(

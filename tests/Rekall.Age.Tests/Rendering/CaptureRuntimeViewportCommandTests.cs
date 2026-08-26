@@ -395,6 +395,55 @@ public sealed class CaptureRuntimeViewportCommandTests
     }
 
     [Fact]
+    public async Task CaptureRuntimeViewportCommandWarnsWhenContentIsWithinDepthRangeButOutsideTheFieldOfView()
+    {
+        // Depth-along-forward can land inside [near, far] even when the content sits well
+        // outside the camera's actual view cone (e.g. pitched toward it vertically but not
+        // enough to bring it inside the FOV). The plain depth check used for
+        // REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT does not catch this, so authors get
+        // no warning even though the capture renders nothing.
+        var root = TestPaths.CreateTempDirectory();
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("MainCamera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject
+                {
+                    ["y"] = 16,
+                    ["z"] = 18,
+                    ["pitch"] = -38,
+                    ["yaw"] = 180
+                }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject
+                {
+                    ["active"] = true,
+                    ["fieldOfView"] = 65,
+                    ["nearClip"] = 0.05,
+                    ["farClip"] = 100
+                })))
+            .AddEntity(RekallAgeEntityDocument.Create("World Cube", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D"))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject
+                {
+                    ["primitive"] = "cube",
+                    ["color"] = "#4fc3e8"
+                })));
+        await new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 0, Path.Combine(root, "Viewport"), 320, 180, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("camera off-axis"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.DoesNotContain(
+            "REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT",
+            result.Value.LayoutDiagnostics.WarningCodes);
+        Assert.Contains(
+            "REKALL_VIEWPORT_CAMERA_CONTENT_OUTSIDE_FIELD_OF_VIEW",
+            result.Value.LayoutDiagnostics.WarningCodes);
+        Assert.Contains(result.Value.LayoutDiagnostics.AuthoringHints, hint =>
+            hint.Contains("pitch", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task CaptureRuntimeViewportCommandDoesNotCallContentBeyondFarClipFacingAway()
     {
         var root = TestPaths.CreateTempDirectory();

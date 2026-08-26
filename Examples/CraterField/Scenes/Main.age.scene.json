@@ -32,7 +32,8 @@
             "x": 0,
             "y": 16,
             "z": 18,
-            "pitch": -38
+            "pitch": 41.6335393365702,
+            "yaw": 180
           }
         }
       ],
@@ -107,6 +108,14 @@
         "level"
       ],
       "components": [
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#5a7a4a",
+            "metallicFactor": 0.0,
+            "roughnessFactor": 0.9
+          }
+        },
         {
           "type": "Rekall.MeshAssetReference",
           "properties": {

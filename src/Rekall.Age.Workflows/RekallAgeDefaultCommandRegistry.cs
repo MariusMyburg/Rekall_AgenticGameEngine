@@ -197,6 +197,7 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new CreatePrefabFromEntityCommand());
         registry.Register(new InstantiatePrefabCommand());
         registry.Register(new SnapEntityToGridCommand());
+        registry.Register(new AimCameraAtCommand());
         registry.Register(new PlaySceneCommand());
         registry.Register(new PlaytestSceneCommand());
         registry.Register(new RunSceneCommand());

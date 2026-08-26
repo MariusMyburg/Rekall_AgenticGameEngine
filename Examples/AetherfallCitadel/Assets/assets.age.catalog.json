@@ -40,6 +40,32 @@
       "modelAssetMetadata": null
     },
     {
+      "id": "aetherfall-warden-pulse",
+      "name": "aetherfall-warden-pulse",
+      "displayName": "Aetherfall Warden Aether Pulse Cast",
+      "kind": "animation",
+      "sourcePath": "Assets/animation/aetherfall-warden-pulse.age.animation.json",
+      "importedPath": "Assets/animation/aetherfall-warden-pulse.age.animation.json",
+      "contentHash": "4db3a6ffc0dfa6f22086b4b8e28598c33a9b7b45ffde40e4cd7bce447e76bc14",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "aetherfall-warden-dash",
+      "name": "aetherfall-warden-dash",
+      "displayName": "Aetherfall Warden Aether Dash Lunge",
+      "kind": "animation",
+      "sourcePath": "Assets/animation/aetherfall-warden-dash.age.animation.json",
+      "importedPath": "Assets/animation/aetherfall-warden-dash.age.animation.json",
+      "contentHash": "bab4efad9c6c0e8efe58e70e7eca5d5ef2f0f7d09ff2ca72522fde0556c98f26",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
       "id": "aetherfall-ashen-processional-path-model",
       "name": "aetherfall-ashen-processional-path-model",
       "displayName": "Ashen Processional Path",

@@ -111,10 +111,7 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
         var facingYaw = Math.Atan2(facingX, facingZ);
         var walkPhase = time * 7.5;
         var stepBob = (0.5 - 0.5 * Math.Cos(walkPhase * 2)) * 0.045 * movement;
-        var dashBlend = Math.Clamp(
-            (warden.ComponentNumber(AetherfallConstants.WardenStateType, "dashCooldown") - 0.52) / 0.33,
-            0,
-            1);
+        var dashBlend = AbilityBlend(warden, "dashCooldown", AetherfallConstants.DashCooldownSeconds, AetherfallConstants.DashAnimationSeconds);
         var breath = Math.Sin(time * 2.2) * 0.018;
         var weightShift = Math.Sin(time * 1.35 + 0.4) * 0.035;
         var glance = Math.Sin(time * 0.61 + 0.8) * 0.026;
@@ -160,34 +157,92 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
             Math.Sqrt(velocityX * velocityX + velocityZ * velocityZ) / AetherfallConstants.WardenSpeed,
             0,
             1);
+        var pulseBlend = AbilityBlend(warden, "pulseCooldown", AetherfallConstants.PulseCooldownSeconds, AetherfallConstants.PulseAnimationSeconds);
+        var dashBlend = AbilityBlend(warden, "dashCooldown", AetherfallConstants.DashCooldownSeconds, AetherfallConstants.DashAnimationSeconds);
+        var locomotionWeight = 1 - Math.Max(pulseBlend, dashBlend);
+        var layers = new JsonArray(
+            new JsonObject
+            {
+                ["name"] = "presentation",
+                ["clip"] = "aetherfall-warden-presentation",
+                ["weight"] = 1,
+                ["loopMode"] = "pingpong"
+            },
+            new JsonObject
+            {
+                ["name"] = "guarded-idle",
+                ["clip"] = "aetherfall-warden-idle",
+                ["weight"] = (1 - movement) * locomotionWeight,
+                ["loopMode"] = "loop"
+            },
+            new JsonObject
+            {
+                ["name"] = "armored-walk",
+                ["clip"] = "aetherfall-warden-walk",
+                ["weight"] = movement * locomotionWeight,
+                ["speed"] = 1 + movement * 0.08,
+                ["loopMode"] = "loop"
+            });
+        if (pulseBlend > AbilityBlendEpsilon)
+        {
+            layers.Add(AbilityLayer(
+                "aether-pulse",
+                "aetherfall-warden-pulse",
+                pulseBlend,
+                AbilityElapsedSeconds(warden, "pulseCooldown", AetherfallConstants.PulseCooldownSeconds, AetherfallConstants.PulseAnimationSeconds)));
+        }
+        if (dashBlend > AbilityBlendEpsilon)
+        {
+            layers.Add(AbilityLayer(
+                "aether-dash",
+                "aetherfall-warden-dash",
+                dashBlend,
+                AbilityElapsedSeconds(warden, "dashCooldown", AetherfallConstants.DashCooldownSeconds, AetherfallConstants.DashAnimationSeconds)));
+        }
         return world.UpdateEntity(warden.Id, entity => entity.UpsertComponent(
             "Rekall.AnimationMixer",
             new JsonObject
             {
                 ["playing"] = true,
-                ["layers"] = new JsonArray(
-                    new JsonObject
-                    {
-                        ["name"] = "presentation",
-                        ["clip"] = "aetherfall-warden-presentation",
-                        ["weight"] = 1,
-                        ["loopMode"] = "pingpong"
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "guarded-idle",
-                        ["clip"] = "aetherfall-warden-idle",
-                        ["weight"] = 1 - movement,
-                        ["loopMode"] = "loop"
-                    },
-                    new JsonObject
-                    {
-                        ["name"] = "armored-walk",
-                        ["clip"] = "aetherfall-warden-walk",
-                        ["weight"] = movement,
-                        ["speed"] = 1 + movement * 0.08,
-                        ["loopMode"] = "loop"
-                    })
+                ["layers"] = layers
             }));
+
+        static JsonObject AbilityLayer(string name, string clip, double weight, double authoritativeTimeSeconds) => new()
+        {
+            ["name"] = name,
+            ["clip"] = clip,
+            ["weight"] = weight,
+            ["loopMode"] = "clamp",
+            ["authoritativeTimeSeconds"] = authoritativeTimeSeconds
+        };
+    }
+
+    private const double AbilityBlendEpsilon = 1e-4;
+
+    /// <summary>
+    /// An ability's cooldown counts down from its full duration the instant it fires. The elapsed time since
+    /// that trigger is therefore <c>cooldownMaxSeconds - cooldownRemaining</c>; this blends from 1 at the
+    /// trigger frame down to 0 once <paramref name="animationSeconds"/> of authored motion has played, so the
+    /// ability pose/clip fades back into locomotion without any extra state.
+    /// </summary>
+    private static double AbilityBlend(
+        RekallAgeRuntimeEntity warden,
+        string cooldownProperty,
+        double cooldownMaxSeconds,
+        double animationSeconds)
+    {
+        var elapsed = AbilityElapsedSeconds(warden, cooldownProperty, cooldownMaxSeconds, animationSeconds);
+        return Math.Clamp(1 - elapsed / animationSeconds, 0, 1);
+    }
+
+    private static double AbilityElapsedSeconds(
+        RekallAgeRuntimeEntity warden,
+        string cooldownProperty,
+        double cooldownMaxSeconds,
+        double animationSeconds)
+    {
+        var cooldownRemaining = warden.ComponentNumber(AetherfallConstants.WardenStateType, cooldownProperty);
+        var elapsed = cooldownMaxSeconds - cooldownRemaining;
+        return Math.Clamp(elapsed, 0, animationSeconds);
     }
 }

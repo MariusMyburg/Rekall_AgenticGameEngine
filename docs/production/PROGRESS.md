@@ -3182,6 +3182,15 @@ behavior.
   animation, TANGENT/sparse/quantized morph accessors, broader complex
   transform fixtures, richer graph curves, and interruptible or hierarchical
   graph policies.
+- Studio has no animation-authoring surface: creating or editing a
+  `Rekall.RigPose`-track clip asset, previewing a rig, or composing
+  `Rekall.AnimationMixer` layers is engine/JSON-only today (proven by the
+  ability-driven authored rig animation checkpoint below, which only exists as
+  hand-authored clip JSON and CLI/runtime acceptance). Every engine capability
+  that reaches gameplay should also reach Studio's editing surface; the next
+  Studio slice should add a rig/clip preview and a mixer-layer editor to the
+  3D workspace (or a dedicated animation workspace) so this is not left as a
+  standing engine/tooling gap.
 - Expand Studio asset/module workflows and run broader installed game-creation
   benchmarks beyond the fixed gauntlet. Deterministic WPF automation,
   schema-guided editing, transactional undo/redo, embedded Ollama authoring,
@@ -5846,7 +5855,46 @@ environmental-gate chronology, raw artifact hashes, and residue audit:
   `desktop60` passes at 8.642528 ms GPU time, 203,638 triangles, 873,116
   vertices, 97 scene draws, and nine textures.
 
-## Evidence index
+## Ability-driven authored rig animation checkpoint
+
+- `ability.pulse` and `ability.dash` now drive authored motion instead of only
+  toggling particles. Two ordinary reusable animation-clip assets
+  (`aetherfall-warden-pulse`, `aetherfall-warden-dash`) hold named-joint
+  quaternion rotation tracks for `upper_arm_r`/`forearm_r` (pulse cast) and
+  `upper_arm_l`/`upper_arm_r`/`leg_l`/`leg_r` (dash lunge), authored in the
+  same `Rekall.RigPose`-track format as the existing idle/walk/presentation
+  clips.
+- `AetherfallRulesSystem` derives each ability's blend and clip-sample time
+  directly from its existing cooldown timer (`elapsed = cooldownMaxSeconds -
+  cooldownRemaining`, clamped to a short authored animation window) with no
+  extra state: the mixer gains an `aether-pulse`/`aether-dash` layer at weight
+  1 the instant the ability fires, fading to 0 as `guarded-idle`/`armored-walk`
+  resume. `authoritativeTimeSeconds` pins the exact clip sample time so
+  playback is deterministic for runtime inspection.
+- This is the generic engine feature (named-joint clip assets plus a
+  weighted/authoritative mixer) doing the animating; the rules module only
+  selects layers and a sample time. An earlier attempt also hard-coded the arm
+  pose procedurally in `Rekall.RigPose` from the module and was reverted:
+  `RekallAgeTransformAnimationSystem` blends mixer-layer clip samples that
+  target the same joint/property (`BlendRigRotations`, weight-normalized
+  across only the active clip layers) and then overwrites that joint's
+  rotation outright — it does not fold the module's procedural rotation in as
+  an implicit base sample. Procedural and clip-driven posing already coexist
+  on the same skeleton (pelvis/chest/head stay continuously procedural for
+  breathing/weight-shift while the idle/walk/pulse/dash clips own the limbs),
+  but for one joint+property pair the clip is authoritative, not blended with
+  procedural code, once any layer with nonzero weight targets it. Making the
+  procedural value an implicit weighted base for that case is a plausible
+  small generic mixer feature, not attempted here.
+- Runtime acceptance (`WardenAbilitiesDriveReusableAuthoredRigClips`) proves,
+  for both abilities, the exact mixer layer/clip/weight, a nonzero
+  `authoritativeTimeSeconds`, no animation-related error/blocking observation,
+  and a real rendered `upper_arm_r` pose-matrix delta versus an idle/walk
+  baseline — not merely component presence. Full Aetherfall acceptance passes
+  48/48; the solution builds Release with zero warnings/errors; project and
+  scene validation report zero issues.
+
+## Layered Warden and isometric framing checkpoint
 
 - `docs/production/2026-08-17-engine-maturity-audit.md`
 - `docs/production/2026-08-17-ollama-authoring-benchmark.md`

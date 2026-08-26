@@ -24,10 +24,12 @@ internal static class AetherfallConstants
     public const double PulseCooldownSeconds = 0.22;
     public const double PulseLifetimeSeconds = 1.4;
     public const double PulseRadius = 0.55;
+    public const double PulseAnimationSeconds = 0.18;
     public const double DashDistance = 2.8;
     public const double DashCost = 18;
     public const double DashCooldownSeconds = 0.85;
     public const double DashInvulnerabilitySeconds = 0.22;
+    public const double DashAnimationSeconds = 0.33;
     public const double ConduitInteractionRadius = 4.0;
     public const double MaximumDeltaSeconds = 0.1;
     public const double ArrivalMinimumX = -6.2;

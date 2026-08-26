@@ -458,6 +458,48 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         }
     }
 
+    [Theory]
+    [InlineData("ability.pulse", "aether-pulse", 8, "guarded-idle", false)]
+    [InlineData("ability.dash", "aether-dash", 12, "armored-walk", true)]
+    public async Task WardenAbilityLayerFadesBackToLocomotionAfterItsAuthoredDuration(
+        string action,
+        string layerName,
+        int frameCountPastFullFade,
+        string settledLocomotionLayerName,
+        bool moving)
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var frames = new List<RekallAgeRuntimeInputFrame>
+        {
+            new(SemanticActions:
+            [
+                .. moving ? [new RekallAgeRuntimeSemanticActionSample("move.vertical", 1, IsDown: true)] : Array.Empty<RekallAgeRuntimeSemanticActionSample>(),
+                new RekallAgeRuntimeSemanticActionSample(action, 1, IsDown: true, WasPressed: true)
+            ])
+            { DeltaSeconds = 1.0 / 30.0 }
+        };
+        for (var frame = 1; frame < frameCountPastFullFade; frame++)
+        {
+            frames.Add(new RekallAgeRuntimeInputFrame(
+                SemanticActions: moving ? [new RekallAgeRuntimeSemanticActionSample("move.vertical", 1, IsDown: true)] : [])
+            { DeltaSeconds = 1.0 / 30.0 });
+        }
+
+        var service = new RekallAgeRuntimeSnapshotService();
+        var settled = await service.InspectSceneAsync(
+            projectRoot, "Main", frameCountPastFullFade, frames, CancellationToken.None);
+
+        var warden = Assert.Single(settled.Entities, entity => entity.Name == "AetherWarden");
+        var mixer = Assert.Single(warden.Components, component => component.Type == "Rekall.AnimationMixer");
+        var layers = mixer.Properties["layers"]!.AsArray().OfType<JsonObject>().ToArray();
+        Assert.DoesNotContain(layers, layer => layer["name"]?.GetValue<string>() == layerName);
+        var settledLayer = Assert.Single(layers, layer => layer["name"]?.GetValue<string>() == settledLocomotionLayerName);
+        Assert.True(settledLayer["weight"]!.GetValue<double>() > 0.99, settledLayer.ToJsonString());
+        Assert.DoesNotContain(settled.Observations, observation =>
+            observation.Code.Contains("animation", StringComparison.OrdinalIgnoreCase)
+            && observation.Severity is "error" or "blocking");
+    }
+
     [Fact]
     public async Task WardenUsesModelBackedParentedArticulationThatFollowsGameplayRoot()
     {

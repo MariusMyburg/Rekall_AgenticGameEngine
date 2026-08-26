@@ -169,6 +169,12 @@ public sealed class RekallAgeDestructionSystem : IRekallAgeRuntimeWorldSystem
             false,
             RekallAgeRuntimeTransform.Identity with { Position3D = origin },
             [
+                new RekallAgeRuntimeComponent("Rekall.Transform3D", new JsonObject
+                {
+                    ["x"] = origin.X,
+                    ["y"] = origin.Y,
+                    ["z"] = origin.Z
+                }),
                 new RekallAgeRuntimeComponent("Rekall.MeshAssetReference", new JsonObject { ["assetId"] = chunkMeshAssetId }),
                 new RekallAgeRuntimeComponent("Rekall.MeshRenderer", new JsonObject()),
                 new RekallAgeRuntimeComponent("Rekall.MeshCollider", new JsonObject { ["convex"] = true }),

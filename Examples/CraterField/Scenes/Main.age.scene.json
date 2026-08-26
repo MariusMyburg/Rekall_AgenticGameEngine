@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "id": "scene_ea61c773b9cc4715bd95a6fe4959a182",
+  "name": "Main",
+  "capabilities": [
+    "animation",
+    "audio",
+    "input",
+    "modules",
+    "physics",
+    "rendering3d",
+    "ui",
+    "world"
+  ],
+  "entities": [
+    {
+      "id": "ent_934ef2331d804c86b54eed5878ff8673",
+      "name": "Sky Camera",
+      "tags": [
+        "camera"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 16,
+            "z": 18,
+            "pitch": -38
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_28fd77be5b4d4328be4d3014826b0e01",
+      "name": "Spawner",
+      "tags": [
+        "spawner"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.CraterFieldRules.SpawnerState",
+          "properties": {
+            "enabled": true,
+            "intervalSeconds": 3,
+            "elapsed": 0,
+            "minX": -9,
+            "maxX": 9,
+            "minZ": -9,
+            "maxZ": 9,
+            "spawnHeight": 10,
+            "fuseSeconds": 1.5,
+            "craterRadius": 2.5,
+            "craterDepth": 1.25,
+            "explosionImpulse": 6,
+            "spawnCount": 0,
+            "explosionCount": 0,
+            "terrainEntityId": "ent_55307f313791412291ff745368811167"
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_f2d528b06e4f4e1fb0b99019b7f6f121",
+      "name": "Sun",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.DirectionalLight",
+          "properties": {
+            "intensity": 3.2
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "pitch": -52,
+            "yaw": -30
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_55307f313791412291ff745368811167",
+      "name": "Terrain",
+      "tags": [
+        "level"
+      ],
+      "components": [
+        {
+          "type": "Rekall.MeshAssetReference",
+          "properties": {
+            "assetId": "terrain-ground"
+          }
+        },
+        {
+          "type": "Rekall.MeshCollider",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

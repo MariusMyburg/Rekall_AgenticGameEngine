@@ -41,6 +41,7 @@ public sealed class DestructionSystemTests
             var vy = rigidbody.Properties["linearVelocityY"]!.GetValue<double>();
             var vz = rigidbody.Properties["linearVelocityZ"]!.GetValue<double>();
             Assert.True(Math.Sqrt(vx * vx + vy * vy + vz * vz) > 0);
+            Assert.Single(chunk.Components, component => component.Type == "Rekall.Transform3D");
         });
     }
 

@@ -1,0 +1,14 @@
+{
+  "name": "Crater Field",
+  "schemaVersion": 1,
+  "capabilities": [
+    "animation",
+    "audio",
+    "input",
+    "modules",
+    "physics",
+    "rendering3d",
+    "ui",
+    "world"
+  ]
+}

@@ -402,6 +402,62 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             $"Expected readable movement-driven foot compensation, found matrix[6]={footMatrix[6]:F6}.");
     }
 
+    [Theory]
+    [InlineData("ability.pulse", "aether-pulse", "aetherfall-warden-pulse", false)]
+    [InlineData("ability.dash", "aether-dash", "aetherfall-warden-dash", true)]
+    public async Task WardenAbilitiesDriveReusableAuthoredRigClips(
+        string action,
+        string layerName,
+        string clipAssetId,
+        bool moving)
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var baselineActions = moving
+            ? new[] { new RekallAgeRuntimeSemanticActionSample("move.vertical", 1, IsDown: true) }
+            : [];
+        var activatedActions = baselineActions
+            .Append(new RekallAgeRuntimeSemanticActionSample(action, 1, IsDown: true, WasPressed: true))
+            .ToArray();
+        var service = new RekallAgeRuntimeSnapshotService();
+        var baseline = await service.InspectSceneAsync(
+            projectRoot,
+            "Main",
+            1,
+            [new RekallAgeRuntimeInputFrame(SemanticActions: baselineActions) { DeltaSeconds = 1.0 / 30.0 }],
+            CancellationToken.None);
+        var activated = await service.InspectSceneAsync(
+            projectRoot,
+            "Main",
+            1,
+            [new RekallAgeRuntimeInputFrame(SemanticActions: activatedActions) { DeltaSeconds = 1.0 / 30.0 }],
+            CancellationToken.None);
+
+        var activatedWarden = Assert.Single(activated.Entities, entity => entity.Name == "AetherWarden");
+        var mixer = Assert.Single(activatedWarden.Components, component => component.Type == "Rekall.AnimationMixer");
+        var layer = Assert.Single(mixer.Properties["layers"]!.AsArray().OfType<JsonObject>(), candidate =>
+            candidate["name"]?.GetValue<string>() == layerName);
+        Assert.Equal(clipAssetId, layer["clip"]!.GetValue<string>());
+        Assert.True(layer["weight"]!.GetValue<double>() > 0.5, layer.ToJsonString());
+        Assert.True(layer["authoritativeTimeSeconds"]!.GetValue<double>() >= 0);
+
+        var baselineArm = JointMatrix(baseline, "upper_arm_r");
+        var activatedArm = JointMatrix(activated, "upper_arm_r");
+        Assert.True(baselineArm.Zip(activatedArm).Max(pair => Math.Abs(pair.First - pair.Second)) > 0.04,
+            $"Expected {action} to visibly alter the authored upper-arm pose.");
+        Assert.DoesNotContain(activated.Observations, observation =>
+            observation.Code.Contains("animation", StringComparison.OrdinalIgnoreCase)
+            && observation.Severity is "error" or "blocking");
+
+        static double[] JointMatrix(RekallAgeRuntimeWorld world, string jointId)
+        {
+            var warden = Assert.Single(world.Entities, entity => entity.Name == "AetherWarden");
+            var pose = Assert.Single(warden.Components, component => component.Type == "Rekall.RigPose");
+            var delta = Assert.Single(pose.Properties["jointDeltas"]!.AsArray().OfType<JsonObject>(), candidate =>
+                candidate["jointId"]?.GetValue<string>() == jointId);
+            return delta["matrix"]!.AsArray().Select(value => value!.GetValue<double>()).ToArray();
+        }
+    }
+
     [Fact]
     public async Task WardenUsesModelBackedParentedArticulationThatFollowsGameplayRoot()
     {

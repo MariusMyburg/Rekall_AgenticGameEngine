@@ -85,14 +85,19 @@ AGE remains an independent C# implementation.
 
 | Capability | Status | Provider/reference | AGE requirement |
 |---|---|---|---|
-| Text/image/multi-view to editable mesh | Research queued after native Wave 1 | Tripo official generation API; Meshy official Text/Image/Multi-Image to 3D APIs | Provider-neutral asynchronous job contract; GLB-first normalized import; never bypass AGE source/edit/cook layers |
-| Provider remesh/retexture/rig/animation | Research queued | Tripo post-process/texture/animation tasks; Meshy remesh/retexture/rigging/animation APIs | Preserve task/model provenance, licenses, units, axes, topology/UV/PBR/rig metadata, and allow ordinary AGE re-edit/reimport |
-| Cost, credentials, consent, and failure handling | Research queued | Provider authentication, pricing, task-status and cancellation documentation | Server-side secrets, preflight cost limits, explicit remote-data consent, bounded polling/retries, cancellation, and inspectable diagnostics |
+| Text/image/multi-view to editable mesh | Experimental Tripo text-to-GLB proof exists; broader work deferred until native Wave 1/Aetherfall acceptance | Tripo official generation API; Meshy official Text/Image/Multi-Image to 3D APIs | Replace the one-off synchronous bridge with a provider-neutral asynchronous job contract; support text/single-image/labeled multi-view inputs; GLB-first normalized import; never bypass AGE source/edit/cook layers |
+| Provider remesh/retexture/rig/animation | Researched; not implemented in the generic provider layer | Tripo post-process/texture/rig/retarget tasks; Meshy remesh/retexture/humanoid rigging/animation APIs | Preserve provider/task/model-version capability snapshot, provenance, licenses, units, axes, topology/UV/PBR/rig metadata, and allow ordinary AGE re-edit/reimport |
+| Cost, credentials, consent, and failure handling | Existing Tripo proof reads a server-side environment key and bounded-polls; production job controls deferred | Provider authentication, live pricing, task progress/streaming, cancellation, expiring-output, and changelog documentation | Server-side secrets, explicit remote-data consent, quoted maximum cost plus actual credits, durable resumable jobs without signed URLs, bounded retry/cancel, and inspectable diagnostics |
+| Comparative production acceptance | Evaluation designed; paid credentialed run deferred | Same ruin prop, modular environment piece, and humanoid through current Tripo and Meshy models | Record prompt/reference hashes, settings, cost, time, geometry/material/texture/rig metrics, validation warnings, fixed-camera captures, Studio edit/reimport, cook, package, and player evidence before choosing any default |
 
-The provider evaluation is intentionally deferred behind the current native
-modeling tranche. AGE must remain capable without either service and must treat
-generated output as imported source content subject to the same validation,
-editing, cooking, packaging, and provenance rules as any other asset.
+The provider evaluation was refreshed against official documentation on
+2026-08-26 and remains intentionally deferred behind the current native modeling
+tranche and Aetherfall visual acceptance. The recommended order is generic job
+contract, migration/expansion of the existing Tripo proof, Meshy adapter, then a
+capped same-fixture comparison. AGE must remain capable without either service
+and must treat generated output as untrusted imported source content subject to
+the same validation, editing, cooking, packaging, and provenance rules as any
+other asset.
 
 ## Current executable gate
 

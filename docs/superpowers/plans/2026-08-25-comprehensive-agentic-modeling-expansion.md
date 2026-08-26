@@ -564,7 +564,20 @@ acceptance work is complete. External generation augments AGE; it must not
 replace AGE's source mesh, editing, modifier, import, cook, or provenance
 contracts.
 
-**Research baseline (2026-08-25):**
+**Research baseline (reviewed 2026-08-26):**
+
+- AGE already has an experimental Tripo text-to-model bridge:
+  `rekall.asset.tripo.generate_model` submits one task, polls synchronously,
+  downloads the preferred GLB, and imports it through the ordinary asset
+  catalog/pipeline. This is a useful proof, not yet the intended production
+  contract. It has no image/multi-view inputs, resumable task record, cancel,
+  Studio task UI, explicit cost/consent preflight, durable provenance manifest,
+  post-processing, rigging/animation, or provider-neutral abstraction.
+- The current Tripo adapter defaults to `Turbo-v1.0-20250506`. Tripo's current
+  generation documentation also lists P1, v3.1, v3.0, and v2.5 families and
+  documents model-specific parameter compatibility. Provider model IDs and
+  supported options must therefore be discovered/configured data rather than
+  assumed to remain stable in AGE code.
 
 - Tripo's official API exposes text-, image-, and multi-view-to-model tasks,
   optional PBR/UV/quad/parts controls, post-process conversion, and GLTF/FBX/OBJ
@@ -576,24 +589,51 @@ contracts.
   https://docs.meshy.ai/en/api/text-to-3d,
   https://docs.meshy.ai/en/api/image-to-3d, and
   https://docs.meshy.ai/en/api/rigging.
+- Meshy's current API additionally exposes smart-topology/polycount controls,
+  2K/4K/8K textures, task streaming/cancellation, real-world auto-sizing and
+  origin placement. Its changelog demonstrates regular model and parameter
+  churn, reinforcing the need for versioned provider capability snapshots:
+  https://docs.meshy.ai/en/api/changelog.
+- Both services meter work in credits, with cost depending on generation model
+  and optional texture/topology/post-process stages. Prices are intentionally
+  not frozen into this plan; AGE must fetch or accept a provider quote and show
+  an upper bound before submission. Current references:
+  https://platform.tripo3d.ai/docs/billing and
+  https://docs.meshy.ai/en/api/pricing.
+
+**Evaluation recommendation:** build one generic asynchronous external-asset job
+contract first, migrate the existing Tripo proof onto it, then add Meshy as the
+second adapter. Do not make either provider mandatory or select a default until
+the comparative fixtures pass. Tripo is the lower-risk first migration because
+AGE already has a working slice; Meshy is the strongest second-adapter test
+because its preview/refine, remesh, PBR, rigging, animation, SSE, and cancellation
+surface exercises more of the generic contract.
 
 - [ ] **Step 1: Define a provider-neutral generation contract**
 
   Specify prompt/reference inputs, target purpose and polycount, topology/UV/PBR/
   rig requirements, asynchronous task state, cancellation, bounded retries,
-  cost estimate/limit, moderation state, and normalized artifact manifests.
+  progress/events, expiring artifact URLs, cost estimate/limit and actual credits,
+  moderation state, provider/model capability snapshot, and normalized artifact
+  manifests. Inputs must support text, one image, and ordered/labeled multi-view
+  images without coupling the core contract to either provider's request schema.
 
 - [ ] **Step 2: Design secure provider adapters**
 
   Keep API keys server-side, make Tripo and Meshy optional adapters, never expose
   credentials to authored game modules, and require explicit user-visible cost
-  and remote-data consent before submission.
+  and remote-data consent before submission. Persist a safe resumable job record,
+  not credentials or signed download URLs. Provider capabilities, limits, and
+  unavailable/deprecated model versions must produce inspectable diagnostics.
 
 - [ ] **Step 3: Normalize results through AGE import/reimport**
 
   Prefer GLB as the canonical interchange path; preserve provider/model/task ID,
   prompt/reference hashes, license/provenance, units, axes, material/texture
-  dependencies, skeleton/animation metadata, and deterministic reimport settings.
+  dependencies, skeleton/animation metadata, generated parts, source/evaluated
+  topology statistics, and deterministic reimport settings. Copy remote artifacts
+  into the project before their URLs expire, validate them as untrusted imports,
+  and expose the result to AGE's ordinary editable source/modifier/cook layers.
 
 - [ ] **Step 4: Evaluate production suitability**
 
@@ -601,13 +641,27 @@ contracts.
   latency, failure modes, price, rights, and editability on the same prop,
   environment-kit, and humanoid fixtures. Do not select a default provider until
   the results pass AGE validation, cook, Studio editing, packaging, and a
-  real-player visual inspection.
+  real-player visual inspection. Record input prompts/reference hashes, requested
+  settings, actual credits, wall time, triangle/material/texture/bone counts,
+  import warnings, and fixed-camera captures so results remain auditable even as
+  provider models change.
 
 - [ ] **Step 5: Expose agent and Studio workflows**
 
   Add submit/status/cancel/import/retry commands plus a Studio task/provenance
   view, while routing the resulting mesh into ordinary AGE modeling graphs and
-  modifier stacks for continued editing.
+  modifier stacks for continued editing. The Studio flow should accept the same
+  reference images users can attach to an authoring conversation, but references
+  remain ordinary project assets rather than hidden chat-only state.
+
+- [ ] **Step 6: Run a paid, credentialed comparative spike before promotion**
+
+  With explicit user consent and capped credits, run Tripo and Meshy against the
+  same realistic ruin prop, modular environment piece, and humanoid character.
+  Keep generated artifacts and proof captures out of source control unless their
+  terms permit redistribution. Promote capabilities from experimental only after
+  a fresh official-API integration test and the editable packaged-game acceptance
+  evidence above; otherwise retain local-file import as the reliable fallback.
 
 ## Plan self-review
 

@@ -92,6 +92,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
     private RekallAgeStudioViewportCamera _meshViewportCamera = RekallAgeStudioViewportCamera.Identity;
+    private readonly RekallAgeStudioModelingGraphCanvasRenderer _modelingGraphCanvasRenderer = new();
+    private readonly RekallAgeModelingNodeCatalog _modelingGraphCatalog = RekallAgeModelingNodeCatalog.CreateDefault();
+    private readonly Dictionary<string, System.Windows.Point> _modelingGraphNodePositions = new(StringComparer.Ordinal);
+    private RekallAgeStudioModelingGraphCanvasFrame? _modelingGraphCanvasFrame;
+    private string? _modelingGraphDragNodeId;
+    private System.Windows.Point _modelingGraphDragOrigin;
+    private System.Windows.Point _modelingGraphDragStart;
+    private RekallAgeStudioModelingGraphPortKey? _modelingGraphPendingLinkPort;
     private readonly RekallAgeAsyncCommand _refreshMeshAssetsCommand;
     private readonly RekallAgeAsyncCommand _createMeshPrimitiveCommand;
     private readonly RekallAgeAsyncCommand _openMeshAssetCommand;
@@ -1863,6 +1871,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         ModelingGraphViewportImage = null;
         ModelingGraphSummary = _modelingGraph.EvaluationSummary;
         SelectedModelingGraphNode = ModelingGraphNodes.FirstOrDefault();
+        _modelingGraphNodePositions.Clear();
+        _modelingGraphPendingLinkPort = null;
+        RefreshModelingGraphCanvas();
     });
 
     private Task EvaluateModelingGraphAsync() => RunGraphModelingAsync(async () =>
@@ -1881,6 +1892,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 640,
                 360,
                 preview: false).Image;
+        RefreshModelingGraphCanvas();
     });
 
     private Task ApplyModelingGraphParametersAsync() => RunGraphModelingAsync(async () =>
@@ -1915,7 +1927,99 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                     360,
                     preview: false).Image;
         }
+        RefreshModelingGraphCanvas();
     });
+
+    /// <summary>Re-renders the node-graph canvas from the current graph, auto-laying-out any node without a remembered position.</summary>
+    private void RefreshModelingGraphCanvas()
+    {
+        var graph = _modelingGraph.Graph;
+        if (graph is null)
+        {
+            _modelingGraphCanvasFrame = null;
+            OnPropertyChanged(nameof(ModelingGraphCanvasImage));
+            return;
+        }
+        var liveNodeIds = graph.Nodes.Select(node => node.NodeId).ToHashSet(StringComparer.Ordinal);
+        foreach (var staleId in _modelingGraphNodePositions.Keys.Where(id => !liveNodeIds.Contains(id)).ToArray())
+            _modelingGraphNodePositions.Remove(staleId);
+        foreach (var (nodeId, position) in RekallAgeStudioModelingGraphLayout.ComputeDefaultPositions(graph.Nodes, graph.Links))
+            _modelingGraphNodePositions.TryAdd(nodeId, position);
+        _modelingGraphCanvasFrame = _modelingGraphCanvasRenderer.Render(
+            graph.Nodes, graph.Links, _modelingGraphNodePositions, _modelingGraphCatalog,
+            SelectedModelingGraphNode?.NodeId, 640, 360);
+        OnPropertyChanged(nameof(ModelingGraphCanvasImage));
+    }
+
+    public BitmapSource? ModelingGraphCanvasImage => _modelingGraphCanvasFrame?.Image;
+
+    /// <summary>
+    /// Handles a mouse-down on the node-graph canvas: a port hit arms or completes a link
+    /// (a second click on a compatible-direction port issues an AddLink patch), a node-body hit
+    /// selects that node (driving the existing parameter panel) and begins a reposition drag, and
+    /// an empty-space hit clears the current selection and any pending link.
+    /// </summary>
+    public async Task ClickModelingGraphCanvasAsync(double normalizedX, double normalizedY)
+    {
+        if (_modelingGraphCanvasFrame is null) return;
+        var (x, y) = DenormalizeGraphCanvasPoint(normalizedX, normalizedY);
+        var port = _modelingGraphCanvasRenderer.PickPort(_modelingGraphCanvasFrame, x, y);
+        if (port is { } hitPort)
+        {
+            if (_modelingGraphPendingLinkPort is { } pending && pending.IsOutput != hitPort.IsOutput
+                && !pending.Equals(hitPort))
+            {
+                var from = pending.IsOutput ? pending : hitPort;
+                var to = pending.IsOutput ? hitPort : pending;
+                _modelingGraphPendingLinkPort = null;
+                await AddModelingGraphLinkAsync(from, to);
+            }
+            else
+            {
+                _modelingGraphPendingLinkPort = hitPort;
+                RefreshModelingGraphCanvas();
+            }
+            return;
+        }
+
+        _modelingGraphPendingLinkPort = null;
+        var nodeId = _modelingGraphCanvasRenderer.PickNode(_modelingGraphCanvasFrame, x, y);
+        SelectedModelingGraphNode = ModelingGraphNodes.FirstOrDefault(node => node.NodeId == nodeId);
+        if (nodeId is not null)
+        {
+            _modelingGraphDragNodeId = nodeId;
+            _modelingGraphDragOrigin = _modelingGraphNodePositions[nodeId];
+            _modelingGraphDragStart = new System.Windows.Point(x, y);
+        }
+        RefreshModelingGraphCanvas();
+    }
+
+    public void UpdateModelingGraphNodeDrag(double normalizedX, double normalizedY)
+    {
+        if (_modelingGraphDragNodeId is not { } nodeId) return;
+        var (x, y) = DenormalizeGraphCanvasPoint(normalizedX, normalizedY);
+        var delta = new System.Windows.Point(x, y) - _modelingGraphDragStart;
+        _modelingGraphNodePositions[nodeId] = _modelingGraphDragOrigin + delta;
+        RefreshModelingGraphCanvas();
+    }
+
+    public void CompleteModelingGraphNodeDrag() => _modelingGraphDragNodeId = null;
+
+    private (double X, double Y) DenormalizeGraphCanvasPoint(double normalizedX, double normalizedY) =>
+        (normalizedX * 640, normalizedY * 360);
+
+    private async Task AddModelingGraphLinkAsync(RekallAgeStudioModelingGraphPortKey from, RekallAgeStudioModelingGraphPortKey to)
+    {
+        var link = new RekallAgeModelingGraphLink($"link-{Guid.NewGuid():N}", from.NodeId, from.PortId, to.NodeId, to.PortId);
+        var operation = new RekallAgeModelingGraphPatchOperation(RekallAgeModelingGraphPatchKind.AddLink, Link: link);
+        await RunGraphModelingAsync(async () =>
+        {
+            await _modelingGraph.ApplyPatchAsync(new([operation]), "studio", _lifecycleCancellation.Token);
+            Replace(ModelingGraphNodes, _modelingGraph.Nodes);
+            ModelingGraphSummary = _modelingGraph.EvaluationSummary;
+            RefreshModelingGraphCanvas();
+        });
+    }
 
     private async Task RunModelingAsync(Func<Task> operation)
     {

@@ -110,4 +110,41 @@ public partial class ModelingWorkspace : UserControl
         ViewModel.ZoomMeshViewport(e.Delta > 0 ? 1.1 : 1 / 1.1);
         e.Handled = true;
     }
+
+    private bool _draggingGraphNode;
+
+    /// <summary>A port hit arms/completes a link; a node-body hit selects and begins a drag; empty space clears both.</summary>
+    private async void OnModelingGraphCanvasMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (ViewModel is null || sender is not Image image || image.ActualWidth <= 0 || image.ActualHeight <= 0) return;
+        var point = e.GetPosition(image);
+        image.CaptureMouse();
+        _draggingGraphNode = true;
+        await ViewModel.ClickModelingGraphCanvasAsync(point.X / image.ActualWidth, point.Y / image.ActualHeight);
+        e.Handled = true;
+    }
+
+    private void OnModelingGraphCanvasMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_draggingGraphNode || ViewModel is null || sender is not Image image) return;
+        var point = e.GetPosition(image);
+        ViewModel.UpdateModelingGraphNodeDrag(point.X / image.ActualWidth, point.Y / image.ActualHeight);
+        e.Handled = true;
+    }
+
+    private void OnModelingGraphCanvasMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_draggingGraphNode || sender is not Image image) return;
+        _draggingGraphNode = false;
+        image.ReleaseMouseCapture();
+        ViewModel?.CompleteModelingGraphNodeDrag();
+        e.Handled = true;
+    }
+
+    private void OnModelingGraphCanvasLostCapture(object sender, MouseEventArgs e)
+    {
+        if (!_draggingGraphNode) return;
+        _draggingGraphNode = false;
+        ViewModel?.CompleteModelingGraphNodeDrag();
+    }
 }

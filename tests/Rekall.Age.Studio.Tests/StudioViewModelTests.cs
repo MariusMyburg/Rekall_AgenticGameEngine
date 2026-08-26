@@ -13,6 +13,7 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor;
 using Rekall.Age.Modeling;
+using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.Project;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
@@ -1272,6 +1273,68 @@ public sealed class StudioViewModelTests
             var mesh = await new RekallAgeMeshAssetStore().LoadAsync(root, "hero-box", CancellationToken.None);
             Assert.Equal("hero-box", mesh.AssetId);
             Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task TwoPortClicksOnTheNodeGraphCanvasCreateALinkThroughTheRealPatchPipeline()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-graph-canvas-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            // "join" accepts multiple linked geometry inputs, so box1->join->output is already a
+            // complete, valid, savable graph and box2 can sit unlinked (a box has no required
+            // input of its own) without failing strict save/patch validation. That lets the test
+            // add a *second* real link (box2 -> join) rather than needing an incomplete graph.
+            var nodes = new[]
+            {
+                new RekallAgeModelingGraphNode("box1", "rekall.modeling.primitive.box", 1, new JsonObject { ["sizeX"] = 2.0 }),
+                new RekallAgeModelingGraphNode("box2", "rekall.modeling.primitive.box", 1, new JsonObject { ["sizeX"] = 1.0 }),
+                new RekallAgeModelingGraphNode("join", "rekall.modeling.join", 1, new JsonObject()),
+                new RekallAgeModelingGraphNode("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            };
+            var links = new[]
+            {
+                new RekallAgeModelingGraphLink("box1-join", "box1", "geometry", "join", "geometry"),
+                new RekallAgeModelingGraphLink("join-output", "join", "geometry", "output", "input")
+            };
+            var graph = RekallAgeModelingGraphAsset.Create(
+                "link-test-graph", "Link Test Graph", nodes, links, [new("mesh", "output", "geometry")]);
+
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Graph Canvas Link Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await new RekallAgeModelingGraphAssetStore().SaveAsync(root, graph, CancellationToken.None);
+            viewModel.SelectedModelingGraphAssetId = "link-test-graph";
+            await ExecuteAsync(viewModel.OpenModelingGraphCommand);
+
+            // Recompute the exact same layout/render the view model just produced internally, so the
+            // port click coordinates below are derived rather than guessed against a private frame.
+            var catalog = RekallAgeModelingNodeCatalog.CreateDefault();
+            var positions = RekallAgeStudioModelingGraphLayout.ComputeDefaultPositions(nodes, links);
+            var renderer = new RekallAgeStudioModelingGraphCanvasRenderer();
+            var frame = renderer.Render(nodes, links, positions, catalog, "box2", 640, 360);
+            var box2Output = frame.PortPoints[new RekallAgeStudioModelingGraphPortKey("box2", "geometry", true)];
+            var joinInput = frame.PortPoints[new RekallAgeStudioModelingGraphPortKey("join", "geometry", false)];
+
+            await viewModel.ClickModelingGraphCanvasAsync(box2Output.X / 640, box2Output.Y / 360);
+            await viewModel.ClickModelingGraphCanvasAsync(joinInput.X / 640, joinInput.Y / 360);
+
+            var persisted = await new RekallAgeModelingGraphAssetStore().LoadAsync(root, "link-test-graph", CancellationToken.None);
+            Assert.Contains(persisted.Links, link =>
+                link.FromNodeId == "box2" && link.FromPortId == "geometry"
+                && link.ToNodeId == "join" && link.ToPortId == "geometry");
         }
         finally
         {

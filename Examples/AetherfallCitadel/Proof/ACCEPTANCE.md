@@ -182,6 +182,19 @@ the accepted gameplay evidence above.
   presentation test proves the runtime follow height and 40-degree FOV. The
   matching High `desktop60` budget remains clean at 63 scene draw calls, 162,632
   triangles, and 594,744 vertices.
+- The broken processional arch no longer renders its detailed curve work as one
+  uniformly shaded surface or a single round ring. Its editable graph now uses
+  96-sample inner and outer rectangular Bézier profile sweeps to form a layered
+  masonry archivolt, then assigns the boolean-cut wall/buttresses to structural
+  stone and the archivolts, keystone, coping, engaged columns, and finials to
+  carved trim. The baked mesh retains 8,784 points and 12,590 faces; the cooked
+  artifact contains exactly two semantic material surfaces, 42,680 vertices,
+  and 17,500 triangles. The settled real High capture has 21,217 distinct
+  colors, 198 render-work draws, and zero observations or asset fallbacks. The
+  final High `desktop60` budget remains clean at 64 scene draw calls, 162,692
+  triangles, and 637,600 vertices. This improves the gate's architectural
+  hierarchy, but the surrounding negative space and broader prop density still
+  fail final visual acceptance.
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
 silhouettes remain too black, prop geometry remains visibly coarse, and the

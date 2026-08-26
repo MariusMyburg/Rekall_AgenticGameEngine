@@ -491,6 +491,14 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   masonry readability and soften the harsh lit-trim contrast without flattening
   the requested deep-black presentation.
 
+  The processional arch now applies the same semantic-surface contract to a
+  more demanding curve consumer: two 96-sample rectangular Bézier sweeps form
+  layered inner/outer archivolts, while the wall mass and carved columns,
+  keystone, coping, and finials remain independently material-addressable. The
+  published output retains exactly two coalesced surfaces and passes the
+  existing 8,000-point detail floor without reverting to the rejected round-ring
+  silhouette.
+
 - [ ] **Step 4: Prove visible improvement**
 
   Capture the same Windows-player view and require rounded hard edges, layered

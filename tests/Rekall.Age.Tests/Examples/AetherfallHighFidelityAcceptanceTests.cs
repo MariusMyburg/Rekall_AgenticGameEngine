@@ -79,8 +79,9 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         var source = Assert.Single(graph.Nodes, node => node.TypeId == "rekall.modeling.curve.source");
         var resample = Assert.Single(graph.Nodes, node => node.TypeId == "rekall.modeling.curve.resample");
         Assert.True(JsonNode.DeepEquals(source.Parameters["document"], JsonSerializer.SerializeToNode(curve, RekallAgeModelingJson.Options)));
-        Assert.Equal(48, resample.Parameters["count"]!.GetValue<int>());
+        Assert.Equal(96, resample.Parameters["count"]!.GetValue<int>());
         Assert.Contains(graph.Links, link => link.FromNodeId == source.NodeId && link.ToNodeId == resample.NodeId);
+        Assert.Contains(graph.Nodes, node => node.NodeId == "arch-outer-ring");
 
         var evaluation = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
             graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default,
@@ -91,6 +92,17 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         Assert.True(mesh.Topology.PointIds.Count >= 8_000);
         Assert.Contains(mesh.Attributes, item => item.Name == "curve.source.span");
         Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
+
+        var model = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(
+            projectRoot, "Assets", "Models", "aetherfall-broken-arch-model.age.model.json")))!.AsObject();
+        var compiledRelativePath = model["lastSuccessfulBuild"]!["compiledMeshPath"]!.GetValue<string>();
+        var compiledMesh = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(projectRoot, compiledRelativePath)))!.AsObject();
+        var surfaces = compiledMesh["surfaces"]!.AsArray();
+
+        Assert.Equal(2, surfaces.Count);
+        Assert.Equal(
+            ["aetherfall.ruin-mass.material", "aetherfall.ruin-trim.material"],
+            surfaces.Select(surface => surface!["materialAssetId"]!.GetValue<string>()).ToArray());
     }
 
     [Fact]

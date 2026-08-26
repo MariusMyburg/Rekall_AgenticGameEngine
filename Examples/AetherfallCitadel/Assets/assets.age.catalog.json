@@ -44,8 +44,8 @@
       "displayName": "Broken Processional Arch",
       "kind": "model",
       "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-broken-arch-mesh.age.mesh.json",
-      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-broken-arch-model\\7b0a24c2ddbda10ed5cf290568e2b205c972ff3071f03fc76651760f544e4c2b.age.compiled-mesh.json",
-      "contentHash": "7b0a24c2ddbda10ed5cf290568e2b205c972ff3071f03fc76651760f544e4c2b",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-broken-arch-model\\816b573b97367ccbd7e0e6e458e60eb508ba8a0d811049ebfc4014ea693e15c3.age.compiled-mesh.json",
+      "contentHash": "816b573b97367ccbd7e0e6e458e60eb508ba8a0d811049ebfc4014ea693e15c3",
       "glbMetadata": null,
       "textureMetadata": null,
       "provenance": null,
@@ -53,8 +53,8 @@
         "modelDocumentPath": "Assets/Models/aetherfall-broken-arch-model.age.model.json",
         "sourceKind": "Mesh",
         "sourceAssetId": "aetherfall-broken-arch-mesh",
-        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-broken-arch-model/7b0a24c2ddbda10ed5cf290568e2b205c972ff3071f03fc76651760f544e4c2b.age.compiled-mesh.json",
-        "compiledContentHash": "7b0a24c2ddbda10ed5cf290568e2b205c972ff3071f03fc76651760f544e4c2b"
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-broken-arch-model/816b573b97367ccbd7e0e6e458e60eb508ba8a0d811049ebfc4014ea693e15c3.age.compiled-mesh.json",
+        "compiledContentHash": "816b573b97367ccbd7e0e6e458e60eb508ba8a0d811049ebfc4014ea693e15c3"
       }
     },
     {

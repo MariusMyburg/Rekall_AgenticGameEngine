@@ -99,30 +99,55 @@ public sealed class AetherfallRulesSystem : IRekallAgeRuntimeModuleSystem
         }
 
         var time = context.ElapsedTime.TotalSeconds;
+        var velocityX = warden.ComponentNumber(AetherfallConstants.WardenStateType, "velocityX");
+        var velocityZ = warden.ComponentNumber(AetherfallConstants.WardenStateType, "velocityZ");
+        var movement = Math.Clamp(
+            Math.Sqrt(velocityX * velocityX + velocityZ * velocityZ) / AetherfallConstants.WardenSpeed,
+            0,
+            1);
+        var facingX = warden.ComponentNumber(AetherfallConstants.WardenStateType, "facingX");
+        var facingZ = warden.ComponentNumber(AetherfallConstants.WardenStateType, "facingZ", 1);
+        var facingYaw = Math.Atan2(facingX, facingZ);
+        var walkPhase = time * 7.5;
+        var legSwing = Math.Sin(walkPhase) * 0.48 * movement;
+        var armSwing = Math.Sin(walkPhase) * 0.34 * movement;
+        var stepBob = (0.5 - 0.5 * Math.Cos(walkPhase * 2)) * 0.045 * movement;
+        var pulseBlend = Math.Sin(Math.Clamp(
+            warden.ComponentNumber(AetherfallConstants.WardenStateType, "pulseCooldown")
+                / AetherfallConstants.PulseCooldownSeconds,
+            0,
+            1) * Math.PI);
+        var dashBlend = Math.Clamp(
+            (warden.ComponentNumber(AetherfallConstants.WardenStateType, "dashCooldown") - 0.52) / 0.33,
+            0,
+            1);
         var breath = Math.Sin(time * 2.2) * 0.018;
         var weightShift = Math.Sin(time * 1.35 + 0.4) * 0.035;
-        var stride = Math.Sin(time * 1.55) * 0.028;
         var glance = Math.Sin(time * 0.61 + 0.8) * 0.026;
-        var chest = System.Numerics.Matrix4x4.CreateRotationX((float)breath)
+        var pelvis = System.Numerics.Matrix4x4.CreateRotationY((float)facingYaw)
+            * System.Numerics.Matrix4x4.CreateRotationX((float)(dashBlend * -0.16))
+            * System.Numerics.Matrix4x4.CreateRotationZ((float)(-weightShift * (1 - movement * 0.7)))
+            * System.Numerics.Matrix4x4.CreateTranslation(0, (float)(stepBob - dashBlend * 0.08), 0);
+        var chest = System.Numerics.Matrix4x4.CreateRotationX((float)(breath + movement * 0.045 + dashBlend * -0.12))
             * System.Numerics.Matrix4x4.CreateRotationZ((float)weightShift);
         return world.UpdateEntity(warden.Id, entity => entity.UpdateComponent("Rekall.RigPose", properties =>
         {
             properties["assetId"] = "aetherfall.warden.rig";
             properties["skinIndex"] = 0;
             properties["jointDeltas"] = new JsonArray(
-                Pose("pelvis", System.Numerics.Matrix4x4.CreateRotationZ((float)(-weightShift * 0.35))),
+                Pose("pelvis", pelvis),
                 Pose("chest", chest),
                 Pose("head", System.Numerics.Matrix4x4.CreateRotationY((float)glance)
                     * System.Numerics.Matrix4x4.CreateRotationZ((float)(-weightShift * 0.45))),
-                Pose("upper_arm_l", System.Numerics.Matrix4x4.CreateRotationX((float)(-stride * 0.55))
+                Pose("upper_arm_l", System.Numerics.Matrix4x4.CreateRotationX((float)(-armSwing - pulseBlend * 0.34))
                     * System.Numerics.Matrix4x4.CreateRotationZ((float)(weightShift * 0.7))),
-                Pose("forearm_l", System.Numerics.Matrix4x4.CreateRotationX((float)(breath * 1.4 + stride * 0.35))),
-                Pose("upper_arm_r", System.Numerics.Matrix4x4.CreateRotationX((float)(stride * 0.55))
+                Pose("forearm_l", System.Numerics.Matrix4x4.CreateRotationX((float)(0.12 + breath * 1.4 + armSwing * 0.35 + pulseBlend * 0.58))),
+                Pose("upper_arm_r", System.Numerics.Matrix4x4.CreateRotationX((float)(armSwing - pulseBlend * 0.34))
                     * System.Numerics.Matrix4x4.CreateRotationZ((float)(weightShift * 0.7))),
-                Pose("forearm_r", System.Numerics.Matrix4x4.CreateRotationX((float)(breath * 1.4 - stride * 0.35))),
-                Pose("leg_l", System.Numerics.Matrix4x4.CreateRotationX((float)stride)
+                Pose("forearm_r", System.Numerics.Matrix4x4.CreateRotationX((float)(0.12 + breath * 1.4 - armSwing * 0.35 + pulseBlend * 0.58))),
+                Pose("leg_l", System.Numerics.Matrix4x4.CreateRotationX((float)legSwing)
                     * System.Numerics.Matrix4x4.CreateRotationZ((float)(-weightShift * 0.22))),
-                Pose("leg_r", System.Numerics.Matrix4x4.CreateRotationX((float)-stride)
+                Pose("leg_r", System.Numerics.Matrix4x4.CreateRotationX((float)-legSwing)
                     * System.Numerics.Matrix4x4.CreateRotationZ((float)(-weightShift * 0.22))));
             return properties;
         }));

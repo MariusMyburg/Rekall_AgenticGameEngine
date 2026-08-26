@@ -28,6 +28,17 @@ passes at 8.066848 ms GPU time. This is functional deformation infrastructure;
 the Warden remains visibly intermediate and still needs higher-detail anatomy,
 clothing, materials, and production locomotion/combat animation.
 
+The first follow-on gameplay-motion slice removes the Warden's state-agnostic
+idle-only pose. Its agent-authored module now derives facing, stride, pelvis
+bob, body lean, arm counter-swing, and pulse/dash accents from semantic
+movement and ordinary agent-owned component state. A deterministic nine-frame
+movement proof requires a readable leg-matrix term above 0.15; the former pose
+failed at 0.012555 and the new pose passes. Combined Aetherfall acceptance is
+45/45 and restricted module trust remains clean. This uses existing generic
+AGE contracts correctly and therefore does not add a genre-specific animation
+behavior to engine core. Production clips, foot planting, IK, bone
+attachments, and richer secondary motion remain open.
+
 The current deformation-authoring checkpoint adds two generic, inspectable
 modeling contracts. `assign_linear_skin_weights` and its graph/modifier
 surfaces author normalized two-joint point bindings from geometry along any

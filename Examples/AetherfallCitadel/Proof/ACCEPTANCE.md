@@ -824,3 +824,21 @@ the new background is an explicit fallback, not a claim that sky assets render.
   anatomy, clothing, surface materials, locomotion, combat motion, and richer
   secondary deformation remain required for the intended dark high-fidelity
   result.
+
+## Movement-responsive Warden pose checkpoint
+
+- The agent-authored Warden pose now consumes the ordinary semantic movement
+  state written by gameplay rather than playing the same tiny idle sway in all
+  circumstances. Movement speed and facing drive pelvis orientation, a
+  grounded step bob, opposing 0.48-radian leg swings, counter-swinging arms,
+  and forward body lean. Pulse and dash cooldown state layer short authored
+  upper-body and crouch accents without adding character behavior to engine
+  core.
+- Deterministic runtime acceptance sends nine `move.horizontal` /
+  `move.vertical` frames through the real project module and requires a leg
+  rotation-matrix term above 0.15. The prior pose failed at 0.012555; the
+  movement-driven pose passes. Combined Aetherfall gameplay and high-fidelity
+  acceptance is 45/45 and both modules remain trusted under the restricted
+  Windows host posture. This materially improves gameplay motion, but it is
+  still procedural locomotion rather than a captured or hand-authored
+  production animation set.

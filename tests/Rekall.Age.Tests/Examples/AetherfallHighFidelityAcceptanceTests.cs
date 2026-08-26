@@ -324,6 +324,31 @@ public sealed class AetherfallHighFidelityAcceptanceTests
     }
 
     [Fact]
+    public async Task WardenRigPoseRespondsVisiblyToSemanticMovement()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var inputs = Enumerable.Range(0, 9)
+            .Select(_ => new RekallAgeRuntimeInputFrame(
+                SemanticActions:
+                [
+                    new("move.horizontal", 1, IsDown: true),
+                    new("move.vertical", 0.35, IsDown: true)
+                ]) { DeltaSeconds = 1.0 / 30.0 })
+            .ToArray();
+
+        var world = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(
+            projectRoot, "Main", inputs.Length, inputs, CancellationToken.None);
+        var warden = Assert.Single(world.Entities, entity => entity.Name == "AetherWarden");
+        var pose = Assert.Single(warden.Components, component => component.Type == "Rekall.RigPose");
+        var leg = Assert.Single(pose.Properties["jointDeltas"]!.AsArray(), delta =>
+            delta!["jointId"]!.GetValue<string>() == "leg_l")!.AsObject();
+        var matrix = leg["matrix"]!.AsArray().Select(value => value!.GetValue<float>()).ToArray();
+
+        Assert.True(Math.Abs(matrix[6]) > 0.15,
+            $"Expected a readable movement-driven leg swing, found matrix[6]={matrix[6]:F6}.");
+    }
+
+    [Fact]
     public async Task WardenUsesModelBackedParentedArticulationThatFollowsGameplayRoot()
     {
         var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");

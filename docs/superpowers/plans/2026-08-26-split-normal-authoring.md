@@ -44,21 +44,21 @@ JSON modeling graphs, native Vulkan capture.
 - Produces: `mark_sharp(sharp: bool, attribute: string = "normal.sharp")`
   on edge selections.
 
-- [ ] **Step 1: Write failing policy edit tests**
+- [x] **Step 1: Write failing policy edit tests**
 
   Add tests that construct a box, call `shade_faces` on one face and
   `mark_sharp` on one edge, and assert face/edge `Bool` attributes have the
   selected value while every unselected element retains the default. Assert a
   second inverse edit preserves unrelated values and increments revision once.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
   Run:
   `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --filter "FullyQualifiedName~MeshNormalAuthoringTests.Policy"`
 
   Expected: FAIL because the operation IDs are unknown.
 
-- [ ] **Step 3: Implement the typed operations**
+- [x] **Step 3: Implement the typed operations**
 
   Add face/edge descriptors and executor switch cases. Implement a shared
   helper that validates an existing attribute's exact domain/type, fills a new
@@ -67,7 +67,7 @@ JSON modeling graphs, native Vulkan capture.
   change set, and emits `REKALL_MESH_OPERATION_ATTRIBUTE_CONFLICT` for an
   incompatible existing attribute.
 
-- [ ] **Step 4: Run GREEN and commit**
+- [x] **Step 4: Run GREEN and commit**
 
   Run the filtered tests plus `MeshEditServiceTests` and
   `MeshOperationTests`. Commit as `feat: author mesh smoothing policy`.
@@ -88,7 +88,7 @@ JSON modeling graphs, native Vulkan capture.
   faceAreaWeight = 1, cornerAngleWeight = 1,
   smoothAttribute = "normal.smooth", sharpAttribute = "normal.sharp")`.
 
-- [ ] **Step 1: Write failing classification tests**
+- [x] **Step 1: Write failing classification tests**
 
   Add a bent two-quad fixture with one coplanar pair, one right-angle pair, and
   boundary edges. Assert 180 degrees keeps manifold edges smooth, 89 degrees
@@ -96,7 +96,7 @@ JSON modeling graphs, native Vulkan capture.
   boundaries are marked sharp. Add an explicit non-manifold fixture and assert
   its shared edge is sharp. Assert values are deterministic across two runs.
 
-- [ ] **Step 2: Write failing smooth-fan tests**
+- [x] **Step 2: Write failing smooth-fan tests**
 
   On a curved three-face fan, assert unmarked smooth corners at one point share
   the same unit normal. Mark the middle boundary sharp and assert corners on
@@ -105,20 +105,20 @@ JSON modeling graphs, native Vulkan capture.
   every output is finite and unit length. Compile the mesh and assert compiled
   normals equal the authored corner values and each tangent is orthogonal.
 
-- [ ] **Step 3: Run RED**
+- [x] **Step 3: Run RED**
 
   Run the two focused test classes. Expected: failures for unknown
   `auto_smooth`, missing policy-aware parameters, and normals blended across
   the requested split.
 
-- [ ] **Step 4: Implement deterministic classification**
+- [x] **Step 4: Implement deterministic classification**
 
   Build edge-to-incident-face adjacency from face corner loops. Calculate
   finite Newell face normals. Write the sharp edge attribute using
   `dot(faceA, faceB) < cos(angleDegrees)` for exactly two incident faces and
   `true` otherwise. Require complete face selection and the closed 0–180 range.
 
-- [ ] **Step 5: Implement smooth corner fans**
+- [x] **Step 5: Implement smooth corner fans**
 
   Precompute face normal, doubled area, and each corner's clamped interior
   angle. At each point, build a local corner adjacency graph through smooth
@@ -129,7 +129,7 @@ JSON modeling graphs, native Vulkan capture.
   corners. Preserve the existing all-smooth result when policy attributes are
   absent.
 
-- [ ] **Step 6: Run GREEN and commit**
+- [x] **Step 6: Run GREEN and commit**
 
   Run `MeshNormalAuthoringTests`, `MeshCompilerTests`, topology validation,
   bevel, solidify, and modifier-stack tests. Commit as

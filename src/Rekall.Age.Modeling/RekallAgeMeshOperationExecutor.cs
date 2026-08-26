@@ -74,6 +74,15 @@ public sealed partial class RekallAgeMeshOperationExecutor
                 StringParameter("attribute", "normal.sharp", "Destination edge-domain sharpness policy attribute.")
             ]),
         new(
+            "auto_smooth",
+            "Classifies mesh edges as normal-fan boundaries from adjacent face angle and topology.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Attributes,
+            [
+                new("angleDegrees", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(60.0), "Maximum smooth angle in degrees from zero through 180."),
+                StringParameter("sharpAttribute", "normal.sharp", "Destination edge-domain sharpness policy attribute.")
+            ]),
+        new(
             "project_uv",
             "Projects selected face corners onto XY, XZ, or YZ and writes a named corner-domain Float2 texture-coordinate attribute.",
             RekallAgeGeometryDomain.Face,
@@ -158,12 +167,15 @@ public sealed partial class RekallAgeMeshOperationExecutor
             ]),
         new(
             "weighted_normals",
-            "Authors area-weighted finite unit corner normals without changing source topology.",
+            "Authors finite split corner normals from smooth-face and sharp-edge policies without changing source topology.",
             RekallAgeGeometryDomain.Face,
             RekallAgeMeshChangeKind.Attributes,
             [
-                new("attribute", RekallAgeGeometryValueType.String, false, JsonSerializer.SerializeToElement("normal.weighted"), "Destination corner normal attribute."),
-                new("faceAreaWeight", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(1.0), "Face-area weighting exponent from 0 through 4.")
+                new("attribute", RekallAgeGeometryValueType.String, false, JsonSerializer.SerializeToElement("normal.authored"), "Destination corner normal attribute."),
+                new("faceAreaWeight", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(1.0), "Face-area weighting exponent from 0 through 4."),
+                new("cornerAngleWeight", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(1.0), "Corner-angle weighting exponent from 0 through 4."),
+                StringParameter("smoothAttribute", "normal.smooth", "Optional face-domain smoothing policy attribute."),
+                StringParameter("sharpAttribute", "normal.sharp", "Optional edge-domain sharpness policy attribute.")
             ]),
         new("fill_holes", "Fills selected simple boundary loops with deterministic polygon faces.", RekallAgeGeometryDomain.Edge,
             RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Attributes,
@@ -215,6 +227,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
             "generate_normals" => GenerateNormals(source, request),
             "shade_faces" => ShadeFaces(source, request),
             "mark_sharp" => MarkSharp(source, request),
+            "auto_smooth" => AutoSmooth(source, request),
             "project_uv" => ProjectUv(source, request),
             "mark_uv_seams" => MarkUvSeams(source, request),
             "unwrap_pack_uv" => UnwrapPackUv(source, request),

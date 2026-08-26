@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.weathered-ruin.graph",
   "name": "Weathered Ruin Wall Module",
-  "revision": 7,
+  "revision": 8,
   "nodes": [
     {
       "nodeId": "wall",
@@ -444,8 +444,11 @@
       "typeId": "rekall.modeling.weighted_normals",
       "typeVersion": 1,
       "parameters": {
-        "attribute": "normal.weighted",
-        "faceAreaWeight": 1.0
+        "attribute": "normal.authored",
+        "faceAreaWeight": 1.0,
+        "cornerAngleWeight": 1.0,
+        "smoothAttribute": "normal.smooth",
+        "sharpAttribute": "normal.sharp"
       }
     },
     {
@@ -505,6 +508,15 @@
           4.42,
           0
         ]
+      }
+    },
+    {
+      "nodeId": "auto-smooth",
+      "typeId": "rekall.modeling.auto_smooth",
+      "typeVersion": 1,
+      "parameters": {
+        "angleDegrees": 35.0,
+        "sharpAttribute": "normal.sharp"
       }
     }
   ],
@@ -748,13 +760,6 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "normals",
-      "fromNodeId": "weather-z",
-      "fromPortId": "geometry",
-      "toNodeId": "normals",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "uv",
       "fromNodeId": "normals",
       "fromPortId": "geometry",
@@ -801,6 +806,20 @@
       "fromNodeId": "wall-header-x",
       "fromPortId": "geometry",
       "toNodeId": "mass-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "auto-smooth-input",
+      "fromNodeId": "weather-z",
+      "fromPortId": "geometry",
+      "toNodeId": "auto-smooth",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "normals",
+      "fromNodeId": "auto-smooth",
+      "fromPortId": "geometry",
+      "toNodeId": "normals",
       "toPortId": "geometry"
     }
   ],

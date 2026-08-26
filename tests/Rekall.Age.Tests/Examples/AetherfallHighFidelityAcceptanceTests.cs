@@ -12,6 +12,62 @@ namespace Rekall.Age.Tests.Examples;
 
 public sealed class AetherfallHighFidelityAcceptanceTests
 {
+    [Theory]
+    [InlineData("aetherfall.warden.graph", "aetherfall-warden-dark-mesh", "aetherfall-warden-dark-model.age.model.json", 55.0)]
+    [InlineData("aetherfall.weathered-ruin.graph", "aetherfall-weathered-ruin-mesh", "aetherfall-weathered-ruin-model.age.model.json", 35.0)]
+    public async Task WardenAndWeatheredRuinPublishSplitNormalPolicy(
+        string graphAssetId,
+        string meshAssetId,
+        string modelFileName,
+        double angleDegrees)
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var graph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
+            projectRoot,
+            graphAssetId,
+            CancellationToken.None);
+        var auto = Assert.Single(graph.Nodes, node => node.TypeId == "rekall.modeling.auto_smooth");
+        var weighted = Assert.Single(graph.Nodes, node => node.TypeId == "rekall.modeling.weighted_normals");
+
+        Assert.Equal(angleDegrees, auto.Parameters["angleDegrees"]!.GetValue<double>());
+        Assert.Equal("normal.authored", weighted.Parameters["attribute"]!.GetValue<string>());
+        Assert.Equal(1.0, weighted.Parameters["cornerAngleWeight"]!.GetValue<double>());
+        Assert.Contains(graph.Links, link => link.FromNodeId == auto.NodeId && link.ToNodeId == weighted.NodeId);
+
+        var source = await new RekallAgeMeshAssetStore().LoadVersionedAsync(
+            projectRoot,
+            meshAssetId,
+            CancellationToken.None);
+        var normals = Assert.Single(source.Value.Attributes, attribute => attribute.Name == "normal.authored");
+        var sharp = Assert.Single(source.Value.Attributes, attribute => attribute.Name == "normal.sharp");
+        Assert.Equal(RekallAgeGeometryDomain.Corner, normals.Domain);
+        Assert.Equal(RekallAgeGeometryDomain.Edge, sharp.Domain);
+        Assert.All(normals.Values, value =>
+        {
+            var x = value[0].GetDouble();
+            var y = value[1].GetDouble();
+            var z = value[2].GetDouble();
+            Assert.True(double.IsFinite(x) && double.IsFinite(y) && double.IsFinite(z));
+            Assert.InRange(Math.Sqrt(x * x + y * y + z * z), 0.999999, 1.000001);
+        });
+
+        var model = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(
+            projectRoot,
+            "Assets",
+            "Models",
+            modelFileName)))!.AsObject();
+        Assert.Equal(source.Revision, model["lastSuccessfulBuild"]!["sourceFileRevision"]!.GetValue<string>());
+        var compiledPath = model["lastSuccessfulBuild"]!["compiledMeshPath"]!.GetValue<string>();
+        var compiled = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(projectRoot, compiledPath)))!.AsObject();
+        var directions = compiled["vertices"]!.AsArray()
+            .Select(vertex => vertex!["normal"]!)
+            .Select(normal => $"{Math.Round(normal["x"]!.GetValue<double>(), 4)},{Math.Round(normal["y"]!.GetValue<double>(), 4)},{Math.Round(normal["z"]!.GetValue<double>(), 4)}")
+            .Distinct(StringComparer.Ordinal)
+            .Take(9)
+            .Count();
+        Assert.True(directions >= 8, $"Expected varied published shading directions, found {directions}.");
+    }
+
     [Fact]
     public async Task WardenMantleUsesNativeProceduralWeightsAndRuntimePoseDeformation()
     {

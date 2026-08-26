@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.warden.graph",
   "name": "Aetherfall Warden Silhouette",
-  "revision": 5,
+  "revision": 6,
   "nodes": [
     {
       "nodeId": "torso",
@@ -857,8 +857,11 @@
       "typeId": "rekall.modeling.weighted_normals",
       "typeVersion": 1,
       "parameters": {
-        "attribute": "normal.weighted",
-        "faceAreaWeight": 1.0
+        "attribute": "normal.authored",
+        "faceAreaWeight": 1.0,
+        "cornerAngleWeight": 1.0,
+        "smoothAttribute": "normal.smooth",
+        "sharpAttribute": "normal.sharp"
       }
     },
     {
@@ -1081,6 +1084,15 @@
       "typeId": "rekall.modeling.join",
       "typeVersion": 1,
       "parameters": {}
+    },
+    {
+      "nodeId": "auto-smooth",
+      "typeId": "rekall.modeling.auto_smooth",
+      "typeVersion": 1,
+      "parameters": {
+        "angleDegrees": 55.0,
+        "sharpAttribute": "normal.sharp"
+      }
     }
   ],
   "links": [
@@ -1449,13 +1461,6 @@
       "toPortId": "geometry"
     },
     {
-      "linkId": "normals",
-      "fromNodeId": "weather",
-      "fromPortId": "geometry",
-      "toNodeId": "normals",
-      "toPortId": "geometry"
-    },
-    {
       "linkId": "uv",
       "fromNodeId": "normals",
       "fromPortId": "geometry",
@@ -1670,6 +1675,20 @@
       "fromNodeId": "join",
       "fromPortId": "geometry",
       "toNodeId": "weather",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "auto-smooth-input",
+      "fromNodeId": "weather",
+      "fromPortId": "geometry",
+      "toNodeId": "auto-smooth",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "normals",
+      "fromNodeId": "auto-smooth",
+      "fromPortId": "geometry",
+      "toNodeId": "normals",
       "toPortId": "geometry"
     }
   ],

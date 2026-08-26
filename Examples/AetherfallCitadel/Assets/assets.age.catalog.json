@@ -291,8 +291,8 @@
       "displayName": "Aetherfall Dark Warden",
       "kind": "model",
       "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-warden-dark-mesh.age.mesh.json",
-      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-dark-model\\090c03556b8f03c4416078d4b62a20914b8ddccaad13d2c082d510d4035c9655.age.compiled-mesh.json",
-      "contentHash": "090c03556b8f03c4416078d4b62a20914b8ddccaad13d2c082d510d4035c9655",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-dark-model\\6baaf73c5bafc5deb11fb5042fc63bbe20f9f24e53700a4329c976c43e7ef9ae.age.compiled-mesh.json",
+      "contentHash": "6baaf73c5bafc5deb11fb5042fc63bbe20f9f24e53700a4329c976c43e7ef9ae",
       "glbMetadata": null,
       "textureMetadata": null,
       "provenance": null,
@@ -300,8 +300,8 @@
         "modelDocumentPath": "Assets/Models/aetherfall-warden-dark-model.age.model.json",
         "sourceKind": "Mesh",
         "sourceAssetId": "aetherfall-warden-dark-mesh",
-        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-dark-model/090c03556b8f03c4416078d4b62a20914b8ddccaad13d2c082d510d4035c9655.age.compiled-mesh.json",
-        "compiledContentHash": "090c03556b8f03c4416078d4b62a20914b8ddccaad13d2c082d510d4035c9655"
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-dark-model/6baaf73c5bafc5deb11fb5042fc63bbe20f9f24e53700a4329c976c43e7ef9ae.age.compiled-mesh.json",
+        "compiledContentHash": "6baaf73c5bafc5deb11fb5042fc63bbe20f9f24e53700a4329c976c43e7ef9ae"
       }
     },
     {
@@ -386,8 +386,8 @@
       "displayName": "Weathered Ruin Wall",
       "kind": "model",
       "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-weathered-ruin-mesh.age.mesh.json",
-      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-weathered-ruin-model\\3de3fd706c08b3d71813125bc070228bc3b0bde0658018ee2e1fc5d6206b7548.age.compiled-mesh.json",
-      "contentHash": "3de3fd706c08b3d71813125bc070228bc3b0bde0658018ee2e1fc5d6206b7548",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-weathered-ruin-model\\a11ce23245189e23cf220eaea0131bc6c1d4e957ba58177b56adb0532d53965a.age.compiled-mesh.json",
+      "contentHash": "a11ce23245189e23cf220eaea0131bc6c1d4e957ba58177b56adb0532d53965a",
       "glbMetadata": null,
       "textureMetadata": null,
       "provenance": null,
@@ -395,8 +395,8 @@
         "modelDocumentPath": "Assets/Models/aetherfall-weathered-ruin-model.age.model.json",
         "sourceKind": "Mesh",
         "sourceAssetId": "aetherfall-weathered-ruin-mesh",
-        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-weathered-ruin-model/3de3fd706c08b3d71813125bc070228bc3b0bde0658018ee2e1fc5d6206b7548.age.compiled-mesh.json",
-        "compiledContentHash": "3de3fd706c08b3d71813125bc070228bc3b0bde0658018ee2e1fc5d6206b7548"
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-weathered-ruin-model/a11ce23245189e23cf220eaea0131bc6c1d4e957ba58177b56adb0532d53965a.age.compiled-mesh.json",
+        "compiledContentHash": "a11ce23245189e23cf220eaea0131bc6c1d4e957ba58177b56adb0532d53965a"
       }
     },
     {

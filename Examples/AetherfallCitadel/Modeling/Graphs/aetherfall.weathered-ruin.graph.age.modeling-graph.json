@@ -2,27 +2,16 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.weathered-ruin.graph",
   "name": "Weathered Ruin Wall Module",
-  "revision": 2,
+  "revision": 7,
   "nodes": [
     {
       "nodeId": "wall",
       "typeId": "rekall.modeling.primitive.box",
       "typeVersion": 1,
       "parameters": {
-        "sizeX": 9,
+        "sizeX": 1.35,
         "sizeY": 4.8,
         "sizeZ": 1.25
-      }
-    },
-    {
-      "nodeId": "wall-inset",
-      "typeId": "rekall.modeling.inset",
-      "typeVersion": 1,
-      "parameters": {
-        "thickness": 0.18,
-        "depth": -0.07,
-        "individual": true,
-        "boundary": true
       }
     },
     {
@@ -31,7 +20,7 @@
       "typeVersion": 1,
       "parameters": {
         "translation": [
-          0,
+          -3.6,
           2.4,
           0
         ]
@@ -422,7 +411,7 @@
       "typeVersion": 1,
       "parameters": {
         "width": 0.11,
-        "segments": 2,
+        "segments": 3,
         "profile": 0.5,
         "clampOverlap": true,
         "hardenNormals": true
@@ -433,7 +422,7 @@
       "typeId": "rekall.modeling.deform.noise",
       "typeVersion": 1,
       "parameters": {
-        "amplitude": 0.13,
+        "amplitude": 0.09,
         "frequency": 1.7,
         "seed": 831,
         "axis": "x"
@@ -444,7 +433,7 @@
       "typeId": "rekall.modeling.deform.noise",
       "typeVersion": 1,
       "parameters": {
-        "amplitude": 0.11,
+        "amplitude": 0.08,
         "frequency": 2.1,
         "seed": 239,
         "axis": "z"
@@ -475,23 +464,51 @@
       "typeId": "rekall.modeling.output.mesh",
       "typeVersion": 1,
       "parameters": {}
+    },
+    {
+      "nodeId": "wall-piers",
+      "typeId": "rekall.modeling.array",
+      "typeVersion": 1,
+      "parameters": {
+        "instanceMode": false,
+        "count": 4,
+        "relativeOffset": false,
+        "offset": [
+          2.4,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "nodeId": "wall-header",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeY": 0.72,
+        "sizeZ": 1.35,
+        "sizeX": 8.8
+      }
+    },
+    {
+      "nodeId": "wall-header-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "rotation": [
+          0,
+          0,
+          -1.5
+        ],
+        "translation": [
+          0,
+          4.42,
+          0
+        ]
+      }
     }
   ],
   "links": [
-    {
-      "linkId": "wall-inset",
-      "fromNodeId": "wall",
-      "fromPortId": "geometry",
-      "toNodeId": "wall-inset",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "wall-x",
-      "fromNodeId": "wall-inset",
-      "fromPortId": "geometry",
-      "toNodeId": "wall-x",
-      "toPortId": "geometry"
-    },
     {
       "linkId": "left-x",
       "fromNodeId": "left",
@@ -539,13 +556,6 @@
       "fromNodeId": "coping-x",
       "fromPortId": "geometry",
       "toNodeId": "coping-array",
-      "toPortId": "geometry"
-    },
-    {
-      "linkId": "j1",
-      "fromNodeId": "wall-x",
-      "fromPortId": "geometry",
-      "toNodeId": "mass-join",
       "toPortId": "geometry"
     },
     {
@@ -757,6 +767,41 @@
       "fromPortId": "geometry",
       "toNodeId": "output",
       "toPortId": "input"
+    },
+    {
+      "linkId": "wall-pier-source",
+      "fromNodeId": "wall",
+      "fromPortId": "geometry",
+      "toNodeId": "wall-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "wall-pier-array",
+      "fromNodeId": "wall-x",
+      "fromPortId": "geometry",
+      "toNodeId": "wall-piers",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "wall-piers-mass",
+      "fromNodeId": "wall-piers",
+      "fromPortId": "geometry",
+      "toNodeId": "mass-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "wall-header-x",
+      "fromNodeId": "wall-header",
+      "fromPortId": "geometry",
+      "toNodeId": "wall-header-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "wall-header-mass",
+      "fromNodeId": "wall-header-x",
+      "fromPortId": "geometry",
+      "toNodeId": "mass-join",
+      "toPortId": "geometry"
     }
   ],
   "outputs": [

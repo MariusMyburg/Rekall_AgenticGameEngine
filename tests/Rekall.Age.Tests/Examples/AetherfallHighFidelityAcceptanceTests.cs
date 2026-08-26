@@ -39,6 +39,8 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         Assert.Contains(graph.Nodes, node => node.NodeId == "relief-ribs");
         Assert.Contains(graph.Nodes, node => node.NodeId == "pilaster-caps");
         Assert.Contains(graph.Nodes, node => node.NodeId == "crown-blocks");
+        Assert.Contains(graph.Nodes, node => node.NodeId == "wall-piers" && node.TypeId == "rekall.modeling.array");
+        Assert.Contains(graph.Nodes, node => node.NodeId == "wall-header");
 
         var evaluation = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
             graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default,
@@ -60,6 +62,27 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         Assert.Equal(
             ["aetherfall.ruin-mass.material", "aetherfall.ruin-trim.material"],
             surfaces.Select(surface => surface!["materialAssetId"]!.GetValue<string>()).ToArray());
+    }
+
+    [Fact]
+    public async Task HollowSentinelPublishesCompleteAnatomyWithSeparatedModifierBranches()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var graph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
+            projectRoot, "aetherfall.hollow-sentinel.graph", CancellationToken.None);
+
+        Assert.Contains(graph.Nodes, node => node.NodeId == "legs" && node.TypeId == "rekall.modeling.mirror");
+        Assert.Contains(graph.Nodes, node => node.NodeId == "boots" && node.TypeId == "rekall.modeling.mirror");
+        Assert.Contains(graph.Nodes, node => node.NodeId == "horns" && node.TypeId == "rekall.modeling.mirror");
+        Assert.Contains(graph.Nodes, node => node.NodeId == "smooth-join");
+        Assert.Contains(graph.Nodes, node => node.NodeId == "soften" && node.TypeId == "rekall.modeling.bevel");
+
+        var evaluation = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default,
+            new(119, 0, "aetherfall-acceptance", "desktop"), CancellationToken.None);
+
+        Assert.True(evaluation.Succeeded, string.Join(Environment.NewLine, evaluation.Diagnostics.Select(item => item.Message)));
+        Assert.True(evaluation.Outputs["mesh"].Topology.FaceIds.Count >= 4_500);
     }
 
     [Fact]

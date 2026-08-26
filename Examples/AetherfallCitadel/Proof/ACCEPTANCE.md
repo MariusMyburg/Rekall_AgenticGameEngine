@@ -300,6 +300,28 @@ the accepted gameplay evidence above.
   than sideways discs, although rigid posing, stylized proportions, nearby
   ruin coarseness, and broader realism remain active failures against the final
   Diablo/Alan Wake visual bar.
+- The shared hollow-sentinel graph now uses the same production-oriented
+  structure: 38 reachable nodes, higher-resolution torso/head/pauldrons/collar,
+  capsule arms, mirrored capsule legs, boots, and horns, with smooth anatomy
+  bypassing the three-segment hard-surface bevel. It evaluates in 0.47 seconds
+  and publishes 16,392 vertices and 7,356 triangles. Because this model drives
+  the opening sentinel, dormant court enemies, guardian effigy, and guardian,
+  the improvement exercises reusable generic modeling rather than a one-off
+  scene prop.
+- The weathered-ruin investigation found a concrete remaining AGE modeling
+  limitation: boolean difference evaluated successfully, but both curved and
+  rectangular cutters could produce n-gons that the explicit triangulate node
+  or model compiler rejected as zero-area/non-triangulable. After three bounded
+  attempts, the scene kit switched to constructive modular modeling instead of
+  concealing that interoperability defect. Four weathered piers plus a separate
+  header now form real open bays, preserving the existing buttresses, relief
+  ribs, string courses, caps, crown damage, two material surfaces, bevel,
+  weathering, weighted normals, and box UVs. The stable 43-node graph evaluates
+  in 0.53 seconds and publishes 10,752 vertices and 4,368 triangles. The real
+  RTX 5090 High diagnostic frame is
+  `Proof/Captures/ConstructiveRuinPass/vulkan-scene-1280x720-20260826015916177.png`:
+  11,370 distinct colors, 14.5% dominant-color share, mean luminance 0.104,
+  213 draws, four dispatches, and zero observations or asset fallbacks.
 
 The frame is diagnostic progress, not final visual acceptance: several ruin
 silhouettes remain too black, the Warden/sentinel/rubble/ruin geometry remains

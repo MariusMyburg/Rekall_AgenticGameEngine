@@ -463,6 +463,17 @@ xUnit, JSON modeling graphs, WPF Studio, Vulkan/WebGPU render compilers.
   Warden adds layered head, shoulder, waist, leg, boot, and weapon forms. Both
   use ordinary generic AGE graph nodes and remain editable source assets.
 
+  Later 2026-08-26 checkpoint: Warden and hollow-sentinel graphs now separate
+  smooth primitive branches from hard-surface branches before segmented bevel,
+  avoiding the topology explosion caused by beveling every sphere/capsule edge.
+  The Warden also corrected axial primitive transforms and the sentinel gained
+  complete lower-body anatomy. A weathered-ruin CSG trial exposed that boolean
+  outputs can still contain n-gons rejected by explicit triangulation or model
+  compilation as zero-area/non-triangulable. The accepted kit therefore uses
+  constructive pier/header openings; robust boolean cleanup and triangulation
+  interoperability remain explicit engine work rather than being hidden in the
+  example.
+
 - [ ] **Step 3: Bake, publish, catalog, and place**
 
   Publish immutable models, preserve material slots/UVs/tangents, place coherent

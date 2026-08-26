@@ -800,6 +800,7 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         var modelingGraph = JsonNode.Parse(File.ReadAllText(Path.Combine(
             projectRoot, "Modeling", "Graphs", "aetherfall.warden.graph.age.modeling-graph.json")))!.AsObject();
         var modelingNodes = modelingGraph["nodes"]!.AsArray();
+        var modelingLinks = modelingGraph["links"]!.AsArray();
         Assert.True(modelingNodes.Count >= 83,
             $"Expected the Warden graph to retain its layered detailed authored construction, found {modelingNodes.Count} nodes.");
         Assert.Contains(modelingNodes, node =>
@@ -850,14 +851,54 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             && node?["typeId"]?.GetValue<string>() == "rekall.modeling.array");
         Assert.DoesNotContain(modelingNodes, node =>
             node?["nodeId"]?.GetValue<string>() == "faceplate-inset");
-        Assert.Equal(3, authoredSurfaces.Count);
+        foreach (var nodeId in new[]
+        {
+            "leather-hard-join", "leather-post-join", "leather-material",
+            "trim-hard-join", "trim-smooth-join", "trim-post-join", "trim-material"
+        })
+        {
+            Assert.Contains(modelingNodes, node => node?["nodeId"]?.GetValue<string>() == nodeId);
+        }
+        foreach (var ownership in new[]
+        {
+            (Source: "belt-x", Target: "leather-hard-join"),
+            (Source: "tassets", Target: "leather-hard-join"),
+            (Source: "boots", Target: "leather-post-join"),
+            (Source: "belt-buckle-x", Target: "trim-hard-join"),
+            (Source: "gorget-x", Target: "trim-smooth-join"),
+            (Source: "rivet-array", Target: "trim-smooth-join"),
+            (Source: "cloak-clasp-x", Target: "trim-smooth-join"),
+            (Source: "helmet-brow-x", Target: "trim-smooth-join")
+        })
+        {
+            Assert.Contains(modelingLinks, link =>
+                link?["fromNodeId"]?.GetValue<string>() == ownership.Source
+                && link?["toNodeId"]?.GetValue<string>() == ownership.Target);
+        }
+        Assert.Equal(5, authoredSurfaces.Count);
         Assert.Equal(
             [
                 "aetherfall.warden-steel.material",
                 "aetherfall.warden-cloth.material",
-                "aetherfall.warden-aether.material"
+                "aetherfall.warden-aether.material",
+                "aetherfall.warden-leather.material",
+                "aetherfall.warden-bronze.material"
             ],
             authoredSurfaces.Select(surface => surface!["materialAssetId"]!.GetValue<string>()).ToArray());
+
+        var leatherMaterial = JsonNode.Parse(File.ReadAllText(Path.Combine(
+            projectRoot, "Materials", "Graphs", "aetherfall.warden-leather.material.age.material-graph.json")))!.AsObject();
+        var leatherPbr = leatherMaterial["nodes"]!.AsArray().Single(node =>
+            node?["typeId"]?.GetValue<string>() == "rekall.material.surface.pbr")!.AsObject();
+        Assert.InRange(leatherPbr["parameters"]!["metallic"]!.GetValue<double>(), 0, 0.08);
+        Assert.InRange(leatherPbr["parameters"]!["roughness"]!.GetValue<double>(), 0.72, 1);
+
+        var bronzeMaterial = JsonNode.Parse(File.ReadAllText(Path.Combine(
+            projectRoot, "Materials", "Graphs", "aetherfall.warden-bronze.material.age.material-graph.json")))!.AsObject();
+        var bronzePbr = bronzeMaterial["nodes"]!.AsArray().Single(node =>
+            node?["typeId"]?.GetValue<string>() == "rekall.material.surface.pbr")!.AsObject();
+        Assert.InRange(bronzePbr["parameters"]!["metallic"]!.GetValue<double>(), 0.45, 0.85);
+        Assert.InRange(bronzePbr["parameters"]!["roughness"]!.GetValue<double>(), 0.48, 0.82);
 
         var aetherMaterialGraph = JsonNode.Parse(File.ReadAllText(Path.Combine(
             projectRoot, "Materials", "Graphs", "aetherfall.warden-aether.material.age.material-graph.json")))!.AsObject();

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.warden-leather.material",
+  "name": "Warden Blackened Leather",
+  "revision": 1,
+  "nodes": [
+    { "nodeId": "color", "typeId": "rekall.material.constant.color", "typeVersion": 1, "parameters": { "value": "#17120f" } },
+    { "nodeId": "pbr", "typeId": "rekall.material.surface.pbr", "typeVersion": 1, "parameters": { "roughness": 0.86, "metallic": 0.02 } },
+    { "nodeId": "output", "typeId": "rekall.material.output", "typeVersion": 1, "parameters": {} }
+  ],
+  "links": [
+    { "linkId": "color-pbr", "fromNodeId": "color", "fromPortId": "color", "toNodeId": "pbr", "toPortId": "baseColor" },
+    { "linkId": "pbr-output", "fromNodeId": "pbr", "fromPortId": "surface", "toNodeId": "output", "toPortId": "surface" }
+  ],
+  "output": { "name": "surface", "nodeId": "output", "portId": "surface" },
+  "exposedParameters": []
+}

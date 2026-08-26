@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.warden.graph",
   "name": "Aetherfall Warden Silhouette",
-  "revision": 21,
+  "revision": 22,
   "nodes": [
     {
       "nodeId": "torso",
@@ -481,6 +481,78 @@
       "parameters": {
         "materialAssetId": "aetherfall.warden-steel.material",
         "slotName": "Aged Steel"
+      }
+    },
+    {
+      "nodeId": "leather-hard-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "leather-bevel",
+      "typeId": "rekall.modeling.bevel",
+      "typeVersion": 1,
+      "parameters": {
+        "width": 0.025,
+        "segments": 4,
+        "profile": 0.46,
+        "clampOverlap": true,
+        "hardenNormals": true
+      }
+    },
+    {
+      "nodeId": "leather-post-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "leather-material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": {
+        "materialAssetId": "aetherfall.warden-leather.material",
+        "slotName": "Blackened Leather"
+      }
+    },
+    {
+      "nodeId": "trim-hard-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "trim-bevel",
+      "typeId": "rekall.modeling.bevel",
+      "typeVersion": 1,
+      "parameters": {
+        "width": 0.018,
+        "segments": 4,
+        "profile": 0.52,
+        "clampOverlap": true,
+        "hardenNormals": true
+      }
+    },
+    {
+      "nodeId": "trim-smooth-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "trim-post-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "trim-material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": {
+        "materialAssetId": "aetherfall.warden-bronze.material",
+        "slotName": "Antique Bronze Trim"
       }
     },
     {
@@ -1376,7 +1448,7 @@
       "linkId": "armor-belt",
       "fromNodeId": "belt-x",
       "fromPortId": "geometry",
-      "toNodeId": "armor-join",
+      "toNodeId": "leather-hard-join",
       "toPortId": "geometry"
     },
     {
@@ -1390,7 +1462,7 @@
       "linkId": "armor-tassets",
       "fromNodeId": "tassets",
       "fromPortId": "geometry",
-      "toNodeId": "armor-join",
+      "toNodeId": "leather-hard-join",
       "toPortId": "geometry"
     },
     {
@@ -1404,14 +1476,14 @@
       "linkId": "armor-boots",
       "fromNodeId": "boots",
       "fromPortId": "geometry",
-      "toNodeId": "armor-smooth-join",
+      "toNodeId": "leather-post-join",
       "toPortId": "geometry"
     },
     {
       "linkId": "armor-buckle",
       "fromNodeId": "belt-buckle-x",
       "fromPortId": "geometry",
-      "toNodeId": "armor-join",
+      "toNodeId": "trim-hard-join",
       "toPortId": "geometry"
     },
     {
@@ -1424,6 +1496,69 @@
     {
       "linkId": "j-armor",
       "fromNodeId": "armor-material",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "leather-hard-bevel",
+      "fromNodeId": "leather-hard-join",
+      "fromPortId": "geometry",
+      "toNodeId": "leather-bevel",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "leather-hard-post",
+      "fromNodeId": "leather-bevel",
+      "fromPortId": "geometry",
+      "toNodeId": "leather-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "leather-assign",
+      "fromNodeId": "leather-post-join",
+      "fromPortId": "geometry",
+      "toNodeId": "leather-material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "j-leather",
+      "fromNodeId": "leather-material",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "trim-hard-bevel",
+      "fromNodeId": "trim-hard-join",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-bevel",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "trim-hard-post",
+      "fromNodeId": "trim-bevel",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "trim-smooth-post",
+      "fromNodeId": "trim-smooth-join",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "trim-assign",
+      "fromNodeId": "trim-post-join",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "j-trim",
+      "fromNodeId": "trim-material",
       "fromPortId": "geometry",
       "toNodeId": "join",
       "toPortId": "geometry"
@@ -1523,21 +1658,21 @@
       "linkId": "armor-gorget-smooth",
       "fromNodeId": "gorget-x",
       "fromPortId": "geometry",
-      "toNodeId": "armor-smooth-join",
+      "toNodeId": "trim-smooth-join",
       "toPortId": "geometry"
     },
     {
       "linkId": "armor-rivets-smooth",
       "fromNodeId": "rivet-array",
       "fromPortId": "geometry",
-      "toNodeId": "armor-smooth-join",
+      "toNodeId": "trim-smooth-join",
       "toPortId": "geometry"
     },
     {
       "linkId": "armor-clasp-smooth",
       "fromNodeId": "cloak-clasp-x",
       "fromPortId": "geometry",
-      "toNodeId": "armor-smooth-join",
+      "toNodeId": "trim-smooth-join",
       "toPortId": "geometry"
     },
     {
@@ -1761,7 +1896,7 @@
       "linkId": "helmet-brow-smooth",
       "fromNodeId": "helmet-brow-x",
       "fromPortId": "geometry",
-      "toNodeId": "armor-smooth-join",
+      "toNodeId": "trim-smooth-join",
       "toPortId": "geometry"
     },
     {

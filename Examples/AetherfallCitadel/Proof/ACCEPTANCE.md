@@ -884,3 +884,28 @@ the new background is an explicit fallback, not a claim that sky assets render.
   targets, IK/constraints, physics handoff, and production animation clips
   remain open. The Warden's anatomy and materials also remain below the target
   visual quality.
+
+## Warden authored-surface separation checkpoint
+
+- The Warden's editable graph now separates five real authored material slots
+  instead of collapsing most equipment into one bright steel surface. Belt,
+  tassets, and boots use blackened leather; buckle, gorget, rivets, cloak clasp,
+  and helmet brow use restrained antique bronze. Cloth, aged steel, and aether
+  emission retain their prior stable identities.
+- Graph revision 22 validates with 93 reachable nodes and no diagnostics. The
+  standard bake produces 12,898 points, 15,126 faces, and 55,816 corners. The
+  stable `aetherfall-warden-dark-model` rebuild is revision 27 and publishes
+  five exact surfaces: steel 43,740 indices, cloth 15,636, aether 36, leather
+  6,540, and bronze 10,740.
+- Executable acceptance verifies graph-level ownership of each equipment group,
+  the exact compiled surface sequence, and bounded PBR values for the two new
+  materials. Combined Aetherfall acceptance passes 45/45; project and scene
+  validation report zero issues.
+- Native High Vulkan proof is
+  `Proof/Captures/WardenSurfaceSeparation/vulkan-scene-1280x720-20260826125234255.png`:
+  RTX 5090, 313 draws, four dispatches, 65 renderables, 11,950 distinct colors,
+  luminance 0.112, and zero observations, missing assets, or fallbacks.
+- The original-size frame reads more clearly, but this is material separation,
+  not the promised final character. The silhouette, armor anatomy, authored
+  wear/normal detail, cloth construction, and animation still need substantial
+  work.

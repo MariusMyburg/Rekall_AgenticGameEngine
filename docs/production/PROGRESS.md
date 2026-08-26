@@ -4,10 +4,23 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 14:37 Africa/Johannesburg
+Last verified: 2026-08-26 14:55 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
+
+The current Aetherfall fidelity slice separates the Warden's equipment into
+five inspectable authored surfaces. Graph revision 22 routes belt, tassets, and
+boots to blackened leather, and buckle, gorget, rivets, cloak clasp, and helmet
+brow to restrained antique bronze while retaining steel, cloth, and aether.
+The 93-node graph validates cleanly, bakes 12,898 points / 15,126 faces / 55,816
+corners, and rebuilds the stable model at revision 27. Acceptance proves exact
+graph ownership and five compiled material slots; Aetherfall passes 45/45 and
+project/scene validation is clean. High Vulkan native evidence reports 313
+draws, four dispatches, 65 renderables, 11,950 colors, luminance 0.112, and zero
+fallbacks or observations. This improves material readability but does not yet
+meet the final character target: anatomy, armor silhouette, surface wear,
+cloth construction, and production animation remain active visual priorities.
 
 The current Blender/Godot-informed deformation checkpoint replaces the
 Warden's two-joint demonstration with generic multi-joint envelope authoring.

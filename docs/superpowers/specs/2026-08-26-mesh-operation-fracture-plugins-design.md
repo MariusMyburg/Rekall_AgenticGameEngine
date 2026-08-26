@@ -53,21 +53,29 @@ is a separate, harder design left for a future pass.
 
 Three additions, layered directly on existing code:
 
-1. **Contracts** (`Rekall.Age.Modeling`): `IRekallAgeMeshOperationPlugin` and
-   `IRekallAgeFractureAlgorithmPlugin`, shaped identically to the methods the
-   engine's own built-in operations and fracture algorithm already use.
+1. **Contracts** (`Rekall.Age.Modeling.Contracts`): `IRekallAgeMeshOperationPlugin`
+   and `IRekallAgeFractureAlgorithmPlugin`, shaped identically to the methods
+   the engine's own built-in operations and fracture algorithm already use.
+   This is the same split `IRekallAgeRuntimeModuleSystem` already uses (defined
+   in `Rekall.Age.Modules` using only `Rekall.Age.Runtime.Abstractions` types,
+   never `Rekall.Age.Runtime` itself) — putting the plugin contracts in the
+   leaf `.Contracts` project, not `Rekall.Age.Modeling` proper, is what keeps
+   the next step acyclic.
 2. **Registration** (`Rekall.Age.Modules`): two new lists and register methods
    on `RekallAgeModuleBuilder`, mirroring `RegisterComponent`/`RegisterRuntimeSystem`
-   exactly. This adds a new `Rekall.Age.Modules` → `Rekall.Age.Modeling`
-   project reference (verified acyclic: `Rekall.Age.Modeling` depends only on
-   `Rekall.Age.Core` and `Rekall.Age.Modeling.Contracts`, neither of which
-   depends on `Rekall.Age.Modules`).
+   exactly. This adds a new `Rekall.Age.Modules` → `Rekall.Age.Modeling.Contracts`
+   project reference (`Rekall.Age.Modeling.Contracts` has zero project
+   references of its own today, so this is trivially acyclic).
 3. **Discovery + dispatch** (`Rekall.Age.Modeling`): a new
    `RekallAgeProjectMeshPluginLoader`, mirroring `RekallAgeProjectRuntimeSystemLoader`'s
    discovery exactly (same `LoadBuiltModuleAssemblies` call, same
    reflection-over-`Configure` pattern), plus extending
    `RekallAgeMeshOperationExecutor` and a new `RekallAgeMeshFractureExecutor`
-   to accept plugins and fall back to them.
+   to accept plugins and fall back to them. This adds a new
+   `Rekall.Age.Modeling` → `Rekall.Age.Modules` project reference (acyclic:
+   `Rekall.Age.Modules` only references `Rekall.Age.Core`,
+   `Rekall.Age.Runtime.Abstractions`, and, after step 2,
+   `Rekall.Age.Modeling.Contracts` — never `Rekall.Age.Modeling`).
 
 ### Contracts
 

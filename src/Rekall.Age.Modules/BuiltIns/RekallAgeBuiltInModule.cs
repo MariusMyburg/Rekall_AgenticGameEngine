@@ -65,6 +65,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeOrbitPathRendererComponent>();
         builder.RegisterComponent<RekallAgeRingRendererComponent>();
         builder.RegisterComponent<RekallAgeStarfieldRendererComponent>();
+        builder.RegisterComponent<RekallAgeGrassRendererComponent>();
         builder.RegisterComponent<RekallAgeMarkerRendererComponent>();
         builder.RegisterComponent<RekallAgeHaloRendererComponent>();
         builder.RegisterComponent<RekallAgePostProcessStackComponent>();
@@ -1495,6 +1496,46 @@ public sealed class RekallAgeStarfieldRendererComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public bool Active { get; init; } = true;
+}
+
+[RekallAgeComponent("Grass Renderer")]
+public sealed class RekallAgeGrassRendererComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 1, Maximum = 20000)]
+    public int BladeCount { get; init; } = 4000;
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double BladeHeight { get; init; } = 0.35;
+
+    [RekallAgeProperty(Minimum = 0.0001)]
+    public double BladeWidth { get; init; } = 0.05;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    public double HeightJitter { get; init; } = 0.35;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 90)]
+    public double MaxSlopeDegrees { get; init; } = 35;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double WindStrength { get; init; } = 0.12;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double WindSpeed { get; init; } = 1.6;
+
+    [RekallAgeProperty]
+    public double WindDirectionX { get; init; } = 1;
+
+    [RekallAgeProperty]
+    public double WindDirectionZ { get; init; } = 0.3;
+
+    [RekallAgeProperty]
+    public int Seed { get; init; } = 4242;
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Color { get; init; } = "#3f6a2eff";
+
+    [RekallAgeProperty(Kind = "color")]
+    public string TipColor { get; init; } = "#8fbf52ff";
 }
 
 [RekallAgeComponent("Marker Renderer")]

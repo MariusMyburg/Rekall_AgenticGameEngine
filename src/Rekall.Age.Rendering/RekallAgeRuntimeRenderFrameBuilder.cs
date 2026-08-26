@@ -453,6 +453,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 component.Type.Equals("Rekall.RingRenderer", StringComparison.Ordinal));
             var starfieldComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.StarfieldRenderer", StringComparison.Ordinal));
+            var grassComponent = entity?.Components.FirstOrDefault(component =>
+                component.Type.Equals("Rekall.GrassRenderer", StringComparison.Ordinal));
             var markerComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.MarkerRenderer", StringComparison.Ordinal));
             var haloComponent = entity?.Components.FirstOrDefault(component =>
@@ -663,6 +665,33 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 VirtualGeometry: virtualGeometry,
                 Skin: ReadSkin(world.ProjectRoot, entity, mesh.EntityName, meshObservations),
                 Morph: ReadMorph(entity));
+
+            if (grassComponent is not null)
+            {
+                var grassMesh = ReadGrassMesh(grassComponent, geometryMesh, world.ElapsedTime.TotalSeconds);
+                if (grassMesh is not null)
+                {
+                    yield return new RekallAgeRuntimeViewportRenderable(
+                        $"{mesh.EntityId}:grass",
+                        mesh.EntityName,
+                        "mesh",
+                        "rekall.geometry.grass",
+                        renderTransform.Position3D.X,
+                        renderTransform.Position3D.Y,
+                        renderTransform.Position3D.Z,
+                        sortKey + 5,
+                        Variant: "rekall.geometry.grass",
+                        RotationX: transform.Rotation3D.X,
+                        RotationY: transform.Rotation3D.Y,
+                        RotationZ: transform.Rotation3D.Z,
+                        ScaleX: scaleX,
+                        ScaleY: scaleY,
+                        ScaleZ: scaleZ,
+                        GeometryMesh: grassMesh,
+                        RoughnessFactor: 1,
+                        Layer: mesh.Layer);
+                }
+            }
 
             if (planetComponent is not null
                 && atmosphereComponent is not null
@@ -2084,6 +2113,157 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         }
 
         return new RekallAgeRuntimeViewportGeometryMesh(vertices, indices);
+    }
+
+    /// <summary>
+    /// Scatters single-quad grass blades across the triangles of an already-resolved surface
+    /// mesh (same local space as that surface, so it composes under the surface's own transform
+    /// with no extra work). Placement is triangle-area-weighted so blade density looks even
+    /// regardless of the source mesh's tessellation, steep triangles are skipped so grass doesn't
+    /// grow out of cliff/wall faces, and each blade's tip sways along a fixed world wind
+    /// direction driven by elapsed time -- CPU-rebuilt every frame like every other procedural
+    /// renderer here (starfield, cloud layers, rings), not a GPU-instanced/compute system, so the
+    /// blade count is capped to keep per-frame vertex generation cheap.
+    /// </summary>
+    private static RekallAgeRuntimeViewportGeometryMesh? ReadGrassMesh(
+        RekallAgeRuntimeComponent? grassComponent,
+        RekallAgeRuntimeViewportGeometryMesh? surface,
+        double elapsedSeconds)
+    {
+        if (grassComponent is null || surface is null || surface.Vertices.Count == 0 || surface.Indices.Count < 3)
+        {
+            return null;
+        }
+
+        var bladeCount = (int)Math.Clamp(Math.Round(ReadNumber(grassComponent, "bladeCount", 4000)), 1, 20000);
+        var bladeHeight = Math.Max(0.0001, ReadNumber(grassComponent, "bladeHeight", 0.35));
+        var bladeWidth = Math.Max(0.0001, ReadNumber(grassComponent, "bladeWidth", 0.05));
+        var heightJitter = Math.Clamp(ReadNumber(grassComponent, "heightJitter", 0.35), 0, 1);
+        var maxSlopeDegrees = Math.Clamp(ReadNumber(grassComponent, "maxSlopeDegrees", 35), 0, 90);
+        var windStrength = Math.Max(0, ReadNumber(grassComponent, "windStrength", 0.12));
+        var windSpeed = Math.Max(0, ReadNumber(grassComponent, "windSpeed", 1.6));
+        var seed = (int)Math.Clamp(Math.Round(ReadNumber(grassComponent, "seed", 4242)), int.MinValue, int.MaxValue);
+        var baseColor = ParseColor(ReadString(grassComponent, "color") ?? "#3f6a2eff");
+        var tipColor = ParseColor(ReadString(grassComponent, "tipColor") ?? "#8fbf52ff");
+        var windDirection = Normalize(new MeshVector3(
+            ReadNumber(grassComponent, "windDirectionX", 1),
+            0,
+            ReadNumber(grassComponent, "windDirectionZ", 0.3)));
+        if (windDirection.LengthSquared <= 0.000001)
+        {
+            windDirection = new MeshVector3(1, 0, 0);
+        }
+
+        var triangleCount = surface.Indices.Count / 3;
+        var maxSlopeCos = Math.Cos(maxSlopeDegrees * Math.PI / 180.0);
+        var eligibleTriangles = new List<int>(triangleCount);
+        var cumulativeArea = new List<double>(triangleCount);
+        double totalArea = 0;
+        for (var t = 0; t < triangleCount; t++)
+        {
+            var v0 = surface.Vertices[checked((int)surface.Indices[t * 3])];
+            var v1 = surface.Vertices[checked((int)surface.Indices[t * 3 + 1])];
+            var v2 = surface.Vertices[checked((int)surface.Indices[t * 3 + 2])];
+            var edge1 = new MeshVector3(v1.X - v0.X, v1.Y - v0.Y, v1.Z - v0.Z);
+            var edge2 = new MeshVector3(v2.X - v0.X, v2.Y - v0.Y, v2.Z - v0.Z);
+            var cross = Cross(edge1, edge2);
+            var area = 0.5 * Math.Sqrt(cross.LengthSquared);
+            if (area <= 0.000000001)
+            {
+                continue;
+            }
+
+            var normal = Normalize(cross);
+            // Math.Abs rather than a signed comparison: this renderer draws both winding
+            // directions (no backface culling), so an authored mesh with inverted winding is
+            // still a perfectly valid, visible surface -- the slope test should judge how flat a
+            // triangle is, not which way its winding happens to face.
+            if (Math.Abs(normal.Y) < maxSlopeCos)
+            {
+                continue;
+            }
+
+            totalArea += area;
+            cumulativeArea.Add(totalArea);
+            eligibleTriangles.Add(t);
+        }
+
+        if (eligibleTriangles.Count == 0)
+        {
+            return null;
+        }
+
+        var random = new Random(seed);
+        var vertices = new List<RekallAgeRuntimeViewportGeometryVertex>(bladeCount * 4);
+        var indices = new List<uint>(bladeCount * 6);
+        for (var i = 0; i < bladeCount; i++)
+        {
+            var searchIndex = cumulativeArea.BinarySearch(random.NextDouble() * totalArea);
+            if (searchIndex < 0)
+            {
+                searchIndex = ~searchIndex;
+            }
+
+            searchIndex = Math.Min(searchIndex, eligibleTriangles.Count - 1);
+            var t = eligibleTriangles[searchIndex];
+            var v0 = surface.Vertices[checked((int)surface.Indices[t * 3])];
+            var v1 = surface.Vertices[checked((int)surface.Indices[t * 3 + 1])];
+            var v2 = surface.Vertices[checked((int)surface.Indices[t * 3 + 2])];
+
+            var s = random.NextDouble();
+            var u = random.NextDouble();
+            if (s + u > 1)
+            {
+                s = 1 - s;
+                u = 1 - u;
+            }
+            var w = 1 - s - u;
+            var root = new MeshVector3(
+                w * v0.X + s * v1.X + u * v2.X,
+                w * v0.Y + s * v1.Y + u * v2.Y,
+                w * v0.Z + s * v1.Z + u * v2.Z);
+
+            var height = bladeHeight * (1 - heightJitter + random.NextDouble() * heightJitter * 2);
+            var yaw = random.NextDouble() * Math.PI * 2;
+            var right = new MeshVector3(Math.Cos(yaw) * bladeWidth * 0.5, 0, Math.Sin(yaw) * bladeWidth * 0.5);
+            var phase = ((root.X * 12.9898) + (root.Z * 78.233)) % (Math.PI * 2);
+            var sway = Math.Sin((elapsedSeconds * windSpeed) + phase) * windStrength;
+            var windOffset = Multiply(windDirection, sway);
+
+            AddGrassBlade(vertices, indices, root, right, height, windOffset, baseColor, tipColor);
+        }
+
+        return new RekallAgeRuntimeViewportGeometryMesh(vertices, indices);
+    }
+
+    private static void AddGrassBlade(
+        List<RekallAgeRuntimeViewportGeometryVertex> vertices,
+        List<uint> indices,
+        MeshVector3 root,
+        MeshVector3 halfWidth,
+        double height,
+        MeshVector3 windOffset,
+        SceneColor baseColor,
+        SceneColor tipColor)
+    {
+        var baseIndex = checked((uint)vertices.Count);
+        var bottomLeft = Add(root, Multiply(halfWidth, -1));
+        var bottomRight = Add(root, halfWidth);
+        var top = new MeshVector3(root.X, root.Y + height, root.Z);
+        var topLeft = Add(Add(top, Multiply(halfWidth, -1)), windOffset);
+        var topRight = Add(Add(top, halfWidth), windOffset);
+
+        vertices.Add(new(bottomLeft.X, bottomLeft.Y, bottomLeft.Z, 0, 1, 0, baseColor.R, baseColor.G, baseColor.B, baseColor.A, 0, 0));
+        vertices.Add(new(bottomRight.X, bottomRight.Y, bottomRight.Z, 0, 1, 0, baseColor.R, baseColor.G, baseColor.B, baseColor.A, 1, 0));
+        vertices.Add(new(topRight.X, topRight.Y, topRight.Z, 0, 1, 0, tipColor.R, tipColor.G, tipColor.B, tipColor.A, 1, 1));
+        vertices.Add(new(topLeft.X, topLeft.Y, topLeft.Z, 0, 1, 0, tipColor.R, tipColor.G, tipColor.B, tipColor.A, 0, 1));
+
+        indices.Add(baseIndex);
+        indices.Add(baseIndex + 1);
+        indices.Add(baseIndex + 2);
+        indices.Add(baseIndex);
+        indices.Add(baseIndex + 2);
+        indices.Add(baseIndex + 3);
     }
 
     private static RekallAgeRuntimeViewportGeometryMesh? ReadMarkerMesh(RekallAgeRuntimeComponent? markerComponent)

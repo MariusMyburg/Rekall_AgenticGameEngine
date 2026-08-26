@@ -377,6 +377,21 @@
       ],
       "components": [
         {
+          "type": "Rekall.GrassRenderer",
+          "properties": {
+            "bladeCount": 6000,
+            "bladeHeight": 0.4,
+            "bladeWidth": 0.045,
+            "heightJitter": 0.4,
+            "maxSlopeDegrees": 40,
+            "windStrength": 0.15,
+            "windSpeed": 1.8,
+            "seed": 777,
+            "color": "#3f6a2eff",
+            "tipColor": "#9ecb5aff"
+          }
+        },
+        {
           "type": "Rekall.Material",
           "properties": {
             "baseColor": "#5a7a4a",

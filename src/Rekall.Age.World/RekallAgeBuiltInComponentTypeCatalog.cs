@@ -62,6 +62,7 @@ public static class RekallAgeBuiltInComponentTypeCatalog
         "Rekall.OrbitPathRenderer",
         "Rekall.RingRenderer",
         "Rekall.StarfieldRenderer",
+        "Rekall.GrassRenderer",
         "Rekall.MarkerRenderer",
         "Rekall.HaloRenderer",
         "Rekall.PostProcessStack",

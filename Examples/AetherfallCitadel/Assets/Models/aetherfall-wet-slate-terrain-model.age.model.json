@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-wet-slate-terrain-model",
+  "displayName": "Wet Slate Terrain",
+  "revision": 3,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-wet-slate-terrain-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "c4797b8aaa1b35664bffe8c0fe9d5ebbbd63c9046def411128be9ec9c81bc347",
+    "sourceLogicalRevision": 3,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-wet-slate-terrain-model/05217ad245838581a8a0508058de76a67b05c899e35494f0364019308b207556.age.compiled-mesh.json",
+    "compiledContentHash": "05217ad245838581a8a0508058de76a67b05c899e35494f0364019308b207556",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-25T17:13:53.6603321+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

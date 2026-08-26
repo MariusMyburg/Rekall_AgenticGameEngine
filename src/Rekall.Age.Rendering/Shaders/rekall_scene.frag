@@ -12,6 +12,63 @@ layout(set = 0, binding = 0) uniform FrameUniform
     vec4 lightColor;
     vec4 lightPosition;
     vec4 cameraPosition;
+    mat4 shadowViewProjection[4];
+    vec4 shadowSplits;
+    vec4 shadowParameters0;
+    vec4 shadowParameters1;
+    vec4 shadowCameraForward;
+    vec4 additionalLightDirection;
+    vec4 additionalLightColor;
+    vec4 additionalLightPosition;
+    vec4 additionalLightParameters;
+    vec4 additionalLightColor2;
+    vec4 additionalLightPosition2;
+    vec4 additionalLightParameters2;
+    vec4 additionalLightColor3;
+    vec4 additionalLightPosition3;
+    vec4 additionalLightParameters3;
+    vec4 additionalLightColor4;
+    vec4 additionalLightPosition4;
+    vec4 additionalLightParameters4;
+    vec4 additionalLightColor5;
+    vec4 additionalLightPosition5;
+    vec4 additionalLightParameters5;
+    vec4 additionalLightColor6;
+    vec4 additionalLightPosition6;
+    vec4 additionalLightParameters6;
+    vec4 additionalLightColor7;
+    vec4 additionalLightPosition7;
+    vec4 additionalLightParameters7;
+    vec4 additionalLightColor8;
+    vec4 additionalLightPosition8;
+    vec4 additionalLightParameters8;
+    vec4 additionalLightColor9;
+    vec4 additionalLightPosition9;
+    vec4 additionalLightParameters9;
+    vec4 additionalLightColor10;
+    vec4 additionalLightPosition10;
+    vec4 additionalLightParameters10;
+    vec4 additionalLightColor11;
+    vec4 additionalLightPosition11;
+    vec4 additionalLightParameters11;
+    vec4 additionalLightColor12;
+    vec4 additionalLightPosition12;
+    vec4 additionalLightParameters12;
+    vec4 additionalLightColor13;
+    vec4 additionalLightPosition13;
+    vec4 additionalLightParameters13;
+    vec4 additionalLightColor14;
+    vec4 additionalLightPosition14;
+    vec4 additionalLightParameters14;
+    vec4 additionalLightColor15;
+    vec4 additionalLightPosition15;
+    vec4 additionalLightParameters15;
+    vec4 additionalLightColor16;
+    vec4 additionalLightPosition16;
+    vec4 additionalLightParameters16;
+    vec4 environmentParameters;
+    vec4 environmentAmbientSkyColor;
+    vec4 environmentAmbientGroundColor;
 } frame;
 
 layout(set = 1, binding = 0) uniform DrawUniformBuffer
@@ -28,6 +85,7 @@ layout(set = 1, binding = 0) uniform DrawUniformBuffer
     vec4 cloudColor;
     vec4 cloudShadowFactors;
     vec4 surfaceWaterFactors;
+    vec4 shadowFactors;
 } draw;
 
 layout(set = 2, binding = 0) uniform texture2D baseColorTexture;
@@ -44,12 +102,61 @@ layout(set = 2, binding = 10) uniform texture2D cloudShadowTexture;
 layout(set = 2, binding = 11) uniform sampler cloudShadowSampler;
 layout(set = 2, binding = 12) uniform texture2D surfaceWaterTexture;
 layout(set = 2, binding = 13) uniform sampler surfaceWaterSampler;
+#ifdef REKALL_DIRECTIONAL_SHADOWS
+layout(set = 3, binding = 0) uniform sampler2DArrayShadow directionalShadowAtlas;
+#endif
 
 layout(location = 0) out vec4 outColor;
 
 const float PI = 3.14159265359;
 const int MAX_VIEW_SAMPLE_COUNT = 32;
 const int MAX_LIGHT_SAMPLE_COUNT = 16;
+const int MAX_SHADOW_FILTER_TAPS = 24;
+
+float sampleDirectionalShadow(vec3 worldPosition, vec3 normal)
+{
+#ifndef REKALL_DIRECTIONAL_SHADOWS
+    return 1.0;
+#else
+    int cascadeCount = int(frame.shadowParameters0.x + 0.5);
+    if (frame.shadowParameters1.z < 0.5 || draw.shadowFactors.y < 0.5 || cascadeCount <= 0)
+    {
+        return 1.0;
+    }
+
+    float viewDepth = dot(worldPosition - frame.cameraPosition.xyz, normalize(frame.shadowCameraForward.xyz));
+    if (viewDepth <= 0.0 || viewDepth > frame.shadowParameters1.y)
+    {
+        return 1.0;
+    }
+
+    int cascadeIndex = 0;
+    if (cascadeCount > 1 && viewDepth > frame.shadowSplits.x) cascadeIndex = 1;
+    if (cascadeCount > 2 && viewDepth > frame.shadowSplits.y) cascadeIndex = 2;
+    if (cascadeCount > 3 && viewDepth > frame.shadowSplits.z) cascadeIndex = 3;
+    vec3 biasedPosition = worldPosition + normal * frame.shadowParameters0.w;
+    vec4 shadowClip = frame.shadowViewProjection[cascadeIndex] * vec4(biasedPosition, 1.0);
+    vec3 shadowNdc = shadowClip.xyz / max(abs(shadowClip.w), 0.000001);
+    vec2 uv = shadowNdc.xy * 0.5 + 0.5;
+    float referenceDepth = shadowNdc.z - frame.shadowParameters0.z;
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))) || referenceDepth <= 0.0 || referenceDepth >= 1.0)
+    {
+        return 1.0;
+    }
+
+    int tapCount = clamp(int(frame.shadowParameters1.x + 0.5), 1, MAX_SHADOW_FILTER_TAPS);
+    float texel = 1.0 / max(frame.shadowParameters0.y, 1.0);
+    float visibility = 0.0;
+    for (int tap = 0; tap < MAX_SHADOW_FILTER_TAPS; ++tap)
+    {
+        if (tap >= tapCount) break;
+        int x = (tap % 5) - 2;
+        int y = ((tap * 3) % 5) - 2;
+        visibility += texture(directionalShadowAtlas, vec4(uv + vec2(x, y) * texel, float(cascadeIndex), referenceDepth));
+    }
+    return visibility / float(tapCount);
+#endif
+}
 
 vec3 perturbNormal(vec3 normal)
 {
@@ -59,10 +166,24 @@ vec3 perturbNormal(vec3 normal)
     vec3 q2 = dFdy(fragWorldPosition);
     vec2 st1 = dFdx(fragUv);
     vec2 st2 = dFdy(fragUv);
-    vec3 tangent = normalize(q1 * st2.t - q2 * st1.t);
-    vec3 bitangent = normalize(-q1 * st2.s + q2 * st1.s);
+    float determinant = st1.s * st2.t - st1.t * st2.s;
+    if (abs(determinant) <= 0.0000001)
+    {
+        return normal;
+    }
+    vec3 tangentRaw = q1 * st2.t - q2 * st1.t;
+    vec3 tangentProjected = tangentRaw - normal * dot(normal, tangentRaw);
+    float tangentLengthSquared = dot(tangentProjected, tangentProjected);
+    if (tangentLengthSquared <= 0.0000001)
+    {
+        return normal;
+    }
+    vec3 tangent = tangentProjected * inversesqrt(tangentLengthSquared);
+    vec3 bitangent = normalize(cross(normal, tangent)) * sign(determinant);
     mat3 tbn = mat3(tangent, bitangent, normal);
-    return normalize(tbn * tangentNormal);
+    vec3 mapped = tbn * tangentNormal;
+    float mappedLengthSquared = dot(mapped, mapped);
+    return mappedLengthSquared <= 0.0000001 ? normal : mapped * inversesqrt(mappedLengthSquared);
 }
 
 float distributionGgx(vec3 normal, vec3 halfVector, float roughness)
@@ -162,6 +283,27 @@ vec3 atmosphereLightColor()
     return max(frame.lightColor.rgb, vec3(0.0));
 }
 
+vec3 primaryLightVector(vec3 worldPosition)
+{
+    return frame.lightPosition.w > 0.5
+        ? frame.lightPosition.xyz - worldPosition
+        : -frame.lightDirection.xyz;
+}
+
+bool hasPrimaryLight(vec3 worldPosition)
+{
+    vec3 lightVector = primaryLightVector(worldPosition);
+    return dot(frame.lightColor.rgb, frame.lightColor.rgb) > 0.000001
+        && dot(lightVector, lightVector) > 0.000001;
+}
+
+vec3 primaryLightDirection(vec3 worldPosition)
+{
+    vec3 lightVector = primaryLightVector(worldPosition);
+    float lightLength = length(lightVector);
+    return lightLength > 0.000001 ? lightVector / lightLength : vec3(0.0);
+}
+
 float ozoneAbsorption()
 {
     return max(draw.atmosphereColor2.w, 0.0);
@@ -216,7 +358,7 @@ float aerialPerspectiveStrength()
 
 vec3 surfaceAtmosphereTransmittance(vec3 surfacePosition, vec3 lightDirection)
 {
-    if (!hasAtmosphereData())
+    if (!hasAtmosphereData() || dot(lightDirection, lightDirection) <= 0.000001)
     {
         return vec3(1.0);
     }
@@ -266,7 +408,7 @@ vec2 sphericalUv(vec3 direction)
 
 float sampleCloudShadow(vec3 surfacePosition, vec3 lightDirection)
 {
-    if (draw.cloudShadowFactors.x <= 0.5)
+    if (draw.cloudShadowFactors.x <= 0.5 || dot(lightDirection, lightDirection) <= 0.000001)
     {
         return 1.0;
     }
@@ -415,9 +557,15 @@ vec3 applySurfaceAerialPerspective(vec3 surfaceColor, vec3 surfacePosition, vec3
     float lowAltitudeView = 1.0 - smoothstep(1.0, 1.35, cameraAtmosphereRatio);
     float effectiveStrength = strength * mix(1.0, 0.32, lowAltitudeView);
     vec3 transmittance = exp(-opticalDepth * surfaceAtmosphereExtinction() * effectiveStrength);
-    vec3 scattering = surfaceAerialPerspectiveScattering(rayOrigin, rayDirection, rayStart, rayEnd, normalize(lightDirection));
+    bool directLightAvailable = dot(frame.lightColor.rgb, frame.lightColor.rgb) > 0.000001
+        && dot(lightDirection, lightDirection) > 0.000001;
+    vec3 scattering = directLightAvailable
+        ? surfaceAerialPerspectiveScattering(rayOrigin, rayDirection, rayStart, rayEnd, normalize(lightDirection))
+        : vec3(0.0);
     vec3 surfaceNormal = normalize(surfacePosition - planetCenter);
-    float surfaceSun = smoothstep(-0.08, 0.18, dot(surfaceNormal, normalize(lightDirection)));
+    float surfaceSun = directLightAvailable
+        ? smoothstep(-0.08, 0.18, dot(surfaceNormal, normalize(lightDirection)))
+        : 0.0;
     vec3 scatteringTint = mix(vec3(1.0), vec3(0.55, 0.78, 1.35), lowAltitudeView);
     return surfaceColor * transmittance + scattering * scatteringTint * effectiveStrength * surfaceSun;
 }
@@ -437,9 +585,11 @@ vec4 renderAtmosphere()
     vec3 planetCenter = draw.model[3].xyz;
     vec3 rayOrigin = frame.cameraPosition.xyz;
     vec3 rayDirection = normalize(fragWorldPosition - rayOrigin);
-    vec3 sunDirection = frame.lightPosition.w > 0.5
-        ? normalize(frame.lightPosition.xyz - fragWorldPosition)
-        : normalize(-frame.lightDirection.xyz);
+    if (!hasPrimaryLight(fragWorldPosition))
+    {
+        return vec4(0.0);
+    }
+    vec3 sunDirection = primaryLightDirection(fragWorldPosition);
     if (shouldDiscardAtmosphereBackHemisphere(rayOrigin, rayDirection, planetCenter, atmosphereRadius))
     {
         discard;
@@ -514,7 +664,11 @@ vec4 renderAtmosphere()
     color += draw.atmosphereColor0.rgb * atmosphereLightColor() * limb * sunlitRim * rayleighStrength * sunIntensity * 0.18;
     vec3 mapped = vec3(1.0) - exp(-color * max(draw.emissiveFactors.a, 0.0));
     float alpha = clamp(max(max(mapped.r, mapped.g), mapped.b) * 1.8, 0.0, 0.9);
+#ifdef REKALL_HDR_SCENE_OUTPUT
+    return vec4(max(color, vec3(0.0)), alpha);
+#else
     return vec4(pow(mapped, vec3(1.0 / 2.2)), alpha);
+#endif
 }
 
 bool isCloudLayer()
@@ -545,9 +699,7 @@ vec4 renderCloudLayer()
 
     vec3 normal = normalize(fragWorldPosition - planetCenter);
     vec3 view = normalize(rayOrigin - fragWorldPosition);
-    vec3 light = frame.lightPosition.w > 0.5
-        ? normalize(frame.lightPosition.xyz - fragWorldPosition)
-        : normalize(-frame.lightDirection.xyz);
+    vec3 light = primaryLightDirection(fragWorldPosition);
     float lambertian = max(dot(normal, light), 0.0);
     float skyVisibility = cloudSkyVisibility(fragWorldPosition, light, planetCenter);
 
@@ -576,7 +728,11 @@ vec4 renderCloudLayer()
         * (frame.lightColor.rgb * directTransmittance * lightTerm * skyVisibility * 2.65 + vec3(ambientTerm));
     color += frame.lightColor.rgb * directTransmittance * silverLining * 0.75;
     color = applySurfaceAerialPerspective(color, fragWorldPosition, light);
+#ifdef REKALL_HDR_SCENE_OUTPUT
+    return vec4(max(color, vec3(0.0)), alpha);
+#else
     return vec4(pow(max(color, vec3(0.0)), vec3(1.0 / 2.2)), alpha);
+#endif
 }
 
 void main()
@@ -611,9 +767,7 @@ void main()
     {
         occlusion = mix(1.0, texture(sampler2D(occlusionTexture, occlusionSampler), fragUv).r, draw.materialFactors.w);
     }
-    vec3 light = frame.lightPosition.w > 0.5
-        ? normalize(frame.lightPosition.xyz - fragWorldPosition)
-        : normalize(-frame.lightDirection.xyz);
+    vec3 light = primaryLightDirection(fragWorldPosition);
     vec3 view = normalize(frame.cameraPosition.xyz - fragWorldPosition);
     vec3 normal = hasAtmosphereData()
         ? normalize(fragWorldPosition - draw.model[3].xyz)
@@ -639,16 +793,59 @@ void main()
     vec3 diffuse = (1.0 - f) * (1.0 - metallic) * albedo / PI;
     diffuse *= mix(1.0, 0.42, waterCoverage);
     vec3 directTransmittance = surfaceAtmosphereTransmittance(fragWorldPosition, light);
-    float ambientStrength = hasAtmosphereData() ? spaceAmbientFloor() : 0.035;
-    vec3 ambient = albedo * ambientStrength * occlusion;
+    float ambientStrength = hasAtmosphereData()
+        ? spaceAmbientFloor()
+        : 0.12 * max(frame.environmentParameters.x, 0.0);
+    float ambientHemisphere = clamp(normal.y * 0.5 + 0.5, 0.0, 1.0);
+    vec3 environmentAmbientColor = mix(frame.environmentAmbientGroundColor.rgb, frame.environmentAmbientSkyColor.rgb, ambientHemisphere);
+    vec3 ambient = albedo * environmentAmbientColor * ambientStrength * occlusion;
     vec3 waterFresnel = fresnelSchlick(ndotv, vec3(0.02));
     ambient += waterFresnel * frame.lightColor.rgb * directTransmittance * waterCoverage * 0.018;
     vec3 emissive = pow(max(texture(sampler2D(emissiveTexture, emissiveSampler), fragUv).rgb * draw.emissiveFactors.rgb, vec3(0.0)), vec3(2.2)) * draw.emissiveFactors.a;
     float cloudShadow = sampleCloudShadow(fragWorldPosition, light);
-    vec3 color = emissive + ambient + (diffuse + specular) * frame.lightColor.rgb * directTransmittance * cloudShadow * ndotl * 1.8;
+    float directionalShadow = sampleDirectionalShadow(fragWorldPosition, normal);
+    vec3 additionalDirect = vec3(0.0);
+    vec4 practicalColors[16] = vec4[](frame.additionalLightColor, frame.additionalLightColor2, frame.additionalLightColor3, frame.additionalLightColor4, frame.additionalLightColor5, frame.additionalLightColor6, frame.additionalLightColor7, frame.additionalLightColor8, frame.additionalLightColor9, frame.additionalLightColor10, frame.additionalLightColor11, frame.additionalLightColor12, frame.additionalLightColor13, frame.additionalLightColor14, frame.additionalLightColor15, frame.additionalLightColor16);
+    vec4 practicalPositions[16] = vec4[](frame.additionalLightPosition, frame.additionalLightPosition2, frame.additionalLightPosition3, frame.additionalLightPosition4, frame.additionalLightPosition5, frame.additionalLightPosition6, frame.additionalLightPosition7, frame.additionalLightPosition8, frame.additionalLightPosition9, frame.additionalLightPosition10, frame.additionalLightPosition11, frame.additionalLightPosition12, frame.additionalLightPosition13, frame.additionalLightPosition14, frame.additionalLightPosition15, frame.additionalLightPosition16);
+    vec4 practicalParameters[16] = vec4[](frame.additionalLightParameters, frame.additionalLightParameters2, frame.additionalLightParameters3, frame.additionalLightParameters4, frame.additionalLightParameters5, frame.additionalLightParameters6, frame.additionalLightParameters7, frame.additionalLightParameters8, frame.additionalLightParameters9, frame.additionalLightParameters10, frame.additionalLightParameters11, frame.additionalLightParameters12, frame.additionalLightParameters13, frame.additionalLightParameters14, frame.additionalLightParameters15, frame.additionalLightParameters16);
+    int practicalCount = clamp(int(frame.additionalLightDirection.w + 0.5), 0, 16);
+    for (int practicalIndex = 0; practicalIndex < practicalCount; practicalIndex++)
+    {
+        if (dot(practicalColors[practicalIndex].rgb, practicalColors[practicalIndex].rgb) <= 0.000001) continue;
+        vec3 practicalOffset = practicalPositions[practicalIndex].xyz - fragWorldPosition;
+        float practicalDistance = length(practicalOffset);
+        vec3 additionalLight = practicalOffset / max(practicalDistance, 0.0001);
+        float practicalRange = max(practicalParameters[practicalIndex].x, 0.001);
+        float practicalWindow = pow(clamp(1.0 - practicalDistance / practicalRange, 0.0, 1.0), 2.0);
+        float practicalAttenuation = practicalWindow / (1.0 + 0.045 * practicalDistance * practicalDistance);
+        vec3 additionalHalfVector = normalize(view + additionalLight);
+        float additionalNdotl = max(dot(normal, additionalLight), 0.0);
+        float additionalD = distributionGgx(normal, additionalHalfVector, roughness);
+        float additionalG = geometrySchlickGgx(ndotv, roughness) * geometrySchlickGgx(additionalNdotl, roughness);
+        vec3 additionalF = fresnelSchlick(max(dot(additionalHalfVector, view), 0.0), f0);
+        vec3 additionalSpecular = additionalD * additionalG * additionalF / max(4.0 * ndotv * additionalNdotl, 0.0001);
+        additionalSpecular *= mix(1.0, surfaceWaterSpecularStrength(), waterCoverage);
+        vec3 additionalDiffuse = (1.0 - additionalF) * (1.0 - metallic) * albedo / PI;
+        additionalDiffuse *= mix(1.0, 0.42, waterCoverage);
+        vec3 additionalTransmittance = surfaceAtmosphereTransmittance(fragWorldPosition, additionalLight);
+        additionalDirect += (additionalDiffuse + additionalSpecular)
+            * practicalColors[practicalIndex].rgb
+            * additionalTransmittance
+            * additionalNdotl
+            * practicalAttenuation
+            * 4.5;
+    }
+    vec3 color = emissive
+        + ambient
+        + (diffuse + specular) * frame.lightColor.rgb * directTransmittance * cloudShadow * directionalShadow * ndotl * 1.8
+        + additionalDirect;
     color = applySurfaceAerialPerspective(color, fragWorldPosition, light);
+    float surfaceAlpha = hasAtmosphereData() ? fragColor.a : fragColor.a * textureColor.a;
+#ifdef REKALL_HDR_SCENE_OUTPUT
+    outColor = vec4(max(color, vec3(0.0)), surfaceAlpha);
+#else
     vec3 mapped = vec3(1.0) - exp(-max(color, vec3(0.0)) * 1.15);
     vec3 lit = pow(mapped, vec3(1.0 / 2.2));
-    float surfaceAlpha = hasAtmosphereData() ? fragColor.a : fragColor.a * textureColor.a;
     outColor = vec4(lit, surfaceAlpha);
+#endif
 }

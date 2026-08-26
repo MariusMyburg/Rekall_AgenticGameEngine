@@ -3,12 +3,22 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Rekall.Age.AssetPipeline;
+using Rekall.Age.Core.Persistence;
 using Rekall.Age.Modeling.Contracts;
 
 namespace Rekall.Age.Tests.Assets;
 
 public sealed class PublishedModelOutputStoreTests
 {
+    [Fact]
+    public void CompiledMeshArtifactsHaveAProductionScaleBudgetSeparateFromEditableDocuments()
+    {
+        Assert.Equal(256L * 1024L * 1024L, RekallAgePublishedModelOutputStore.MaximumCompiledOutputBytes);
+        Assert.True(
+            RekallAgePublishedModelOutputStore.MaximumCompiledOutputBytes
+            > RekallAgePersistedJson.MaximumDocumentBytes);
+    }
+
     [Fact]
     public async Task ContentAddressedCommitsPreserveEveryValidatedRevision()
     {

@@ -136,6 +136,7 @@ public sealed class RekallAgeOpenXrPerspectiveSceneFrameSource
     private readonly Silk.NET.Vulkan.Format _colorFormat;
     private readonly Func<TimeSpan> _clock;
     private readonly Stopwatch? _ownedClock;
+    private readonly RekallAgeVulkanSceneMeshBuilder _meshBuilder = new();
 
     public RekallAgeOpenXrPerspectiveSceneFrameSource(
         RekallAgeRuntimeWorld world,
@@ -166,7 +167,7 @@ public sealed class RekallAgeOpenXrPerspectiveSceneFrameSource
             _width,
             _height,
             _debugOverlay).ForHeadsetOutput();
-        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, _assets);
+        var meshes = _meshBuilder.BuildMeshes(frame, _assets);
         var target = RekallAgeVulkanSceneRenderTarget.OpenXrStereoSwapchain(
             checked((uint)_width),
             checked((uint)_height),

@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.rubble-boulder.graph",
+  "name": "Fractured Slate Boulder",
+  "revision": 4,
+  "nodes": [
+    {
+      "nodeId": "rock",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 1.5,
+        "segments": 20,
+        "rings": 12
+      }
+    },
+    {
+      "nodeId": "shape",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "scale": [
+          1.45,
+          0.82,
+          1
+        ]
+      }
+    },
+    {
+      "nodeId": "noise-x",
+      "typeId": "rekall.modeling.deform.noise",
+      "typeVersion": 1,
+      "parameters": {
+        "amplitude": 0.32,
+        "frequency": 2.4,
+        "seed": 71,
+        "axis": "x"
+      }
+    },
+    {
+      "nodeId": "noise-y",
+      "typeId": "rekall.modeling.deform.noise",
+      "typeVersion": 1,
+      "parameters": {
+        "amplitude": 0.27,
+        "frequency": 2.7,
+        "seed": 193,
+        "axis": "y"
+      }
+    },
+    {
+      "nodeId": "noise-z",
+      "typeId": "rekall.modeling.deform.noise",
+      "typeVersion": 1,
+      "parameters": {
+        "amplitude": 0.3,
+        "frequency": 2.2,
+        "seed": 509,
+        "axis": "z"
+      }
+    },
+    {
+      "nodeId": "surface-detail",
+      "typeId": "rekall.modeling.subdivide_smooth",
+      "typeVersion": 1,
+      "parameters": {
+        "levels": 1,
+        "creaseAttribute": "crease.edge"
+      }
+    },
+    {
+      "nodeId": "smooth-normals",
+      "typeId": "rekall.modeling.weighted_normals",
+      "typeVersion": 1,
+      "parameters": {
+        "attribute": "normal.weighted",
+        "faceAreaWeight": 0.65
+      }
+    },
+    {
+      "nodeId": "uv",
+      "typeId": "rekall.modeling.project_uv",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "xz",
+        "scaleU": 0.3,
+        "scaleV": 0.3,
+        "projection": "box"
+      }
+    },
+    {
+      "nodeId": "material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": {
+        "materialAssetId": "aetherfall.wet-slate.material",
+        "slotName": "Wet Rock"
+      }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    {
+      "linkId": "1",
+      "fromNodeId": "rock",
+      "fromPortId": "geometry",
+      "toNodeId": "shape",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "2",
+      "fromNodeId": "shape",
+      "fromPortId": "geometry",
+      "toNodeId": "noise-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "3",
+      "fromNodeId": "noise-x",
+      "fromPortId": "geometry",
+      "toNodeId": "noise-y",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "4",
+      "fromNodeId": "noise-y",
+      "fromPortId": "geometry",
+      "toNodeId": "noise-z",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "detail",
+      "fromNodeId": "noise-z",
+      "fromPortId": "geometry",
+      "toNodeId": "surface-detail",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "smooth-shading",
+      "fromNodeId": "surface-detail",
+      "fromPortId": "geometry",
+      "toNodeId": "smooth-normals",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "5",
+      "fromNodeId": "smooth-normals",
+      "fromPortId": "geometry",
+      "toNodeId": "uv",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "6",
+      "fromNodeId": "uv",
+      "fromPortId": "geometry",
+      "toNodeId": "material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "7",
+      "fromNodeId": "material",
+      "fromPortId": "geometry",
+      "toNodeId": "output",
+      "toPortId": "input"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mesh",
+      "nodeId": "output",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

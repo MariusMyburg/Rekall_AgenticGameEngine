@@ -35,12 +35,28 @@ public sealed record RekallAgeVulkanScenePipelineDescription(
             new RekallAgeVulkanDescriptorBindingDescription("CloudShadowTexture", 2, 10, "sampled-image", "fragment"),
             new RekallAgeVulkanDescriptorBindingDescription("CloudShadowSampler", 2, 11, "sampler", "fragment"),
             new RekallAgeVulkanDescriptorBindingDescription("SurfaceWaterTexture", 2, 12, "sampled-image", "fragment"),
-            new RekallAgeVulkanDescriptorBindingDescription("SurfaceWaterSampler", 2, 13, "sampler", "fragment")
+            new RekallAgeVulkanDescriptorBindingDescription("SurfaceWaterSampler", 2, 13, "sampler", "fragment"),
+            new RekallAgeVulkanDescriptorBindingDescription("DirectionalShadowAtlas", 3, 0, "combined-image-sampler", "fragment")
         ],
         PushConstantBytes: 0,
         DepthTestEnabled: true,
         TextureSamplingEnabled: true,
         AlphaBlendingEnabled: true);
+
+    public static RekallAgeVulkanScenePipelineDescription Shadow { get; } = new(
+        Path.Combine("Shaders", "rekall_shadow.vert"),
+        Path.Combine("Shaders", "rekall_shadow.frag"),
+        Default.VertexAttributes,
+        [
+            new RekallAgeVulkanDescriptorBindingDescription("ShadowCascadeUniform", 0, 0, "uniform-buffer", "vertex"),
+            new RekallAgeVulkanDescriptorBindingDescription("DrawUniform", 1, 0, "dynamic-uniform-buffer", "vertex+fragment"),
+            new RekallAgeVulkanDescriptorBindingDescription("BaseColorTexture", 2, 0, "sampled-image", "fragment"),
+            new RekallAgeVulkanDescriptorBindingDescription("BaseColorSampler", 2, 1, "sampler", "fragment")
+        ],
+        PushConstantBytes: 0,
+        DepthTestEnabled: true,
+        TextureSamplingEnabled: true,
+        AlphaBlendingEnabled: false);
 }
 
 public sealed record RekallAgeVulkanVertexAttributeDescription(

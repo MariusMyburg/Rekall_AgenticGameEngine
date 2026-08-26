@@ -8,17 +8,85 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
 {
     public RekallAgeVulkanSceneBatch Build(
         RekallAgeRuntimeViewportFrame frame,
-        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
+        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes,
+        string? primaryLightEntityId = null,
+        RekallAgeVulkanDirectionalLightInjection? directionalLight = null,
+        RekallAgeVulkanEffectiveCamera? effectiveCamera = null)
     {
         var renderablesByEntityId = BuildRenderableLookup(frame);
         var vertices = BuildLocalVertices(meshes);
         var indices = FlattenIndices(renderablesByEntityId, frame.ActiveCamera, meshes, out var draws, out var bounds);
+        effectiveCamera ??= ResolveEffectiveCamera(frame, bounds);
         return new RekallAgeVulkanSceneBatch(
             vertices,
             indices,
             draws,
-            BuildFrameUniform(frame, bounds),
-            BuildStereoFrame(frame, bounds));
+            BuildFrameUniform(frame, renderablesByEntityId, effectiveCamera, primaryLightEntityId, directionalLight),
+            BuildStereoFrame(frame, bounds))
+        {
+            EffectiveCamera = effectiveCamera
+        };
+    }
+
+    public RekallAgeVulkanSceneBatch BuildDynamic(
+        RekallAgeRuntimeViewportFrame frame,
+        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes,
+        RekallAgeVulkanSceneBatch stableBatch,
+        string? primaryLightEntityId = null,
+        RekallAgeVulkanDirectionalLightInjection? directionalLight = null)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        ArgumentNullException.ThrowIfNull(meshes);
+        ArgumentNullException.ThrowIfNull(stableBatch);
+        if (meshes.Count != stableBatch.Draws.Count)
+        {
+            throw new ArgumentException("Stable batch topology must contain one draw for each source mesh.", nameof(stableBatch));
+        }
+
+        var renderablesByEntityId = BuildRenderableLookup(frame);
+        var draws = new RekallAgeVulkanSceneDraw[stableBatch.Draws.Count];
+        for (var i = 0; i < draws.Length; i++)
+        {
+            renderablesByEntityId.TryGetValue(meshes[i].EntityId, out var renderable);
+            draws[i] = stableBatch.Draws[i] with
+            {
+                Model = CreateModelMatrix(renderable, frame.ActiveCamera)
+            };
+        }
+
+        var effectiveCamera = frame.ActiveCamera is null || IsDefaultCamera(frame.ActiveCamera)
+            ? stableBatch.EffectiveCamera
+            : ResolveEffectiveCamera(frame, SceneBounds.Empty);
+        return new RekallAgeVulkanSceneBatch(
+            stableBatch.Vertices,
+            stableBatch.Indices,
+            draws,
+            BuildFrameUniform(frame, renderablesByEntityId, effectiveCamera, primaryLightEntityId, directionalLight),
+            BuildStereoFrame(frame, SceneBounds.Empty))
+        {
+            EffectiveCamera = effectiveCamera
+        };
+    }
+
+    public RekallAgeVulkanEffectiveCamera ResolveEffectiveCamera(
+        RekallAgeRuntimeViewportFrame frame,
+        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        ArgumentNullException.ThrowIfNull(meshes);
+        var renderablesByEntityId = BuildRenderableLookup(frame);
+        var bounds = SceneBounds.Empty;
+        foreach (var mesh in meshes)
+        {
+            renderablesByEntityId.TryGetValue(mesh.EntityId, out var renderable);
+            var model = CreateModelMatrix(renderable, frame.ActiveCamera);
+            foreach (var vertex in mesh.Vertices)
+            {
+                bounds = bounds.Include(Vector3.Transform(new Vector3(vertex.X, vertex.Y, vertex.Z), model));
+            }
+        }
+
+        return ResolveEffectiveCamera(frame, bounds);
     }
 
     private static IReadOnlyList<RekallAgeVulkanSceneVertex> BuildLocalVertices(
@@ -64,7 +132,8 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
                 && mesh.Primitive.Equals("atmosphere", StringComparison.Ordinal);
             var isTransparent = isAtmosphereShell
                 || mesh.CloudLayer is not null
-                || mesh.Primitive.Equals("halo", StringComparison.Ordinal);
+                || mesh.Primitive.Equals("halo", StringComparison.Ordinal)
+                || mesh.AlphaMode.Equals("blend", StringComparison.OrdinalIgnoreCase);
             ranges.Add(new RekallAgeVulkanSceneDraw(
                 (uint)indices.Count,
                 (uint)mesh.Indices.Count,
@@ -118,7 +187,13 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
                 mesh.CloudShadow?.Factors ?? Vector4.Zero,
                 mesh.SurfaceWater?.Factors ?? Vector4.Zero,
                 isTransparent,
-                mesh.ShaderPipeline));
+                mesh.ShaderPipeline,
+                mesh.EntityId,
+                mesh.CastShadows,
+                mesh.ReceiveShadows,
+                mesh.ShadowLayerMask,
+                mesh.AlphaMode,
+                mesh.AlphaCutoff));
             foreach (var vertex in mesh.Vertices)
             {
                 var world = Vector3.Transform(new Vector3(vertex.X, vertex.Y, vertex.Z), model);
@@ -135,6 +210,97 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
 
     private static RekallAgeVulkanSceneFrameUniform BuildFrameUniform(
         RekallAgeRuntimeViewportFrame frame,
+        IReadOnlyDictionary<string, RekallAgeRuntimeViewportRenderable> renderablesByEntityId,
+        RekallAgeVulkanEffectiveCamera camera,
+        string? primaryLightEntityId,
+        RekallAgeVulkanDirectionalLightInjection? directionalLight)
+    {
+        var renderables = renderablesByEntityId.Values;
+        var light = directionalLight is null
+            ? string.IsNullOrWhiteSpace(primaryLightEntityId)
+                ? ResolveFirstDirectionalLight(renderables) ?? ResolvePrimaryLight(renderablesByEntityId, renderables, primaryLightEntityId: null)
+                : ResolvePrimaryLight(renderablesByEntityId, renderables, primaryLightEntityId)
+            : directionalLight.Available
+                ? new SceneLight(
+                    directionalLight.EntityId,
+                    directionalLight.Direction,
+                    Vector4.Zero,
+                    directionalLight.Color)
+                : SceneLight.Disabled;
+        var pointLightBudget = Math.Clamp(
+            frame.ResolvedQualityPlan?.Lighting.MaximumPointLights ?? 4,
+            1,
+            16);
+        var pointLightCandidates = ResolvePointLights(renderables, int.MaxValue);
+        var pointLights = pointLightCandidates.Take(pointLightBudget).ToArray();
+        var additionalLight = pointLights.Length == 0 ? SceneLight.Disabled : pointLights[0];
+        if (string.Equals(light.EntityId, additionalLight.EntityId, StringComparison.Ordinal))
+        {
+            additionalLight = SceneLight.Disabled;
+        }
+        var environment = frame.Environment;
+        var environmentParameters = environment is null
+            ? new Vector4(1, 0, 11.2f, 0)
+            : new Vector4(
+                (float)Math.Clamp(environment.AmbientEnergy, 0, 16),
+                (float)Math.Clamp(environment.Exposure, -8, 8),
+                (float)Math.Clamp(environment.WhitePoint, 0.1, 64),
+                environment.ToneMapper.Equals("agx", StringComparison.OrdinalIgnoreCase) ? 1 : 0);
+        var environmentAmbientSkyColor = new Vector4(ParseColor(environment?.AmbientSkyColor), 1);
+        var environmentAmbientGroundColor = new Vector4(ParseColor(environment?.AmbientGroundColor), 1);
+        return new RekallAgeVulkanSceneFrameUniform(
+            camera.ViewProjection,
+            light.Direction,
+            light.Color,
+            light.Position,
+            new Vector4(camera.Position, 1),
+            camera.SoftwareViewProjection,
+            additionalLight.Direction,
+            additionalLight.Color,
+            additionalLight.Position,
+            new Vector4(additionalLight.Range, additionalLight.Priority, 0, 0),
+            environmentParameters)
+        {
+            EnvironmentAmbientSkyColor = environmentAmbientSkyColor,
+            EnvironmentAmbientGroundColor = environmentAmbientGroundColor,
+            PointLightBudget = pointLightBudget,
+            PointLights = pointLights.Select(item => new RekallAgeVulkanPointLight(
+                item.EntityId ?? string.Empty, item.Color, item.Position, new Vector4(item.Range, item.Priority, 0, 0))).ToArray(),
+            DroppedPointLightEntityIds = pointLightCandidates
+                .Skip(pointLightBudget)
+                .Select(item => item.EntityId ?? string.Empty)
+                .ToArray()
+        };
+    }
+
+    private static IReadOnlyList<SceneLight> ResolvePointLights(
+        IEnumerable<RekallAgeRuntimeViewportRenderable> renderables,
+        int maximumCount)
+    {
+        return renderables
+            .Where(renderable => renderable.Kind.Equals("light", StringComparison.Ordinal)
+                && renderable.Intensity > 0.0001
+                && IsPointLight(renderable))
+            .OrderByDescending(renderable => renderable.LightPriority)
+            .ThenByDescending(renderable => renderable.Intensity)
+            .ThenBy(renderable => renderable.EntityId, StringComparer.Ordinal)
+            .Take(maximumCount)
+            .Select(ToSceneLight)
+            .ToArray();
+    }
+
+    private static SceneLight? ResolveFirstDirectionalLight(
+        IEnumerable<RekallAgeRuntimeViewportRenderable> renderables)
+    {
+        var directional = renderables.FirstOrDefault(renderable =>
+            renderable.Kind.Equals("light", StringComparison.Ordinal)
+            && renderable.Intensity > 0.0001
+            && !IsPointLight(renderable));
+        return directional is null ? null : ToSceneLight(directional);
+    }
+
+    private static RekallAgeVulkanEffectiveCamera ResolveEffectiveCamera(
+        RekallAgeRuntimeViewportFrame frame,
         SceneBounds bounds)
     {
         bounds = bounds.OrDefault();
@@ -145,19 +311,41 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         var extent = MathF.Max(1f, MathF.Max(
             bounds.MaxX - bounds.MinX,
             MathF.Max(bounds.MaxY - bounds.MinY, bounds.MaxZ - bounds.MinZ)));
-        var pose = ResolveCameraPose(frame.ActiveCamera, center, extent);
+        var authored = frame.ActiveCamera;
+        var autoFramed = authored is null || IsDefaultCamera(authored);
+        var pose = ResolveCameraPose(authored, center, extent);
+        var screenRight = NormalizeOrFallback(Vector3.Cross(pose.Forward, pose.Up), pose.Right);
+        var screenUp = NormalizeOrFallback(Vector3.Cross(screenRight, pose.Forward), pose.Up);
         var view = Matrix4x4.CreateLookAt(pose.Eye, pose.Eye + pose.Forward, pose.Up);
-        var projection = CreateProjection(frame.ActiveCamera, frame, extent);
-        var softwareViewProjection = view * projection;
+        var softwareProjection = CreateProjection(authored, frame, extent);
+        var softwareViewProjection = view * softwareProjection;
+        var projection = softwareProjection;
         projection.M22 *= -1f;
-
-        var light = ResolvePrimaryLight(frame);
-        return new RekallAgeVulkanSceneFrameUniform(
+        var nearClip = MathF.Max(0.001f, (float)(authored?.NearClip ?? 0.05));
+        var farClip = MathF.Max(nearClip + 0.001f, (float)(authored?.FarClip ?? Math.Max(100f, extent * 16f)));
+        var aspect = frame.Height <= 0 ? 1f : frame.Width / (float)frame.Height;
+        var orthographic = authored?.ProjectionMode.Equals("orthographic", StringComparison.OrdinalIgnoreCase) == true;
+        var tangentOrHalfHeight = orthographic
+            ? MathF.Max(0.001f, (float)(authored?.OrthographicSize ?? 10)) * 0.5f
+            : MathF.Tan(ToRadians(Math.Clamp((float)(authored?.FieldOfViewDegrees ?? 65), 1f, 179f)) * 0.5f);
+        return new RekallAgeVulkanEffectiveCamera(
+            authored?.EntityId,
+            pose.Eye,
+            autoFramed
+                ? new Vector3(0, 180, 0)
+                : new Vector3((float)authored!.RotationX, (float)authored.RotationY, (float)authored.RotationZ),
+            pose.Forward,
+            screenRight,
+            screenUp,
+            nearClip,
+            farClip,
+            aspect,
+            tangentOrHalfHeight,
+            orthographic,
+            autoFramed,
+            view,
+            projection,
             view * projection,
-            light.Direction,
-            light.Color,
-            light.Position,
-            new Vector4(pose.Eye, 1),
             softwareViewProjection);
     }
 
@@ -346,11 +534,24 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
             1);
     }
 
-    private static SceneLight ResolvePrimaryLight(RekallAgeRuntimeViewportFrame frame)
+    private static SceneLight ResolvePrimaryLight(
+        IReadOnlyDictionary<string, RekallAgeRuntimeViewportRenderable> renderablesByEntityId,
+        IEnumerable<RekallAgeRuntimeViewportRenderable> renderables,
+        string? primaryLightEntityId)
     {
+        if (!string.IsNullOrWhiteSpace(primaryLightEntityId)
+            && renderablesByEntityId.TryGetValue(primaryLightEntityId, out var selected))
+        {
+            if (selected.Kind.Equals("light", StringComparison.Ordinal)
+                && selected.Intensity > 0.0001)
+            {
+                return ToSceneLight(selected);
+            }
+        }
+
         RekallAgeRuntimeViewportRenderable? firstLight = null;
         RekallAgeRuntimeViewportRenderable? firstPointLight = null;
-        foreach (var renderable in frame.Renderables)
+        foreach (var renderable in renderables)
         {
             if (!renderable.Kind.Equals("light", StringComparison.Ordinal))
             {
@@ -373,23 +574,30 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         if (light is null)
         {
             return new SceneLight(
+                null,
                 Vector3.Normalize(new Vector3(-0.45f, -0.65f, -0.6f)),
                 new Vector4(0, 0, 0, 0),
                 Vector4.One);
         }
 
-        return new SceneLight(
+        return ToSceneLight(light);
+    }
+
+    private static SceneLight ToSceneLight(RekallAgeRuntimeViewportRenderable light) =>
+        new(
+            light.EntityId,
             DirectionFromEuler(light.RotationX, light.RotationY, light.RotationZ),
             IsPointLight(light)
                 ? new Vector4((float)light.X, (float)light.Y, (float)light.Z, 1)
                 : new Vector4((float)light.X, (float)light.Y, (float)light.Z, 0),
-            ResolveLightColor(light));
-    }
+            ResolveLightColor(light),
+            (float)Math.Clamp(light.LightRange, 0.001, 1_000_000),
+            light.LightPriority);
 
     private static Vector4 ResolveLightColor(RekallAgeRuntimeViewportRenderable light)
     {
         var color = ParseColor(light.MaterialColor);
-        var intensity = (float)Math.Clamp(light.Intensity, 0.05, 4.0);
+        var intensity = (float)Math.Clamp(light.Intensity, 0.05, IsPointLight(light) ? 16.0 : 4.0);
         return new Vector4(color.X * intensity, color.Y * intensity, color.Z * intensity, 1);
     }
 
@@ -472,7 +680,16 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         }
     }
 
-    private readonly record struct SceneLight(Vector3 Direction, Vector4 Position, Vector4 Color);
+    private readonly record struct SceneLight(
+        string? EntityId,
+        Vector3 Direction,
+        Vector4 Position,
+        Vector4 Color,
+        float Range = 10,
+        int Priority = 0)
+    {
+        public static SceneLight Disabled { get; } = new(null, Vector3.Zero, Vector4.Zero, Vector4.Zero);
+    }
 
     private readonly record struct CameraPose(Vector3 Eye, Vector3 Forward, Vector3 Right, Vector3 Up);
 }

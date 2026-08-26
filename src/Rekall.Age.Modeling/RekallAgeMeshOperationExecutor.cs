@@ -26,6 +26,29 @@ public sealed partial class RekallAgeMeshOperationExecutor
             RekallAgeMeshChangeKind.Positions,
             [NumberParameter("x"), NumberParameter("y"), NumberParameter("z")]),
         new(
+            "taper_points",
+            "Linearly scales selected point planes perpendicular to an axis across an authored coordinate range.",
+            RekallAgeGeometryDomain.Point,
+            RekallAgeMeshChangeKind.Positions,
+            [
+                StringParameter("axis", "y", "Taper axis: x, y, or z."),
+                NumberParameter("minimum"), NumberParameter("maximum", 1),
+                NumberParameter("startScale", 1), NumberParameter("endScale", 0.5),
+                NumberParameter("centerX"), NumberParameter("centerY"), NumberParameter("centerZ")
+            ]),
+        new(
+            "bend_points",
+            "Bends selected points through an authored angle and coordinate range while rotating cross-sections around an origin.",
+            RekallAgeGeometryDomain.Point,
+            RekallAgeMeshChangeKind.Positions,
+            [
+                StringParameter("axis", "y", "Longitudinal bend axis: x, y, or z."),
+                StringParameter("bendAxis", "z", "Perpendicular displacement axis: x, y, or z."),
+                NumberParameter("minimum"), NumberParameter("maximum", 1),
+                NumberParameter("angleDegrees", 45),
+                NumberParameter("centerX"), NumberParameter("centerY"), NumberParameter("centerZ")
+            ]),
+        new(
             "reverse_faces",
             "Reverses selected face winding while preserving stable face/corner identity and corner attributes.",
             RekallAgeGeometryDomain.Face,
@@ -56,12 +79,40 @@ public sealed partial class RekallAgeMeshOperationExecutor
             RekallAgeMeshChangeKind.Attributes,
             [StringParameter("attribute", "normal.generated", "Destination corner normal attribute name.")]),
         new(
+            "shade_faces",
+            "Authors smooth or flat shading policy on selected stable faces without changing topology.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Attributes,
+            [
+                new("smooth", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Whether selected faces participate in smooth normal fans."),
+                StringParameter("attribute", "normal.smooth", "Destination face-domain smoothing policy attribute.")
+            ]),
+        new(
+            "mark_sharp",
+            "Authors sharp or smooth fan boundaries on selected stable edges without changing topology.",
+            RekallAgeGeometryDomain.Edge,
+            RekallAgeMeshChangeKind.Attributes,
+            [
+                new("sharp", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Whether selected edges split adjacent normal fans."),
+                StringParameter("attribute", "normal.sharp", "Destination edge-domain sharpness policy attribute.")
+            ]),
+        new(
+            "auto_smooth",
+            "Classifies mesh edges as normal-fan boundaries from adjacent face angle and topology.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Attributes,
+            [
+                new("angleDegrees", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(60.0), "Maximum smooth angle in degrees from zero through 180."),
+                StringParameter("sharpAttribute", "normal.sharp", "Destination edge-domain sharpness policy attribute.")
+            ]),
+        new(
             "project_uv",
             "Projects selected face corners onto XY, XZ, or YZ and writes a named corner-domain Float2 texture-coordinate attribute.",
             RekallAgeGeometryDomain.Face,
             RekallAgeMeshChangeKind.Attributes,
             [
                 StringParameter("attribute", "uv.generated", "Destination corner UV attribute name."),
+                StringParameter("projection", "planar", "Projection mode: planar, box, cylindrical, or spherical."),
                 StringParameter("axis", "xy", "Projection axis: xy, xz, or yz."),
                 NumberParameter("scaleU", 1), NumberParameter("scaleV", 1),
                 NumberParameter("offsetU"), NumberParameter("offsetV")
@@ -74,16 +125,131 @@ public sealed partial class RekallAgeMeshOperationExecutor
             []),
         new(
             "subdivide_smooth",
-            "Applies one Catmull-Clark-style smooth subdivision level to a complete manifold or boundary surface.",
+            "Applies one crease-aware Catmull-Clark-style smooth subdivision level to a complete manifold or boundary surface.",
             RekallAgeGeometryDomain.Face,
             RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
-            []),
+            [StringParameter("creaseAttribute", "crease.edge", "Optional edge-domain Float crease weight attribute; values are clamped to zero through one.")]),
+        new(
+            "set_edge_crease",
+            "Authors bounded subdivision crease weights on selected stable edges.",
+            RekallAgeGeometryDomain.Edge,
+            RekallAgeMeshChangeKind.Attributes,
+            [new("weight", RekallAgeGeometryValueType.Float, true, null, "Finite crease weight from zero (smooth) through one (sharp)."),
+             StringParameter("attribute", "crease.edge", "Destination edge-domain Float crease attribute.")]),
         new(
             "merge_by_distance",
             "Welds selected points within a finite distance using deterministic spatial hashing, deduplicates resulting edges, and preserves stable provenance.",
             RekallAgeGeometryDomain.Point,
             RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
-            [new("distance", RekallAgeGeometryValueType.Float, true, null, "Positive finite weld distance in mesh-local units.")])
+            [new("distance", RekallAgeGeometryValueType.Float, true, null, "Positive finite weld distance in mesh-local units.")]),
+        new(
+            "bevel_edges",
+            "Rounds every selected manifold edge with bounded profile-controlled segments, inset faces, edge strips, and vertex caps with stable provenance.",
+            RekallAgeGeometryDomain.Edge,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
+            [
+                new("width", RekallAgeGeometryValueType.Float, true, null, "Positive finite bevel width in mesh-local units."),
+                new("segments", RekallAgeGeometryValueType.Int32, false, JsonSerializer.SerializeToElement(1), "Bounded transition segment count from 1 through 64."),
+                new("profile", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(0.5), "Transition profile from 0.01 through 0.99; 0.5 is circular."),
+                new("clampOverlap", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Clamp width locally before inset regions overlap."),
+                new("hardenNormals", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(false), "Preserve hard face transitions for the normal-authoring stage."),
+                StringParameter("weightAttribute", "", "Optional edge-domain Float attribute that scales selected bevel widths from zero through one."),
+                new("materialIndex", RekallAgeGeometryValueType.Int32, false, JsonSerializer.SerializeToElement(-1), "Material slot for generated bevel faces, or -1 to inherit adjacent source faces.")
+            ]),
+        new(
+            "select_edges_by_angle",
+            "Creates or replaces a named edge selection from adjacent-face angle without changing geometry.",
+            RekallAgeGeometryDomain.Edge,
+            RekallAgeMeshChangeKind.Selection,
+            [
+                StringParameter("name", "angle-edges", "Stable selection-set name."),
+                new("minimumAngleDegrees", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(30.0), "Inclusive minimum adjacent-face angle from zero through 180 degrees."),
+                new("maximumAngleDegrees", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(180.0), "Inclusive maximum adjacent-face angle from zero through 180 degrees."),
+                new("includeBoundary", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(false), "Include one-face boundary edges.")
+            ]),
+        new(
+            "assign_linear_skin_weights",
+            "Authors normalized two-joint point skin bindings from position along an axis and bounded blend range.",
+            RekallAgeGeometryDomain.Point,
+            RekallAgeMeshChangeKind.Attributes,
+            [
+                StringParameter("axis", "y", "Blend axis: x, y, or z."),
+                NumberParameter("minimum"), NumberParameter("maximum", 1),
+                new("jointA", RekallAgeGeometryValueType.Int32, false, JsonSerializer.SerializeToElement(0), "Non-negative joint index at or below the minimum."),
+                new("jointB", RekallAgeGeometryValueType.Int32, false, JsonSerializer.SerializeToElement(1), "Non-negative joint index at or above the maximum.")
+            ]),
+        new(
+            "assign_envelope_skin_weights",
+            "Authors deterministic normalized strongest-four point skin bindings from tapered bone-segment envelopes.",
+            RekallAgeGeometryDomain.Point,
+            RekallAgeMeshChangeKind.Attributes,
+            [
+                new("envelopes", RekallAgeGeometryValueType.Json, true, null, "One through 256 structured joint envelopes with head/tail positions, radii, falloff, and optional weight."),
+                new("maximumInfluences", RekallAgeGeometryValueType.Int32, false, JsonSerializer.SerializeToElement(4), "Maximum retained joint influences from one through four."),
+                new("fallbackToNearest", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Bind zero-influence points to the nearest envelope instead of failing.")
+            ]),
+        new(
+            "mark_uv_seams",
+            "Marks selected stable edges as UV chart seams in a named edge-domain Bool attribute.",
+            RekallAgeGeometryDomain.Edge,
+            RekallAgeMeshChangeKind.Attributes,
+            [StringParameter("attribute", "uv.seam", "Destination edge seam attribute."), new("marked", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Whether selected edges are marked as seams.")]),
+        new(
+            "unwrap_pack_uv",
+            "Builds deterministic seam-bounded UV islands, planar-parameterizes them, and packs them into a named corner map.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Attributes,
+            [StringParameter("attribute", "uv.lightmap", "Destination corner UV attribute."), StringParameter("seamAttribute", "uv.seam", "Edge seam attribute used to split charts."), NumberParameter("margin", 0.01), StringParameter("semantic", "texcoord-1", "Texture-coordinate semantic for the generated map.")]),
+        new(
+            "inset_faces",
+            "Insets selected polygon faces by a bounded thickness with optional normal-axis depth and explicit border faces.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
+            [
+                new("thickness", RekallAgeGeometryValueType.Float, true, null, "Positive finite inset thickness in mesh-local units."),
+                new("depth", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(0.0), "Signed offset along each source face normal."),
+                new("individual", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(false), "Inset faces independently instead of as a connected region."),
+                new("boundary", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Create explicit border faces between source and inset boundaries.")
+            ]),
+        new(
+            "solidify",
+            "Gives an open or closed surface deterministic thickness with reversed inner faces and optional boundary rims.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
+            [
+                new("thickness", RekallAgeGeometryValueType.Float, true, null, "Non-zero finite shell thickness."),
+                new("offset", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(0.0), "Shell placement from -1 (inside) through 1 (outside)."),
+                new("rim", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Close open boundary edges with rim faces."),
+                new("evenThickness", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Use normalized averaged point normals for consistent thickness.")
+            ]),
+        new(
+            "weighted_normals",
+            "Authors finite split corner normals from smooth-face and sharp-edge policies without changing source topology.",
+            RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Attributes,
+            [
+                new("attribute", RekallAgeGeometryValueType.String, false, JsonSerializer.SerializeToElement("normal.authored"), "Destination corner normal attribute."),
+                new("faceAreaWeight", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(1.0), "Face-area weighting exponent from 0 through 4."),
+                new("cornerAngleWeight", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(1.0), "Corner-angle weighting exponent from 0 through 4."),
+                StringParameter("smoothAttribute", "normal.smooth", "Optional face-domain smoothing policy attribute."),
+                StringParameter("sharpAttribute", "normal.sharp", "Optional edge-domain sharpness policy attribute.")
+            ]),
+        new("fill_holes", "Fills selected simple boundary loops with deterministic polygon faces.", RekallAgeGeometryDomain.Edge,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Attributes,
+            [new("materialIndex", RekallAgeGeometryValueType.Int32, false, JsonSerializer.SerializeToElement(0), "Material slot assigned to created fill faces.")]),
+        new("bridge_edge_loops", "Bridges exactly two equal-cardinality simple boundary loops with deterministic quad faces.", RekallAgeGeometryDomain.Edge,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Attributes,
+            [new("materialIndex", RekallAgeGeometryValueType.Int32, false, JsonSerializer.SerializeToElement(0), "Material slot assigned to created bridge faces.")]),
+        new("poke_faces", "Pokes selected faces into centroid triangle fans while preserving source attributes and provenance.", RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection, []),
+        new("dissolve_edges", "Dissolves one selected two-face manifold edge into a single polygon while preserving compatible face material data.", RekallAgeGeometryDomain.Edge,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection, []),
+        new("bisect_plane", "Clips a complete mesh against an authored plane with deterministic edge intersections and interpolated point attributes.", RekallAgeGeometryDomain.Face,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
+            [NumberParameter("planeX"), NumberParameter("planeY"), NumberParameter("planeZ"), NumberParameter("normalX", 1), NumberParameter("normalY"), NumberParameter("normalZ"),
+             new("clearPositive", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(true), "Remove geometry on the positive plane side."),
+             new("clearNegative", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(false), "Remove geometry on the negative plane side."),
+             new("fill", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(false), "Cap the cut boundary (not yet supported).")])
     ];
     private readonly RekallAgeMeshValidator _validator = new();
 
@@ -111,15 +277,35 @@ public sealed partial class RekallAgeMeshOperationExecutor
         var result = request.OperationId switch
         {
             "transform" => Transform(source, request),
+            "taper_points" => TaperPoints(source, request),
+            "bend_points" => BendPoints(source, request),
             "reverse_faces" => ReverseFaces(source, request),
             "triangulate_faces" => TriangulateFaces(source, request),
             "extrude_faces" => ExtrudeFaces(source, request),
             "delete" => DeleteFaces(source, request),
             "generate_normals" => GenerateNormals(source, request),
+            "shade_faces" => ShadeFaces(source, request),
+            "mark_sharp" => MarkSharp(source, request),
+            "auto_smooth" => AutoSmooth(source, request),
             "project_uv" => ProjectUv(source, request),
+            "mark_uv_seams" => MarkUvSeams(source, request),
+            "unwrap_pack_uv" => UnwrapPackUv(source, request),
             "subdivide_faces" => SubdivideFaces(source, request),
             "subdivide_smooth" => SubdivideSmooth(source, request),
+            "set_edge_crease" => SetEdgeCrease(source, request),
             "merge_by_distance" => MergeByDistance(source, request),
+            "bevel_edges" => BevelEdges(source, request),
+            "select_edges_by_angle" => SelectEdgesByAngle(source, request),
+            "assign_linear_skin_weights" => AssignLinearSkinWeights(source, request),
+            "assign_envelope_skin_weights" => AssignEnvelopeSkinWeights(source, request),
+            "inset_faces" => InsetFaces(source, request),
+            "solidify" => Solidify(source, request),
+            "weighted_normals" => WeightedNormals(source, request),
+            "fill_holes" => FillHoles(source, request),
+            "bridge_edge_loops" => BridgeEdgeLoops(source, request),
+            "poke_faces" => SubdivideFaces(source, request),
+            "dissolve_edges" => DissolveEdges(source, request),
+            "bisect_plane" => BisectPlane(source, request),
             _ => throw Failure("REKALL_MESH_OPERATION_UNKNOWN", $"Unknown mesh operation '{request.OperationId}'.")
         };
         var outputValidation = _validator.Validate(result.Mesh);
@@ -215,23 +401,26 @@ public sealed partial class RekallAgeMeshOperationExecutor
         RequireDomain(request, RekallAgeGeometryDomain.Face);
         var faceIndices = ResolveIndices(source.Topology.FaceIds, request.ElementIds, "face");
         var attributeName = ReadBoundedString(request.Parameters, "attribute", "uv.generated"); var axis = ReadBoundedString(request.Parameters, "axis", "xy").ToLowerInvariant();
+        var projection = ReadBoundedString(request.Parameters, "projection", "planar").ToLowerInvariant();
         if (axis is not ("xy" or "xz" or "yz")) throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", "UV projection axis must be 'xy', 'xz', or 'yz'.");
+        if (projection is not ("planar" or "box" or "cylindrical" or "spherical")) throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", "UV projection mode must be planar, box, cylindrical, or spherical.");
         var existing = source.Attributes.FirstOrDefault(item => item.Name == attributeName);
         if (existing is not null && (existing.Domain != RekallAgeGeometryDomain.Corner || existing.ValueType != RekallAgeGeometryValueType.Float2)) throw Failure("REKALL_MESH_OPERATION_ATTRIBUTE_CONFLICT", $"Attribute '{attributeName}' exists with an incompatible domain or type.");
         var scaleU = ReadFiniteDouble(request.Parameters, "scaleU", 1); var scaleV = ReadFiniteDouble(request.Parameters, "scaleV", 1); var offsetU = ReadFiniteDouble(request.Parameters, "offsetU"); var offsetV = ReadFiniteDouble(request.Parameters, "offsetV");
         var values = existing?.Values.ToArray() ?? Enumerable.Repeat(JsonSerializer.SerializeToElement(new[] { 0d, 0d }), source.Topology.CornerIds.Count).ToArray(); var modifiedCorners = new List<ulong>();
         foreach (var faceIndex in faceIndices)
         {
+            var normal = UvFaceNormal(source.Topology, faceIndex);
             for (var corner = source.Topology.FaceOffsets[faceIndex]; corner < source.Topology.FaceOffsets[faceIndex + 1]; corner++)
             {
                 var point = source.Topology.Positions[source.Topology.CornerPointIndices[corner]];
-                var (first, second) = axis switch { "xy" => (point.X, point.Y), "xz" => (point.X, point.Z), _ => (point.Y, point.Z) };
-                var u = first * scaleU + offsetU; var v = second * scaleV + offsetV;
+                var projected = RekallAgeUvProjection.Project(point, projection, axis, normal);
+                var u = projected.X * scaleU + offsetU; var v = projected.Y * scaleV + offsetV;
                 if (!double.IsFinite(u) || !double.IsFinite(v)) throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", "UV projection produced a non-finite coordinate.");
                 values[corner] = JsonSerializer.SerializeToElement(new[] { u, v }); modifiedCorners.Add(source.Topology.CornerIds[corner]);
             }
         }
-        var attribute = new RekallAgeGeometryAttribute(attributeName, RekallAgeGeometryDomain.Corner, RekallAgeGeometryValueType.Float2, values, "texcoord");
+        var attribute = new RekallAgeGeometryAttribute(attributeName, RekallAgeGeometryDomain.Corner, RekallAgeGeometryValueType.Float2, values, "texcoord-0");
         var attributes = source.Attributes.Where(item => item.Name != attributeName).Append(attribute).OrderBy(item => item.Name, StringComparer.Ordinal).ToArray();
         var mesh = source with { Revision = checked(source.Revision + 1), Attributes = attributes };
         return Result(source, mesh, ChangeSet(RekallAgeMeshChangeKind.Attributes, modifiedFaces: request.ElementIds.Order().ToArray(), modifiedCorners: modifiedCorners.Order().ToArray(), changedAttributes: [attributeName], affectedBounds: Bounds(faceIndices.SelectMany(index => Enumerable.Range(source.Topology.FaceOffsets[index], source.Topology.FaceOffsets[index + 1] - source.Topology.FaceOffsets[index])).Select(index => source.Topology.Positions[source.Topology.CornerPointIndices[index]]))), request.ElementIds.Order().Select(id => Preserve(RekallAgeGeometryDomain.Face, id)).ToArray());
@@ -1115,7 +1304,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
     {
         if (indices.Count == 0) return DefaultValue(attribute);
         if (attribute.Interpolation is RekallAgeGeometryInterpolation.Constant or RekallAgeGeometryInterpolation.Nearest
-            || attribute.ValueType is RekallAgeGeometryValueType.Bool or RekallAgeGeometryValueType.String
+            || attribute.ValueType is RekallAgeGeometryValueType.Bool or RekallAgeGeometryValueType.Int4 or RekallAgeGeometryValueType.String
                 or RekallAgeGeometryValueType.Quaternion or RekallAgeGeometryValueType.Matrix4x4)
             return attribute.Values[indices[0]];
         if (attribute.ValueType == RekallAgeGeometryValueType.Int32)
@@ -1164,6 +1353,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
         {
             RekallAgeGeometryValueType.Bool => JsonSerializer.SerializeToElement(false),
             RekallAgeGeometryValueType.Int32 => JsonSerializer.SerializeToElement(0),
+            RekallAgeGeometryValueType.Int4 => JsonSerializer.SerializeToElement(new int[4]),
             RekallAgeGeometryValueType.Float => JsonSerializer.SerializeToElement(0.0),
             RekallAgeGeometryValueType.Float2 => JsonSerializer.SerializeToElement(new double[2]),
             RekallAgeGeometryValueType.Float3 => JsonSerializer.SerializeToElement(new double[3]),
@@ -1285,6 +1475,22 @@ public sealed partial class RekallAgeMeshOperationExecutor
         if (node is not JsonValue value || !value.TryGetValue<string>(out var text) || string.IsNullOrWhiteSpace(text) || text.Length > 128)
             throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", $"Parameter '{name}' must be a bounded non-empty string.");
         return text;
+    }
+
+    private static int ReadBoundedInt(JsonObject parameters, string name, int defaultValue, int minimum, int maximum)
+    {
+        if (!parameters.TryGetPropertyValue(name, out var node) || node is null) return defaultValue;
+        if (node is not JsonValue value || !value.TryGetValue<int>(out var number) || number < minimum || number > maximum)
+            throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", $"Parameter '{name}' must be an integer between {minimum} and {maximum}.");
+        return number;
+    }
+
+    private static bool ReadBoolean(JsonObject parameters, string name, bool defaultValue)
+    {
+        if (!parameters.TryGetPropertyValue(name, out var node) || node is null) return defaultValue;
+        if (node is not JsonValue value || !value.TryGetValue<bool>(out var result))
+            throw Failure("REKALL_MESH_OPERATION_PARAMETER_INVALID", $"Parameter '{name}' must be boolean.");
+        return result;
     }
 
     private static bool TryReadNumber(JsonValue value, out double number)

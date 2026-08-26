@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "durationSeconds": 1.6,
+  "tracks": [
+    { "component": "Rekall.RigPose", "jointId": "upper_arm_l", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [-0.039989, 0, 0, 0.999200] }, { "time": 0.8, "value": [-0.054972, 0, 0, 0.998488] }, { "time": 1.6, "value": [-0.039989, 0, 0, 0.999200] }
+    ] },
+    { "component": "Rekall.RigPose", "jointId": "upper_arm_r", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [0.039989, 0, 0, 0.999200] }, { "time": 0.8, "value": [0.054972, 0, 0, 0.998488] }, { "time": 1.6, "value": [0.039989, 0, 0, 0.999200] }
+    ] },
+    { "component": "Rekall.RigPose", "jointId": "forearm_l", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [0.124675, 0, 0, 0.992198] }, { "time": 0.8, "value": [0.149438, 0, 0, 0.988771] }, { "time": 1.6, "value": [0.124675, 0, 0, 0.992198] }
+    ] },
+    { "component": "Rekall.RigPose", "jointId": "forearm_r", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [0.149438, 0, 0, 0.988771] }, { "time": 0.8, "value": [0.174108, 0, 0, 0.984727] }, { "time": 1.6, "value": [0.149438, 0, 0, 0.988771] }
+    ] },
+    { "component": "Rekall.RigPose", "jointId": "leg_l", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [0, 0, -0.017499, 0.999847] }, { "time": 0.8, "value": [0, 0, -0.027497, 0.999622] }, { "time": 1.6, "value": [0, 0, -0.017499, 0.999847] }
+    ] },
+    { "component": "Rekall.RigPose", "jointId": "leg_r", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [0, 0, 0.017499, 0.999847] }, { "time": 0.8, "value": [0, 0, 0.027497, 0.999622] }, { "time": 1.6, "value": [0, 0, 0.017499, 0.999847] }
+    ] },
+    { "component": "Rekall.RigPose", "jointId": "shin_l", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [0.039989, 0, 0, 0.999200] }, { "time": 0.8, "value": [0.052476, 0, 0, 0.998622] }, { "time": 1.6, "value": [0.039989, 0, 0, 0.999200] }
+    ] },
+    { "component": "Rekall.RigPose", "jointId": "shin_r", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [0.039989, 0, 0, 0.999200] }, { "time": 0.8, "value": [0.052476, 0, 0, 0.998622] }, { "time": 1.6, "value": [0.039989, 0, 0, 0.999200] }
+    ] },
+    { "component": "Rekall.RigPose", "jointId": "foot_l", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [-0.019999, 0, 0, 0.999800] }, { "time": 1.6, "value": [-0.019999, 0, 0, 0.999800] }
+    ] },
+    { "component": "Rekall.RigPose", "jointId": "foot_r", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [-0.019999, 0, 0, 0.999800] }, { "time": 1.6, "value": [-0.019999, 0, 0, 0.999800] }
+    ] }
+  ]
+}

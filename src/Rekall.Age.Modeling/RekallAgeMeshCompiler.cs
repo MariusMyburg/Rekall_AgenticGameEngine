@@ -41,6 +41,14 @@ public sealed class RekallAgeMeshCompiler
                 && attribute.ValueType == RekallAgeGeometryValueType.Float2);
         var colorAttribute = FindAttribute(mesh, "color", RekallAgeGeometryValueType.ColorLinear)
             ?? FindAttribute(mesh, "color", RekallAgeGeometryValueType.Float4);
+        var jointIndicesAttribute = FindAttribute(mesh, "joint-indices-0", RekallAgeGeometryValueType.Int4);
+        var jointWeightsAttribute = FindAttribute(mesh, "joint-weights-0", RekallAgeGeometryValueType.Float4);
+        if ((jointIndicesAttribute is null) != (jointWeightsAttribute is null))
+        {
+            throw new RekallAgeMeshCompileException(
+                "REKALL_MESH_COMPILE_SKIN_ATTRIBUTE_PAIR_REQUIRED",
+                "Skinning requires both joint-indices-0 and joint-weights-0 point attributes.");
+        }
         var materialAttribute = mesh.Attributes.FirstOrDefault(attribute =>
             string.Equals(attribute.Semantic, "material-index", StringComparison.OrdinalIgnoreCase)
             && attribute.ValueType == RekallAgeGeometryValueType.Int32
@@ -51,6 +59,8 @@ public sealed class RekallAgeMeshCompiler
         var uvs = new RekallAgeGeometryVector2[topology.CornerIds.Count];
         var colors = new RekallAgeGeometryVector4[topology.CornerIds.Count];
         var pointIds = new ulong[topology.CornerIds.Count];
+        var jointIndices = new IReadOnlyList<int>?[topology.CornerIds.Count];
+        var jointWeights = new IReadOnlyList<double>?[topology.CornerIds.Count];
         var tangentSums = new RekallAgeGeometryVector3[topology.CornerIds.Count];
         var bitangentSums = new RekallAgeGeometryVector3[topology.CornerIds.Count];
         var indices = new List<uint>();
@@ -70,30 +80,52 @@ public sealed class RekallAgeMeshCompiler
                 normals[cornerIndex] = Normalize(ReadVector3(normalAttribute, cornerIndex, pointIndex) ?? faceNormal, faceNormal);
                 uvs[cornerIndex] = ReadVector2(uvAttribute, cornerIndex, pointIndex) ?? new(0, 0);
                 colors[cornerIndex] = ReadVector4(colorAttribute, cornerIndex, pointIndex) ?? new(1, 1, 1, 1);
+                if (jointIndicesAttribute is not null && jointWeightsAttribute is not null)
+                {
+                    (jointIndices[cornerIndex], jointWeights[cornerIndex]) = ReadSkinBinding(
+                        jointIndicesAttribute, jointWeightsAttribute, pointIndex, topology.PointIds[pointIndex]);
+                }
             }
+        }
 
-            var materialIndex = ReadMaterialIndex(materialAttribute, faceIndex);
-            var surface = GetSurface(surfaces, mesh.MaterialSlots, materialIndex, indices.Count);
-            var localTriangles = TriangulateFace(topology, faceIndex, start, end);
-            foreach (var localTriangle in localTriangles)
+        var faceGroups = Enumerable.Range(0, topology.FaceIds.Count)
+            .GroupBy(faceIndex => ReadMaterialIndex(materialAttribute, faceIndex))
+            .OrderBy(group => group.Min())
+            .ToArray();
+        foreach (var faceGroup in faceGroups)
+        {
+            var materialIndex = faceGroup.Key;
+            var materialAssetId = materialIndex >= 0 && materialIndex < mesh.MaterialSlots.Count
+                ? mesh.MaterialSlots[materialIndex].MaterialAssetId
+                : null;
+            var surface = new SurfaceBuilder(surfaces.Count, materialIndex, materialAssetId, indices.Count);
+            surfaces.Add(surface);
+
+            foreach (var faceIndex in faceGroup)
             {
-                var a = start + localTriangle.A;
-                var b = start + localTriangle.B;
-                var c = start + localTriangle.C;
-                var firstIndex = indices.Count;
-                indices.Add(checked((uint)a));
-                indices.Add(checked((uint)b));
-                indices.Add(checked((uint)c));
-                AccumulateTangent(a, b, c, positions, normals, uvs, tangentSums, bitangentSums);
-                triangles.Add(new(
-                    triangles.Count,
-                    topology.FaceIds[faceIndex],
-                    [topology.CornerIds[a], topology.CornerIds[b], topology.CornerIds[c]],
-                    [pointIds[a], pointIds[b], pointIds[c]],
-                    surface.SurfaceIndex));
-                surface.IndexCount += indices.Count - firstIndex;
+                var start = topology.FaceOffsets[faceIndex];
+                var end = topology.FaceOffsets[faceIndex + 1];
+                var localTriangles = TriangulateFace(topology, faceIndex, start, end);
+                foreach (var localTriangle in localTriangles)
+                {
+                    var a = start + localTriangle.A;
+                    var b = start + localTriangle.B;
+                    var c = start + localTriangle.C;
+                    var firstIndex = indices.Count;
+                    indices.Add(checked((uint)a));
+                    indices.Add(checked((uint)b));
+                    indices.Add(checked((uint)c));
+                    AccumulateTangent(a, b, c, positions, normals, uvs, tangentSums, bitangentSums);
+                    triangles.Add(new(
+                        triangles.Count,
+                        topology.FaceIds[faceIndex],
+                        [topology.CornerIds[a], topology.CornerIds[b], topology.CornerIds[c]],
+                        [pointIds[a], pointIds[b], pointIds[c]],
+                        surface.SurfaceIndex));
+                    surface.IndexCount += indices.Count - firstIndex;
+                }
+                surface.SourceFaceIds.Add(topology.FaceIds[faceIndex]);
             }
-            surface.SourceFaceIds.Add(topology.FaceIds[faceIndex]);
         }
 
         var vertices = new RekallAgeCompiledMeshVertex[topology.CornerIds.Count];
@@ -108,7 +140,9 @@ public sealed class RekallAgeMeshCompiler
                 normals[index],
                 new(tangent.X, tangent.Y, tangent.Z, handedness),
                 uvs[index],
-                colors[index]);
+                colors[index],
+                jointIndices[index],
+                jointWeights[index]);
         }
 
         return new RekallAgeCompiledMeshSnapshot(
@@ -140,22 +174,29 @@ public sealed class RekallAgeMeshCompiler
         return attribute.Values[faceIndex].TryGetInt32(out var value) ? value : 0;
     }
 
-    private static SurfaceBuilder GetSurface(
-        List<SurfaceBuilder> surfaces,
-        IReadOnlyList<RekallAgeMaterialSlot> materialSlots,
-        int materialIndex,
-        int firstIndex)
+    private static (IReadOnlyList<int> Joints, IReadOnlyList<double> Weights) ReadSkinBinding(
+        RekallAgeGeometryAttribute joints,
+        RekallAgeGeometryAttribute weights,
+        int pointIndex,
+        ulong pointId)
     {
-        if (surfaces.Count > 0 && surfaces[^1].MaterialSlotIndex == materialIndex)
+        var jointValues = joints.Values[pointIndex].EnumerateArray().Select(value => value.GetInt32()).ToArray();
+        var weightValues = weights.Values[pointIndex].EnumerateArray().Select(value => value.GetDouble()).ToArray();
+        if (jointValues.Any(value => value < 0)
+            || weightValues.Any(value => !double.IsFinite(value) || value < 0))
         {
-            return surfaces[^1];
+            throw new RekallAgeMeshCompileException(
+                "REKALL_MESH_COMPILE_SKIN_BINDING_INVALID",
+                $"Point {pointId} has negative joint indices or non-finite/negative skin weights.");
         }
-        var materialAssetId = materialIndex >= 0 && materialIndex < materialSlots.Count
-            ? materialSlots[materialIndex].MaterialAssetId
-            : null;
-        var result = new SurfaceBuilder(surfaces.Count, materialIndex, materialAssetId, firstIndex);
-        surfaces.Add(result);
-        return result;
+        var total = weightValues.Sum();
+        if (!double.IsFinite(total) || total <= Epsilon)
+        {
+            throw new RekallAgeMeshCompileException(
+                "REKALL_MESH_COMPILE_SKIN_BINDING_INVALID",
+                $"Point {pointId} must have at least one positive skin weight.");
+        }
+        return (jointValues, weightValues.Select(value => value / total).ToArray());
     }
 
     private static IReadOnlyList<LocalTriangle> TriangulateFace(

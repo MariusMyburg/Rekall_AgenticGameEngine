@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace Rekall.Age.Modules.BuiltIns;
 
 [RekallAgeModule("rekall.builtins", "Rekall Built-ins")]
@@ -18,6 +20,11 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeCameraTarget3DComponent>();
         builder.RegisterComponent<RekallAgeCameraTargetCycleInputComponent>();
         builder.RegisterComponent<RekallAgeRenderLayerComponent>();
+        builder.RegisterComponent<RekallAgeRenderQualityProfileComponent>();
+        builder.RegisterComponent<RekallAgeEnvironment3DComponent>();
+        builder.RegisterComponent<RekallAgeShadowSettingsComponent>();
+        builder.RegisterComponent<RekallAgeFogVolumeComponent>();
+        builder.RegisterComponent<RekallAgeParticleEmitter3DComponent>();
         builder.RegisterComponent<RekallAgeSpriteRendererComponent>();
         builder.RegisterComponent<RekallAgeMeshRendererComponent>();
         builder.RegisterComponent<RekallAgeXrRigComponent>();
@@ -70,6 +77,9 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeAnimationMixerComponent>();
         builder.RegisterComponent<RekallAgeAnimationStateGraphComponent>();
         builder.RegisterComponent<RekallAgeSkeletalAnimatorComponent>();
+        builder.RegisterComponent<RekallAgeSkeletonPoseComponent>();
+        builder.RegisterComponent<RekallAgeRigPoseComponent>();
+        builder.RegisterComponent<RekallAgeRigAttachmentComponent>();
         builder.RegisterComponent<RekallAgeMorphWeightsComponent>();
         builder.RegisterComponent<RekallAgeUiCanvasComponent>();
         builder.RegisterComponent<RekallAgeUiElementComponent>();
@@ -420,6 +430,234 @@ public sealed class RekallAgeRenderLayerComponent : RekallAgeComponent
     public string Layer { get; init; } = "default";
 }
 
+[RekallAgeComponent(
+    "Render Quality Profile",
+    Description = "Backend-neutral authored rendering-quality intent. The renderer resolves these requests against device capabilities and reports requested, resolved, and degradation facts without changing gameplay simulation.")]
+public sealed class RekallAgeRenderQualityProfileComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(AllowedValues = ["Performance", "Low", "Medium", "High", "Ultra", "Epic"])]
+    public string Preset { get; init; } = "High";
+
+    [RekallAgeProperty]
+    public double ResolutionScale { get; init; } = 1;
+
+    [RekallAgeProperty]
+    public int ShadowCascadeCount { get; init; } = 3;
+
+    [RekallAgeProperty]
+    public int ShadowResolution { get; init; } = 2048;
+
+    [RekallAgeProperty(AllowedValues = ["analytic", "froxel-low", "froxel", "froxel-high", "froxel-epic"])]
+    public string FogMode { get; init; } = "froxel";
+
+    [RekallAgeProperty]
+    public bool Bloom { get; init; } = true;
+
+    [RekallAgeProperty]
+    public bool Ssao { get; init; } = true;
+
+    [RekallAgeProperty]
+    public int MaximumActiveParticles { get; init; } = 64_000;
+
+    [RekallAgeProperty]
+    public bool AutomaticScaling { get; init; }
+
+    [RekallAgeProperty]
+    public double TargetFramesPerSecond { get; init; } = 60;
+
+    [RekallAgeProperty]
+    public bool EnableGpuTimestamps { get; init; }
+}
+
+[RekallAgeComponent(
+    "Environment 3D",
+    Description = "Authors backend-neutral sky, ambient-light, exposure, tone-map, grade, and background intent. A background color is the deterministic fallback when a requested sky asset is absent or unsupported by the active renderer.")]
+public sealed class RekallAgeEnvironment3DComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "environment")]
+    public string? SkyAsset { get; init; }
+
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "environment")]
+    public string? EnvironmentAsset { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 16)]
+    public double AmbientEnergy { get; init; } = 1;
+
+    [RekallAgeProperty(Kind = "color")]
+    public string AmbientSkyColor { get; init; } = "#ffffff";
+
+    [RekallAgeProperty(Kind = "color")]
+    public string AmbientGroundColor { get; init; } = "#ffffff";
+
+    [RekallAgeProperty(Kind = "color")]
+    public string? BackgroundColor { get; init; }
+
+    [RekallAgeProperty(Minimum = -8, Maximum = 8)]
+    public double Exposure { get; init; }
+
+    [RekallAgeProperty(AllowedValues = ["agx", "aces", "linear"])]
+    public string ToneMapper { get; init; } = "agx";
+
+    [RekallAgeProperty(Minimum = 0.1, Maximum = 64)]
+    public double WhitePoint { get; init; } = 11.2;
+
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "colorGrade")]
+    public string? ColorGrade { get; init; }
+
+    [RekallAgeProperty(AllowedValues = ["skybox", "color", "camera", "clear"])]
+    public string BackgroundPolicy { get; init; } = "skybox";
+}
+
+[RekallAgeComponent(
+    "Shadow Settings",
+    Description = "Authors backend-neutral directional-shadow quality and stability intent for the scene.")]
+public sealed class RekallAgeShadowSettingsComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 1, Maximum = 4)]
+    public int CascadeCount { get; init; } = 3;
+
+    [RekallAgeProperty(Minimum = 128, Maximum = 16384)]
+    public int AtlasResolution { get; init; } = 2048;
+
+    [RekallAgeProperty(Minimum = 0.01)]
+    public double MaximumDistance { get; init; } = 100;
+
+    [RekallAgeProperty(AllowedValues = ["uniform", "logarithmic", "practical"])]
+    public string SplitPolicy { get; init; } = "practical";
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double Bias { get; init; } = 0.001;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double NormalBias { get; init; } = 0.01;
+
+    [RekallAgeProperty(AllowedValues = ["hard", "pcf", "pcss"])]
+    public string Filter { get; init; } = "pcf";
+
+    [RekallAgeProperty]
+    public bool Stabilization { get; init; } = true;
+}
+
+[RekallAgeComponent(
+    "Fog Volume",
+    Description = "Authors a global or transform-bounded participating-media volume. Transform3D supplies the box or sphere position, orientation, and extents.")]
+public sealed class RekallAgeFogVolumeComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(AllowedValues = ["global", "box", "sphere"])]
+    public string Shape { get; init; } = "global";
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 64)]
+    public double Density { get; init; }
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Albedo { get; init; } = "#ffffff";
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Emission { get; init; } = "#000000";
+
+    [RekallAgeProperty(Minimum = -0.95, Maximum = 0.95)]
+    public double Anisotropy { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 64)]
+    public double HeightFalloff { get; init; }
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double BlendDistance { get; init; }
+
+    [RekallAgeProperty]
+    public int Priority { get; init; }
+}
+
+[RekallAgeComponent(
+    "Particle Emitter 3D",
+    Description = "Authors a deterministic generic 3D particle emitter. Transform3D supplies its pose; curves, simulation, rendering, and quality-priority facts remain inspectable scene data.")]
+public sealed class RekallAgeParticleEmitter3DComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public bool Enabled { get; init; } = true;
+
+    [RekallAgeProperty(Description = "Optional semantic role used by agents and diagnostics; it does not create engine-owned behavior.")]
+    public string? Role { get; init; }
+
+    [RekallAgeProperty(AllowedValues = ["world", "local"])]
+    public string SimulationSpace { get; init; } = "world";
+
+    [RekallAgeProperty(Minimum = 1)]
+    public int Capacity { get; init; } = 1024;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double SpawnRate { get; init; }
+
+    [RekallAgeProperty]
+    public object[] Bursts { get; init; } = [];
+
+    [RekallAgeProperty(Minimum = 0.001)]
+    public double Lifetime { get; init; } = 1;
+
+    [RekallAgeProperty]
+    public uint Seed { get; init; } = 1;
+
+    [RekallAgeProperty]
+    public JsonObject VelocityDirection { get; init; } = new();
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 180)]
+    public double VelocityConeDegrees { get; init; }
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double MinimumSpeed { get; init; }
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double MaximumSpeed { get; init; }
+
+    [RekallAgeProperty]
+    public JsonObject Gravity { get; init; } = new();
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double Drag { get; init; }
+
+    [RekallAgeProperty]
+    public object[] SizeCurve { get; init; } = [];
+
+    [RekallAgeProperty]
+    public object[] ColorCurve { get; init; } = [];
+
+    [RekallAgeProperty(AllowedValues = ["quad", "mesh", "ribbon"])]
+    public string DrawMode { get; init; } = "quad";
+
+    [RekallAgeProperty]
+    public bool Lit { get; init; }
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double EmissiveIntensity { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double SoftParticleFade { get; init; }
+
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
+    public string? Texture { get; init; }
+
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
+    public string? TextureAssetId { get; init; }
+
+    [RekallAgeProperty(Minimum = 1)]
+    public int FlipbookColumns { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 1)]
+    public int FlipbookRows { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double FlipbookFramesPerSecond { get; init; }
+
+    [RekallAgeProperty(AllowedValues = ["alpha", "add", "premultiplied"])]
+    public string BlendMode { get; init; } = "alpha";
+
+    [RekallAgeProperty]
+    public int Priority { get; init; }
+
+    [RekallAgeProperty(Minimum = 0)]
+    public double VisibilityDistance { get; init; } = double.MaxValue;
+}
+
 [RekallAgeComponent("XR Rig")]
 public sealed class RekallAgeXrRigComponent : RekallAgeComponent
 {
@@ -480,6 +718,18 @@ public sealed class RekallAgePointLightComponent : RekallAgeComponent
 
     [RekallAgeProperty(Kind = "color")]
     public string Color { get; init; } = "#ffffff";
+
+    [RekallAgeProperty(Minimum = 0.001)]
+    public double Range { get; init; } = 10;
+
+    [RekallAgeProperty]
+    public int Priority { get; init; }
+
+    [RekallAgeProperty]
+    public bool CastShadows { get; init; }
+
+    [RekallAgeProperty]
+    public int ShadowPriority { get; init; }
 }
 
 [RekallAgeComponent("Multiplayer Session")]
@@ -871,6 +1121,12 @@ public sealed class RekallAgeMeshRendererComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public string? FragmentShader { get; init; }
+
+    [RekallAgeProperty]
+    public bool CastShadows { get; init; } = true;
+
+    [RekallAgeProperty]
+    public bool ReceiveShadows { get; init; } = true;
 }
 
 [RekallAgeComponent("Rigidbody 2D", Description = "Makes an entity a dynamic planar body simulated on the XY plane. Requires Transform2D and a 2D collider on the same entity. For static geometry, use a collider without a rigid body.")]

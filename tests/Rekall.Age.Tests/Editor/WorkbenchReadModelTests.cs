@@ -4,6 +4,9 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor;
 using Rekall.Age.Project;
+using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
+using Rekall.Age.Rendering.Commands;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
 
@@ -11,6 +14,230 @@ namespace Rekall.Age.Tests.Editor;
 
 public sealed class WorkbenchReadModelTests
 {
+    [Fact]
+    public async Task WorkbenchKeepsAuthoredQualitySeparateFromUnavailableRuntimeResolution()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Quality Workbench", ["world", "rendering3d"]),
+            CancellationToken.None);
+        var qualityEntity = RekallAgeEntityDocument.Create("Render Settings", ["rendering"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.RenderQualityProfile",
+                new JsonObject
+                {
+                    ["preset"] = "Epic",
+                    ["resolutionScale"] = 0.85,
+                    ["shadowCascadeCount"] = 4,
+                    ["enableGpuTimestamps"] = true
+                }));
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"]).AddEntity(qualityEntity),
+            CancellationToken.None);
+
+        var model = await new RekallAgeWorkbenchModelBuilder().BuildAsync(root, "Main", CancellationToken.None);
+
+        Assert.Equal(qualityEntity.Id, model.Rendering.Authoring?.EntityId);
+        Assert.Equal("Epic", model.Rendering.Authoring?.Preset);
+        Assert.Equal(0.85, model.Rendering.Authoring?.ResolutionScale);
+        Assert.Equal("Epic", model.Rendering.Runtime.RequestedPreset);
+        Assert.Null(model.Rendering.Runtime.ResolvedPreset);
+        Assert.Null(model.Rendering.Runtime.TotalGpuMilliseconds);
+        Assert.Equal("Unavailable", model.Rendering.Runtime.TotalGpuMillisecondsText);
+        Assert.Equal("REKALL_GPU_TIMESTAMPS_UNAVAILABLE", model.Rendering.Runtime.GpuTimingCode);
+        Assert.Contains(model.Actions.Actions, action =>
+            action.Tool == "rekall.render.compare_quality_presets" && action.Recommended);
+        Assert.Contains(model.Actions.Actions, action =>
+            action.Tool == "rekall.render.performance.inspect_scene_budget" && action.Recommended);
+    }
+
+    [Fact]
+    public void WorkbenchRenderingRuntimePreservesRequestedResolvedFactsAndOrderedGpuTiming()
+    {
+        var degradation = new RekallAgeRenderFeatureDegradation(
+            "REKALL_RENDER_FEATURE_DEVICE_CLAMPED",
+            "shadowResolution",
+            "16384",
+            "8192",
+            "The requested shadow resolution was clamped by device limits.");
+        var plan = new RekallAgeResolvedRenderFeaturePlan(
+            "Cinematic",
+            "High",
+            1920,
+            1080,
+            1440,
+            810,
+            0.75,
+            new RekallAgeResolvedShadowQuality(3, 8192, 12),
+            new RekallAgeResolvedFogQuality("froxel", 160, 90, 48),
+            new RekallAgeResolvedPostQuality(true, true, true),
+            new RekallAgeResolvedParticleQuality(64000),
+            12_345_678,
+            87_654_321,
+            [degradation]);
+        var timings = new RekallAgeGpuFrameTimingReport(
+            true,
+            null,
+            12,
+            [
+                new RekallAgeGpuPassTiming("shadow", 1_250_000, 1.25),
+                new RekallAgeGpuPassTiming("forward", 2_500_000, 2.5)
+            ],
+            4_000_000,
+            4,
+            "vulkan-timestamp-query");
+
+        var runtime = RekallAgeWorkbenchModelBuilder.BuildRenderingRuntime(
+            plan,
+            timings,
+            123_456_789,
+            17,
+            3,
+            ["command execute rekall.render.capture_runtime_viewport"]);
+
+        Assert.Equal("Cinematic", runtime.RequestedPreset);
+        Assert.Equal("High", runtime.ResolvedPreset);
+        Assert.Equal(1440, runtime.RenderWidth);
+        Assert.Equal(810, runtime.RenderHeight);
+        Assert.Equal(4, runtime.TotalGpuMilliseconds);
+        Assert.Equal("4.000 ms", runtime.TotalGpuMillisecondsText);
+        Assert.Equal(["shadow", "forward"], runtime.PassTimings.Select(pass => pass.Name));
+        Assert.Equal([1.25, 2.5], runtime.PassTimings.Select(pass => pass.Milliseconds));
+        Assert.Contains(runtime.Resources, resource => resource.Name == "Frame resources" && resource.Bytes == 123_456_789);
+        Assert.Contains(runtime.Resources, resource => resource.Name == "Planned transient" && resource.Bytes == 12_345_678);
+        Assert.Contains(runtime.Resources, resource => resource.Name == "Planned persistent" && resource.Bytes == 87_654_321);
+        var presentedDegradation = Assert.Single(runtime.Degradations);
+        Assert.Equal(degradation.Code, presentedDegradation.Code);
+        Assert.Equal("16384", presentedDegradation.RequestedValue);
+        Assert.Equal("8192", presentedDegradation.ResolvedValue);
+        Assert.Equal(17, runtime.DrawCount);
+        Assert.Equal(3, runtime.DispatchCount);
+    }
+
+    [Fact]
+    public void WorkbenchRenderingRuntimeNeverFormatsUnavailableGpuTimingAsZero()
+    {
+        var plan = new RekallAgeResolvedRenderFeaturePlan(
+            "Low",
+            "Low",
+            320,
+            180,
+            214,
+            121,
+            0.67,
+            new RekallAgeResolvedShadowQuality(1, 1024, 4),
+            new RekallAgeResolvedFogQuality("analytic"),
+            new RekallAgeResolvedPostQuality(true, false, false),
+            new RekallAgeResolvedParticleQuality(8000),
+            100,
+            200,
+            []);
+
+        var runtime = RekallAgeWorkbenchModelBuilder.BuildRenderingRuntime(
+            plan,
+            RekallAgeGpuFrameTimingReport.Unavailable(7),
+            300,
+            2,
+            0,
+            []);
+
+        Assert.False(runtime.GpuTimingAvailable);
+        Assert.Null(runtime.TotalGpuMilliseconds);
+        Assert.Equal("Unavailable", runtime.TotalGpuMillisecondsText);
+        Assert.DoesNotContain("0", runtime.TotalGpuMillisecondsText, StringComparison.Ordinal);
+        Assert.Empty(runtime.PassTimings);
+    }
+
+    [Fact]
+    public async Task WorkbenchQualityComparisonUsesExactCommandResultPathsAndDegradationFacts()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Quality Comparison", ["world"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"]),
+            CancellationToken.None);
+        var model = await new RekallAgeWorkbenchModelBuilder().BuildAsync(root, "Main", CancellationToken.None);
+        var degradation = new RekallAgeRenderFeatureDegradation(
+            "REKALL_RENDER_QUALITY_OVERRIDE_CLAMPED",
+            "resolutionScale",
+            "0.01",
+            "0.25",
+            "The caller override was clamped.");
+        var unavailable = RekallAgeGpuFrameTimingReport.Unavailable(3);
+        var comparison = new CompareQualityPresetsResult(
+            "Main",
+            3,
+            [
+                new RekallAgeQualityPresetCapture(
+                    "Performance",
+                    "Performance",
+                    3,
+                    "D:/captures/performance.png",
+                    false,
+                    320,
+                    180,
+                    80,
+                    45,
+                    1234,
+                    7,
+                    1,
+                    [degradation],
+                    unavailable,
+                    RekallAgeViewportFrameAnalysis.NotAnalyzed),
+                new RekallAgeQualityPresetCapture(
+                    "Epic",
+                    "High",
+                    3,
+                    "D:/captures/epic.png",
+                    true,
+                    320,
+                    180,
+                    320,
+                    180,
+                    5678,
+                    11,
+                    2,
+                    [],
+                    new RekallAgeGpuFrameTimingReport(
+                        true,
+                        null,
+                        3,
+                        [new RekallAgeGpuPassTiming("forward", 2_000_000, 2)],
+                        2_500_000,
+                        2.5,
+                        "vulkan-timestamp-query"),
+                    RekallAgeViewportFrameAnalysis.NotAnalyzed)
+            ],
+            ["command execute rekall.render.capture_runtime_viewport"]);
+
+        var mapped = RekallAgeWorkbenchModelBuilder.WithQualityComparisonResult(model, comparison);
+
+        Assert.Equal(
+            ["D:/captures/performance.png", "D:/captures/epic.png"],
+            mapped.Rendering.Comparisons.Select(item => item.ScreenshotPath));
+        Assert.Equal("Performance", mapped.Rendering.Comparisons[0].RequestedPreset);
+        Assert.Equal("Performance", mapped.Rendering.Comparisons[0].ResolvedPreset);
+        Assert.False(mapped.Rendering.Comparisons[0].NonBlank);
+        Assert.Equal("Unavailable", mapped.Rendering.Comparisons[0].TotalGpuMillisecondsText);
+        Assert.Equal("Epic", mapped.Rendering.Comparisons[1].RequestedPreset);
+        Assert.Equal("High", mapped.Rendering.Comparisons[1].ResolvedPreset);
+        Assert.True(mapped.Rendering.Comparisons[1].NonBlank);
+        Assert.Equal("2.500 ms", mapped.Rendering.Comparisons[1].TotalGpuMillisecondsText);
+        Assert.False(mapped.Rendering.DebugViews[0].NonBlank);
+        Assert.True(mapped.Rendering.DebugViews[1].NonBlank);
+        var mappedDegradation = Assert.Single(mapped.Rendering.Comparisons[0].Degradations);
+        Assert.Equal(degradation.Code, mappedDegradation.Code);
+        Assert.Equal("0.01", mappedDegradation.RequestedValue);
+        Assert.Equal("0.25", mappedDegradation.ResolvedValue);
+        Assert.Equal(comparison.NextCommands, mapped.Rendering.Runtime.SuggestedActions);
+    }
+
     [Fact]
     public async Task WorkbenchRemainsInspectableWhenAnAuthoredModuleNeedsRepair()
     {

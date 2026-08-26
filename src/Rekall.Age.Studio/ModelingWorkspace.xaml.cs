@@ -6,8 +6,22 @@ namespace Rekall.Age.Studio;
 public partial class ModelingWorkspace : UserControl
 {
     private bool _dragging;
+    private bool _orbiting;
+    private bool _panning;
+    private System.Windows.Point _lastNavigationPoint;
 
-    public ModelingWorkspace() => InitializeComponent();
+    public ModelingWorkspace()
+    {
+        InitializeComponent();
+        // Attached in code-behind rather than XAML: WPF XAML cannot declare two handlers for the
+        // same routed event (MouseMove) on one element, but a routed event supports any number of
+        // CLR subscribers, so the orbit/pan/zoom navigation handlers are added alongside the
+        // existing gizmo-drag/selection handlers already declared in the markup.
+        MeshViewportImage.MouseDown += OnMeshViewportMouseDown;
+        MeshViewportImage.MouseMove += OnMeshViewportMouseMoveForNavigation;
+        MeshViewportImage.MouseUp += OnMeshViewportMouseUpForNavigation;
+        MeshViewportImage.MouseWheel += OnMeshViewportWheel;
+    }
 
     private RekallAgeStudioViewModel? ViewModel => DataContext as RekallAgeStudioViewModel;
 
@@ -34,7 +48,7 @@ public partial class ModelingWorkspace : UserControl
 
     private void OnMeshMouseMove(object sender, MouseEventArgs e)
     {
-        if (!_dragging || ViewModel is null || sender is not Image image) return;
+        if (_orbiting || _panning || !_dragging || ViewModel is null || sender is not Image image) return;
         var point = e.GetPosition(image);
         ViewModel.UpdateMeshViewportTransform(point.X / image.ActualWidth, point.Y / image.ActualHeight);
         e.Handled = true;
@@ -55,5 +69,45 @@ public partial class ModelingWorkspace : UserControl
         if (!_dragging || ViewModel is null) return;
         _dragging = false;
         ViewModel.CancelMeshViewportTransform();
+    }
+
+    /// <summary>Starts an orbit (middle-drag) or pan (shift + middle-drag) navigation gesture.</summary>
+    private void OnMeshViewportMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (ViewModel is null || sender is not Image image || e.ChangedButton != MouseButton.Middle) return;
+        _lastNavigationPoint = e.GetPosition(image);
+        _panning = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        _orbiting = !_panning;
+        image.CaptureMouse();
+        e.Handled = true;
+    }
+
+    /// <summary>Applies an in-progress orbit/pan gesture's mouse-delta to the viewport camera.</summary>
+    private void OnMeshViewportMouseMoveForNavigation(object sender, MouseEventArgs e)
+    {
+        if (ViewModel is null || sender is not Image image || (!_orbiting && !_panning)) return;
+        var point = e.GetPosition(image);
+        var delta = point - _lastNavigationPoint;
+        _lastNavigationPoint = point;
+        if (_orbiting) ViewModel.OrbitMeshViewport(delta.X * 0.01, delta.Y * 0.01);
+        else ViewModel.PanMeshViewport(delta.X, delta.Y);
+        e.Handled = true;
+    }
+
+    private void OnMeshViewportMouseUpForNavigation(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Image image || e.ChangedButton != MouseButton.Middle) return;
+        _orbiting = false;
+        _panning = false;
+        image.ReleaseMouseCapture();
+        e.Handled = true;
+    }
+
+    /// <summary>Scroll-wheel dolly zoom.</summary>
+    private void OnMeshViewportWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (ViewModel is null) return;
+        ViewModel.ZoomMeshViewport(e.Delta > 0 ? 1.1 : 1 / 1.1);
+        e.Handled = true;
     }
 }

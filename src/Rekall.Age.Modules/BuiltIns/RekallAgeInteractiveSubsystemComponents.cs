@@ -55,12 +55,12 @@ public sealed class RekallAgeAudioBusComponent : RekallAgeComponent
     [RekallAgeProperty] public bool Muted { get; init; }
 }
 
-[RekallAgeComponent("Animation Clip", Description = "Versioned reusable timeline data. Tracks target component/property pairs and contain time/value keys.")]
+[RekallAgeComponent("Animation Clip", Description = "Versioned reusable timeline data. Tracks target generic entity/component/property paths and contain time/value keys.")]
 public sealed class RekallAgeAnimationClipComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 1, Maximum = 1)] public int Version { get; init; } = 1;
     [RekallAgeProperty(Minimum = 0.00001)] public double DurationSeconds { get; init; } = 1;
-    [RekallAgeProperty(Kind = "animationTracks", Description = "Array of {component, property, interpolation, keys} objects. Component is the exact fully qualified runtime type, for example {component:\"Rekall.Transform3D\", property:\"X\", interpolation:\"linear\", keys:[{time:0,value:0},{time:1,value:6}]}. Interpolation is step, linear, smooth/smoothstep, or cubic. Cubic keys have {time,value,inTangent,outTangent}; tangents are derivatives in value units per second. Cubic values are finite scalars, flat numeric arrays of 1 to 16 components, or RGB/RGBA colors; tangents must match the scalar/array/channel shape. Other modes also support strings through step fallback. Runtime limits are 1,024 tracks per clip and 4,096 keys per track. Unknown modes and malformed cubic data fail closed.")]
+    [RekallAgeProperty(Kind = "animationTracks", Description = "Array of {targetEntityId?, targetPath?, component, property, interpolation, keys} objects. Omit both target fields to animate the clip owner, for example {component:\"Rekall.Transform3D\", property:\"X\", interpolation:\"linear\", keys:[{time:0,value:0},{time:1,value:6}]}. targetEntityId addresses any exact runtime entity id; targetPath addresses 1-32 slash-separated direct-child id or unique-name segments relative to the owner, similar to a scene node path. Use ids when sibling names are duplicated. A hierarchy example is {targetPath:\"Shoulder/Hand\", component:\"Rekall.Transform3D\", property:\"roll\", interpolation:\"linear\", keys:[{time:0,value:-20},{time:1,value:40}]}. Component is always the exact fully qualified runtime type. Interpolation is step, linear, smooth/smoothstep, or cubic. Cubic keys have {time,value,inTangent,outTangent}; tangents are derivatives in value units per second. Cubic values are finite scalars, flat numeric arrays of 1 to 16 components, or RGB/RGBA colors; tangents must match the scalar/array/channel shape. Other modes also support strings through step fallback. Runtime limits are 1,024 tracks per clip and 4,096 keys per track. Unknown modes, unresolved or ambiguous targets, and malformed cubic data fail closed with structured observations.")]
     public object[] Tracks { get; init; } = [];
     [RekallAgeProperty(Kind = "animationEvents", Description = "Array of {time,name,payload?} marker objects emitted as animation.event facts. Runtime limit is 4,096 markers per clip.")]
     public object[] Events { get; init; } = [];
@@ -113,6 +113,33 @@ public sealed class RekallAgeSkeletalAnimatorComponent : RekallAgeComponent
     [RekallAgeProperty] public double Speed { get; init; } = 1;
     [RekallAgeProperty(AllowedValues = ["clamp", "loop", "pingpong"])] public string LoopMode { get; init; } = "loop";
     [RekallAgeProperty(Minimum = 0)] public double StartTimeSeconds { get; init; }
+}
+
+[RekallAgeComponent("Skeleton Pose", Description = "Supplies generic finite joint matrices for a weighted mesh. Imported skeletal animation writes this component at runtime; agent-authored modules may also update it for native AGE rigs.")]
+public sealed class RekallAgeSkeletonPoseComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 0)] public int SkinIndex { get; init; }
+    [RekallAgeProperty(Kind = "skeletonJoints", Description = "Array of 1 to 4096 {jointIndex,matrix} objects. jointIndex is non-negative and matrix is a finite row-major 4x4 array of 16 numbers.")]
+    public object[] Joints { get; init; } = [];
+}
+
+[RekallAgeComponent("Rig Pose", Description = "Evaluates named local joint deltas from a native AGE rig asset into renderable skin matrices.")]
+public sealed class RekallAgeRigPoseComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Kind = "assetRef", AssetKind = "rig", Description = "Catalog-independent ID of a native Modeling/Rigs rig asset.")]
+    public string AssetId { get; init; } = string.Empty;
+    [RekallAgeProperty(Minimum = 0)] public int SkinIndex { get; init; }
+    [RekallAgeProperty(Kind = "rigPoseDeltas", Description = "Array of at most 4096 {jointId,matrix} local delta transforms. Matrices are finite row-major 4x4 arrays and joint IDs are resolved through the rig asset.")]
+    public object[] JointDeltas { get; init; } = [];
+}
+
+[RekallAgeComponent("Rig Attachment", Description = "Composes this parented entity through a stable named joint from the parent entity's native AGE rig pose.")]
+public sealed class RekallAgeRigAttachmentComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Description = "Stable joint ID from the parent entity's Rekall.RigPose asset.")]
+    public string JointId { get; init; } = string.Empty;
+    [RekallAgeProperty(Description = "When false, this entity uses ordinary parent transform composition.")]
+    public bool Enabled { get; init; } = true;
 }
 
 [RekallAgeComponent("Morph Weights", Description = "Supplies a complete generic morph-target weight array for the Rekall.MeshRenderer on the same entity. The existing AnimationClip, AnimationMixer, cubic interpolation, and AnimationStateGraph contracts can animate Weights.")]

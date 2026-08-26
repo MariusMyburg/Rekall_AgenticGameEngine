@@ -355,6 +355,7 @@ public sealed class RekallAgeMeshValidator
         {
             RekallAgeGeometryValueType.Bool => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
             RekallAgeGeometryValueType.Int32 => value.TryGetInt32(out _),
+            RekallAgeGeometryValueType.Int4 => IsIntegerArray(value, 4),
             RekallAgeGeometryValueType.Float => IsFiniteNumber(value),
             RekallAgeGeometryValueType.Float2 => IsFiniteNumberArray(value, 2),
             RekallAgeGeometryValueType.Float3 => IsFiniteNumberArray(value, 3),
@@ -364,6 +365,11 @@ public sealed class RekallAgeMeshValidator
             _ => false
         };
     }
+
+    private static bool IsIntegerArray(JsonElement value, int count) =>
+        value.ValueKind == JsonValueKind.Array
+        && value.GetArrayLength() == count
+        && value.EnumerateArray().All(item => item.TryGetInt32(out _));
 
     private static bool IsFiniteNumber(JsonElement value)
     {

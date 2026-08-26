@@ -86,6 +86,79 @@ public sealed class ModelingGraphEvaluationTests
     }
 
     [Fact]
+    public async Task NoiseDeformProducesDeterministicInspectableTerrainBreakup()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "terrain-noise", "Terrain Noise",
+            [
+                new("grid", "rekall.modeling.primitive.grid", 1, new JsonObject
+                {
+                    ["sizeX"] = 8.0, ["sizeY"] = 8.0, ["segmentsX"] = 8, ["segmentsY"] = 8
+                }),
+                new("noise", "rekall.modeling.deform.noise", 1, new JsonObject
+                {
+                    ["amplitude"] = 1.25, ["frequency"] = 0.42, ["seed"] = 417, ["axis"] = "z"
+                }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("grid-noise", "grid", "geometry", "noise", "geometry"),
+                new("noise-output", "noise", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var evaluator = new RekallAgeModelingGraphEvaluator();
+        var first = await evaluator.EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+        var second = await evaluator.EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.True(first.Succeeded, string.Join(Environment.NewLine, first.Diagnostics.Select(item => item.Message)));
+        Assert.Contains(RekallAgeModelingNodeCatalog.CreateDefault().Descriptors,
+            item => item.TypeId == "rekall.modeling.deform.noise");
+        var heights = first.Outputs["mesh"].Topology.Positions.Select(position => position.Z).ToArray();
+        Assert.True(heights.Max() - heights.Min() > 0.25);
+        Assert.Equal(heights, second.Outputs["mesh"].Topology.Positions.Select(position => position.Z));
+    }
+
+    [Fact]
+    public async Task ScatterAreaCreatesDeterministicVariedInspectableInstances()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create(
+            "scatter-area", "Scatter Area",
+            [
+                new("rock", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("scatter", "rekall.modeling.scatter.area", 1, new JsonObject
+                {
+                    ["count"] = 7, ["sizeX"] = 12.0, ["sizeZ"] = 8.0, ["seed"] = 913,
+                    ["minimumScale"] = 0.45, ["maximumScale"] = 1.2,
+                    ["minimumYaw"] = -35.0, ["maximumYaw"] = 35.0
+                }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("rock-scatter", "rock", "geometry", "scatter", "geometry"),
+                new("scatter-output", "scatter", "geometry", "output", "input")
+            ],
+            [new("mesh", "output", "geometry")]);
+
+        var first = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+        var second = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(
+            graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, EvaluationContext(), CancellationToken.None);
+
+        Assert.True(first.Succeeded, string.Join(Environment.NewLine, first.Diagnostics.Select(item => item.Message)));
+        Assert.Contains(RekallAgeModelingNodeCatalog.CreateDefault().Descriptors,
+            item => item.TypeId == "rekall.modeling.scatter.area");
+        Assert.Equal(56, first.Outputs["mesh"].Topology.PointIds.Count);
+        Assert.Equal(first.Outputs["mesh"].Topology.Positions, second.Outputs["mesh"].Topology.Positions);
+        Assert.True(first.Outputs["mesh"].Topology.Positions.Max(point => point.X)
+            - first.Outputs["mesh"].Topology.Positions.Min(point => point.X) > 5);
+        Assert.True(first.Outputs["mesh"].Topology.Positions.Max(point => point.Z)
+            - first.Outputs["mesh"].Topology.Positions.Min(point => point.Z) > 3);
+    }
+
+    [Fact]
     public async Task GridExtrudeAndTriangulateReuseSemanticMeshOperations()
     {
         var graph = RekallAgeModelingGraphAsset.Create(

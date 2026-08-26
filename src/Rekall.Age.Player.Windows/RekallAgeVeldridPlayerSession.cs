@@ -76,6 +76,7 @@ internal sealed class RekallAgeVeldridPlayerSessionFactory(
     int sceneSupersampleFactor,
     int openXrEyeWidth,
     int openXrEyeHeight,
+    bool debugHudEnabled,
     bool audioRequired,
     RekallAgePlayerFaultInjection faultInjection) : IRekallAgePlayerSessionFactory
 {
@@ -99,6 +100,7 @@ internal sealed class RekallAgeVeldridPlayerSessionFactory(
             sceneSupersampleFactor,
             openXrEyeWidth,
             openXrEyeHeight,
+            debugHudEnabled,
             cancellationToken).ConfigureAwait(false);
         if (audioRequired && !player.AudioOutputAvailable)
         {

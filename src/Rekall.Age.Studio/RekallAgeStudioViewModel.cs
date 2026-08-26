@@ -3,12 +3,12 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using Rekall.Age.Agent.Codex;
 using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.Assets;
 using Rekall.Age.Core.Commands;
@@ -19,6 +19,7 @@ using Rekall.Age.LevelDesign.Commands;
 using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Workflows;
 using Rekall.Age.Workflows.Commands;
@@ -35,12 +36,15 @@ public enum RekallAgeStudioMode
 public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDisposable
 {
     private readonly RekallAgeWorkbenchSession _session;
-    private readonly HttpClient? _ollamaHttpClient;
-    private readonly RekallAgeProjectAgentSession _agentSession;
+    private readonly RekallAgeCommandRegistry _agentRegistry;
+    private readonly RekallAgeLanguageModelProviderCatalog _languageModelProviderCatalog;
     private readonly IRekallAgeStudioPreviewSession _previewSession;
     private readonly SemaphoreSlim _modeTransitionGate = new(1, 1);
     private readonly CancellationTokenSource _lifecycleCancellation = new();
     private readonly object _disposeSync = new();
+    private readonly object _languageModelLifecycleSync = new();
+    private readonly object _renderingOperationsSync = new();
+    private readonly HashSet<Task> _activeRenderingOperations = [];
     private readonly RekallAgeAsyncCommand _openCommand;
     private readonly RekallAgeAsyncCommand _createCommand;
     private readonly RekallAgeAsyncCommand _addEntityCommand;
@@ -57,6 +61,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _removePropertyCommand;
     private readonly RekallAgeAsyncCommand _validateCommand;
     private readonly RekallAgeAsyncCommand _captureCommand;
+    private readonly RekallAgeAsyncCommand _attachQualityProfileCommand;
+    private readonly RekallAgeAsyncCommand _applyQualityCommand;
+    private readonly RekallAgeAsyncCommand _captureQualityCommand;
+    private readonly RekallAgeAsyncCommand _compareQualityCommand;
     private readonly RekallAgeAsyncCommand _playCommand;
     private readonly RekallAgeAsyncCommand _simulateCommand;
     private readonly RekallAgeAsyncCommand _pauseSimulationCommand;
@@ -71,6 +79,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _undoCommand;
     private readonly RekallAgeAsyncCommand _redoCommand;
     private readonly RekallAgeAsyncCommand _discoverModelsCommand;
+    private readonly RekallAgeAsyncCommand _signInCodexCommand;
+    private readonly RekallAgeAsyncCommand _cancelCodexSignInCommand;
     private readonly RekallAgeAsyncCommand _runAgentCommand;
     private readonly RekallAgeAsyncCommand _cancelAgentCommand;
     private readonly RekallAgeStudioModelingSession _modeling = new();
@@ -81,9 +91,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly Action<string> _openPackageFolder;
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
+    private RekallAgeStudioViewportCamera _meshViewportCamera = RekallAgeStudioViewportCamera.Identity;
     private readonly RekallAgeAsyncCommand _refreshMeshAssetsCommand;
     private readonly RekallAgeAsyncCommand _createMeshPrimitiveCommand;
     private readonly RekallAgeAsyncCommand _openMeshAssetCommand;
+    private readonly RekallAgeAsyncCommand _frameSelectedMeshViewportCommand;
+    private readonly RekallAgeAsyncCommand _toggleMeshViewportProjectionCommand;
     private readonly RekallAgeAsyncCommand _publishModelCommand;
     private readonly RekallAgeAsyncCommand _placeModelCommand;
     private readonly RekallAgeAsyncCommand _publishAndPlaceModelCommand;
@@ -98,6 +111,17 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _applyModelingGraphParametersCommand;
     private Process? _player;
     private CancellationTokenSource? _agentCancellation;
+    private RekallAgeLanguageModelProviderLease? _languageModelProviderLease;
+    private IRekallAgeProjectAgentRunner? _languageModelRunner;
+    private IDisposable? _fixedLanguageModelRunner;
+    private CancellationTokenSource? _languageModelRefreshCancellation;
+    private Task _languageModelProviderTransition = Task.CompletedTask;
+    private long _languageModelProviderTransitionGeneration;
+    private Task? _activeLanguageModelRefresh;
+    private Task? _activeAgentRun;
+    private Task? _activeCodexSignIn;
+    private CancellationTokenSource? _codexSignInCancellation;
+    private string? _sessionOpenAiApiKey;
     private bool _isBusy;
     private bool _isAgentRunning;
     private bool _isLiveViewportEnabled = true;
@@ -115,7 +139,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _propertyNameInput = "position";
     private string _propertyValueInput = "[0, 0, 0]";
     private string _propertySchemaHelp = "Select a registered property to see its type and constraints.";
-    private string _selectedOllamaModel = "qwen3.5:35b";
+    private RekallAgeLanguageModelProviderDescriptor _selectedLanguageModelProvider = null!;
+    private string _selectedLanguageModel = string.Empty;
+    private string _selectedReasoningEffort = "medium";
+    private string _providerStatus = string.Empty;
     private string _agentTaskInput = string.Empty;
     private string? _selectedMeshAssetId;
     private string _modelAssetIdInput = string.Empty;
@@ -178,6 +205,23 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private double _scaleSnap = 0.1;
     private int _viewportRenderableCount;
     private bool _viewportVisuallyInformative;
+    private string _selectedQualityPreset = "High";
+    private string _comparisonQualityPreset = "Performance";
+    private string _qualityResolutionScaleInput = string.Empty;
+    private string _qualityShadowCascadeCountInput = string.Empty;
+    private string _qualityShadowResolutionInput = string.Empty;
+    private string _qualityFogModeInput = string.Empty;
+    private bool? _qualityBloomOverride;
+    private bool? _qualitySsaoOverride;
+    private string _qualityMaximumActiveParticlesInput = string.Empty;
+    private string _requestedQualityPreset = "High";
+    private string _resolvedQualityPreset = "Unavailable";
+    private string _outputResolutionText = "Unavailable";
+    private string _internalResolutionText = "Unavailable";
+    private string _totalGpuMillisecondsText = "Unavailable";
+    private string _gpuTimingStatusText = "REKALL_GPU_TIMESTAMPS_UNAVAILABLE · unavailable";
+    private string _renderWorkloadText = "0 draws · 0 dispatches";
+    private RekallAgeWorkbenchRenderDebugViewModel? _selectedRenderDebugView;
     private RekallAgeWorkbenchModel? _currentModel;
     private readonly List<RekallAgeLanguageModelToolExecution> _lastAgentToolExecutions = [];
     internal bool TreatGauntletAsTerminalSuccess { get; set; }
@@ -185,18 +229,29 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     internal int? AgentMaxTurns { get; set; }
 
     public RekallAgeStudioViewModel()
-        : this(new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()), null)
+        : this(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            new RekallAgeLanguageModelProviderCatalog(),
+            null,
+            new RekallAgeStudioPreviewSession(),
+            null)
     {
     }
 
     internal RekallAgeStudioViewModel(RekallAgeWorkbenchSession session)
-        : this(session, null)
+        : this(
+            session,
+            new RekallAgeLanguageModelProviderCatalog(),
+            null,
+            new RekallAgeStudioPreviewSession(),
+            null)
     {
     }
 
     internal RekallAgeStudioViewModel(Action<string> openPackageFolder)
         : this(
             new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            new RekallAgeLanguageModelProviderCatalog(),
             null,
             new RekallAgeStudioPreviewSession(),
             openPackageFolder)
@@ -206,7 +261,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     internal RekallAgeStudioViewModel(
         RekallAgeWorkbenchSession session,
         IRekallAgeLanguageModelClient? languageModelClient)
-        : this(session, languageModelClient, new RekallAgeStudioPreviewSession())
+        : this(
+            session,
+            new RekallAgeLanguageModelProviderCatalog(),
+            languageModelClient,
+            new RekallAgeStudioPreviewSession(),
+            null)
     {
     }
 
@@ -215,19 +275,52 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         IRekallAgeLanguageModelClient? languageModelClient,
         IRekallAgeStudioPreviewSession previewSession,
         Action<string>? openPackageFolder = null)
+        : this(
+            session,
+            new RekallAgeLanguageModelProviderCatalog(),
+            languageModelClient,
+            previewSession,
+            openPackageFolder)
     {
-        _session = session;
-        _previewSession = previewSession;
+    }
+
+    internal RekallAgeStudioViewModel(
+        RekallAgeWorkbenchSession session,
+        RekallAgeLanguageModelProviderCatalog languageModelProviderCatalog,
+        IRekallAgeStudioPreviewSession previewSession,
+        Action<string>? openPackageFolder = null)
+        : this(session, languageModelProviderCatalog, null, previewSession, openPackageFolder)
+    {
+    }
+
+    private RekallAgeStudioViewModel(
+        RekallAgeWorkbenchSession session,
+        RekallAgeLanguageModelProviderCatalog languageModelProviderCatalog,
+        IRekallAgeLanguageModelClient? fixedLanguageModelClient,
+        IRekallAgeStudioPreviewSession previewSession,
+        Action<string>? openPackageFolder)
+    {
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+        _languageModelProviderCatalog = languageModelProviderCatalog
+            ?? throw new ArgumentNullException(nameof(languageModelProviderCatalog));
+        _previewSession = previewSession ?? throw new ArgumentNullException(nameof(previewSession));
         _openPackageFolder = openPackageFolder ?? OpenDirectoryInExplorer;
-        if (languageModelClient is null)
+        _agentRegistry = RekallAgeDefaultCommandRegistry.Create();
+        _selectedLanguageModelProvider = _languageModelProviderCatalog.Providers.Single(provider => provider.Id == "ollama");
+        _selectedLanguageModel = _selectedLanguageModelProvider.DefaultModel;
+        if (fixedLanguageModelClient is null)
         {
-            _ollamaHttpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
-            var configuredOllamaUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL");
-            languageModelClient = new RekallAgeOllamaLanguageModelClient(
-                _ollamaHttpClient,
-                new Uri(string.IsNullOrWhiteSpace(configuredOllamaUrl) ? "http://127.0.0.1:11434" : configuredOllamaUrl));
+            _languageModelProviderLease = _languageModelProviderCatalog.Acquire("ollama", _agentRegistry);
+            _languageModelRunner = _languageModelProviderLease.Runner;
+            _providerStatus = $"{_selectedLanguageModelProvider.DisplayName} ready. Refresh models.";
         }
-        _agentSession = new RekallAgeProjectAgentSession(languageModelClient, RekallAgeDefaultCommandRegistry.Create());
+        else
+        {
+            var runner = new RekallAgeLanguageModelProjectAgentRunner(fixedLanguageModelClient, _agentRegistry);
+            _languageModelRunner = runner;
+            _fixedLanguageModelRunner = runner;
+            _providerStatus = $"{fixedLanguageModelClient.ProviderId} test session ready.";
+        }
         _openCommand = CreateAsyncCommand(OpenFromInputsAsync, CanOpenOrCreate);
         _createCommand = CreateAsyncCommand(CreateFromInputsAsync, CanOpenOrCreate);
         _addEntityCommand = CreateAsyncCommand(AddEntityAsync, HasEditableProject);
@@ -244,6 +337,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _removePropertyCommand = CreateAsyncCommand(RemovePropertyAsync, CanEditProperty);
         _validateCommand = CreateAsyncCommand(ValidateAsync, HasOpenProject);
         _captureCommand = CreateAsyncCommand(CaptureAsync, HasEditableProject);
+        _attachQualityProfileCommand = CreateAsyncCommand(AttachQualityProfileAsync, CanAttachQualityProfile);
+        _applyQualityCommand = CreateAsyncCommand(() => RunAsync(ApplyRenderQualityAsync), HasQualityProfile);
+        _captureQualityCommand = CreateAsyncCommand(
+            () => RunRenderingAsync(CaptureQualityAsync),
+            HasEditableProject);
+        _compareQualityCommand = CreateAsyncCommand(
+            () => RunRenderingAsync(CompareQualityAsync),
+            CanCompareQuality);
         _simulateCommand = CreateAsyncCommand(StartSimulationAsync, () => HasOpenProject() && Mode == RekallAgeStudioMode.Edit);
         _pauseSimulationCommand = CreateAsyncCommand(ToggleSimulationPauseAsync, () => !IsBusy && IsSimulating);
         _stepSimulationCommand = CreateAsyncCommand(StepSimulationAsync, () => !IsBusy && IsSimulating && IsSimulationPaused);
@@ -257,12 +358,25 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _auditWebCommand = CreateAsyncCommand(AuditWebAsync, CanAuditWeb);
         _undoCommand = CreateAsyncCommand(UndoAsync, () => HasEditableProject() && _session.CanUndo);
         _redoCommand = CreateAsyncCommand(RedoAsync, () => HasEditableProject() && _session.CanRedo);
-        _discoverModelsCommand = CreateAsyncCommand(DiscoverModelsAsync, () => !IsBusy && !IsAgentRunning);
+        _discoverModelsCommand = CreateAsyncCommand(
+            DiscoverModelsAsync,
+            () => !IsBusy && !IsAgentRunning && _languageModelRunner is not null);
+        _signInCodexCommand = CreateAsyncCommand(SignInCodexAsync,
+            () => !IsBusy && !IsAgentRunning && _activeCodexSignIn is not { IsCompleted: false }
+                && SelectedLanguageModelProvider.Id == "codex" && _languageModelRunner is IRekallAgeCodexProjectAgentRunner);
+        _cancelCodexSignInCommand = CreateAsyncCommand(CancelCodexSignInAsync,
+            () => _activeCodexSignIn is { IsCompleted: false });
         _runAgentCommand = CreateAsyncCommand(RunAgentAsync, CanRunAgent);
         _cancelAgentCommand = CreateAsyncCommand(CancelAgentAsync, () => IsAgentRunning);
         _refreshMeshAssetsCommand = CreateAsyncCommand(RefreshMeshAssetsAsync, HasOpenProject);
         _createMeshPrimitiveCommand = CreateAsyncCommand(CreateMeshPrimitiveAsync, CanCreateMeshPrimitive);
         _openMeshAssetCommand = CreateAsyncCommand(OpenMeshAssetAsync, CanOpenMeshAsset);
+        _frameSelectedMeshViewportCommand = CreateAsyncCommand(
+            () => { FrameSelectedMeshViewport(); return Task.CompletedTask; },
+            () => _meshViewportFrame is not null);
+        _toggleMeshViewportProjectionCommand = CreateAsyncCommand(
+            () => { ToggleMeshViewportProjection(); return Task.CompletedTask; },
+            () => _meshViewportFrame is not null);
         _publishModelCommand = CreateAsyncCommand(PublishModelAsync, CanPublishModel);
         _placeModelCommand = CreateAsyncCommand(PlaceModelAsync, CanPlaceModel);
         _publishAndPlaceModelCommand = CreateAsyncCommand(PublishAndPlaceModelAsync, CanPublishAndPlaceModel);
@@ -289,7 +403,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<string> SceneSummaryLines { get; } = [];
     public ObservableCollection<string> ActionLines { get; } = [];
     public ObservableCollection<string> RuntimeObservationLines { get; } = [];
-    public ObservableCollection<string> OllamaModels { get; } = [];
+    public IReadOnlyList<RekallAgeLanguageModelProviderDescriptor> LanguageModelProviders =>
+        _languageModelProviderCatalog.DescribeProviders(SessionLanguageModelProviderSettings());
+    public ObservableCollection<string> LanguageModels { get; } = [];
+    public IReadOnlyList<string> ReasoningEfforts { get; } =
+        ["none", "low", "medium", "high", "xhigh", "max"];
     public ObservableCollection<string> AgentLines { get; } = [];
     public IReadOnlyList<string> PackageTargets { get; } =
         [RekallAgePlayablePackageTargets.Windows, RekallAgePlayablePackageTargets.Headless];
@@ -310,6 +428,16 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<RekallAgeInspectorComponentSchemaModel> ComponentSchemas { get; } = [];
     public ObservableCollection<RekallAgeInspectorPropertySchemaModel> PropertySchemas { get; } = [];
     public ObservableCollection<string> PropertyValueChoices { get; } = [];
+    public ObservableCollection<RekallAgeWorkbenchRenderPassTimingModel> RenderPassTimings { get; } = [];
+    public ObservableCollection<RekallAgeWorkbenchRenderResourceModel> RenderResources { get; } = [];
+    public ObservableCollection<RekallAgeWorkbenchRenderDegradationModel> RenderDegradations { get; } = [];
+    public ObservableCollection<RekallAgeWorkbenchRenderQualityComparisonModel> RenderQualityComparisons { get; } = [];
+    public ObservableCollection<RekallAgeWorkbenchRenderDebugViewModel> RenderDebugViews { get; } = [];
+    public ObservableCollection<string> RenderSuggestedActions { get; } = [];
+    public IReadOnlyList<string> QualityPresets { get; } =
+        ["Performance", "Low", "Medium", "High", "Ultra", "Epic"];
+    public IReadOnlyList<string> QualityFogModes { get; } =
+        ["analytic", "froxel-low", "froxel", "froxel-high", "froxel-epic"];
 
     public ICommand OpenCommand => _openCommand;
     public ICommand CreateCommand => _createCommand;
@@ -327,6 +455,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand RemovePropertyCommand => _removePropertyCommand;
     public ICommand ValidateCommand => _validateCommand;
     public ICommand CaptureCommand => _captureCommand;
+    public ICommand AttachQualityProfileCommand => _attachQualityProfileCommand;
+    public ICommand ApplyQualityCommand => _applyQualityCommand;
+    public ICommand CaptureQualityCommand => _captureQualityCommand;
+    public ICommand CompareQualityCommand => _compareQualityCommand;
     public ICommand SimulateCommand => _simulateCommand;
     public ICommand PauseSimulationCommand => _pauseSimulationCommand;
     public ICommand StepSimulationCommand => _stepSimulationCommand;
@@ -340,12 +472,20 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand AuditWebCommand => _auditWebCommand;
     public ICommand UndoCommand => _undoCommand;
     public ICommand RedoCommand => _redoCommand;
-    public ICommand DiscoverModelsCommand => _discoverModelsCommand;
+    public ICommand RefreshLanguageModelsCommand => _discoverModelsCommand;
+
+    public ICommand SignInCodexCommand => _signInCodexCommand;
+
+    public ICommand CancelCodexSignInCommand => _cancelCodexSignInCommand;
     public ICommand RunAgentCommand => _runAgentCommand;
     public ICommand CancelAgentCommand => _cancelAgentCommand;
     public ICommand RefreshMeshAssetsCommand => _refreshMeshAssetsCommand;
     public ICommand CreateMeshPrimitiveCommand => _createMeshPrimitiveCommand;
     public ICommand OpenMeshAssetCommand => _openMeshAssetCommand;
+
+    public ICommand FrameSelectedMeshViewportCommand => _frameSelectedMeshViewportCommand;
+
+    public ICommand ToggleMeshViewportProjectionCommand => _toggleMeshViewportProjectionCommand;
     public ICommand PublishModelCommand => _publishModelCommand;
     public ICommand PlaceModelCommand => _placeModelCommand;
     public ICommand PublishAndPlaceModelCommand => _publishAndPlaceModelCommand;
@@ -358,6 +498,140 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand OpenModelingGraphCommand => _openModelingGraphCommand;
     public ICommand EvaluateModelingGraphCommand => _evaluateModelingGraphCommand;
     public ICommand ApplyModelingGraphParametersCommand => _applyModelingGraphParametersCommand;
+
+    public string SelectedQualityPreset
+    {
+        get => _selectedQualityPreset;
+        set
+        {
+            if (Set(ref _selectedQualityPreset, value)) RefreshCommands();
+        }
+    }
+
+    public string ComparisonQualityPreset
+    {
+        get => _comparisonQualityPreset;
+        set
+        {
+            if (Set(ref _comparisonQualityPreset, value)) RefreshCommands();
+        }
+    }
+
+    public string QualityResolutionScaleInput
+    {
+        get => _qualityResolutionScaleInput;
+        set
+        {
+            if (Set(ref _qualityResolutionScaleInput, value)) RefreshCommands();
+        }
+    }
+
+    public string QualityShadowCascadeCountInput
+    {
+        get => _qualityShadowCascadeCountInput;
+        set
+        {
+            if (Set(ref _qualityShadowCascadeCountInput, value)) RefreshCommands();
+        }
+    }
+
+    public string QualityShadowResolutionInput
+    {
+        get => _qualityShadowResolutionInput;
+        set
+        {
+            if (Set(ref _qualityShadowResolutionInput, value)) RefreshCommands();
+        }
+    }
+
+    public string QualityFogModeInput
+    {
+        get => _qualityFogModeInput;
+        set
+        {
+            if (Set(ref _qualityFogModeInput, value)) RefreshCommands();
+        }
+    }
+
+    public bool? QualityBloomOverride
+    {
+        get => _qualityBloomOverride;
+        set
+        {
+            if (Set(ref _qualityBloomOverride, value)) RefreshCommands();
+        }
+    }
+
+    public bool? QualitySsaoOverride
+    {
+        get => _qualitySsaoOverride;
+        set
+        {
+            if (Set(ref _qualitySsaoOverride, value)) RefreshCommands();
+        }
+    }
+
+    public string QualityMaximumActiveParticlesInput
+    {
+        get => _qualityMaximumActiveParticlesInput;
+        set
+        {
+            if (Set(ref _qualityMaximumActiveParticlesInput, value)) RefreshCommands();
+        }
+    }
+
+    public string RequestedQualityPreset
+    {
+        get => _requestedQualityPreset;
+        private set => Set(ref _requestedQualityPreset, value);
+    }
+
+    public string ResolvedQualityPreset
+    {
+        get => _resolvedQualityPreset;
+        private set => Set(ref _resolvedQualityPreset, value);
+    }
+
+    public string OutputResolutionText
+    {
+        get => _outputResolutionText;
+        private set => Set(ref _outputResolutionText, value);
+    }
+
+    public string InternalResolutionText
+    {
+        get => _internalResolutionText;
+        private set => Set(ref _internalResolutionText, value);
+    }
+
+    public string TotalGpuMillisecondsText
+    {
+        get => _totalGpuMillisecondsText;
+        private set => Set(ref _totalGpuMillisecondsText, value);
+    }
+
+    public string GpuTimingStatusText
+    {
+        get => _gpuTimingStatusText;
+        private set => Set(ref _gpuTimingStatusText, value);
+    }
+
+    public string RenderWorkloadText
+    {
+        get => _renderWorkloadText;
+        private set => Set(ref _renderWorkloadText, value);
+    }
+
+    public RekallAgeWorkbenchRenderDebugViewModel? SelectedRenderDebugView
+    {
+        get => _selectedRenderDebugView;
+        set
+        {
+            if (!Set(ref _selectedRenderDebugView, value) || value is null || !File.Exists(value.OutputPath)) return;
+            ViewportImage = LoadBitmap(value.OutputPath);
+            ViewportSummary = $"{value.Label} · {(value.NonBlank ? "nonblank" : "blank")}";
+        }
+    }
 
     public string ProjectPathInput
     {
@@ -424,12 +698,60 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         private set => Set(ref _propertySchemaHelp, value);
     }
 
-    public string SelectedOllamaModel
+    public RekallAgeLanguageModelProviderDescriptor SelectedLanguageModelProvider
     {
-        get => _selectedOllamaModel;
+        get => _selectedLanguageModelProvider;
         set
         {
-            if (Set(ref _selectedOllamaModel, value)) RefreshCommands();
+            ArgumentNullException.ThrowIfNull(value);
+            lock (_languageModelLifecycleSync)
+            {
+                if (!LanguageModelProviders.Any(provider => provider.Id == value.Id)
+                    || !Set(ref _selectedLanguageModelProvider, value)) return;
+                _codexSignInCancellation?.Cancel();
+                Replace(LanguageModels, []);
+                SelectedLanguageModel = string.Empty;
+                ProviderStatus = $"Switching to {value.DisplayName}…";
+                QueueLanguageModelProviderTransition(value);
+            }
+            RefreshCommands();
+        }
+    }
+
+    public string SelectedLanguageModel
+    {
+        get => _selectedLanguageModel;
+        set
+        {
+            if (Set(ref _selectedLanguageModel, value ?? string.Empty)) RefreshCommands();
+        }
+    }
+
+    public string ProviderStatus
+    {
+        get => _providerStatus;
+        private set => Set(ref _providerStatus, value);
+    }
+
+    public bool HasSessionOpenAiCredential => _sessionOpenAiApiKey is not null;
+
+    public RekallAgeCodexApprovalCallback? CodexApprovalHandler { get; set; }
+
+    public RekallAgeCodexAuthenticationLauncher? CodexAuthenticationLauncher { get; set; }
+
+    internal ValueTask<RekallAgeCodexApprovalDecision> RouteCodexApprovalAsync(
+        RekallAgeCodexApprovalRequest request,
+        CancellationToken cancellationToken) =>
+        CodexApprovalHandler?.Invoke(request, cancellationToken)
+        ?? ValueTask.FromResult(RekallAgeCodexApprovalDecision.Decline);
+
+    public string SelectedReasoningEffort
+    {
+        get => _selectedReasoningEffort;
+        set
+        {
+            if (!ReasoningEfforts.Contains(value, StringComparer.Ordinal)) return;
+            Set(ref _selectedReasoningEffort, value);
         }
     }
 
@@ -734,6 +1056,53 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         _meshTransformGesture = null;
         StatusText = MeshSummary;
+    }
+
+    /// <summary>Orbits the mesh viewport camera by the given yaw/pitch deltas, in radians.</summary>
+    public void OrbitMeshViewport(double deltaYaw, double deltaPitch)
+    {
+        _meshViewportCamera = _meshViewportCamera with
+        {
+            Yaw = _meshViewportCamera.Yaw + deltaYaw,
+            Pitch = Math.Clamp(_meshViewportCamera.Pitch + deltaPitch, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01)
+        };
+        RefreshMeshEditingState();
+    }
+
+    /// <summary>Pans the mesh viewport camera by the given screen-space pixel deltas.</summary>
+    public void PanMeshViewport(double deltaX, double deltaY)
+    {
+        _meshViewportCamera = _meshViewportCamera with
+        {
+            PanX = _meshViewportCamera.PanX + deltaX,
+            PanY = _meshViewportCamera.PanY + deltaY
+        };
+        RefreshMeshEditingState();
+    }
+
+    /// <summary>Multiplies the mesh viewport camera's zoom by <paramref name="factor"/> (greater than 1 zooms in).</summary>
+    public void ZoomMeshViewport(double factor)
+    {
+        if (!double.IsFinite(factor) || factor <= 0) return;
+        _meshViewportCamera = _meshViewportCamera with
+        {
+            Zoom = Math.Clamp(_meshViewportCamera.Zoom * factor, 0.05, 50)
+        };
+        RefreshMeshEditingState();
+    }
+
+    /// <summary>Toggles the mesh viewport camera between orthographic and perspective projection.</summary>
+    public void ToggleMeshViewportProjection()
+    {
+        _meshViewportCamera = _meshViewportCamera with { Orthographic = !_meshViewportCamera.Orthographic };
+        RefreshMeshEditingState();
+    }
+
+    /// <summary>Resets the mesh viewport camera's pan/zoom (keeping its current orbit angle), re-centering on the mesh.</summary>
+    public void FrameSelectedMeshViewport()
+    {
+        _meshViewportCamera = _meshViewportCamera with { PanX = 0, PanY = 0, Zoom = 1 };
+        RefreshMeshEditingState();
     }
 
     public string? LastPackagePath
@@ -1061,14 +1430,130 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private async Task DisposeCoreAsync()
     {
-        _lifecycleCancellation.Cancel();
-        _agentCancellation?.Cancel();
-        await StopCoreAsync(resetEditPreview: false, CancellationToken.None);
-        await _previewSession.DisposeAsync();
-        _agentCancellation?.Dispose();
-        _ollamaHttpClient?.Dispose();
-        _lifecycleCancellation.Dispose();
-        _modeTransitionGate.Dispose();
+        try
+        {
+            try
+            {
+                _lifecycleCancellation.Cancel();
+            }
+            catch (Exception)
+            {
+                ReportLanguageModelShutdownFailure();
+            }
+
+            try
+            {
+                _agentCancellation?.Cancel();
+                _codexSignInCancellation?.Cancel();
+            }
+            catch (Exception)
+            {
+                ReportLanguageModelShutdownFailure();
+            }
+
+            Task providerTransition;
+            Task? activeLanguageModelRefresh;
+            Task? activeAgentRun;
+            Task? activeCodexSignIn;
+            lock (_languageModelLifecycleSync)
+            {
+                providerTransition = _languageModelProviderTransition;
+                activeLanguageModelRefresh = _activeLanguageModelRefresh;
+                activeAgentRun = _activeAgentRun;
+                activeCodexSignIn = _activeCodexSignIn;
+            }
+            Task[] renderingOperations;
+            lock (_renderingOperationsSync)
+            {
+                renderingOperations = [.. _activeRenderingOperations];
+            }
+
+            try
+            {
+                await Task.WhenAll(renderingOperations).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                ReportUnexpectedFailure(exception);
+            }
+
+            var languageModelOperations = new List<Task> { providerTransition };
+            if (activeLanguageModelRefresh is not null) languageModelOperations.Add(activeLanguageModelRefresh);
+            if (activeAgentRun is not null) languageModelOperations.Add(activeAgentRun);
+            if (activeCodexSignIn is not null) languageModelOperations.Add(activeCodexSignIn);
+            try
+            {
+                await Task.WhenAll(languageModelOperations).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+            {
+            }
+            catch (Exception)
+            {
+                ReportLanguageModelShutdownFailure();
+            }
+
+            try
+            {
+                await StopCoreAsync(resetEditPreview: false, CancellationToken.None);
+            }
+            catch (Exception)
+            {
+                ReportLanguageModelShutdownFailure();
+            }
+
+            try
+            {
+                await _previewSession.DisposeAsync();
+            }
+            catch (Exception)
+            {
+                ReportLanguageModelShutdownFailure();
+            }
+        }
+        finally
+        {
+            try
+            {
+                _agentCancellation?.Dispose();
+            }
+            catch (Exception)
+            {
+                ReportLanguageModelShutdownFailure();
+            }
+            _agentCancellation = null;
+
+            try
+            {
+                await ReleaseLanguageModelRunnerAsync().ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                ReportLanguageModelShutdownFailure();
+            }
+
+            _sessionOpenAiApiKey = null;
+            try
+            {
+                _lifecycleCancellation.Dispose();
+            }
+            catch (Exception)
+            {
+                ReportLanguageModelShutdownFailure();
+            }
+
+            try
+            {
+                _modeTransitionGate.Dispose();
+            }
+            catch (Exception)
+            {
+                ReportLanguageModelShutdownFailure();
+            }
+        }
     }
 
     private bool CanOpenOrCreate() => !IsBusy && Mode == RekallAgeStudioMode.Edit && !string.IsNullOrWhiteSpace(ProjectPathInput);
@@ -1079,13 +1564,24 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         && !string.IsNullOrWhiteSpace(ParentEntityIdInput)
         && !ParentEntityIdInput.Trim().Equals(_session.SelectedEntityId, StringComparison.Ordinal);
     private bool HasEditableProject() => HasOpenProject() && Mode == RekallAgeStudioMode.Edit;
+    private bool HasQualityProfile() => HasEditableProject()
+        && _currentModel?.Rendering.Authoring is not null
+        && QualityPresets.Contains(SelectedQualityPreset, StringComparer.Ordinal);
+    private bool CanAttachQualityProfile() => HasSelectedEntity()
+        && _currentModel?.Rendering.Authoring is null
+        && QualityPresets.Contains(SelectedQualityPreset, StringComparer.Ordinal);
+    private bool CanCompareQuality() => HasEditableProject()
+        && QualityPresets.Contains(SelectedQualityPreset, StringComparer.Ordinal)
+        && QualityPresets.Contains(ComparisonQualityPreset, StringComparer.Ordinal)
+        && !SelectedQualityPreset.Equals(ComparisonQualityPreset, StringComparison.Ordinal);
     private bool CanEditComponent() => HasEditableProject()
         && _session.SelectedEntityId is not null
         && !string.IsNullOrWhiteSpace(ComponentTypeInput);
     private bool CanEditProperty() => CanEditComponent() && !string.IsNullOrWhiteSpace(PropertyNameInput);
     private bool CanRunAgent() => HasEditableProject()
         && !IsAgentRunning
-        && !string.IsNullOrWhiteSpace(SelectedOllamaModel)
+        && _languageModelRunner is not null
+        && !string.IsNullOrWhiteSpace(SelectedLanguageModel)
         && !string.IsNullOrWhiteSpace(AgentTaskInput);
     private bool CanSwitchScene() => HasEditableProject()
         && !string.IsNullOrWhiteSpace(SceneNameInput)
@@ -1183,6 +1679,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private Task OpenMeshAssetAsync() => RunModelingAsync(async () =>
     {
+        _meshViewportCamera = RekallAgeStudioViewportCamera.Identity;
         await _modeling.OpenAsync(_session.ProjectRoot!, SelectedMeshAssetId!, _lifecycleCancellation.Token);
         _modeling.SetDomain(MeshEditDomain);
         RefreshMeshEditingState();
@@ -1508,7 +2005,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (SelectedMeshElementId is null || !MeshElementIds.Contains(SelectedMeshElementId.Value)) SelectedMeshElementId = MeshElementIds.Count == 0 ? null : MeshElementIds[0];
         Replace(MeshSelectionLines, _modeling.SelectedElementIds.Select((id, index) => $"{index + 1}. {MeshEditDomain} {id}{(id == _modeling.ActiveElementId ? " (active)" : string.Empty)}"));
         MeshSummary = $"{mesh.Name} r{mesh.Revision} · {mesh.Topology.PointIds.Count} points · {mesh.Topology.EdgeIds.Count} edges · {mesh.Topology.FaceIds.Count} faces · {_modeling.SelectedElementIds.Count} selected{(_modeling.Preview is null ? string.Empty : " · PREVIEW")}";
-        _meshViewportFrame = _meshViewportRenderer.Render(mesh, MeshEditDomain, _modeling.SelectedElementIds, 640, 360, _modeling.Preview is not null);
+        _meshViewportFrame = _meshViewportRenderer.Render(mesh, MeshEditDomain, _modeling.SelectedElementIds, 640, 360, _modeling.Preview is not null, _meshViewportCamera);
         MeshViewportImage = _meshViewportFrame.Image;
         OnPropertyChanged(nameof(MeshEditDomain)); RefreshCommands();
     }
@@ -1683,6 +2180,220 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             "studio",
             CancellationToken.None).AsTask(), refreshPreviewAfter: true);
 
+    private Task AttachQualityProfileAsync() => RunAsync(() => _session.ExecuteAsync(
+        "rekall.component.add",
+        JsonSerializer.Serialize(new
+        {
+            projectRoot = _session.ProjectRoot,
+            sceneName = _session.SceneName,
+            entityId = _session.SelectedEntityId,
+            componentType = "Rekall.RenderQualityProfile",
+            properties = new JsonObject { ["preset"] = SelectedQualityPreset }
+        }),
+        "Attach render quality profile",
+        "studio",
+        CancellationToken.None).AsTask(), refreshPreviewAfter: true);
+
+    private async Task<RekallAgeWorkbenchOperationResult> ApplyRenderQualityAsync()
+    {
+        if (_currentModel?.Rendering.Authoring is not { } authoring)
+        {
+            return InvalidQualityInput("Attach a Rekall.RenderQualityProfile before applying authored quality settings.");
+        }
+        if (!TryBuildQualityOverrides(out var overrides, out var parseError))
+        {
+            return InvalidQualityInput(parseError);
+        }
+
+        var mutations = new (string Property, JsonNode? Value)[]
+        {
+            ("preset", JsonValue.Create(SelectedQualityPreset)),
+            ("resolutionScale", overrides.ResolutionScale.HasValue ? JsonValue.Create(overrides.ResolutionScale.Value) : null),
+            ("shadowCascadeCount", overrides.ShadowCascadeCount.HasValue ? JsonValue.Create(overrides.ShadowCascadeCount.Value) : null),
+            ("shadowResolution", overrides.ShadowResolution.HasValue ? JsonValue.Create(overrides.ShadowResolution.Value) : null),
+            ("fogMode", string.IsNullOrWhiteSpace(overrides.FogMode) ? null : JsonValue.Create(overrides.FogMode)),
+            ("bloom", overrides.Bloom.HasValue ? JsonValue.Create(overrides.Bloom.Value) : null),
+            ("ssao", overrides.Ssao.HasValue ? JsonValue.Create(overrides.Ssao.Value) : null),
+            ("maximumActiveParticles", overrides.MaximumActiveParticles.HasValue ? JsonValue.Create(overrides.MaximumActiveParticles.Value) : null)
+        };
+
+        RekallAgeWorkbenchOperationResult? result = null;
+        foreach (var mutation in mutations)
+        {
+            var remove = mutation.Value is null;
+            result = await _session.ExecuteAsync(
+                remove ? "rekall.component.remove_property" : "rekall.component.set_property",
+                remove
+                    ? JsonSerializer.Serialize(new
+                    {
+                        projectRoot = _session.ProjectRoot,
+                        sceneName = _session.SceneName,
+                        entityId = authoring.EntityId,
+                        componentType = "Rekall.RenderQualityProfile",
+                        propertyName = mutation.Property
+                    })
+                    : JsonSerializer.Serialize(new
+                    {
+                        projectRoot = _session.ProjectRoot,
+                        sceneName = _session.SceneName,
+                        entityId = authoring.EntityId,
+                        componentType = "Rekall.RenderQualityProfile",
+                        propertyName = mutation.Property,
+                        value = mutation.Value
+                    }),
+                $"Set render quality {mutation.Property}",
+                "studio",
+                CancellationToken.None);
+            if (!result.Ok) return result;
+        }
+
+        return result! with { Summary = $"Set requested render quality to '{SelectedQualityPreset}' through generic component mutations." };
+    }
+
+    private async Task<RekallAgeWorkbenchOperationResult> CaptureQualityAsync(
+        CancellationToken cancellationToken)
+    {
+        if (!TryBuildQualityOverrides(out var overrides, out var parseError))
+        {
+            return InvalidQualityInput(parseError);
+        }
+
+        return await _session.ExecuteAsync(
+            "rekall.render.capture_runtime_viewport",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = _session.ProjectRoot,
+                sceneName = _session.SceneName,
+                frames = 1,
+                outputDirectory = Path.Combine(_session.ProjectRoot!, "Artifacts", "Studio", "HighFidelity"),
+                width = 960,
+                height = 540,
+                debugOverlay = false,
+                backendId = "vulkan",
+                qualityPreset = SelectedQualityPreset,
+                qualityOverrides = overrides,
+                includeGpuTimings = true
+            }),
+            $"Capture {SelectedQualityPreset} render quality",
+            "studio",
+            cancellationToken);
+    }
+
+    private async Task<RekallAgeWorkbenchOperationResult> CompareQualityAsync(
+        CancellationToken cancellationToken)
+    {
+        if (!TryBuildQualityOverrides(out var overrides, out var parseError))
+        {
+            return InvalidQualityInput(parseError);
+        }
+
+        return await _session.ExecuteAsync(
+            "rekall.render.compare_quality_presets",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = _session.ProjectRoot,
+                sceneName = _session.SceneName,
+                presets = new[] { SelectedQualityPreset, ComparisonQualityPreset },
+                frames = 1,
+                outputDirectory = Path.Combine(_session.ProjectRoot!, "Artifacts", "Studio", "QualityComparison"),
+                width = 960,
+                height = 540,
+                backendId = "vulkan",
+                overrides,
+                includeGpuTimings = true
+            }),
+            $"Compare {SelectedQualityPreset} and {ComparisonQualityPreset} render quality",
+            "studio",
+            cancellationToken);
+    }
+
+    private bool TryBuildQualityOverrides(
+        out RekallAgeRenderQualityOverrides overrides,
+        out string? error)
+    {
+        if (!TryParseOptionalDouble(QualityResolutionScaleInput, out var resolutionScale))
+        {
+            overrides = new();
+            error = "Resolution scale must be a finite number or blank.";
+            return false;
+        }
+        if (!TryParseOptionalInt32(QualityShadowCascadeCountInput, out var shadowCascadeCount))
+        {
+            overrides = new();
+            error = "Shadow cascade count must be an integer or blank.";
+            return false;
+        }
+        if (!TryParseOptionalInt32(QualityShadowResolutionInput, out var shadowResolution))
+        {
+            overrides = new();
+            error = "Shadow resolution must be an integer or blank.";
+            return false;
+        }
+        if (!TryParseOptionalInt32(QualityMaximumActiveParticlesInput, out var maximumActiveParticles))
+        {
+            overrides = new();
+            error = "Maximum active particles must be an integer or blank.";
+            return false;
+        }
+
+        overrides = new RekallAgeRenderQualityOverrides(
+            resolutionScale,
+            shadowCascadeCount,
+            shadowResolution,
+            string.IsNullOrWhiteSpace(QualityFogModeInput) ? null : QualityFogModeInput.Trim(),
+            QualityBloomOverride,
+            QualitySsaoOverride,
+            maximumActiveParticles);
+        error = null;
+        return true;
+    }
+
+    private static bool TryParseOptionalDouble(string input, out double? value)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            value = null;
+            return true;
+        }
+
+        if ((double.TryParse(input, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+             || double.TryParse(input, NumberStyles.Float, CultureInfo.CurrentCulture, out parsed))
+            && double.IsFinite(parsed))
+        {
+            value = parsed;
+            return true;
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static bool TryParseOptionalInt32(string input, out int? value)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            value = null;
+            return true;
+        }
+
+        if (int.TryParse(input, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            || int.TryParse(input, NumberStyles.Integer, CultureInfo.CurrentCulture, out parsed))
+        {
+            value = parsed;
+            return true;
+        }
+
+        value = null;
+        return false;
+    }
+
+    private static RekallAgeWorkbenchOperationResult InvalidQualityInput(string? message)
+    {
+        const string code = "REKALL_STUDIO_RENDER_QUALITY_INPUT_INVALID";
+        message ??= "Render-quality controls contain an invalid value.";
+        return new(false, message, null, [new RekallAgeCommandError(code, message, "render-quality")]);
+    }
+
     private Task ValidateAsync() => RunAsync(() => _session.ExecuteAsync(
         "rekall.validation.scene",
         JsonSerializer.Serialize(new { projectRoot = _session.ProjectRoot, sceneName = _session.SceneName }),
@@ -1790,32 +2501,141 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         "studio",
         CancellationToken.None).AsTask());
 
-    private async Task DiscoverModelsAsync()
+    private async Task SignInCodexAsync()
+    {
+        if (_languageModelRunner is not IRekallAgeCodexProjectAgentRunner runner
+            || CodexAuthenticationLauncher is null)
+        {
+            ProviderStatus = "REKALL_CODEX_LOGIN_LAUNCH_UNAVAILABLE: Studio cannot open the Codex sign-in page.";
+            return;
+        }
+
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifecycleCancellation.Token);
+        _codexSignInCancellation = cancellation;
+        ProviderStatus = "Opening Codex ChatGPT sign-in…";
+        RefreshCommands();
+        try
+        {
+            var signIn = runner.SignInWithChatGptAsync(
+                CodexAuthenticationLauncher, cancellation.Token).AsTask();
+            _activeCodexSignIn = signIn;
+            var account = await signIn;
+            ProviderStatus = $"Codex sign-in completed via {CodexAuthenticationLabel(account.AuthenticationType ?? string.Empty)}. Refreshing models…";
+            await DiscoverModelsAsync();
+        }
+        catch (RekallAgeLanguageModelProviderException error)
+        {
+            ProviderStatus = $"{error.Code}: {error.Message}";
+            StatusText = ProviderStatus;
+        }
+        finally
+        {
+            if (ReferenceEquals(_codexSignInCancellation, cancellation)) _codexSignInCancellation = null;
+            RefreshCommands();
+        }
+    }
+
+    private async Task CancelCodexSignInAsync()
+    {
+        _codexSignInCancellation?.Cancel();
+        if (_activeCodexSignIn is not null)
+        {
+            try { await _activeCodexSignIn; }
+            catch (RekallAgeLanguageModelProviderException) { }
+        }
+    }
+
+    private Task DiscoverModelsAsync()
+    {
+        lock (_languageModelLifecycleSync)
+        {
+            if (_activeLanguageModelRefresh is { IsCompleted: false }) return _activeLanguageModelRefresh;
+            var runner = _languageModelRunner;
+            if (runner is null) return Task.CompletedTask;
+            var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifecycleCancellation.Token);
+            _languageModelRefreshCancellation = cancellation;
+            _activeLanguageModelRefresh = DiscoverModelsCoreAsync(
+                cancellation,
+                SelectedLanguageModelProvider,
+                runner,
+                _languageModelProviderTransitionGeneration);
+            return _activeLanguageModelRefresh;
+        }
+    }
+
+    private async Task DiscoverModelsCoreAsync(
+        CancellationTokenSource operationCancellation,
+        RekallAgeLanguageModelProviderDescriptor provider,
+        IRekallAgeProjectAgentRunner runner,
+        long generation)
     {
         IsBusy = true;
         try
         {
-            var models = await _agentSession.ListModelsAsync(CancellationToken.None);
-            Replace(OllamaModels, models.Select(model => model.Id));
-            if (OllamaModels.Contains("qwen3.5:35b"))
-            {
-                SelectedOllamaModel = "qwen3.5:35b";
-            }
-            else if (OllamaModels.Count > 0 && !OllamaModels.Contains(SelectedOllamaModel))
-            {
-                SelectedOllamaModel = OllamaModels[0];
-            }
-            StatusText = OllamaModels.Count == 0
-                ? "Ollama is reachable but no local models are installed."
-                : $"Found {OllamaModels.Count} local Ollama model{(OllamaModels.Count == 1 ? string.Empty : "s")}.";
+            var models = await runner.ListModelsAsync(operationCancellation.Token);
+            TryApplyLanguageModels(provider, runner, generation, models);
+        }
+        catch (RekallAgeLanguageModelProviderException exception)
+        {
+            ReportLanguageModelProviderFailureIfCurrent(provider, runner, generation, exception);
+        }
+        catch (OperationCanceledException) when (operationCancellation.IsCancellationRequested)
+        {
         }
         finally
         {
+            lock (_languageModelLifecycleSync)
+            {
+                if (ReferenceEquals(_languageModelRefreshCancellation, operationCancellation))
+                {
+                    _languageModelRefreshCancellation = null;
+                }
+            }
+            operationCancellation.Dispose();
             IsBusy = false;
         }
     }
 
-    private async Task RunAgentAsync()
+    private Task RunAgentAsync()
+    {
+        Task operationTask;
+        lock (_languageModelLifecycleSync)
+        {
+            if (_activeAgentRun is { IsCompleted: false }) return _activeAgentRun;
+            var runner = _languageModelRunner;
+            if (runner is null) return Task.CompletedTask;
+            operationTask = RunAgentCoreAsync(
+                runner,
+                runner.ProviderId,
+                SelectedLanguageModel);
+            _activeAgentRun = operationTask;
+        }
+
+        return AwaitAgentRunAsync(operationTask);
+    }
+
+    private async Task AwaitAgentRunAsync(Task operationTask)
+    {
+        try
+        {
+            await operationTask.ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_languageModelLifecycleSync)
+            {
+                if (ReferenceEquals(_activeAgentRun, operationTask) && !operationTask.IsFaulted)
+                {
+                    _activeAgentRun = null;
+                }
+            }
+        }
+    }
+
+    private async Task RunAgentCoreAsync(
+        IRekallAgeProjectAgentRunner runner,
+        string providerId,
+        string model)
     {
         if (_session.ProjectRoot is null || _session.SceneName is null) return;
         _agentCancellation?.Dispose();
@@ -1825,29 +2645,40 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         IsBusy = true;
         AgentLines.Clear();
         _lastAgentToolExecutions.Clear();
-        AppendAgentLine($"model: {SelectedOllamaModel}");
+        AppendAgentLine($"provider: {providerId}");
+        AppendAgentLine($"model: {model}");
         AppendAgentLine($"task: {AgentTaskInput.Trim()}");
+        var agentStopwatch = Stopwatch.StartNew();
         try
         {
             IProgress<RekallAgeLanguageModelAgentProgress> progress = SynchronizationContext.Current is null
                 ? new ImmediateProgress<RekallAgeLanguageModelAgentProgress>(ReportAgentProgress)
                 : new Progress<RekallAgeLanguageModelAgentProgress>(ReportAgentProgress);
-            var result = await _agentSession.RunAsync(
+            var result = await runner.RunAsync(
                 new RekallAgeProjectAgentSessionRequest(
                     _session.ProjectRoot,
                     _session.SceneName,
-                    SelectedOllamaModel,
+                    model,
                     AgentTaskInput)
                 {
                     MaxTurns = AgentMaxTurns,
+                    Think = SelectedReasoningEffort,
                     RequireCompletionAudit = true,
                     RequireCompletionAuditToolEvidence = !TreatGauntletAsTerminalSuccess,
                     TreatGauntletAsTerminalSuccess = TreatGauntletAsTerminalSuccess
                 },
                 progress,
                 cancellationToken);
+            agentStopwatch.Stop();
             _lastAgentToolExecutions.Clear();
             _lastAgentToolExecutions.AddRange(result.AgentResult.ToolExecutions);
+            AppendAgentLine($"response: {result.AgentResult.ResponseId ?? "unavailable"}");
+            AppendAgentLine(
+                $"usage: input={result.AgentResult.Usage.PromptTokens} output={result.AgentResult.Usage.CompletionTokens} "
+                + $"cached={result.AgentResult.Usage.CachedInputTokens?.ToString(CultureInfo.InvariantCulture) ?? "unavailable"} "
+                + $"reasoning={result.AgentResult.Usage.ReasoningTokens?.ToString(CultureInfo.InvariantCulture) ?? "unavailable"}");
+            AppendAgentLine($"tools: {result.AgentResult.ToolCallCount}");
+            AppendAgentLine($"elapsed: {agentStopwatch.Elapsed.TotalMilliseconds.ToString("F0", CultureInfo.InvariantCulture)} ms");
             AppendAgentLine(result.Summary);
             if (!string.IsNullOrWhiteSpace(result.AgentResult.FinalContent))
             {
@@ -1863,10 +2694,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 "studio-agent",
                 cancellationToken);
             if (_session.Model is not null) ApplyModel(_session.Model);
-            var capture = await CaptureOperationAsync();
+            var capture = await CaptureOperationAsync(cancellationToken);
             StatusText = result.Succeeded && validation.Ok && capture.Ok
                 ? result.Summary
                 : $"{result.Summary} Review Validation and AI Agent output.";
+        }
+        catch (RekallAgeLanguageModelProviderException exception)
+        {
+            ReportLanguageModelProviderFailure(exception);
+            AppendAgentLine(ProviderStatus);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -1882,11 +2718,374 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
     }
 
-    private Task CancelAgentAsync()
+    private async Task CancelAgentAsync()
     {
         _agentCancellation?.Cancel();
         StatusText = "Cancelling AI authoring…";
-        return Task.CompletedTask;
+        Task? activeRun;
+        lock (_languageModelLifecycleSync)
+        {
+            activeRun = _activeAgentRun;
+        }
+        if (activeRun is null) return;
+        try
+        {
+            await activeRun;
+        }
+        catch (Exception)
+        {
+            // The command boundary already records the bounded, redacted failure.
+            // Provider transition must still release the old runner and acquire the selected provider.
+        }
+        finally
+        {
+            lock (_languageModelLifecycleSync)
+            {
+                if (ReferenceEquals(_activeAgentRun, activeRun)) _activeAgentRun = null;
+            }
+        }
+    }
+
+    public Task ApplyOpenAiApiKeyAsync(string? apiKey)
+    {
+        lock (_languageModelLifecycleSync)
+        {
+            _sessionOpenAiApiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey;
+            OnPropertyChanged(nameof(HasSessionOpenAiCredential));
+            OnPropertyChanged(nameof(LanguageModelProviders));
+            _selectedLanguageModelProvider = LanguageModelProviders.Single(
+                provider => provider.Id == _selectedLanguageModelProvider.Id);
+            OnPropertyChanged(nameof(SelectedLanguageModelProvider));
+            if (SelectedLanguageModelProvider.Id != "openai")
+            {
+                ProviderStatus = _sessionOpenAiApiKey is null
+                    ? "OpenAI session key cleared."
+                    : "OpenAI session key accepted in memory for this Studio session.";
+                return Task.CompletedTask;
+            }
+
+            Replace(LanguageModels, []);
+            SelectedLanguageModel = string.Empty;
+            ProviderStatus = "Refreshing OpenAI session authentication…";
+            QueueLanguageModelProviderTransition(SelectedLanguageModelProvider);
+            return _languageModelProviderTransition;
+        }
+    }
+
+    internal Task WaitForLanguageModelProviderTransitionAsync()
+    {
+        lock (_languageModelLifecycleSync)
+        {
+            return _languageModelProviderTransition;
+        }
+    }
+
+    private void QueueLanguageModelProviderTransition(
+        RekallAgeLanguageModelProviderDescriptor provider)
+    {
+        lock (_languageModelLifecycleSync)
+        {
+            var generation = checked(++_languageModelProviderTransitionGeneration);
+            _languageModelProviderTransition = TransitionLanguageModelProviderAfterAsync(
+                _languageModelProviderTransition,
+                provider,
+                generation,
+                SessionLanguageModelProviderSettings());
+        }
+    }
+
+    private async Task TransitionLanguageModelProviderAfterAsync(
+        Task previousTransition,
+        RekallAgeLanguageModelProviderDescriptor provider,
+        long generation,
+        RekallAgeLanguageModelProviderSettings? sessionSettings)
+    {
+        RekallAgeLanguageModelProviderLease? acquiredLease = null;
+        try
+        {
+            await previousTransition;
+            if (!IsCurrentLanguageModelTransition(provider, generation)) return;
+            await CancelAndAwaitLanguageModelRefreshAsync();
+            await CancelAndAwaitCodexSignInAsync();
+            await CancelAgentAsync();
+            await ReleaseLanguageModelRunnerAsync();
+            _lifecycleCancellation.Token.ThrowIfCancellationRequested();
+            acquiredLease = _languageModelProviderCatalog.Acquire(
+                provider.Id,
+                _agentRegistry,
+                sessionSettings);
+            var runner = acquiredLease.Runner;
+            if (runner is IRekallAgeCodexProjectAgentRunner codexRunner)
+            {
+                codexRunner.ApprovalCallback = RouteCodexApprovalAsync;
+            }
+            IReadOnlyList<RekallAgeLanguageModelInfo> models;
+            try
+            {
+                models = await runner.ListModelsAsync(_lifecycleCancellation.Token);
+            }
+            catch (RekallAgeLanguageModelProviderException exception)
+                when (exception.Code == RekallAgeCodexErrorCodes.AuthenticationRequired
+                    && runner is IRekallAgeCodexProjectAgentRunner)
+            {
+                lock (_languageModelLifecycleSync)
+                {
+                    if (!IsCurrentLanguageModelTransitionLocked(provider, generation)) return;
+                    _languageModelProviderLease = acquiredLease;
+                    _languageModelRunner = runner;
+                    acquiredLease = null;
+                }
+                ReportLanguageModelTransitionFailureIfCurrent(provider, generation, exception);
+                return;
+            }
+            lock (_languageModelLifecycleSync)
+            {
+                if (!IsCurrentLanguageModelTransitionLocked(provider, generation)) return;
+                _languageModelProviderLease = acquiredLease;
+                _languageModelRunner = runner;
+                acquiredLease = null;
+                ApplyLanguageModels(EffectiveProviderDescriptor(provider, runner), models);
+            }
+        }
+        catch (RekallAgeLanguageModelProviderException exception)
+        {
+            ReportLanguageModelTransitionFailureIfCurrent(provider, generation, exception);
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            ReportUnexpectedLanguageModelTransitionFailureIfCurrent(provider, generation);
+        }
+        finally
+        {
+            try
+            {
+                if (acquiredLease is not null)
+                {
+                    await acquiredLease.DisposeAsync();
+                }
+            }
+            catch (Exception)
+            {
+                ReportUnexpectedLanguageModelTransitionFailureIfCurrent(provider, generation);
+            }
+            RefreshCommands();
+        }
+    }
+
+    private async Task CancelAndAwaitLanguageModelRefreshAsync()
+    {
+        CancellationTokenSource? cancellation;
+        Task? refresh;
+        lock (_languageModelLifecycleSync)
+        {
+            cancellation = _languageModelRefreshCancellation;
+            refresh = _activeLanguageModelRefresh;
+        }
+        cancellation?.Cancel();
+        if (refresh is null) return;
+        try
+        {
+            await refresh;
+        }
+        catch (Exception)
+        {
+            // The command boundary already records the bounded, redacted failure.
+            // Provider transition must still release the old runner and acquire the selected provider.
+        }
+        finally
+        {
+            lock (_languageModelLifecycleSync)
+            {
+                if (ReferenceEquals(_activeLanguageModelRefresh, refresh)) _activeLanguageModelRefresh = null;
+            }
+        }
+    }
+
+    private async Task CancelAndAwaitCodexSignInAsync()
+    {
+        _codexSignInCancellation?.Cancel();
+        var signIn = _activeCodexSignIn;
+        if (signIn is null) return;
+        try { await signIn; }
+        catch (RekallAgeLanguageModelProviderException) { }
+    }
+
+    private bool TryApplyLanguageModels(
+        RekallAgeLanguageModelProviderDescriptor provider,
+        IRekallAgeProjectAgentRunner runner,
+        long generation,
+        IReadOnlyList<RekallAgeLanguageModelInfo> models)
+    {
+        lock (_languageModelLifecycleSync)
+        {
+            if (!IsCurrentLanguageModelTransitionLocked(provider, generation)
+                || !ReferenceEquals(_languageModelRunner, runner)) return false;
+            ApplyLanguageModels(EffectiveProviderDescriptor(provider, runner), models);
+            return true;
+        }
+    }
+
+    private static RekallAgeLanguageModelProviderDescriptor EffectiveProviderDescriptor(
+        RekallAgeLanguageModelProviderDescriptor provider,
+        IRekallAgeProjectAgentRunner runner) =>
+        runner is IRekallAgeCodexProjectAgentRunner codexRunner
+            ? codexRunner.CurrentProviderDescriptor
+            : provider;
+
+    private void ApplyLanguageModels(
+        RekallAgeLanguageModelProviderDescriptor provider,
+        IReadOnlyList<RekallAgeLanguageModelInfo> models)
+    {
+        Replace(LanguageModels, models.Select(model => model.Id));
+        if (!LanguageModels.Contains(provider.DefaultModel))
+        {
+            SelectedLanguageModel = string.Empty;
+            ReportLanguageModelProviderFailure(new RekallAgeLanguageModelProviderException(
+                "REKALL_LANGUAGE_MODEL_DEFAULT_UNAVAILABLE",
+                provider.Id,
+                $"{provider.DisplayName} did not return its configured default model.",
+                requestedValue: provider.DefaultModel,
+                resolvedValue: LanguageModels.Count == 0 ? "none" : string.Join(',', LanguageModels)));
+            return;
+        }
+
+        SelectedLanguageModel = provider.DefaultModel;
+        var authentication = provider.Id == "codex"
+            ? $" via {CodexAuthenticationLabel(provider.AuthenticationState)}"
+            : string.Empty;
+        ProviderStatus = $"{provider.DisplayName} ready{authentication} with {LanguageModels.Count} model{(LanguageModels.Count == 1 ? string.Empty : "s")}.";
+        StatusText = ProviderStatus;
+    }
+
+    private static string CodexAuthenticationLabel(string authenticationState) =>
+        authenticationState switch
+        {
+            "chatgpt" => "ChatGPT",
+            "api-key" => "API key",
+            _ => "Codex authentication"
+        };
+
+    private bool IsCurrentLanguageModelTransition(
+        RekallAgeLanguageModelProviderDescriptor provider,
+        long generation)
+    {
+        lock (_languageModelLifecycleSync)
+        {
+            return IsCurrentLanguageModelTransitionLocked(provider, generation);
+        }
+    }
+
+    private bool IsCurrentLanguageModelTransitionLocked(
+        RekallAgeLanguageModelProviderDescriptor provider,
+        long generation) =>
+        generation == _languageModelProviderTransitionGeneration
+        && provider.Id.Equals(SelectedLanguageModelProvider.Id, StringComparison.Ordinal);
+
+    private void ReportLanguageModelProviderFailureIfCurrent(
+        RekallAgeLanguageModelProviderDescriptor provider,
+        IRekallAgeProjectAgentRunner runner,
+        long generation,
+        RekallAgeLanguageModelProviderException exception)
+    {
+        lock (_languageModelLifecycleSync)
+        {
+            if (!IsCurrentLanguageModelTransitionLocked(provider, generation)
+                || !ReferenceEquals(_languageModelRunner, runner)) return;
+            Replace(LanguageModels, []);
+            SelectedLanguageModel = string.Empty;
+            ReportLanguageModelProviderFailure(exception);
+        }
+    }
+
+    private void ReportLanguageModelTransitionFailureIfCurrent(
+        RekallAgeLanguageModelProviderDescriptor provider,
+        long generation,
+        RekallAgeLanguageModelProviderException exception)
+    {
+        lock (_languageModelLifecycleSync)
+        {
+            if (!IsCurrentLanguageModelTransitionLocked(provider, generation)) return;
+            Replace(LanguageModels, []);
+            SelectedLanguageModel = string.Empty;
+            ReportLanguageModelProviderFailure(exception);
+        }
+    }
+
+    private void ReportUnexpectedLanguageModelTransitionFailureIfCurrent(
+        RekallAgeLanguageModelProviderDescriptor provider,
+        long generation) =>
+        ReportLanguageModelTransitionFailureIfCurrent(
+            provider,
+            generation,
+            new RekallAgeLanguageModelProviderException(
+                "REKALL_LANGUAGE_MODEL_PROVIDER_TRANSITION_FAILED",
+                provider.Id,
+                "Language-model provider transition failed unexpectedly."));
+
+    private RekallAgeLanguageModelProviderSettings? SessionLanguageModelProviderSettings() =>
+        _sessionOpenAiApiKey is null
+            ? null
+            : new RekallAgeLanguageModelProviderSettings
+            {
+                OllamaUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL"),
+                OpenAiApiKey = _sessionOpenAiApiKey,
+                OpenAiUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OPENAI_URL")
+            };
+
+    private void ReportLanguageModelProviderFailure(
+        RekallAgeLanguageModelProviderException exception)
+    {
+        ProviderStatus = FormatLanguageModelProviderDiagnostic(exception);
+        StatusText = ProviderStatus;
+        Replace(ValidationLines, [$"error: {ProviderStatus}"]);
+    }
+
+    private void ReportLanguageModelShutdownFailure()
+    {
+        const string diagnostic =
+            "REKALL_STUDIO_LANGUAGE_MODEL_SHUTDOWN_FAILED: Language-model shutdown encountered an unexpected failure.";
+        ProviderStatus = diagnostic;
+        StatusText = diagnostic;
+        Replace(ValidationLines, [$"error: {diagnostic}"]);
+    }
+
+    private static string FormatLanguageModelProviderDiagnostic(
+        RekallAgeLanguageModelProviderException exception)
+    {
+        var facts = new List<string> { $"{exception.Code}: {exception.Message}" };
+        if (!string.IsNullOrWhiteSpace(exception.RequestedValue))
+        {
+            facts.Add($"Requested: {Bound(exception.RequestedValue, 256)}.");
+        }
+        if (!string.IsNullOrWhiteSpace(exception.ResolvedValue))
+        {
+            facts.Add($"Resolved: {Bound(exception.ResolvedValue, 256)}.");
+        }
+        return string.Join(' ', facts);
+    }
+
+    private async Task ReleaseLanguageModelRunnerAsync()
+    {
+        _languageModelRunner = null;
+        var providerLease = _languageModelProviderLease;
+        _languageModelProviderLease = null;
+        var fixedRunner = _fixedLanguageModelRunner;
+        _fixedLanguageModelRunner = null;
+        if (providerLease is not null)
+        {
+            await providerLease.DisposeAsync().ConfigureAwait(false);
+        }
+        if (fixedRunner is IAsyncDisposable asyncDisposableRunner)
+        {
+            await asyncDisposableRunner.DisposeAsync().ConfigureAwait(false);
+        }
+        else
+        {
+            fixedRunner?.Dispose();
+        }
     }
 
     private void ReportAgentProgress(RekallAgeLanguageModelAgentProgress progress)
@@ -1917,9 +3116,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private static string Bound(string value, int maxCharacters) =>
         value.Length <= maxCharacters ? value : value[..maxCharacters] + "…";
 
-    private Task CaptureAsync() => RunAsync(CaptureOperationAsync);
+    private Task CaptureAsync() => RunRenderingAsync(CaptureOperationAsync);
 
-    private async Task<RekallAgeWorkbenchOperationResult> CaptureOperationAsync()
+    private async Task<RekallAgeWorkbenchOperationResult> CaptureOperationAsync(
+        CancellationToken cancellationToken)
     {
         ViewportVisuallyInformative = false;
         var result = await _session.ExecuteAsync(
@@ -1937,7 +3137,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             }),
             "Capture Viewport",
             "studio",
-            CancellationToken.None);
+            cancellationToken);
         if (result.Ok && result.Value is CaptureRuntimeViewportResult capture && capture.Captured)
         {
             ViewportImage = LoadBitmap(capture.ScreenshotPath);
@@ -2175,9 +3375,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             var result = await operation();
             StatusText = result.Summary;
-            if (result.Ok && _session.Model is not null)
+            if (_session.Model is not null)
             {
                 ApplyModel(_session.Model);
+            }
+            if (result.Ok)
+            {
                 foreach (var warning in result.Errors)
                 {
                     ValidationLines.Add($"warning: {warning.Code} - {warning.Message}");
@@ -2197,9 +3400,55 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             StatusText = ex.Message;
             Replace(ValidationLines, [$"error: REKALL_STUDIO_OPERATION_FAILED - {ex.Message}"]);
         }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+            StatusText = "Studio rendering operation canceled during shutdown.";
+        }
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    private Task RunRenderingAsync(
+        Func<CancellationToken, Task<RekallAgeWorkbenchOperationResult>> operation,
+        bool refreshPreviewAfter = false)
+    {
+        CancellationTokenSource operationCancellation;
+        Task operationTask;
+        lock (_renderingOperationsSync)
+        {
+            if (_lifecycleCancellation.IsCancellationRequested)
+            {
+                return Task.CompletedTask;
+            }
+
+            operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                _lifecycleCancellation.Token);
+            operationTask = RunAsync(
+                () => operation(operationCancellation.Token),
+                refreshPreviewAfter);
+            _activeRenderingOperations.Add(operationTask);
+        }
+
+        return AwaitRenderingOperationAsync(operationTask, operationCancellation);
+    }
+
+    private async Task AwaitRenderingOperationAsync(
+        Task operationTask,
+        CancellationTokenSource operationCancellation)
+    {
+        try
+        {
+            await operationTask.ConfigureAwait(false);
+        }
+        finally
+        {
+            operationCancellation.Dispose();
+            lock (_renderingOperationsSync)
+            {
+                _activeRenderingOperations.Remove(operationTask);
+            }
         }
     }
 
@@ -2264,6 +3513,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         Replace(ActionLines, model.Actions.Actions.Select(action => $"{action.Category}: {action.Label} ({action.Tool})"));
         Replace(RuntimeObservationLines, model.Runtime.Observations.Select(observation =>
             $"{observation.Severity}: {observation.Code} - {observation.Message}"));
+        ApplyRendering(model.Rendering, synchronizeAuthoring: true);
         ViewportTitle = $"{model.Scene.Name} Viewport";
         ViewportRenderableCount = model.Runtime.RenderableCount;
         if (ViewportImage is null)
@@ -2272,6 +3522,46 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
         RefreshSceneGizmo();
     }
+
+    private void ApplyRendering(
+        RekallAgeWorkbenchRenderQualityModel rendering,
+        bool synchronizeAuthoring)
+    {
+        if (synchronizeAuthoring && rendering.Authoring is { } authoring)
+        {
+            SelectedQualityPreset = authoring.Preset;
+            QualityResolutionScaleInput = ToQualityInput(authoring.ResolutionScale);
+            QualityShadowCascadeCountInput = ToQualityInput(authoring.ShadowCascadeCount);
+            QualityShadowResolutionInput = ToQualityInput(authoring.ShadowResolution);
+            QualityFogModeInput = authoring.FogMode ?? string.Empty;
+            QualityBloomOverride = authoring.Bloom;
+            QualitySsaoOverride = authoring.Ssao;
+            QualityMaximumActiveParticlesInput = ToQualityInput(authoring.MaximumActiveParticles);
+        }
+
+        var runtime = rendering.Runtime;
+        RequestedQualityPreset = runtime.RequestedPreset;
+        ResolvedQualityPreset = runtime.ResolvedPreset ?? "Unavailable";
+        OutputResolutionText = FormatResolution(runtime.OutputWidth, runtime.OutputHeight);
+        InternalResolutionText = FormatResolution(runtime.RenderWidth, runtime.RenderHeight);
+        TotalGpuMillisecondsText = runtime.TotalGpuMillisecondsText;
+        GpuTimingStatusText = $"{runtime.GpuTimingCode ?? "available"} · {runtime.GpuTimingProvenance}";
+        RenderWorkloadText = $"{runtime.DrawCount} draws · {runtime.DispatchCount} dispatches";
+        Replace(RenderPassTimings, runtime.PassTimings);
+        Replace(RenderResources, runtime.Resources);
+        Replace(RenderDegradations, runtime.Degradations);
+        Replace(RenderQualityComparisons, rendering.Comparisons);
+        Replace(RenderDebugViews, rendering.DebugViews);
+        Replace(RenderSuggestedActions, runtime.SuggestedActions);
+        SelectedRenderDebugView = RenderDebugViews.FirstOrDefault();
+        RefreshCommands();
+    }
+
+    private static string FormatResolution(int? width, int? height) =>
+        width.HasValue && height.HasValue ? $"{width.Value}×{height.Value}" : "Unavailable";
+
+    private static string ToQualityInput<T>(T? value) where T : struct, IFormattable =>
+        value.HasValue ? value.Value.ToString(null, CultureInfo.InvariantCulture) : string.Empty;
 
     private void RefreshSceneGizmo()
     {
@@ -2470,6 +3760,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _removePropertyCommand.RaiseCanExecuteChanged();
         _validateCommand.RaiseCanExecuteChanged();
         _captureCommand.RaiseCanExecuteChanged();
+        _attachQualityProfileCommand.RaiseCanExecuteChanged();
+        _applyQualityCommand.RaiseCanExecuteChanged();
+        _captureQualityCommand.RaiseCanExecuteChanged();
+        _compareQualityCommand.RaiseCanExecuteChanged();
         _simulateCommand.RaiseCanExecuteChanged();
         _pauseSimulationCommand.RaiseCanExecuteChanged();
         _stepSimulationCommand.RaiseCanExecuteChanged();
@@ -2484,11 +3778,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _undoCommand.RaiseCanExecuteChanged();
         _redoCommand.RaiseCanExecuteChanged();
         _discoverModelsCommand.RaiseCanExecuteChanged();
+        _signInCodexCommand.RaiseCanExecuteChanged();
+        _cancelCodexSignInCommand.RaiseCanExecuteChanged();
         _runAgentCommand.RaiseCanExecuteChanged();
         _cancelAgentCommand.RaiseCanExecuteChanged();
         _refreshMeshAssetsCommand.RaiseCanExecuteChanged();
         _createMeshPrimitiveCommand.RaiseCanExecuteChanged();
         _openMeshAssetCommand.RaiseCanExecuteChanged();
+        _frameSelectedMeshViewportCommand.RaiseCanExecuteChanged();
+        _toggleMeshViewportProjectionCommand.RaiseCanExecuteChanged();
         _publishModelCommand.RaiseCanExecuteChanged();
         _placeModelCommand.RaiseCanExecuteChanged();
         _publishAndPlaceModelCommand.RaiseCanExecuteChanged();
@@ -2506,10 +3804,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private RekallAgeAsyncCommand CreateAsyncCommand(Func<Task> execute, Func<bool> canExecute) =>
         new(execute, canExecute, ReportUnexpectedFailure);
 
-    private void ReportUnexpectedFailure(Exception exception)
+    private void ReportUnexpectedFailure(Exception _)
     {
         StatusText = "Studio operation failed. See Validation for details.";
-        Replace(ValidationLines, [$"error: REKALL_STUDIO_UNEXPECTED_FAILURE - {exception.Message}"]);
+        Replace(ValidationLines, ["error: REKALL_STUDIO_UNEXPECTED_FAILURE - The operation failed unexpectedly."]);
         IsBusy = false;
     }
 }

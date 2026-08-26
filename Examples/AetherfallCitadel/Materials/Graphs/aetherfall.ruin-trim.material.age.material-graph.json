@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.ruin-trim.material",
+  "name": "Ruin Worn Carved Trim",
+  "revision": 1,
+  "nodes": [
+    { "nodeId": "color", "typeId": "rekall.material.constant.color", "typeVersion": 1, "parameters": { "value": "#ded4c2" } },
+    { "nodeId": "pbr", "typeId": "rekall.material.surface.pbr", "typeVersion": 1, "parameters": { "roughness": 0.74, "metallic": 0.04 } },
+    { "nodeId": "output", "typeId": "rekall.material.output", "typeVersion": 1, "parameters": {} }
+  ],
+  "links": [
+    { "linkId": "color-pbr", "fromNodeId": "color", "fromPortId": "color", "toNodeId": "pbr", "toPortId": "baseColor" },
+    { "linkId": "pbr-output", "fromNodeId": "pbr", "fromPortId": "surface", "toNodeId": "output", "toPortId": "surface" }
+  ],
+  "output": { "name": "surface", "nodeId": "output", "portId": "surface" },
+  "exposedParameters": []
+}

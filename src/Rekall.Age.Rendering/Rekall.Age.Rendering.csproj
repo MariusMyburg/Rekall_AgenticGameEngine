@@ -25,6 +25,7 @@
   <ItemGroup>
     <Content Include="Shaders\*.vert" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Shaders\*.frag" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Shaders\*.comp" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <PropertyGroup>

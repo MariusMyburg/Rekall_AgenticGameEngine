@@ -10,7 +10,8 @@ public sealed record RekallAgeVulkanSceneCommandDraw(
     RekallAgeVulkanSceneMaterialKey MaterialKey,
     RekallAgeVulkanSceneGpuDrawPushConstants PushConstants,
     bool Transparent = false,
-    RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null);
+    RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline = null,
+    string EntityId = "");
 
 public sealed record RekallAgeVulkanSceneRenderPassCommand(
     uint FramebufferIndex,
@@ -30,11 +31,17 @@ public sealed record RekallAgeVulkanSceneCommandPlan(
     IReadOnlyList<string> Blockers)
 {
     public int DrawCount => RenderPasses.Sum(pass => pass.Draws.Count);
+
+    public IReadOnlyList<RekallAgeHighFidelityRenderPass> PostPasses { get; init; } =
+        Array.Empty<RekallAgeHighFidelityRenderPass>();
 }
 
 public static class RekallAgeVulkanSceneCommandPlanBuilder
 {
-    public static RekallAgeVulkanSceneCommandPlan BuildOffscreen(RekallAgeVulkanScenePreparedFrame preparedFrame)
+    public static RekallAgeVulkanSceneCommandPlan BuildOffscreen(
+        RekallAgeVulkanScenePreparedFrame preparedFrame,
+        RekallAgeHighFidelityRenderGraph? highFidelityGraph = null,
+        RekallAgeVulkanShadowPlan? shadowPlan = null)
     {
         var backend = RekallAgeVulkanSceneRenderBackendPlanner.Plan(preparedFrame.Target);
         var blockers = new List<string>(backend.Blockers);
@@ -43,7 +50,9 @@ public static class RekallAgeVulkanSceneCommandPlanBuilder
             blockers.Add("Offscreen command plans require a non-OpenXR render target.");
         }
 
-        if (!preparedFrame.HasDrawableGeometry)
+        var hasParticleWork = highFidelityGraph?.Passes.Any(pass =>
+            pass.Name.Equals("particle-simulate", StringComparison.Ordinal)) == true;
+        if (!preparedFrame.HasDrawableGeometry && !hasParticleWork)
         {
             blockers.Add("Offscreen command plans require drawable geometry.");
         }
@@ -53,15 +62,15 @@ public static class RekallAgeVulkanSceneCommandPlanBuilder
             return Blocked(preparedFrame, backend, blockers);
         }
 
-        return new RekallAgeVulkanSceneCommandPlan(
+        var plan = new RekallAgeVulkanSceneCommandPlan(
             preparedFrame,
             [
                 new RekallAgeVulkanSceneRenderPassCommand(
                     0,
                     null,
                     new Vector4(0, 0, preparedFrame.Target.Width, preparedFrame.Target.Height),
-                    RekallAgeVulkanSceneUniformUploadBuilder.BuildFrameUniform(preparedFrame.Batch.Frame),
-                    BuildDrawCommands(preparedFrame.DrawPlan.Draws))
+                    RekallAgeVulkanSceneUniformUploadBuilder.BuildFrameUniform(preparedFrame.Batch.Frame, shadowPlan),
+                    BuildDrawCommands(preparedFrame.DrawPlan.Draws, shadowPlan))
             ],
             backend.CommandSubmission.FrameUniformBufferCount,
             backend.CommandSubmission.CopiesColorToReadback,
@@ -69,6 +78,17 @@ public static class RekallAgeVulkanSceneCommandPlanBuilder
             backend.CommandSubmission.RequiresExternalAcquireRelease,
             true,
             Array.Empty<string>());
+        if (preparedFrame.Target.IsHighFidelityOffscreenCapture && highFidelityGraph is not null)
+        {
+            plan = plan with
+            {
+                PostPasses = highFidelityGraph.Passes
+                    .Where(pass => pass.Name is "ssao-resolve" or "fog-integrate" or "fog-debug-readback" or "particle-upload" or "particle-simulate" or "transparent-particles" or "bloom" or "tone-map" or "ui" or "present")
+                    .ToArray()
+            };
+        }
+
+        return plan;
     }
 
     public static RekallAgeVulkanSceneCommandPlan BuildOpenXr(RekallAgeOpenXrNativeSceneRenderPlan nativePlan)
@@ -91,7 +111,7 @@ public static class RekallAgeVulkanSceneCommandPlanBuilder
             return Blocked(preparedFrame, backend, blockers);
         }
 
-        var draws = BuildDrawCommands(preparedFrame.DrawPlan.Draws);
+        var draws = BuildDrawCommands(preparedFrame.DrawPlan.Draws, null);
         return new RekallAgeVulkanSceneCommandPlan(
             preparedFrame,
             nativePlan.Eyes
@@ -128,7 +148,8 @@ public static class RekallAgeVulkanSceneCommandPlanBuilder
     }
 
     private static IReadOnlyList<RekallAgeVulkanSceneCommandDraw> BuildDrawCommands(
-        IReadOnlyList<RekallAgeVulkanScenePreparedDraw> draws)
+        IReadOnlyList<RekallAgeVulkanScenePreparedDraw> draws,
+        RekallAgeVulkanShadowPlan? shadowPlan)
     {
         return draws
             .Select(draw => new RekallAgeVulkanSceneCommandDraw(
@@ -148,9 +169,15 @@ public static class RekallAgeVulkanSceneCommandPlanBuilder
                     draw.CloudFactors,
                     draw.CloudColor,
                     draw.CloudShadowFactors,
-                    draw.SurfaceWaterFactors),
+                    draw.SurfaceWaterFactors,
+                    draw.CastShadows,
+                    draw.ReceiveShadows
+                        && (shadowPlan is null || (draw.ShadowLayerMask & shadowPlan.ReceiverMask) != 0),
+                    draw.AlphaMode,
+                    draw.AlphaCutoff),
                 draw.Transparent,
-                draw.ShaderPipeline))
+                draw.ShaderPipeline,
+                draw.EntityId))
             .ToArray();
     }
 }

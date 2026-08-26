@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.Versioning;
 using Rekall.Age.Modules.Hosting.Windows;
 using Rekall.Age.Runtime.Abstractions;
@@ -187,6 +188,7 @@ public sealed class RekallAgeRestrictedModuleHostClient : IAsyncDisposable
         try
         {
             var sequence = Interlocked.Increment(ref _sequence);
+            var requestStartedAt = Stopwatch.GetTimestamp();
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             deadline.CancelAfter(timeout);
             try
@@ -209,6 +211,17 @@ public sealed class RekallAgeRestrictedModuleHostClient : IAsyncDisposable
                 }
 
                 var response = await responseTask;
+                if (Stopwatch.GetElapsedTime(requestStartedAt) > timeout
+                    && !cancellationToken.IsCancellationRequested)
+                {
+                    Interlocked.Exchange(ref _unavailable, 1);
+                    await _process.DisposeAsync();
+                    throw new RekallAgeModuleHostException(
+                        timeoutCode,
+                        $"The module-host operation '{operation}' exceeded its {timeout.TotalMilliseconds:0}-millisecond deadline.",
+                        operation);
+                }
+
                 if (response.Sequence != sequence || !string.Equals(response.Operation, operation, StringComparison.Ordinal))
                 {
                     Interlocked.Exchange(ref _unavailable, 1);

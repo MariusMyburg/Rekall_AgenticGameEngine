@@ -165,6 +165,38 @@ public sealed class StudioModelingGraphSessionTests
         Assert.False(operation.IsValid);
     }
 
+    [Fact]
+    public void StructuredParameterEditorRoundTripsCurveDocumentsAsJsonObjectsInsteadOfQuotedStrings()
+    {
+        var source = RekallAgeModelingNodeCatalog.CreateDefault().Find("rekall.modeling.curve.source", 1)!;
+        var document = new JsonObject
+        {
+            ["schemaVersion"] = 1,
+            ["assetId"] = "curve.studio",
+            ["name"] = "Studio Curve",
+            ["revision"] = 1,
+            ["splines"] = new JsonArray()
+        };
+        var editor = new RekallAgeStudioModelingGraphParameterModel(
+            source.Parameters.Single(item => item.ParameterId == "document"), document);
+
+        Assert.Equal(RekallAgeModelingValueType.Json, source.Parameters.Single(item => item.ParameterId == "document").ValueType);
+        Assert.True(editor.TryGetValue(out var initial));
+        Assert.IsType<JsonObject>(initial);
+        editor.ValueText = "{\"schemaVersion\":1,\"assetId\":\"curve.changed\",\"splines\":[]}";
+        Assert.True(editor.IsValid);
+        Assert.True(editor.IsModified);
+        Assert.Equal("curve.changed", Assert.IsType<JsonObject>(AssertParsed(editor))["assetId"]!.GetValue<string>());
+        editor.ValueText = "not-json";
+        Assert.False(editor.IsValid);
+
+        static JsonNode AssertParsed(RekallAgeStudioModelingGraphParameterModel parameter)
+        {
+            Assert.True(parameter.TryGetValue(out var value));
+            return value!;
+        }
+    }
+
     private static string TemporaryRoot() =>
         Path.Combine(Path.GetTempPath(), "rekall-age-studio-graph-" + Guid.NewGuid().ToString("N"));
 

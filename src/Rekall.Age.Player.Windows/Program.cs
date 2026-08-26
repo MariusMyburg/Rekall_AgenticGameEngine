@@ -2,7 +2,6 @@
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -104,6 +103,7 @@ internal static class Program
         var openXrEyeWidth = ReadPositiveIntOption(args, "--vr-eye-width") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeWidth;
         var openXrEyeHeight = ReadPositiveIntOption(args, "--vr-eye-height") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeHeight;
         var frameLimit = ReadPositiveIntOption(args, "--frames") ?? 0;
+        var debugHudEnabled = RekallAgePlayerPresentationPolicy.Plan(args).DebugHudEnabled;
         var audioRequired = HasOption(args, "--audio-required");
         var projectRoot = Path.GetFullPath(args[0]);
         var sceneName = args[1];
@@ -119,6 +119,7 @@ internal static class Program
             sceneSupersampleFactor,
             openXrEyeWidth,
             openXrEyeHeight,
+            debugHudEnabled,
             audioRequired,
             faultInjection);
         var evidenceWriter = new RekallAgePlayerFailureReportWriter(
@@ -235,18 +236,21 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly CommandList _commands;
     private readonly Pipeline _scenePipeline;
     private readonly Pipeline _sceneTransparentPipeline;
+    private readonly Pipeline _directionalShadowPipeline;
     private readonly RekallAgeVeldridShaderPipelineCache _shaderPipelineCache;
     private readonly Pipeline _presentPipeline;
     private readonly RekallAgeVeldridPresentPassAdapter _presentPassAdapter;
     private readonly RekallAgeVeldridRuntimeGpuWorkloadExecutor _runtimeGpuWorkloadExecutor;
     private readonly Pipeline _hudPipeline;
     private readonly ResourceLayout _frameLayout;
+    private readonly ResourceLayout _directionalShadowFrameLayout;
     private readonly ResourceLayout _drawLayout;
     private readonly ResourceLayout _materialLayout;
     private readonly ResourceLayout _presentTextureLayout;
     private readonly ResourceLayout _postProcessLayout;
     private readonly ResourceLayout _hudTextureLayout;
-    private readonly ResourceSet _frameSet;
+    private ResourceSet _frameSet;
+    private readonly ResourceSet _directionalShadowFrameSet;
     private ResourceSet _drawSet;
     private readonly ResourceSet _postProcessSet;
     private readonly RekallAgeRuntimeExecutionLoop _runtimeLoop;
@@ -269,6 +273,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly RekallAgeOpenXrVulkanInteropInspection? _openXrVulkanInterop;
     private readonly RekallAgeOpenXrCompositorSessionBootstrapResult? _openXrCompositorSession;
     private readonly bool _simulateXrInput;
+    private readonly bool _debugHudEnabled;
     private readonly int _sceneSupersampleFactor;
     private readonly int _openXrEyeWidth;
     private readonly int _openXrEyeHeight;
@@ -276,11 +281,14 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly RekallAgeVulkanSceneMeshBuilder _meshBuilder = new();
     private readonly RekallAgeVulkanSceneBatchBuilder _batchBuilder = new();
+    private readonly RekallAgeInteractiveQualityFrameResolver _interactiveQualityResolver = new();
 
     private DeviceBuffer _vertexBuffer;
     private DeviceBuffer _indexBuffer;
     private DeviceBuffer _hudVertexBuffer;
     private DeviceBuffer _frameUniformBuffer;
+    private readonly DeviceBuffer _fogUniformBuffer;
+    private readonly DeviceBuffer _directionalShadowFrameUniformBuffer;
     private DeviceBuffer _drawUniformBuffer;
     private DeviceBuffer _postProcessUniformBuffer;
     private uint _vertexBufferCapacityBytes;
@@ -316,6 +324,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private long _lastShaderHotReloadRequestTicks;
     private CachedRenderGeometry? _cachedStaticGeometry;
     private bool _hudDirty = true;
+    private int? _uiOverlaySignature;
     private RekallAgeSceneDocument _sceneDocument;
     private readonly object _runtimeInputGate = new();
     private RekallAgeRuntimeInputState _latestRuntimeInput = RekallAgeRuntimeInputState.Empty;
@@ -325,6 +334,19 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private Task? _openXrSubmitTask;
     private bool _audioSubmissionLogged;
     private string? _lastRuntimeGpuWorkloadStatus;
+    private int _profileFrameCount;
+    private double _profileSimulationMs;
+    private double _profileFrameBuildMs;
+    private double _profilePacketMs;
+    private double _profileUiMs;
+    private double _profileSubmitMs;
+    private int _profileGeometryCacheHits;
+    private int _profileGeometryCacheMisses;
+    private DirectionalShadowTarget _directionalShadowTarget;
+    private readonly RekallAgeInteractiveShadowFramePlanner _interactiveShadowPlanner = new();
+    private readonly RekallAgeInteractiveFogFramePlanner _interactiveFogPlanner = new();
+    private readonly RekallAgeInteractiveAmbientOcclusionPlanner _interactiveAmbientOcclusionPlanner = new();
+    private readonly RekallAgeInteractiveParticleBridge _interactiveParticleBridge = new();
 
     public bool AudioOutputAvailable => _audioOutput is not null;
 
@@ -341,22 +363,27 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         CommandList commands,
         Pipeline scenePipeline,
         Pipeline sceneTransparentPipeline,
+        Pipeline directionalShadowPipeline,
         RekallAgeVeldridShaderPipelineCache shaderPipelineCache,
         Pipeline presentPipeline,
         Pipeline hudPipeline,
         ResourceLayout frameLayout,
+        ResourceLayout directionalShadowFrameLayout,
         ResourceLayout drawLayout,
         ResourceLayout materialLayout,
         ResourceLayout presentTextureLayout,
         ResourceLayout postProcessLayout,
         ResourceLayout hudTextureLayout,
         ResourceSet frameSet,
+        ResourceSet directionalShadowFrameSet,
         ResourceSet drawSet,
         ResourceSet postProcessSet,
         DeviceBuffer vertexBuffer,
         DeviceBuffer indexBuffer,
         DeviceBuffer hudVertexBuffer,
         DeviceBuffer frameUniformBuffer,
+        DeviceBuffer fogUniformBuffer,
+        DeviceBuffer directionalShadowFrameUniformBuffer,
         DeviceBuffer drawUniformBuffer,
         DeviceBuffer postProcessUniformBuffer,
         Rekall.Age.Runtime.Abstractions.RekallAgeRuntimeWorld runtimeWorld,
@@ -368,13 +395,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         TextureBinding flatNormalTexture,
         TextureBinding defaultMetallicRoughnessTexture,
         TextureBinding hudTexture,
+        DirectionalShadowTarget directionalShadowTarget,
         RekallAgeOpenXrSessionBootstrapResult? openXrStatus,
         RekallAgeOpenXrVulkanInteropInspection? openXrVulkanInterop,
         RekallAgeOpenXrCompositorSessionBootstrapResult? openXrCompositorSession,
         bool simulateXrInput,
         int sceneSupersampleFactor,
         int openXrEyeWidth,
-        int openXrEyeHeight)
+        int openXrEyeHeight,
+        bool debugHudEnabled)
     {
         _projectRoot = projectRoot;
         _sceneName = sceneName;
@@ -389,24 +418,29 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _commands = commands;
         _scenePipeline = scenePipeline;
         _sceneTransparentPipeline = sceneTransparentPipeline;
+        _directionalShadowPipeline = directionalShadowPipeline;
         _shaderPipelineCache = shaderPipelineCache;
         _presentPipeline = presentPipeline;
         _presentPassAdapter = new RekallAgeVeldridPresentPassAdapter();
         _runtimeGpuWorkloadExecutor = new RekallAgeVeldridRuntimeGpuWorkloadExecutor(projectRoot, device, commands);
         _hudPipeline = hudPipeline;
         _frameLayout = frameLayout;
+        _directionalShadowFrameLayout = directionalShadowFrameLayout;
         _drawLayout = drawLayout;
         _materialLayout = materialLayout;
         _presentTextureLayout = presentTextureLayout;
         _postProcessLayout = postProcessLayout;
         _hudTextureLayout = hudTextureLayout;
         _frameSet = frameSet;
+        _directionalShadowFrameSet = directionalShadowFrameSet;
         _drawSet = drawSet;
         _postProcessSet = postProcessSet;
         _vertexBuffer = vertexBuffer;
         _indexBuffer = indexBuffer;
         _hudVertexBuffer = hudVertexBuffer;
         _frameUniformBuffer = frameUniformBuffer;
+        _fogUniformBuffer = fogUniformBuffer;
+        _directionalShadowFrameUniformBuffer = directionalShadowFrameUniformBuffer;
         _drawUniformBuffer = drawUniformBuffer;
         _postProcessUniformBuffer = postProcessUniformBuffer;
         _vertexBufferCapacityBytes = vertexBuffer.SizeInBytes;
@@ -428,12 +462,14 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _flatNormalTexture = flatNormalTexture;
         _defaultMetallicRoughnessTexture = defaultMetallicRoughnessTexture;
         _hudTexture = hudTexture;
+        _directionalShadowTarget = directionalShadowTarget;
         _hudTextureSet = _factory.CreateResourceSet(new ResourceSetDescription(_hudTextureLayout, _hudTexture.Texture, _hudTexture.Sampler));
         _uiTexture = CreateUiTextureBinding(InitialWidth, InitialHeight);
         _openXrStatus = openXrStatus;
         _openXrVulkanInterop = openXrVulkanInterop;
         _openXrCompositorSession = openXrCompositorSession;
         _simulateXrInput = simulateXrInput;
+        _debugHudEnabled = debugHudEnabled;
         _sceneSupersampleFactor = Math.Clamp(sceneSupersampleFactor, 1, 4);
         _openXrEyeWidth = Math.Clamp(openXrEyeWidth, 64, RekallAgeOpenXrHeadsetSubmitPlanner.MaxSceneEyeExtent);
         _openXrEyeHeight = Math.Clamp(openXrEyeHeight, 64, RekallAgeOpenXrHeadsetSubmitPlanner.MaxSceneEyeExtent);
@@ -455,6 +491,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         int sceneSupersampleFactor,
         int openXrEyeWidth,
         int openXrEyeHeight,
+        bool debugHudEnabled,
         CancellationToken cancellationToken)
     {
         sceneSupersampleFactor = Math.Clamp(sceneSupersampleFactor, 1, 4);
@@ -474,7 +511,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var runResult = await runtimeLoop.RunAsync(initialWorld, 1, cancellationToken);
         var world = runResult.World;
         var baseFrame = new RekallAgeRuntimeRenderFrameBuilder()
-            .Build(world, InitialWidth, InitialHeight, debugOverlay: true);
+            .Build(world, InitialWidth, InitialHeight, debugOverlay: debugHudEnabled);
         var entityCount = world.Entities.Count;
         PlayerLog.Write($"Loaded runtime scene renderables={baseFrame.Renderables.Count}.");
         PlayerLog.Write("Resolving viewport assets.");
@@ -555,6 +592,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var sceneShaders = factory.CreateFromSpirv(
             new ShaderDescription(ShaderStages.Vertex, Encoding.UTF8.GetBytes(SceneVertexShader), "main"),
             new ShaderDescription(ShaderStages.Fragment, Encoding.UTF8.GetBytes(SceneFragmentShader), "main"));
+        var directionalShadowShaders = factory.CreateFromSpirv(
+            new ShaderDescription(ShaderStages.Vertex, Encoding.UTF8.GetBytes(DirectionalShadowVertexShader), "main"));
         var presentShaders = factory.CreateFromSpirv(
             new ShaderDescription(ShaderStages.Vertex, Encoding.UTF8.GetBytes(PresentVertexShader), "main"),
             new ShaderDescription(ShaderStages.Fragment, Encoding.UTF8.GetBytes(PresentFragmentShader), "main"));
@@ -571,7 +610,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             new VertexElementDescription("Color", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float4),
             new VertexElementDescription("UV", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2));
         var frameLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
-            new ResourceLayoutElementDescription("FrameUniform", ResourceKind.UniformBuffer, ShaderStages.Vertex | ShaderStages.Fragment)));
+            new ResourceLayoutElementDescription("FrameUniform", ResourceKind.UniformBuffer, ShaderStages.Vertex | ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("DirectionalShadowAtlas", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("DirectionalShadowSampler", ResourceKind.Sampler, ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("InteractiveFogUniform", ResourceKind.UniformBuffer, ShaderStages.Fragment)));
+        var directionalShadowFrameLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
+            new ResourceLayoutElementDescription("DirectionalShadowFrameUniform", ResourceKind.UniformBuffer, ShaderStages.Vertex)));
         var drawLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
             new ResourceLayoutElementDescription(
                 "DrawUniform",
@@ -595,12 +639,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             new ResourceLayoutElementDescription("SurfaceWaterSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
         var presentTextureLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
             new ResourceLayoutElementDescription("SceneTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
-            new ResourceLayoutElementDescription("SceneSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
+            new ResourceLayoutElementDescription("SceneSampler", ResourceKind.Sampler, ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("SceneDepthTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("SceneDepthSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
         var postProcessLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
             new ResourceLayoutElementDescription("PostProcessUniform", ResourceKind.UniformBuffer, ShaderStages.Fragment)));
         var hudTextureLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
             new ResourceLayoutElementDescription("SurfaceTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
             new ResourceLayoutElementDescription("SurfaceSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
+        var directionalShadowTarget = CreateDirectionalShadowTarget(factory, 2048);
         using var initialSceneTarget = CreateSceneRenderTarget(factory, InitialWidth, InitialHeight, sceneSupersampleFactor, presentTextureLayout);
         var sceneShaderSet = new ShaderSetDescription([sceneVertexLayout], sceneShaders);
         var scenePipelineDescription = new GraphicsPipelineDescription(
@@ -619,6 +666,14 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             sceneShaderSet,
             [frameLayout, drawLayout, materialLayout],
             initialSceneTarget.Framebuffer.OutputDescription);
+        var directionalShadowPipelineDescription = new GraphicsPipelineDescription(
+            BlendStateDescription.Empty,
+            DepthStencilStateDescription.DepthOnlyLessEqual,
+            RasterizerStateDescription.CullNone,
+            PrimitiveTopology.TriangleList,
+            new ShaderSetDescription([sceneVertexLayout], [directionalShadowShaders]),
+            [directionalShadowFrameLayout, drawLayout],
+            directionalShadowTarget.Framebuffers[0].OutputDescription);
         var presentShaderSet = new ShaderSetDescription([], presentShaders);
         var presentPipelineDescription = new GraphicsPipelineDescription(
             BlendStateDescription.SingleOverrideBlend,
@@ -640,9 +695,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         PlayerLog.Write("Creating graphics pipelines.");
         var scenePipeline = factory.CreateGraphicsPipeline(scenePipelineDescription);
         var sceneTransparentPipeline = factory.CreateGraphicsPipeline(sceneTransparentPipelineDescription);
+        var directionalShadowPipeline = factory.CreateGraphicsPipeline(directionalShadowPipelineDescription);
         var presentPipeline = factory.CreateGraphicsPipeline(presentPipelineDescription);
         var hudPipeline = factory.CreateGraphicsPipeline(hudPipelineDescription);
-        foreach (var shader in sceneShaders.Concat(presentShaders).Concat(hudShaders))
+        foreach (var shader in sceneShaders.Concat([directionalShadowShaders]).Concat(presentShaders).Concat(hudShaders))
         {
             shader.Dispose();
         }
@@ -668,6 +724,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var frameUniformBuffer = factory.CreateBuffer(new BufferDescription(
             checked((uint)Marshal.SizeOf<FrameUniform>()),
             BufferUsage.UniformBuffer | BufferUsage.Dynamic));
+        var fogUniformBuffer = factory.CreateBuffer(new BufferDescription(
+            checked((uint)Marshal.SizeOf<InteractiveFogUniform>()),
+            BufferUsage.UniformBuffer | BufferUsage.Dynamic));
+        var directionalShadowFrameUniformBuffer = factory.CreateBuffer(new BufferDescription(
+            checked((uint)Marshal.SizeOf<DirectionalShadowFrameUniform>()),
+            BufferUsage.UniformBuffer | BufferUsage.Dynamic));
         var drawUniformStrideBytes = AlignTo(
             checked((uint)Marshal.SizeOf<DrawUniform>()),
             Math.Max(1, device.UniformBufferMinOffsetAlignment));
@@ -677,7 +739,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var postProcessUniformBuffer = factory.CreateBuffer(new BufferDescription(
             checked((uint)Marshal.SizeOf<PostProcessUniform>()),
             BufferUsage.UniformBuffer | BufferUsage.Dynamic));
-        var frameSet = factory.CreateResourceSet(new ResourceSetDescription(frameLayout, frameUniformBuffer));
+        var frameSet = factory.CreateResourceSet(new ResourceSetDescription(
+            frameLayout,
+            frameUniformBuffer,
+            directionalShadowTarget.View,
+            directionalShadowTarget.Sampler,
+            fogUniformBuffer));
+        var directionalShadowFrameSet = factory.CreateResourceSet(new ResourceSetDescription(
+            directionalShadowFrameLayout,
+            directionalShadowFrameUniformBuffer));
         var drawSet = factory.CreateResourceSet(new ResourceSetDescription(drawLayout, drawUniformBuffer));
         var postProcessSet = factory.CreateResourceSet(new ResourceSetDescription(postProcessLayout, postProcessUniformBuffer));
         PlayerLog.Write("Creating texture resources.");
@@ -749,22 +819,27 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             commands,
             scenePipeline,
             sceneTransparentPipeline,
+            directionalShadowPipeline,
             shaderPipelineCache,
             presentPipeline,
             hudPipeline,
             frameLayout,
+            directionalShadowFrameLayout,
             drawLayout,
             materialLayout,
             presentTextureLayout,
             postProcessLayout,
             hudTextureLayout,
             frameSet,
+            directionalShadowFrameSet,
             drawSet,
             postProcessSet,
             vertexBuffer,
             indexBuffer,
             hudVertexBuffer,
             frameUniformBuffer,
+            fogUniformBuffer,
+            directionalShadowFrameUniformBuffer,
             drawUniformBuffer,
             postProcessUniformBuffer,
             world,
@@ -776,13 +851,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             flatNormalTexture,
             defaultMetallicRoughnessTexture,
             hudTexture,
+            directionalShadowTarget,
             openXrStatus,
             openXrVulkanInterop,
             openXrCompositorSession,
             simulateXrInput,
             sceneSupersampleFactor,
             openXrEyeWidth,
-            openXrEyeHeight);
+            openXrEyeHeight,
+            debugHudEnabled);
         player.StartLiveEditServer();
         player.StartAssetHotReloadWatcher();
         player.StartShaderHotReloadWatcher();
@@ -1165,12 +1242,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         Cleanup("hud-texture-set", _hudTextureSet.Dispose);
         Cleanup("ui-texture", _uiTexture.Dispose);
         Cleanup("frame-set", _frameSet.Dispose);
+        Cleanup("directional-shadow-frame-set", _directionalShadowFrameSet.Dispose);
         Cleanup("draw-set", _drawSet.Dispose);
         Cleanup("post-process-set", _postProcessSet.Dispose);
         Cleanup("vertex-buffer", _vertexBuffer.Dispose);
         Cleanup("index-buffer", _indexBuffer.Dispose);
         Cleanup("hud-vertex-buffer", _hudVertexBuffer.Dispose);
         Cleanup("frame-uniform-buffer", _frameUniformBuffer.Dispose);
+        Cleanup("fog-uniform-buffer", _fogUniformBuffer.Dispose);
+        Cleanup("directional-shadow-frame-uniform-buffer", _directionalShadowFrameUniformBuffer.Dispose);
         Cleanup("draw-uniform-buffer", _drawUniformBuffer.Dispose);
         Cleanup("post-process-uniform-buffer", _postProcessUniformBuffer.Dispose);
         foreach (var texture in _textures.Values)
@@ -1185,15 +1265,18 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         Cleanup("project-shader-pipelines", _shaderPipelineCache.Dispose);
         Cleanup("scene-pipeline", _scenePipeline.Dispose);
         Cleanup("scene-transparent-pipeline", _sceneTransparentPipeline.Dispose);
+        Cleanup("directional-shadow-pipeline", _directionalShadowPipeline.Dispose);
         Cleanup("present-pipeline", _presentPipeline.Dispose);
         Cleanup("present-pass-adapter", _presentPassAdapter.Dispose);
         Cleanup("hud-pipeline", _hudPipeline.Dispose);
         Cleanup("frame-layout", _frameLayout.Dispose);
+        Cleanup("directional-shadow-frame-layout", _directionalShadowFrameLayout.Dispose);
         Cleanup("draw-layout", _drawLayout.Dispose);
         Cleanup("material-layout", _materialLayout.Dispose);
         Cleanup("present-texture-layout", _presentTextureLayout.Dispose);
         Cleanup("post-process-layout", _postProcessLayout.Dispose);
         Cleanup("hud-texture-layout", _hudTextureLayout.Dispose);
+        Cleanup("directional-shadow-target", _directionalShadowTarget.Dispose);
         Cleanup("command-list", _commands.Dispose);
         Cleanup("graphics-device", _device.Dispose);
         Cleanup("window", () =>
@@ -1487,6 +1570,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _simulationClock.Reset(_clock.Elapsed);
         _cachedStaticGeometry = null;
         _hudDirty = true;
+        _uiOverlaySignature = null;
     }
 
     private JsonObject ReloadAssetsForCurrentWorld(string message)
@@ -1495,7 +1579,16 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             _runtimeWorld,
             Math.Max(1, _window.Width),
             Math.Max(1, _window.Height),
-            debugOverlay: true);
+            debugOverlay: _debugHudEnabled);
+        var authoredQuality = _runtimeWorld.Subsystems.Rendering.QualityProfiles
+            .OrderBy(profile => profile.EntityName, StringComparer.Ordinal)
+            .ThenBy(profile => profile.EntityId, StringComparer.Ordinal)
+            .Select(profile => profile.Intent)
+            .FirstOrDefault();
+        frame = _interactiveQualityResolver.Resolve(
+            frame,
+            authoredQuality,
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline($"veldrid-{_device.BackendType.ToString().ToLowerInvariant()}"));
         var assets = new RekallAgeRuntimeViewportAssetResolver()
             .ResolveAsync(_projectRoot, frame, CancellationToken.None)
             .AsTask()
@@ -1524,6 +1617,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _assetRevision++;
         _cachedStaticGeometry = null;
         _hudDirty = true;
+        _uiOverlaySignature = null;
         PlayerLog.Write($"Live assets reloaded images={assets.Images.Count} textures={assets.Textures.Count} models={assets.Models.Count} issues={assets.Issues.Count}.");
         return CreateLiveStatus("reload_assets", true, message);
     }
@@ -1534,7 +1628,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             _runtimeWorld,
             Math.Max(1, _window.Width),
             Math.Max(1, _window.Height),
-            debugOverlay: true);
+            debugOverlay: _debugHudEnabled);
         return new JsonObject
         {
             ["sessionId"] = _sessionId,
@@ -1669,16 +1763,28 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             return;
         }
 
+        var profileStart = Stopwatch.GetTimestamp();
         ProcessLiveEditQueue();
         ProcessAssetHotReload();
         ProcessShaderHotReload();
         var frameNumber = Interlocked.Increment(ref _frameIndex);
         AdvanceSimulationToWallClock();
+        var profileAfterSimulation = Stopwatch.GetTimestamp();
         var frame = _frameBuilder.Build(
             _runtimeWorld,
             Math.Max(1, _window.Width),
             Math.Max(1, _window.Height),
-            debugOverlay: true);
+            debugOverlay: _debugHudEnabled);
+        var authoredQuality = _runtimeWorld.Subsystems.Rendering.QualityProfiles
+            .OrderBy(profile => profile.EntityName, StringComparer.Ordinal)
+            .ThenBy(profile => profile.EntityId, StringComparer.Ordinal)
+            .Select(profile => profile.Intent)
+            .FirstOrDefault();
+        frame = _interactiveQualityResolver.Resolve(
+            frame,
+            authoredQuality,
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline($"veldrid-{_device.BackendType.ToString().ToLowerInvariant()}"));
+        var profileAfterFrameBuild = Stopwatch.GetTimestamp();
         EnsureSceneRenderTarget(frame.Width, frame.Height);
         var sceneFrame = frame with
         {
@@ -1689,6 +1795,51 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             sceneFrame,
             useStaticGeometryCache: ShouldUseStaticGeometryCache(sceneFrame),
             out var verticesChanged);
+        var highFidelityPlan = new RekallAgeVulkanHighFidelityFrameRenderer().Plan(
+            sceneFrame,
+            _cachedStaticGeometry?.Meshes);
+        var interactiveShadow = _interactiveShadowPlanner.Plan(highFidelityPlan?.ShadowPlan);
+        var interactiveFog = _interactiveFogPlanner.Plan(highFidelityPlan?.FogPlan);
+        var ambientOcclusion = _interactiveAmbientOcclusionPlanner.Plan(
+            sceneFrame.ResolvedQualityPlan,
+            !string.Equals(
+                Environment.GetEnvironmentVariable("REKALL_INTERACTIVE_AO"),
+                "0",
+                StringComparison.OrdinalIgnoreCase));
+        if (frameNumber == 1)
+        {
+            var shadowDiagnostics = highFidelityPlan?.ShadowPlan.Diagnostics.Count > 0
+                ? string.Join(" | ", highFidelityPlan.ShadowPlan.Diagnostics.Select(item => $"{item.Code}: {item.Message}"))
+                : "none";
+            PlayerLog.Write(
+                $"Interactive high fidelity quality={sceneFrame.ResolvedQualityPlan?.ResolvedPreset ?? "none"} " +
+                $"post={sceneFrame.PostProcessStack?.Enabled == true} plan={highFidelityPlan is not null} " +
+                $"shadows={highFidelityPlan?.ShadowPlan.Enabled == true} cascades={highFidelityPlan?.ShadowPlan.Cascades.Count ?? 0} " +
+                $"fog={interactiveFog.Enabled} fogMode={interactiveFog.RequestedMode}->{interactiveFog.ExecutedMode} fogVolumes={interactiveFog.Volumes.Count} " +
+                $"ao={ambientOcclusion.Enabled} aoSamples={ambientOcclusion.SampleCount} " +
+                $"diagnostics={shadowDiagnostics}.");
+            foreach (var diagnostic in interactiveFog.Diagnostics)
+            {
+                PlayerLog.Write($"Interactive fog diagnostic {diagnostic.Code}: {diagnostic.Message}");
+            }
+        }
+        EnsureDirectionalShadowTarget(interactiveShadow.Resolution);
+        packet = ApplyInteractiveShadowFrame(packet, interactiveShadow);
+        packet = ApplyInteractiveEnvironment(packet, sceneFrame.Environment);
+        var interactiveParticles = _interactiveParticleBridge.Build(
+            highFidelityPlan?.ParticlePlan,
+            sceneFrame.ElapsedSeconds,
+            sceneFrame.DeltaSeconds);
+        packet = AppendInteractiveParticles(packet, sceneFrame.ActiveCamera, interactiveParticles);
+        verticesChanged |= interactiveParticles.ActiveParticleCount > 0;
+        if (frameNumber == 1)
+        {
+            PlayerLog.Write(
+                $"Interactive particles mode={interactiveParticles.ExecutionMode} " +
+                $"emitters={interactiveParticles.EmitterCount} active={interactiveParticles.ActiveParticleCount}.");
+        }
+        _device.UpdateBuffer(_fogUniformBuffer, 0, BuildInteractiveFogUniform(interactiveFog));
+        var profileAfterPacket = Stopwatch.GetTimestamp();
 
         if (verticesChanged && packet.Vertices.Length > 0)
         {
@@ -1719,14 +1870,17 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                         draw.CloudFactors,
                         draw.CloudColor,
                         draw.CloudShadowFactors,
-                        draw.SurfaceWaterFactors));
+                        draw.SurfaceWaterFactors,
+                        new Vector4(draw.ReceiveShadows ? 1 : 0, 0, 0, 0)));
             }
         }
 
         UpdateTitle(frameNumber, _clock.Elapsed.TotalSeconds, packet.Vertices.Length);
         var uiVertices = BuildFullScreenOverlayVertices(frame.Renderables.Any(renderable => renderable.UiVisual is not null));
-        var hudVertices = BuildHudVertices(frame.Width, frame.Height);
-        if (_hudDirty)
+        var hudVertices = _debugHudEnabled
+            ? BuildHudVertices(frame.Width, frame.Height)
+            : [];
+        if (_debugHudEnabled && _hudDirty)
         {
             UpdateHudTexture(BuildHudLines(frame, packet));
             _hudDirty = false;
@@ -1744,13 +1898,26 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             _device.UpdateBuffer(_hudVertexBuffer, 0, overlayVertices);
         }
 
-        _device.UpdateBuffer(_postProcessUniformBuffer, 0, BuildPostProcessUniform(frame.PostProcessStack));
+        _device.UpdateBuffer(
+            _postProcessUniformBuffer,
+            0,
+            BuildPostProcessUniform(
+                frame.PostProcessStack,
+                ambientOcclusion,
+                packet.FrameUniform.ViewProjection,
+                packet.FrameUniform.CameraPosition,
+                sceneFrame.Environment,
+                _sceneTarget.Width,
+                _sceneTarget.Height));
+        var profileAfterUi = Stopwatch.GetTimestamp();
 
         _commands.Begin();
+        RecordDirectionalShadowPass(packet, interactiveShadow);
         _commands.SetFramebuffer(_sceneTarget.Framebuffer);
         _commands.SetFullViewports();
         _commands.SetFullScissorRects();
-        _commands.ClearColorTarget(0, new RgbaFloat(0.08f, 0.10f, 0.14f, 1f));
+        var background = RekallAgeEnvironmentBackgroundResolver.Resolve(frame);
+        _commands.ClearColorTarget(0, new RgbaFloat(background.X, background.Y, background.Z, background.W));
         _commands.ClearDepthStencil(1f);
         if (packet.Vertices.Length > 0)
         {
@@ -1810,6 +1977,55 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _commands.End();
         _device.SubmitCommands(_commands);
         _device.SwapBuffers();
+        var profileAfterSubmit = Stopwatch.GetTimestamp();
+        RecordFrameProfile(
+            profileStart,
+            profileAfterSimulation,
+            profileAfterFrameBuild,
+            profileAfterPacket,
+            profileAfterUi,
+            profileAfterSubmit);
+    }
+
+    private void RecordFrameProfile(
+        long start,
+        long afterSimulation,
+        long afterFrameBuild,
+        long afterPacket,
+        long afterUi,
+        long afterSubmit)
+    {
+        if (!_debugHudEnabled)
+        {
+            return;
+        }
+
+        _profileFrameCount++;
+        _profileSimulationMs += Stopwatch.GetElapsedTime(start, afterSimulation).TotalMilliseconds;
+        _profileFrameBuildMs += Stopwatch.GetElapsedTime(afterSimulation, afterFrameBuild).TotalMilliseconds;
+        _profilePacketMs += Stopwatch.GetElapsedTime(afterFrameBuild, afterPacket).TotalMilliseconds;
+        _profileUiMs += Stopwatch.GetElapsedTime(afterPacket, afterUi).TotalMilliseconds;
+        _profileSubmitMs += Stopwatch.GetElapsedTime(afterUi, afterSubmit).TotalMilliseconds;
+        if (_profileFrameCount < 120)
+        {
+            return;
+        }
+
+        PlayerLog.Write(
+            $"Frame profile avgMs simulation={_profileSimulationMs / _profileFrameCount:F2} " +
+            $"frameBuild={_profileFrameBuildMs / _profileFrameCount:F2} " +
+            $"packet={_profilePacketMs / _profileFrameCount:F2} " +
+            $"ui={_profileUiMs / _profileFrameCount:F2} " +
+            $"submit={_profileSubmitMs / _profileFrameCount:F2} " +
+            $"geometryCache={_profileGeometryCacheHits}h/{_profileGeometryCacheMisses}m.");
+        _profileFrameCount = 0;
+        _profileSimulationMs = 0;
+        _profileFrameBuildMs = 0;
+        _profilePacketMs = 0;
+        _profileUiMs = 0;
+        _profileSubmitMs = 0;
+        _profileGeometryCacheHits = 0;
+        _profileGeometryCacheMisses = 0;
     }
 
     private void RenderPlayableFrame()
@@ -2111,11 +2327,13 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             && _cachedStaticGeometry is not null
             && _cachedStaticGeometry.Key.Equals(CreateGeometryCacheKey(frame)))
         {
+            _profileGeometryCacheHits++;
             var packet = BuildRenderPacket(frame, _cachedStaticGeometry, out _);
             changed = false;
             return packet;
         }
 
+        _profileGeometryCacheMisses++;
         var result = BuildRenderPacket(frame, null, out var geometry);
         if (useStaticGeometryCache && geometry is not null)
         {
@@ -2155,7 +2373,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             return new RenderPacket([], [], [], default, [], 0, 0, 0);
         }
 
-        var batch = _batchBuilder.Build(frame, meshes);
+        var batch = cachedGeometry is null
+            ? _batchBuilder.Build(frame, meshes)
+            : _batchBuilder.BuildDynamic(frame, meshes, cachedGeometry.StableBatch);
         var vertices = cachedGeometry?.Vertices;
         if (vertices is null)
         {
@@ -2204,7 +2424,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 draw.CloudShadowFactors,
                 draw.SurfaceWaterFactors,
                 draw.Transparent,
-                draw.ShaderPipeline));
+                draw.ShaderPipeline,
+                draw.EntityId,
+                draw.CastShadows,
+                draw.ReceiveShadows));
         }
 
         var indices = cachedGeometry?.Indices;
@@ -2244,6 +2467,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             builtGeometry = new CachedRenderGeometry(
                 default,
                 meshes,
+                batch,
                 vertices,
                 indices,
                 meshCount,
@@ -2260,16 +2484,152 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 new Vector4(batch.Frame.LightDirection, 0),
                 batch.Frame.LightColor,
                 batch.Frame.LightPosition,
-                batch.Frame.CameraPosition),
+                batch.Frame.CameraPosition,
+                new Vector4(batch.Frame.AdditionalLightDirection, 0),
+                batch.Frame.AdditionalLightColor,
+                batch.Frame.AdditionalLightPosition,
+                batch.Frame.AdditionalLightParameters,
+                PointLight(batch.Frame, 1).Color, PointLight(batch.Frame, 1).Position, PointLight(batch.Frame, 1).Parameters,
+                PointLight(batch.Frame, 2).Color, PointLight(batch.Frame, 2).Position, PointLight(batch.Frame, 2).Parameters,
+                PointLight(batch.Frame, 3).Color, PointLight(batch.Frame, 3).Position, PointLight(batch.Frame, 3).Parameters,
+                EnvironmentAmbientSkyColor: batch.Frame.EnvironmentAmbientSkyColor,
+                EnvironmentAmbientGroundColor: batch.Frame.EnvironmentAmbientGroundColor),
             BuildStereoUniforms(batch),
             meshCount,
             triangleCount.Value,
             textureCount.Value);
     }
 
+    private static RenderPacket AppendInteractiveParticles(
+        RenderPacket packet,
+        RekallAgeRuntimeViewportCamera? camera,
+        RekallAgeInteractiveParticleFrame particleFrame)
+    {
+        if (camera is null || particleFrame.Particles.Count == 0)
+        {
+            return packet;
+        }
+
+        var rotation = Matrix4x4.CreateFromYawPitchRoll(
+            DegreesToRadians((float)camera.RotationY),
+            DegreesToRadians((float)camera.RotationX),
+            DegreesToRadians((float)camera.RotationZ));
+        var right = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitX, rotation));
+        var up = Vector3.Normalize(Vector3.TransformNormal(Vector3.UnitY, rotation));
+        var normal = Vector3.Normalize(Vector3.Cross(right, up));
+        var vertices = new List<GpuVertex>(packet.Vertices.Length + particleFrame.Particles.Count * 4);
+        vertices.AddRange(packet.Vertices);
+        var indices = new List<uint>(packet.Indices.Length + particleFrame.Particles.Count * 6);
+        indices.AddRange(packet.Indices);
+        var draws = new List<GpuDraw>(packet.Draws.Length + particleFrame.EmitterCount);
+        draws.AddRange(packet.Draws);
+
+        foreach (var group in particleFrame.Particles.GroupBy(item => item.EmitterEntityId, StringComparer.Ordinal))
+        {
+            var firstIndex = checked((uint)indices.Count);
+            var vertexOffset = vertices.Count;
+            var particleIndex = 0u;
+            foreach (var particle in group)
+            {
+                var halfRight = right * (particle.Size * 0.5f);
+                var halfUp = up * (particle.Size * 0.5f);
+                vertices.Add(new(particle.Position - halfRight - halfUp, normal, particle.Color, new(0, 1)));
+                vertices.Add(new(particle.Position + halfRight - halfUp, normal, particle.Color, new(1, 1)));
+                vertices.Add(new(particle.Position + halfRight + halfUp, normal, particle.Color, new(1, 0)));
+                vertices.Add(new(particle.Position - halfRight + halfUp, normal, particle.Color, new(0, 0)));
+                indices.Add(particleIndex + 0);
+                indices.Add(particleIndex + 1);
+                indices.Add(particleIndex + 2);
+                indices.Add(particleIndex + 0);
+                indices.Add(particleIndex + 2);
+                indices.Add(particleIndex + 3);
+                particleIndex += 4;
+            }
+
+            var representative = group.First();
+            var emissive = representative.Color;
+            draws.Add(new GpuDraw(
+                FirstIndex: firstIndex,
+                IndexCount: checked((uint)(group.Count() * 6)),
+                VertexOffset: vertexOffset,
+                Model: Matrix4x4.Identity,
+                TextureId: representative.TextureAssetId,
+                MetallicRoughnessTextureId: null,
+                NormalTextureId: null,
+                OcclusionTextureId: null,
+                EmissiveTextureId: null,
+                CloudShadowTextureId: null,
+                SurfaceWaterTextureId: null,
+                MaterialFactors: new Vector4(0, 1, 0, 0),
+                EmissiveFactors: new Vector4(emissive.X, emissive.Y, emissive.Z, 1.35f),
+                AtmosphereFactors0: Vector4.Zero,
+                AtmosphereFactors1: Vector4.Zero,
+                AtmosphereColor0: Vector4.Zero,
+                AtmosphereColor1: Vector4.Zero,
+                AtmosphereColor2: Vector4.Zero,
+                CloudFactors: Vector4.Zero,
+                CloudColor: Vector4.Zero,
+                CloudShadowFactors: Vector4.Zero,
+                SurfaceWaterFactors: Vector4.Zero,
+                Transparent: true,
+                ShaderPipeline: null,
+                EntityId: representative.EmitterEntityId,
+                CastShadows: false,
+                ReceiveShadows: false));
+        }
+
+        return packet with
+        {
+            Vertices = vertices.ToArray(),
+            Indices = indices.ToArray(),
+            Draws = draws.ToArray(),
+            TriangleCount = packet.TriangleCount + particleFrame.ActiveParticleCount * 2
+        };
+    }
+
+    private static float DegreesToRadians(float degrees) => degrees * MathF.PI / 180f;
+
+    private static RenderPacket ApplyInteractiveEnvironment(
+        RenderPacket packet,
+        RekallAgeRuntimeViewportEnvironment? environment)
+    {
+        var parameters = environment is null
+            ? new Vector4(1, 0, 11.2f, 0)
+            : new Vector4(
+                (float)Math.Clamp(environment.AmbientEnergy, 0, 16),
+                (float)Math.Clamp(environment.Exposure, -8, 8),
+                (float)Math.Clamp(environment.WhitePoint, 0.1, 64),
+                environment.ToneMapper.Equals("agx", StringComparison.OrdinalIgnoreCase) ? 1 : 0);
+        var ambientSkyColor = ParseEnvironmentColor(environment?.AmbientSkyColor);
+        var ambientGroundColor = ParseEnvironmentColor(environment?.AmbientGroundColor);
+        return packet with
+        {
+            FrameUniform = packet.FrameUniform with
+            {
+                EnvironmentParameters = parameters,
+                EnvironmentAmbientSkyColor = ambientSkyColor,
+                EnvironmentAmbientGroundColor = ambientGroundColor
+            }
+        };
+    }
+
+    private static Vector4 ParseEnvironmentColor(string? value)
+    {
+        if (value is { Length: 7 or 9 } && value[0] == '#'
+            && byte.TryParse(value.AsSpan(1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var red)
+            && byte.TryParse(value.AsSpan(3, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var green)
+            && byte.TryParse(value.AsSpan(5, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var blue))
+        {
+            return new Vector4(red / 255f, green / 255f, blue / 255f, 1);
+        }
+
+        return Vector4.One;
+    }
+
     private GeometryCacheKey CreateGeometryCacheKey(Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame)
     {
         var hash = new HashCode();
+        hash.Add(RekallAgeVirtualGeometrySelectionSignature.Compute(frame));
         var meshRenderableCount = 0;
         foreach (var renderable in frame.Renderables)
         {
@@ -2302,10 +2662,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             hash.Add(renderable.EmissiveStrength);
             hash.Add(renderable.GeometryMesh?.Vertices.Count ?? 0);
             hash.Add(renderable.GeometryMesh?.Indices.Count ?? 0);
-            hash.Add(renderable.GeometryMesh is null ? 0 : RuntimeHelpers.GetHashCode(renderable.GeometryMesh));
+            hash.Add(renderable.GeometryMesh is null ? 0 : RekallAgeRuntimeGeometrySignature.For(renderable.GeometryMesh));
             hash.Add(renderable.LineSegments?.Segments.Count ?? 0);
             hash.Add(renderable.LineSegments?.Thickness ?? 0);
-            hash.Add(renderable.LineSegments is null ? 0 : RuntimeHelpers.GetHashCode(renderable.LineSegments));
+            hash.Add(renderable.LineSegments is null ? 0 : RekallAgeRuntimeGeometrySignature.For(renderable.LineSegments));
         }
 
         return new GeometryCacheKey(
@@ -2336,23 +2696,79 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                     new Vector4(batch.Frame.LightDirection, 0),
                     batch.Frame.LightColor,
                     batch.Frame.LightPosition,
-                    view.EyePosition),
+                    view.EyePosition,
+                    new Vector4(batch.Frame.AdditionalLightDirection, 0),
+                    batch.Frame.AdditionalLightColor,
+                    batch.Frame.AdditionalLightPosition,
+                    batch.Frame.AdditionalLightParameters,
+                    PointLight(batch.Frame, 1).Color, PointLight(batch.Frame, 1).Position, PointLight(batch.Frame, 1).Parameters,
+                    PointLight(batch.Frame, 2).Color, PointLight(batch.Frame, 2).Position, PointLight(batch.Frame, 2).Parameters,
+                    PointLight(batch.Frame, 3).Color, PointLight(batch.Frame, 3).Position, PointLight(batch.Frame, 3).Parameters),
                 view.Viewport);
         }
 
         return uniforms;
     }
 
-    private static PostProcessUniform BuildPostProcessUniform(RekallAgeRuntimeViewportPostProcessStack? stack)
+    private static RekallAgeVulkanPointLight PointLight(RekallAgeVulkanSceneFrameUniform frame, int index) =>
+        index >= 0 && index < frame.PointLights.Count
+            ? frame.PointLights[index]
+            : new(string.Empty, Vector4.Zero, Vector4.Zero, Vector4.Zero);
+
+    private static PostProcessUniform BuildPostProcessUniform(
+        RekallAgeRuntimeViewportPostProcessStack? stack,
+        RekallAgeInteractiveAmbientOcclusionPlan ambientOcclusion,
+        Matrix4x4 viewProjection,
+        Vector4 cameraPosition,
+        RekallAgeRuntimeViewportEnvironment? environment,
+        int width,
+        int height)
     {
+        var inverseViewProjection = Matrix4x4.Invert(viewProjection, out var inverse)
+            ? inverse
+            : Matrix4x4.Identity;
+        var environmentParameters = environment is null
+            ? new Vector4(0, 11.2f, 0, 0)
+            : new Vector4(
+                (float)Math.Clamp(environment.Exposure, -8, 8),
+                (float)Math.Clamp(environment.WhitePoint, 0.1, 64),
+                environment.ToneMapper.Equals("agx", StringComparison.OrdinalIgnoreCase) ? 1 : 0,
+                environment.ColorGradeAssetId is null ? 0 : 1);
+        var screenParameters = new Vector4(
+            Math.Max(1, width),
+            Math.Max(1, height),
+            1f / Math.Max(1, width),
+            1f / Math.Max(1, height));
+        var ambientOcclusionParameters = ambientOcclusion.Enabled
+            ? new Vector4(
+                ambientOcclusion.SampleCount,
+                ambientOcclusion.RadiusPixels,
+                ambientOcclusion.Strength,
+                ambientOcclusion.Bias)
+            : Vector4.Zero;
+
         if (stack is null)
         {
-            return PostProcessUniform.Default;
+            return PostProcessUniform.Default with
+            {
+                ScreenParameters = screenParameters,
+                AmbientOcclusionParameters = ambientOcclusionParameters,
+                InverseViewProjection = inverseViewProjection,
+                CameraPosition = cameraPosition,
+                EnvironmentParameters = environmentParameters
+            };
         }
 
         if (!stack.Enabled || stack.Passes.Count == 0)
         {
-            return PostProcessUniform.Disabled;
+            return PostProcessUniform.Disabled with
+            {
+                ScreenParameters = screenParameters,
+                AmbientOcclusionParameters = ambientOcclusionParameters,
+                InverseViewProjection = inverseViewProjection,
+                CameraPosition = cameraPosition,
+                EnvironmentParameters = environmentParameters
+            };
         }
 
         var threshold = PostProcessUniform.Default.Parameters.X;
@@ -2382,7 +2798,13 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             }
         }
 
-        return new PostProcessUniform(new Vector4(threshold, intensity, radius, enabled));
+        return new PostProcessUniform(
+            new Vector4(threshold, intensity, radius, enabled),
+            screenParameters,
+            ambientOcclusionParameters,
+            inverseViewProjection,
+            cameraPosition,
+            environmentParameters);
     }
 
     private static void AddTextureId(HashSet<string> textureIds, string? textureId)
@@ -2580,6 +3002,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
     private void UpdateUiTexture(RekallAgeRuntimeViewportFrame frame)
     {
+        var signature = RekallAgeRuntimeUiOverlaySignature.Compute(frame);
+        if (_uiOverlaySignature == signature)
+        {
+            return;
+        }
+
         if (_uiTexture.Texture.Width != (uint)frame.Width || _uiTexture.Texture.Height != (uint)frame.Height)
         {
             _device.WaitForIdle();
@@ -2599,6 +3027,45 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             1,
             0,
             0);
+        _uiOverlaySignature = signature;
+    }
+
+    private void RecordDirectionalShadowPass(
+        RenderPacket packet,
+        RekallAgeInteractiveShadowFrame shadow)
+    {
+        if (!shadow.Enabled || packet.Vertices.Length == 0)
+        {
+            return;
+        }
+
+        _commands.SetPipeline(_directionalShadowPipeline);
+        _commands.SetVertexBuffer(0, _vertexBuffer);
+        _commands.SetIndexBuffer(_indexBuffer, IndexFormat.UInt32);
+        _commands.SetGraphicsResourceSet(0, _directionalShadowFrameSet);
+        for (var cascadeIndex = 0; cascadeIndex < shadow.CascadeCount; cascadeIndex++)
+        {
+            _commands.SetFramebuffer(_directionalShadowTarget.Framebuffers[cascadeIndex]);
+            _commands.SetFullViewports();
+            _commands.SetFullScissorRects();
+            _commands.ClearDepthStencil(1f);
+            _device.UpdateBuffer(
+                _directionalShadowFrameUniformBuffer,
+                0,
+                new DirectionalShadowFrameUniform(shadow.ViewProjections[cascadeIndex]));
+            for (var drawIndex = 0; drawIndex < packet.Draws.Length; drawIndex++)
+            {
+                var draw = packet.Draws[drawIndex];
+                if (!draw.CastShadows || draw.Transparent)
+                {
+                    continue;
+                }
+
+                _drawUniformDynamicOffsets[0] = checked(_drawUniformStrideBytes * (uint)drawIndex);
+                _commands.SetGraphicsResourceSet(1, _drawSet, _drawUniformDynamicOffsets);
+                _commands.DrawIndexed(draw.IndexCount, 1, draw.FirstIndex, draw.VertexOffset, 0);
+            }
+        }
     }
 
     private TextureBinding CreateUiTextureBinding(int width, int height)
@@ -2797,8 +3264,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             height,
             mipLevels: 1,
             arrayLayers: 1,
-            PixelFormat.D24_UNorm_S8_UInt,
-            TextureUsage.DepthStencil));
+            PixelFormat.D32_Float_S8_UInt,
+            TextureUsage.DepthStencil | TextureUsage.Sampled));
         var framebuffer = factory.CreateFramebuffer(new FramebufferDescription(depth, color));
         var sampler = factory.CreateSampler(new SamplerDescription(
             SamplerAddressMode.Clamp,
@@ -2811,7 +3278,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             maximumLod: 0,
             lodBias: 0,
             borderColor: SamplerBorderColor.TransparentBlack));
-        var resourceSet = factory.CreateResourceSet(new ResourceSetDescription(presentTextureLayout, color, sampler));
+        var resourceSet = factory.CreateResourceSet(new ResourceSetDescription(
+            presentTextureLayout,
+            color,
+            sampler,
+            depth,
+            sampler));
         return new SceneRenderTarget(
             displayWidth,
             displayHeight,
@@ -2822,6 +3294,115 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             framebuffer,
             sampler,
             resourceSet);
+    }
+
+    private void EnsureDirectionalShadowTarget(int resolution)
+    {
+        resolution = Math.Clamp(resolution, 256, 4096);
+        if (_directionalShadowTarget.Resolution == resolution)
+        {
+            return;
+        }
+
+        _device.WaitForIdle();
+        _frameSet.Dispose();
+        _directionalShadowTarget.Dispose();
+        _directionalShadowTarget = CreateDirectionalShadowTarget(_factory, resolution);
+        _frameSet = _factory.CreateResourceSet(new ResourceSetDescription(
+            _frameLayout,
+            _frameUniformBuffer,
+            _directionalShadowTarget.View,
+            _directionalShadowTarget.Sampler,
+            _fogUniformBuffer));
+        PlayerLog.Write($"Interactive directional shadow atlas recreated resolution={resolution} cascades={RekallAgeInteractiveShadowFramePlanner.MaximumCascadeCount}.");
+    }
+
+    private static DirectionalShadowTarget CreateDirectionalShadowTarget(ResourceFactory factory, int resolution)
+    {
+        resolution = Math.Clamp(resolution, 256, 4096);
+        var texture = factory.CreateTexture(TextureDescription.Texture2D(
+            checked((uint)resolution),
+            checked((uint)resolution),
+            mipLevels: 1,
+            arrayLayers: RekallAgeInteractiveShadowFramePlanner.MaximumCascadeCount,
+            PixelFormat.D32_Float_S8_UInt,
+            TextureUsage.DepthStencil | TextureUsage.Sampled));
+        var view = factory.CreateTextureView(new TextureViewDescription(
+            texture,
+            baseMipLevel: 0,
+            mipLevels: 1,
+            baseArrayLayer: 0,
+            arrayLayers: RekallAgeInteractiveShadowFramePlanner.MaximumCascadeCount));
+        var sampler = factory.CreateSampler(new SamplerDescription(
+            SamplerAddressMode.Clamp,
+            SamplerAddressMode.Clamp,
+            SamplerAddressMode.Clamp,
+            SamplerFilter.MinLinear_MagLinear_MipPoint,
+            ComparisonKind.Never,
+            maximumAnisotropy: 1,
+            minimumLod: 0,
+            maximumLod: 0,
+            lodBias: 0,
+            borderColor: SamplerBorderColor.OpaqueWhite));
+        var framebuffers = Enumerable.Range(0, RekallAgeInteractiveShadowFramePlanner.MaximumCascadeCount)
+            .Select(layer => factory.CreateFramebuffer(new FramebufferDescription(
+                new FramebufferAttachmentDescription(texture, checked((uint)layer)),
+                [])))
+            .ToArray();
+        return new DirectionalShadowTarget(resolution, texture, view, sampler, framebuffers);
+    }
+
+    private static RenderPacket ApplyInteractiveShadowFrame(
+        RenderPacket packet,
+        RekallAgeInteractiveShadowFrame shadow)
+    {
+        var matrices = shadow.ViewProjections;
+        FrameUniform Apply(FrameUniform uniform) => uniform with
+        {
+            ShadowViewProjection0 = matrices[0],
+            ShadowViewProjection1 = matrices[1],
+            ShadowViewProjection2 = matrices[2],
+            ShadowViewProjection3 = matrices[3],
+            ShadowSplitDepths = shadow.SplitDepths,
+            ShadowParameters = new Vector4(
+                shadow.Enabled ? shadow.CascadeCount : 0,
+                shadow.DepthBias,
+                shadow.NormalBias,
+                1f / Math.Max(1, shadow.Resolution))
+        };
+
+        return packet with
+        {
+            FrameUniform = Apply(packet.FrameUniform),
+            StereoFrameUniforms = packet.StereoFrameUniforms
+                .Select(item => item with { Uniform = Apply(item.Uniform) })
+                .ToArray()
+        };
+    }
+
+    private static InteractiveFogUniform BuildInteractiveFogUniform(RekallAgeInteractiveFogFrame fog)
+    {
+        var packed = Enumerable.Repeat(InteractiveFogVolumeUniform.Disabled, RekallAgeInteractiveFogFramePlanner.MaximumVolumeCount)
+            .ToArray();
+        for (var index = 0; index < fog.Volumes.Count && index < packed.Length; index++)
+        {
+            var volume = fog.Volumes[index];
+            var shape = volume.Shape.Equals("box", StringComparison.Ordinal) ? 1f
+                : volume.Shape.Equals("sphere", StringComparison.Ordinal) ? 2f
+                : 0f;
+            packed[index] = new InteractiveFogVolumeUniform(
+                new Vector4(volume.Position, shape),
+                new Vector4(volume.HalfExtents, volume.Density),
+                new Vector4(volume.Albedo, volume.Anisotropy),
+                new Vector4(volume.Emission, volume.HeightFalloff),
+                new Vector4(volume.BlendDistance, volume.Priority, 0, 0),
+                volume.WorldToLocal);
+        }
+
+        return new InteractiveFogUniform(
+            new Vector4(fog.Enabled ? fog.Volumes.Count : 0, 6, 0.24f, 0),
+            packed[0], packed[1], packed[2], packed[3],
+            packed[4], packed[5], packed[6], packed[7]);
     }
 
     private static Dictionary<string, TextureBinding> CreateTextureBindings(
@@ -3090,6 +3671,27 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         }
     }
 
+    private const string DirectionalShadowVertexShader = """
+        #version 450
+
+        layout(location = 0) in vec3 Position;
+
+        layout(set = 0, binding = 0) uniform DirectionalShadowFrameUniformBuffer
+        {
+            mat4 ViewProjection;
+        } ShadowFrame;
+
+        layout(set = 1, binding = 0) uniform DrawUniformBuffer
+        {
+            mat4 Model;
+        } Draw;
+
+        void main()
+        {
+            gl_Position = ShadowFrame.ViewProjection * Draw.Model * vec4(Position, 1.0);
+        }
+        """;
+
     private const string SceneVertexShader = """
         #version 450
 
@@ -3105,6 +3707,28 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec4 LightColor;
             vec4 LightPosition;
             vec4 CameraPosition;
+            vec4 AdditionalLightDirection;
+            vec4 AdditionalLightColor;
+            vec4 AdditionalLightPosition;
+            vec4 AdditionalLightParameters;
+            vec4 AdditionalLightColor2;
+            vec4 AdditionalLightPosition2;
+            vec4 AdditionalLightParameters2;
+            vec4 AdditionalLightColor3;
+            vec4 AdditionalLightPosition3;
+            vec4 AdditionalLightParameters3;
+            vec4 AdditionalLightColor4;
+            vec4 AdditionalLightPosition4;
+            vec4 AdditionalLightParameters4;
+            mat4 ShadowViewProjection0;
+            mat4 ShadowViewProjection1;
+            mat4 ShadowViewProjection2;
+            mat4 ShadowViewProjection3;
+            vec4 ShadowSplitDepths;
+            vec4 ShadowParameters;
+            vec4 EnvironmentParameters;
+            vec4 EnvironmentAmbientSkyColor;
+            vec4 EnvironmentAmbientGroundColor;
         } Frame;
 
         layout(set = 1, binding = 0) uniform DrawUniformBuffer
@@ -3121,6 +3745,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec4 CloudColor;
             vec4 CloudShadowFactors;
             vec4 SurfaceWaterFactors;
+            vec4 ShadowFactors;
         } Draw;
 
         layout(location = 0) out vec3 fsin_Normal;
@@ -3154,6 +3779,28 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec4 LightColor;
             vec4 LightPosition;
             vec4 CameraPosition;
+            vec4 AdditionalLightDirection;
+            vec4 AdditionalLightColor;
+            vec4 AdditionalLightPosition;
+            vec4 AdditionalLightParameters;
+            vec4 AdditionalLightColor2;
+            vec4 AdditionalLightPosition2;
+            vec4 AdditionalLightParameters2;
+            vec4 AdditionalLightColor3;
+            vec4 AdditionalLightPosition3;
+            vec4 AdditionalLightParameters3;
+            vec4 AdditionalLightColor4;
+            vec4 AdditionalLightPosition4;
+            vec4 AdditionalLightParameters4;
+            mat4 ShadowViewProjection0;
+            mat4 ShadowViewProjection1;
+            mat4 ShadowViewProjection2;
+            mat4 ShadowViewProjection3;
+            vec4 ShadowSplitDepths;
+            vec4 ShadowParameters;
+            vec4 EnvironmentParameters;
+            vec4 EnvironmentAmbientSkyColor;
+            vec4 EnvironmentAmbientGroundColor;
         } Frame;
         
         layout(set = 1, binding = 0) uniform DrawUniformBuffer
@@ -3170,6 +3817,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec4 CloudColor;
             vec4 CloudShadowFactors;
             vec4 SurfaceWaterFactors;
+            vec4 ShadowFactors;
         } Draw;
         
         layout(set = 2, binding = 0) uniform texture2D BaseColorTexture;
@@ -3186,6 +3834,24 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         layout(set = 2, binding = 11) uniform sampler CloudShadowSampler;
         layout(set = 2, binding = 12) uniform texture2D SurfaceWaterTexture;
         layout(set = 2, binding = 13) uniform sampler SurfaceWaterSampler;
+        layout(set = 0, binding = 1) uniform texture2DArray DirectionalShadowAtlas;
+        layout(set = 0, binding = 2) uniform sampler DirectionalShadowSampler;
+
+        struct InteractiveFogVolume
+        {
+            vec4 PositionShape;
+            vec4 HalfExtentsDensity;
+            vec4 AlbedoAnisotropy;
+            vec4 EmissionHeightFalloff;
+            vec4 BlendPriority;
+            mat4 WorldToLocal;
+        };
+
+        layout(set = 0, binding = 3) uniform InteractiveFogUniformBuffer
+        {
+            vec4 Settings;
+            InteractiveFogVolume Volumes[8];
+        } Fog;
         
         layout(location = 0) out vec4 fsout_Color;const float PI = 3.14159265359;
         const int MAX_VIEW_SAMPLE_COUNT = 32;
@@ -3199,10 +3865,24 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec3 q2 = dFdy(fsin_WorldPosition);
             vec2 st1 = dFdx(fsin_UV);
             vec2 st2 = dFdy(fsin_UV);
-            vec3 tangent = normalize(q1 * st2.t - q2 * st1.t);
-            vec3 bitangent = normalize(-q1 * st2.s + q2 * st1.s);
+            float determinant = st1.s * st2.t - st1.t * st2.s;
+            if (abs(determinant) <= 0.0000001)
+            {
+                return normal;
+            }
+            vec3 tangentRaw = q1 * st2.t - q2 * st1.t;
+            vec3 tangentProjected = tangentRaw - normal * dot(normal, tangentRaw);
+            float tangentLengthSquared = dot(tangentProjected, tangentProjected);
+            if (tangentLengthSquared <= 0.0000001)
+            {
+                return normal;
+            }
+            vec3 tangent = tangentProjected * inversesqrt(tangentLengthSquared);
+            vec3 bitangent = normalize(cross(normal, tangent)) * sign(determinant);
             mat3 tbn = mat3(tangent, bitangent, normal);
-            return normalize(tbn * tangentNormal);
+            vec3 mapped = tbn * tangentNormal;
+            float mappedLengthSquared = dot(mapped, mapped);
+            return mappedLengthSquared <= 0.0000001 ? normal : mapped * inversesqrt(mappedLengthSquared);
         }
         
         float distributionGgx(vec3 normal, vec3 halfVector, float roughness)
@@ -3718,6 +4398,132 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             color = applySurfaceAerialPerspective(color, fsin_WorldPosition, light);
             return vec4(pow(max(color, vec3(0.0)), vec3(1.0 / 2.2)), alpha);
         }
+
+        mat4 directionalShadowMatrix(int cascadeIndex)
+        {
+            if (cascadeIndex == 0) return Frame.ShadowViewProjection0;
+            if (cascadeIndex == 1) return Frame.ShadowViewProjection1;
+            if (cascadeIndex == 2) return Frame.ShadowViewProjection2;
+            return Frame.ShadowViewProjection3;
+        }
+
+        float sampleDirectionalShadow(vec3 worldPosition, vec3 normal, vec3 lightDirection)
+        {
+            int cascadeCount = int(Frame.ShadowParameters.x + 0.5);
+            if (cascadeCount <= 0 || Draw.ShadowFactors.x < 0.5)
+            {
+                return 1.0;
+            }
+
+            float viewDistance = distance(Frame.CameraPosition.xyz, worldPosition);
+            int cascadeIndex = 0;
+            if (cascadeCount > 1 && viewDistance > Frame.ShadowSplitDepths.x) cascadeIndex = 1;
+            if (cascadeCount > 2 && viewDistance > Frame.ShadowSplitDepths.y) cascadeIndex = 2;
+            if (cascadeCount > 3 && viewDistance > Frame.ShadowSplitDepths.z) cascadeIndex = 3;
+
+            vec3 offsetPosition = worldPosition + normal * Frame.ShadowParameters.z;
+            vec4 shadowClip = directionalShadowMatrix(cascadeIndex) * vec4(offsetPosition, 1.0);
+            if (shadowClip.w <= 0.00001)
+            {
+                return 1.0;
+            }
+
+            vec3 shadowNdc = shadowClip.xyz / shadowClip.w;
+            vec2 shadowUv = shadowNdc.xy * 0.5 + 0.5;
+            if (shadowUv.x <= 0.0 || shadowUv.x >= 1.0 || shadowUv.y <= 0.0 || shadowUv.y >= 1.0 || shadowNdc.z <= 0.0 || shadowNdc.z >= 1.0)
+            {
+                return 1.0;
+            }
+
+            float slopeBias = Frame.ShadowParameters.y * (1.0 + 2.0 * (1.0 - max(dot(normal, lightDirection), 0.0)));
+            float referenceDepth = shadowNdc.z - slopeBias;
+            float texel = Frame.ShadowParameters.w;
+            float visibility = 0.0;
+            for (int y = -1; y <= 1; y++)
+            {
+                for (int x = -1; x <= 1; x++)
+                {
+                    float storedDepth = texture(
+                        sampler2DArray(DirectionalShadowAtlas, DirectionalShadowSampler),
+                        vec3(shadowUv + vec2(x, y) * texel, float(cascadeIndex))).r;
+                    visibility += referenceDepth <= storedDepth ? 1.0 : 0.0;
+                }
+            }
+            return mix(0.22, 1.0, visibility / 9.0);
+        }
+
+        float interactiveFogInfluence(int volumeIndex, vec3 worldPosition)
+        {
+            InteractiveFogVolume volume = Fog.Volumes[volumeIndex];
+            int shape = int(volume.PositionShape.w + 0.5);
+            float influence = 1.0;
+            if (shape == 1)
+            {
+                vec3 local = (volume.WorldToLocal * vec4(worldPosition, 1.0)).xyz;
+                vec3 remaining = volume.HalfExtentsDensity.xyz - abs(local);
+                float edge = min(remaining.x, min(remaining.y, remaining.z));
+                if (edge <= 0.0) return 0.0;
+                float blend = volume.BlendPriority.x;
+                influence = blend <= 0.0001 ? 1.0 : smoothstep(0.0, blend, edge);
+            }
+            else if (shape == 2)
+            {
+                vec3 local = (volume.WorldToLocal * vec4(worldPosition, 1.0)).xyz;
+                float normalizedRadius = length(local / max(volume.HalfExtentsDensity.xyz, vec3(0.001)));
+                if (normalizedRadius >= 1.0) return 0.0;
+                float normalizedBlend = volume.BlendPriority.x / max(max(volume.HalfExtentsDensity.x, volume.HalfExtentsDensity.y), volume.HalfExtentsDensity.z);
+                influence = normalizedBlend <= 0.0001
+                    ? 1.0
+                    : smoothstep(0.0, normalizedBlend, 1.0 - normalizedRadius);
+            }
+
+            float height = max(0.0, worldPosition.y - volume.PositionShape.y);
+            return influence * exp(-height * volume.EmissionHeightFalloff.w);
+        }
+
+        vec3 applyInteractiveFog(vec3 surfaceColor, vec3 surfacePosition, vec3 lightDirection)
+        {
+            int volumeCount = int(Fog.Settings.x + 0.5);
+            if (volumeCount <= 0)
+            {
+                return surfaceColor;
+            }
+
+            vec3 ray = surfacePosition - Frame.CameraPosition.xyz;
+            float rayLength = min(length(ray), 140.0);
+            if (rayLength <= 0.001)
+            {
+                return surfaceColor;
+            }
+
+            vec3 rayDirection = normalize(ray);
+            const int stepCount = 6;
+            float stepSize = rayLength / float(stepCount);
+            float transmittance = 1.0;
+            vec3 integrated = vec3(0.0);
+            for (int stepIndex = 0; stepIndex < stepCount; stepIndex++)
+            {
+                vec3 samplePosition = Frame.CameraPosition.xyz + rayDirection * ((float(stepIndex) + 0.5) * stepSize);
+                for (int volumeIndex = 0; volumeIndex < 8; volumeIndex++)
+                {
+                    if (volumeIndex >= volumeCount) break;
+                    InteractiveFogVolume volume = Fog.Volumes[volumeIndex];
+                    float influence = interactiveFogInfluence(volumeIndex, samplePosition);
+                    float opticalDepth = volume.HalfExtentsDensity.w * influence * stepSize * Fog.Settings.z;
+                    if (opticalDepth <= 0.000001) continue;
+
+                    float extinction = exp(-opticalDepth);
+                    float forwardPhase = mix(0.34, 0.78, pow(max(dot(rayDirection, lightDirection), 0.0), mix(2.0, 8.0, max(volume.AlbedoAnisotropy.w, 0.0))));
+                    float shadowVisibility = sampleDirectionalShadow(samplePosition, lightDirection, lightDirection);
+                    vec3 fogLight = volume.AlbedoAnisotropy.rgb
+                        * (vec3(0.16) + Frame.LightColor.rgb * forwardPhase * shadowVisibility * 0.58)
+                        + volume.EmissionHeightFalloff.rgb;
+                    integrated += transmittance * fogLight * (1.0 - extinction);
+                    transmittance *= extinction;
+                }
+            }
+            return surfaceColor * transmittance + integrated;
+        }
         
         void main()
         {
@@ -3779,14 +4585,45 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec3 diffuse = (1.0 - f) * (1.0 - metallic) * albedo / PI;
             diffuse *= mix(1.0, 0.42, waterCoverage);
             vec3 directTransmittance = surfaceAtmosphereTransmittance(fsin_WorldPosition, light);
-            float ambientStrength = hasAtmosphereData() ? spaceAmbientFloor() : 0.035;
-            vec3 ambient = albedo * ambientStrength * occlusion;
+            float ambientStrength = hasAtmosphereData()
+                ? spaceAmbientFloor()
+                : 0.12 * max(Frame.EnvironmentParameters.x, 0.0);
+            float ambientHemisphere = clamp(normal.y * 0.5 + 0.5, 0.0, 1.0);
+            vec3 environmentAmbientColor = mix(Frame.EnvironmentAmbientGroundColor.rgb, Frame.EnvironmentAmbientSkyColor.rgb, ambientHemisphere);
+            vec3 ambient = albedo * environmentAmbientColor * ambientStrength * occlusion;
             vec3 waterFresnel = fresnelSchlick(ndotv, vec3(0.02));
             ambient += waterFresnel * Frame.LightColor.rgb * directTransmittance * waterCoverage * 0.018;
             vec3 emissive = pow(max(texture(sampler2D(EmissiveTexture, EmissiveSampler), fsin_UV).rgb * Draw.EmissiveFactors.rgb, vec3(0.0)), vec3(2.2)) * Draw.EmissiveFactors.a;
             float cloudShadow = sampleCloudShadow(fsin_WorldPosition, light);
-            vec3 color = emissive + ambient + (diffuse + specular) * Frame.LightColor.rgb * directTransmittance * cloudShadow * ndotl * 1.8;
+            float directionalShadow = sampleDirectionalShadow(fsin_WorldPosition, normal, light);
+            vec3 color = emissive + ambient + (diffuse + specular) * Frame.LightColor.rgb * directTransmittance * cloudShadow * directionalShadow * ndotl * 1.8;
+            vec4 practicalColors[4] = vec4[](Frame.AdditionalLightColor, Frame.AdditionalLightColor2, Frame.AdditionalLightColor3, Frame.AdditionalLightColor4);
+            vec4 practicalPositions[4] = vec4[](Frame.AdditionalLightPosition, Frame.AdditionalLightPosition2, Frame.AdditionalLightPosition3, Frame.AdditionalLightPosition4);
+            vec4 practicalParameters[4] = vec4[](Frame.AdditionalLightParameters, Frame.AdditionalLightParameters2, Frame.AdditionalLightParameters3, Frame.AdditionalLightParameters4);
+            for (int practicalIndex = 0; practicalIndex < 4; practicalIndex++)
+            {
+                if (dot(practicalColors[practicalIndex].rgb, practicalColors[practicalIndex].rgb) <= 0.000001) continue;
+                vec3 practicalOffset = practicalPositions[practicalIndex].xyz - fsin_WorldPosition;
+                float practicalDistance = length(practicalOffset);
+                vec3 practicalLight = practicalOffset / max(practicalDistance, 0.0001);
+                float practicalRange = max(practicalParameters[practicalIndex].x, 0.001);
+                float practicalWindow = pow(clamp(1.0 - practicalDistance / practicalRange, 0.0, 1.0), 2.0);
+                float practicalAttenuation = practicalWindow / (1.0 + 0.045 * practicalDistance * practicalDistance);
+                vec3 practicalHalf = normalize(view + practicalLight);
+                float practicalNdotL = max(dot(normal, practicalLight), 0.0);
+                float practicalD = distributionGgx(normal, practicalHalf, roughness);
+                float practicalG = geometrySchlickGgx(ndotv, roughness) * geometrySchlickGgx(practicalNdotL, roughness);
+                vec3 practicalF = fresnelSchlick(max(dot(practicalHalf, view), 0.0), f0);
+                vec3 practicalSpecular = practicalD * practicalG * practicalF / max(4.0 * ndotv * practicalNdotL, 0.0001);
+                vec3 practicalDiffuse = (1.0 - practicalF) * (1.0 - metallic) * albedo / PI;
+                color += (practicalDiffuse + practicalSpecular) * practicalColors[practicalIndex].rgb * practicalNdotL * practicalAttenuation * 4.5;
+            }
             color = applySurfaceAerialPerspective(color, fsin_WorldPosition, light);
+            color = applyInteractiveFog(color, fsin_WorldPosition, light);
+            // Exposure belongs in linear scene light. Applying it after this curve in the
+            // presentation pass operated on gamma-encoded LDR values and effectively
+            // tone-mapped the frame twice, flattening authored warm/cool separation.
+            color *= exp2(Frame.EnvironmentParameters.y);
             vec3 mapped = vec3(1.0) - exp(-max(color, vec3(0.0)) * 1.15);
             vec3 lit = pow(mapped, vec3(1.0 / 2.2));
             float surfaceAlpha = hasAtmosphereData() ? fsin_Color.a : fsin_Color.a * textureColor.a;
@@ -3818,9 +4655,16 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         layout(location = 0) in vec2 fsin_UV;
         layout(set = 0, binding = 0) uniform texture2D SceneTexture;
         layout(set = 0, binding = 1) uniform sampler SceneSampler;
+        layout(set = 0, binding = 2) uniform texture2D SceneDepthTexture;
+        layout(set = 0, binding = 3) uniform sampler SceneDepthSampler;
         layout(set = 1, binding = 0) uniform PostProcessUniformBuffer
         {
             vec4 PostProcessParameters;
+            vec4 ScreenParameters;
+            vec4 AmbientOcclusionParameters;
+            mat4 InverseViewProjection;
+            vec4 CameraPosition;
+            vec4 EnvironmentParameters;
         };
 
         layout(location = 0) out vec4 fsout_Color;
@@ -3856,6 +4700,56 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(0.0, radius2.y)).rgb) * 0.03;
             bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv - vec2(0.0, radius2.y)).rgb) * 0.03;
             return bloom;
+        }
+
+        float resolveAmbientOcclusion(vec2 uv, vec2 texel)
+        {
+            int sampleCount = int(AmbientOcclusionParameters.x + 0.5);
+            if (sampleCount <= 0)
+            {
+                return 1.0;
+            }
+
+            float centerDepth = texture(sampler2D(SceneDepthTexture, SceneDepthSampler), uv).r;
+            if (centerDepth >= 0.99999)
+            {
+                return 1.0;
+            }
+
+            const vec2 directions[12] = vec2[](
+                vec2(1.0, 0.0), vec2(0.707, 0.707), vec2(0.0, 1.0), vec2(-0.707, 0.707),
+                vec2(-1.0, 0.0), vec2(-0.707, -0.707), vec2(0.0, -1.0), vec2(0.707, -0.707),
+                vec2(0.383, 0.924), vec2(-0.924, 0.383), vec2(-0.383, -0.924), vec2(0.924, -0.383));
+            vec4 centerWorldH = InverseViewProjection * vec4(uv * 2.0 - 1.0, centerDepth, 1.0);
+            vec3 centerWorld = centerWorldH.xyz / max(abs(centerWorldH.w), 0.00001);
+            float centerDistance = distance(CameraPosition.xyz, centerWorld);
+            float radius = AmbientOcclusionParameters.y;
+            float bias = AmbientOcclusionParameters.w;
+            float occlusion = 0.0;
+            for (int index = 0; index < 12; ++index)
+            {
+                if (index >= sampleCount)
+                {
+                    break;
+                }
+
+                float ring = 0.45 + 0.55 * (float(index + 1) / float(sampleCount));
+                vec2 sampleUv = clamp(uv + directions[index] * texel * radius * ring, texel, vec2(1.0) - texel);
+                float sampleDepth = texture(sampler2D(SceneDepthTexture, SceneDepthSampler), sampleUv).r;
+                if (sampleDepth >= 0.99999)
+                {
+                    continue;
+                }
+                vec4 sampleWorldH = InverseViewProjection * vec4(sampleUv * 2.0 - 1.0, sampleDepth, 1.0);
+                vec3 sampleWorld = sampleWorldH.xyz / max(abs(sampleWorldH.w), 0.00001);
+                float depthDelta = centerDistance - distance(CameraPosition.xyz, sampleWorld);
+                float blocker = smoothstep(bias, bias + 0.42, depthDelta);
+                float rangeWeight = 1.0 - smoothstep(0.2, 3.5, depthDelta);
+                occlusion += blocker * rangeWeight;
+            }
+
+            float normalized = occlusion / float(sampleCount);
+            return clamp(1.0 - normalized * AmbientOcclusionParameters.z, 0.55, 1.0);
         }
 
         vec4 resolveFxaa(vec2 texel)
@@ -3900,8 +4794,14 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec2 texel = 1.0 / vec2(textureSize(sampler2D(SceneTexture, SceneSampler), 0));
             vec4 resolved = resolveFxaa(texel);
             vec3 bloom = sampleBloom(fsin_UV, texel);
-            vec3 color = resolved.rgb + bloom * PostProcessParameters.y * PostProcessParameters.w;
-            color = color / (vec3(1.0) + color * 0.18);
+            float ambientOcclusion = resolveAmbientOcclusion(fsin_UV, texel);
+            // The scene target is already single-tone-mapped and gamma encoded. Keep
+            // presentation effects bounded in that display space until the interactive
+            // path moves to a floating-point HDR target; do not apply exposure/tonemap twice.
+            vec3 color = clamp(
+                resolved.rgb * ambientOcclusion + bloom * PostProcessParameters.y * PostProcessParameters.w,
+                vec3(0.0),
+                vec3(1.0));
             fsout_Color = vec4(color, resolved.a);
         }
         """;
@@ -3952,7 +4852,57 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         Vector4 LightDirection,
         Vector4 LightColor,
         Vector4 LightPosition,
-        Vector4 CameraPosition);
+        Vector4 CameraPosition,
+        Vector4 AdditionalLightDirection,
+        Vector4 AdditionalLightColor,
+        Vector4 AdditionalLightPosition,
+        Vector4 AdditionalLightParameters,
+        Vector4 AdditionalLightColor2,
+        Vector4 AdditionalLightPosition2,
+        Vector4 AdditionalLightParameters2,
+        Vector4 AdditionalLightColor3,
+        Vector4 AdditionalLightPosition3,
+        Vector4 AdditionalLightParameters3,
+        Vector4 AdditionalLightColor4,
+        Vector4 AdditionalLightPosition4,
+        Vector4 AdditionalLightParameters4,
+        Matrix4x4 ShadowViewProjection0 = default,
+        Matrix4x4 ShadowViewProjection1 = default,
+        Matrix4x4 ShadowViewProjection2 = default,
+        Matrix4x4 ShadowViewProjection3 = default,
+        Vector4 ShadowSplitDepths = default,
+        Vector4 ShadowParameters = default,
+        Vector4 EnvironmentParameters = default,
+        Vector4 EnvironmentAmbientSkyColor = default,
+        Vector4 EnvironmentAmbientGroundColor = default);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly record struct DirectionalShadowFrameUniform(Matrix4x4 ViewProjection);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly record struct InteractiveFogVolumeUniform(
+        Vector4 PositionShape,
+        Vector4 HalfExtentsDensity,
+        Vector4 AlbedoAnisotropy,
+        Vector4 EmissionHeightFalloff,
+        Vector4 BlendPriority,
+        Matrix4x4 WorldToLocal)
+    {
+        public static InteractiveFogVolumeUniform Disabled { get; } = new(
+            Vector4.Zero, Vector4.Zero, Vector4.Zero, Vector4.Zero, Vector4.Zero, Matrix4x4.Identity);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly record struct InteractiveFogUniform(
+        Vector4 Settings,
+        InteractiveFogVolumeUniform Volume0,
+        InteractiveFogVolumeUniform Volume1,
+        InteractiveFogVolumeUniform Volume2,
+        InteractiveFogVolumeUniform Volume3,
+        InteractiveFogVolumeUniform Volume4,
+        InteractiveFogVolumeUniform Volume5,
+        InteractiveFogVolumeUniform Volume6,
+        InteractiveFogVolumeUniform Volume7);
 
     [StructLayout(LayoutKind.Sequential)]
     private readonly record struct DrawUniform(
@@ -3967,13 +4917,32 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         Vector4 CloudFactors,
         Vector4 CloudColor,
         Vector4 CloudShadowFactors,
-        Vector4 SurfaceWaterFactors);
+        Vector4 SurfaceWaterFactors,
+        Vector4 ShadowFactors);
 
     [StructLayout(LayoutKind.Sequential)]
-    private readonly record struct PostProcessUniform(Vector4 Parameters)
+    private readonly record struct PostProcessUniform(
+        Vector4 Parameters,
+        Vector4 ScreenParameters,
+        Vector4 AmbientOcclusionParameters,
+        Matrix4x4 InverseViewProjection,
+        Vector4 CameraPosition,
+        Vector4 EnvironmentParameters)
     {
-        public static PostProcessUniform Default { get; } = new(new Vector4(0.86f, 0.42f, 1f, 1f));
-        public static PostProcessUniform Disabled { get; } = new(new Vector4(0.86f, 0f, 1f, 0f));
+        public static PostProcessUniform Default { get; } = new(
+            new Vector4(0.86f, 0.42f, 1f, 1f),
+            Vector4.One,
+            Vector4.Zero,
+            Matrix4x4.Identity,
+            Vector4.Zero,
+            new Vector4(0, 11.2f, 0, 0));
+        public static PostProcessUniform Disabled { get; } = new(
+            new Vector4(0.86f, 0f, 1f, 0f),
+            Vector4.One,
+            Vector4.Zero,
+            Matrix4x4.Identity,
+            Vector4.Zero,
+            new Vector4(0, 11.2f, 0, 0));
     }
 
     private sealed record RenderPacket(
@@ -3989,6 +4958,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private sealed record CachedRenderGeometry(
         GeometryCacheKey Key,
         IReadOnlyList<RekallAgeVulkanSceneMesh> Meshes,
+        RekallAgeVulkanSceneBatch StableBatch,
         GpuVertex[] Vertices,
         uint[] Indices,
         int MeshCount,
@@ -4051,7 +5021,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         Vector4 CloudShadowFactors,
         Vector4 SurfaceWaterFactors,
         bool Transparent,
-        RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline);
+        RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline,
+        string EntityId,
+        bool CastShadows,
+        bool ReceiveShadows);
 
     private readonly record struct MaterialKey(
         string? BaseColorTextureId,
@@ -4090,6 +5063,25 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             Framebuffer.Dispose();
             Depth.Dispose();
             Color.Dispose();
+        }
+    }
+
+    private sealed record DirectionalShadowTarget(
+        int Resolution,
+        Texture Texture,
+        TextureView View,
+        Sampler Sampler,
+        IReadOnlyList<Framebuffer> Framebuffers) : IDisposable
+    {
+        public void Dispose()
+        {
+            foreach (var framebuffer in Framebuffers)
+            {
+                framebuffer.Dispose();
+            }
+            Sampler.Dispose();
+            View.Dispose();
+            Texture.Dispose();
         }
     }
 }

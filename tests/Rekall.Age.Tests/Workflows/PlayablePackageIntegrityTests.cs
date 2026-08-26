@@ -236,7 +236,13 @@ public sealed class PlayablePackageIntegrityTests
             context);
 
         Assert.True(capture.Ok, capture.Summary);
-        var action = Assert.Single(capture.Value.InputActions);
+        Assert.Equal(2, capture.Value.InputActions.Count);
+        var gauntletAction = Assert.Single(capture.Value.InputActions, action =>
+            action.Name == "agent.gauntlet.advance");
+        Assert.Equal(0, gauntletAction.Value);
+        Assert.False(gauntletAction.IsDown);
+        var action = Assert.Single(capture.Value.InputActions, action =>
+            action.Name == "capture.move");
         Assert.Equal("capture.move", action.Name);
         Assert.Equal(1, action.Value);
         Assert.True(action.IsDown);

@@ -289,7 +289,7 @@ public sealed partial class RekallAgeModelingGraphEvaluator
         var nearest = weights[1] > weights[0] ? 1 : 0;
         if (weights[2] > weights[nearest]) nearest = 2;
         if (schema.Interpolation == RekallAgeGeometryInterpolation.Nearest || schema.ValueType is
-            RekallAgeGeometryValueType.Bool or RekallAgeGeometryValueType.Int32 or RekallAgeGeometryValueType.String)
+            RekallAgeGeometryValueType.Bool or RekallAgeGeometryValueType.Int32 or RekallAgeGeometryValueType.Int4 or RekallAgeGeometryValueType.String)
             return sourceValues[nearest].Clone();
         if (schema.ValueType == RekallAgeGeometryValueType.Float)
             return JsonSerializer.SerializeToElement(sourceValues.Select((value, index) => value.GetDouble() * weights[index]).Sum());

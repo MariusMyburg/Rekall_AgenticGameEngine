@@ -9,6 +9,7 @@ namespace Rekall.Age.Rendering;
 public sealed class RekallAgeRuntimeRenderFrameBuilder
 {
     private readonly RekallAgeCompiledMeshResolver _compiledMeshResolver = new();
+    private readonly RekallAgeRigPoseResolver _rigPoseResolver = new();
 
     public RekallAgeRuntimeViewportFrame Build(
         RekallAgeRuntimeWorld world,
@@ -26,10 +27,11 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             throw new ArgumentOutOfRangeException(nameof(height), "Viewport height must be greater than zero.");
         }
 
+        var transformResolver = new RekallAgeRuntimeWorldTransformResolver(world, _rigPoseResolver);
         var cameras = world.Subsystems.Rendering.Cameras
             .Select(camera =>
             {
-                var transform = FindTransform(world, camera.EntityId);
+                var transform = transformResolver.Resolve(camera.EntityId);
                 return new RekallAgeRuntimeViewportCamera(
                     camera.EntityId,
                     camera.EntityName,
@@ -69,8 +71,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         var headsetCamera = cameras.FirstOrDefault(IsHeadsetCamera);
         var meshObservations = new List<RekallAgeRuntimeViewportObservation>();
         var renderableCandidates = (debugOverlay
-            ? BuildRenderables(world, activeCamera, width, height, meshObservations).Concat(BuildColliderDebugRenderables(world))
-            : BuildRenderables(world, activeCamera, width, height, meshObservations))
+            ? BuildRenderables(world, transformResolver, activeCamera, width, height, meshObservations).Concat(BuildColliderDebugRenderables(world))
+            : BuildRenderables(world, transformResolver, activeCamera, width, height, meshObservations))
             .ToArray();
         var renderables = renderableCandidates
             .Where(renderable => RekallAgeRenderLayerMask.IncludesLayer(renderable.Layer, activeCamera?.CullingMask))
@@ -80,6 +82,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             .ToArray();
         var culling = BuildCullingDiagnostics(renderableCandidates, activeCamera);
         var cameraViews = BuildCameraViews(cameras, renderableCandidates, width, height);
+        var fogVolumes = BuildFogVolumes(world, transformResolver);
+        var particleEmitters = BuildParticleEmitters(world, transformResolver);
 
         var observations = world.Observations
             .Select(observation => new RekallAgeRuntimeViewportObservation(
@@ -89,6 +93,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 observation.TargetName.Length > 0 ? observation.TargetName : observation.TargetId,
                 observation.Message))
             .Concat(meshObservations)
+            .Concat(transformResolver.Observations)
             .ToArray();
 
         return new RekallAgeRuntimeViewportFrame(
@@ -108,9 +113,127 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         {
             Culling = culling,
             CameraViews = cameraViews,
-            HeadsetCamera = headsetCamera
+            HeadsetCamera = headsetCamera,
+            Environment = BuildEnvironment(world),
+            FogVolumes = fogVolumes,
+            ParticleEmitters = particleEmitters,
+            DeltaSeconds = world.DeltaSeconds
         };
     }
+
+    private static RekallAgeRuntimeViewportEnvironment? BuildEnvironment(RekallAgeRuntimeWorld world)
+    {
+        var environment = world.Subsystems.Rendering.Environments
+            .OrderBy(item => item.EntityName, StringComparer.Ordinal)
+            .ThenBy(item => item.EntityId, StringComparer.Ordinal)
+            .FirstOrDefault();
+        return environment is null
+            ? null
+            : new RekallAgeRuntimeViewportEnvironment(
+                environment.EntityId,
+                environment.EntityName,
+                environment.SkyAssetId,
+                environment.AmbientEnergy,
+                environment.Exposure,
+                environment.ToneMapper,
+                environment.WhitePoint,
+                environment.ColorGradeAssetId,
+                environment.BackgroundPolicy)
+            {
+                AmbientSkyColor = environment.AmbientSkyColor,
+                AmbientGroundColor = environment.AmbientGroundColor,
+                BackgroundColor = environment.BackgroundColor
+            };
+    }
+
+    private static IReadOnlyList<RekallAgeRuntimeViewportParticleEmitter> BuildParticleEmitters(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeWorldTransformResolver transformResolver) =>
+        world.Subsystems.Rendering.ParticleEmitters
+            .Select(emitter =>
+            {
+                var transform = transformResolver.Resolve(emitter.EntityId);
+                return new RekallAgeRuntimeViewportParticleEmitter(
+                emitter.EntityId,
+                emitter.EntityName,
+                emitter.Enabled,
+                emitter.SimulationSpace,
+                emitter.Capacity,
+                emitter.SpawnRate,
+                emitter.Bursts.Select(item => new RekallAgeRuntimeViewportParticleBurst(item.TimeSeconds, item.Count)).ToArray(),
+                emitter.LifetimeSeconds,
+                emitter.DeterministicSeed,
+                emitter.VelocityDirection.X,
+                emitter.VelocityDirection.Y,
+                emitter.VelocityDirection.Z,
+                emitter.VelocityConeDegrees,
+                emitter.MinimumSpeed,
+                emitter.MaximumSpeed,
+                emitter.Gravity.X,
+                emitter.Gravity.Y,
+                emitter.Gravity.Z,
+                emitter.Drag,
+                emitter.SizeCurve.Select(item => new RekallAgeRuntimeViewportParticleScalarKey(item.NormalizedAge, item.Value)).ToArray(),
+                emitter.ColorCurve.Select(item => new RekallAgeRuntimeViewportParticleColorKey(item.NormalizedAge, item.Color)).ToArray(),
+                emitter.DrawMode,
+                emitter.Lit,
+                emitter.EmissiveIntensity,
+                emitter.SoftParticleFade,
+                emitter.TextureAssetId,
+                emitter.FlipbookColumns,
+                emitter.FlipbookRows,
+                emitter.FlipbookFramesPerSecond,
+                emitter.BlendMode,
+                emitter.Priority,
+                emitter.VisibilityDistance,
+                emitter.Layer,
+                new RekallAgeRuntimeViewportTransform(
+                    transform.Position3D.X,
+                    transform.Position3D.Y,
+                    transform.Position3D.Z,
+                    transform.Rotation3D.X,
+                    transform.Rotation3D.Y,
+                    transform.Rotation3D.Z,
+                    transform.Scale3D.X,
+                    transform.Scale3D.Y,
+                    transform.Scale3D.Z));
+            })
+            .OrderByDescending(item => item.Priority)
+            .ThenBy(item => item.EntityId, StringComparer.Ordinal)
+            .ToArray();
+
+    private static IReadOnlyList<RekallAgeRuntimeViewportFogVolume> BuildFogVolumes(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeWorldTransformResolver transformResolver) =>
+        world.Subsystems.Rendering.FogVolumes
+            .Select(volume =>
+            {
+                var transform = transformResolver.Resolve(volume.EntityId);
+                return new RekallAgeRuntimeViewportFogVolume(
+                volume.EntityId,
+                volume.EntityName,
+                volume.Shape,
+                volume.Density,
+                volume.Albedo,
+                volume.Emission,
+                volume.Anisotropy,
+                volume.HeightFalloff,
+                volume.BlendDistance,
+                volume.Priority,
+                new RekallAgeRuntimeViewportTransform(
+                    transform.Position3D.X,
+                    transform.Position3D.Y,
+                    transform.Position3D.Z,
+                    transform.Rotation3D.X,
+                    transform.Rotation3D.Y,
+                    transform.Rotation3D.Z,
+                    transform.Scale3D.X,
+                    transform.Scale3D.Y,
+                    transform.Scale3D.Z));
+            })
+            .OrderByDescending(volume => volume.Priority)
+            .ThenBy(volume => volume.EntityId, StringComparer.Ordinal)
+            .ToArray();
 
     private static RekallAgeRuntimeViewportPostProcessStack? BuildPostProcessStack(RekallAgeRuntimeWorld world)
     {
@@ -268,6 +391,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
 
     private IEnumerable<RekallAgeRuntimeViewportRenderable> BuildRenderables(
         RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeWorldTransformResolver transformResolver,
         RekallAgeRuntimeViewportCamera? activeCamera,
         int viewportWidth,
         int viewportHeight,
@@ -275,7 +399,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
     {
         foreach (var sprite in world.Subsystems.Rendering.Sprites)
         {
-            var transform = FindTransform(world, sprite.EntityId);
+            var transform = transformResolver.Resolve(sprite.EntityId);
             yield return new RekallAgeRuntimeViewportRenderable(
                 sprite.EntityId,
                 sprite.EntityName,
@@ -294,7 +418,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         foreach (var mesh in world.Subsystems.Rendering.Meshes)
         {
             var entity = FindEntity(world, mesh.EntityId);
-            var transform = entity?.Transform ?? RekallAgeRuntimeTransform.Identity;
+            var transform = transformResolver.Resolve(mesh.EntityId);
             var meshRendererComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type is "Rekall.MeshRenderer" or "Rekall.MeshSet");
             var planetComponent = entity?.Components.FirstOrDefault(component =>
@@ -537,7 +661,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     ? ReadString(textLabelComponent, "facingMode") ?? ReadString(textLabelComponent, "FacingMode") ?? "world"
                     : "world",
                 VirtualGeometry: virtualGeometry,
-                Skin: ReadSkin(entity),
+                Skin: ReadSkin(world.ProjectRoot, entity, mesh.EntityName, meshObservations),
                 Morph: ReadMorph(entity));
 
             if (planetComponent is not null
@@ -632,7 +756,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
 
         foreach (var light in world.Subsystems.Rendering.Lights)
         {
-            var transform = FindTransform(world, light.EntityId);
+            var transform = transformResolver.Resolve(light.EntityId);
             yield return new RekallAgeRuntimeViewportRenderable(
                 light.EntityId,
                 light.EntityName,
@@ -648,7 +772,11 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 RotationZ: transform.Rotation3D.Z,
                 Intensity: light.Intensity,
                 MaterialColor: light.Color,
-                Layer: light.Layer);
+                Layer: light.Layer)
+            {
+                LightRange = light.Range,
+                LightPriority = light.Priority
+            };
         }
 
         foreach (var element in world.Subsystems.Ui.Elements.Where(element => element.Layout is not null))
@@ -1101,12 +1229,6 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         return Math.Clamp(Math.Max(x, Math.Max(y, z)) * 0.0125, 0.015, 0.08);
     }
 
-    private static RekallAgeRuntimeTransform FindTransform(RekallAgeRuntimeWorld world, string entityId)
-    {
-        return world.Entities.FirstOrDefault(entity => entity.Id.Equals(entityId, StringComparison.Ordinal))?.Transform
-            ?? RekallAgeRuntimeTransform.Identity;
-    }
-
     private static RekallAgeRuntimeEntity? FindEntity(RekallAgeRuntimeWorld world, string entityId)
     {
         return world.Entities.FirstOrDefault(entity => entity.Id.Equals(entityId, StringComparison.Ordinal));
@@ -1223,12 +1345,31 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             EmptyToNull(ReadString(component, "debugMode")) ?? "off");
     }
 
-    private static RekallAgeRuntimeViewportSkin? ReadSkin(RekallAgeRuntimeEntity? entity)
+    private RekallAgeRuntimeViewportSkin? ReadSkin(
+        string? projectRoot,
+        RekallAgeRuntimeEntity? entity,
+        string entityName,
+        ICollection<RekallAgeRuntimeViewportObservation> observations)
     {
         var pose = entity?.Components.FirstOrDefault(component =>
             component.Type.Equals("Rekall.SkeletonPose", StringComparison.Ordinal));
-        if (pose is null
-            || !TryGetPropertyValue(pose.Properties, "joints", out var node)
+        if (pose is null)
+        {
+            var rigPose = entity?.Components.FirstOrDefault(component =>
+                component.Type.Equals("Rekall.RigPose", StringComparison.Ordinal));
+            var resolution = _rigPoseResolver.Resolve(projectRoot, rigPose);
+            if (resolution.IssueCode is not null)
+            {
+                observations.Add(new RekallAgeRuntimeViewportObservation(
+                    resolution.IssueCode,
+                    "error",
+                    "rendering",
+                    entityName,
+                    resolution.IssueMessage ?? "Native rig pose could not be resolved."));
+            }
+            return resolution.Skin;
+        }
+        if (!TryGetPropertyValue(pose.Properties, "joints", out var node)
             || node is not JsonArray joints
             || joints.Count is 0 or > 4_096)
         {

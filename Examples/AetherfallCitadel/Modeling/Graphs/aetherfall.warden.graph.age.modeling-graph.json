@@ -1,18 +1,610 @@
 {
   "schemaVersion": 1,
   "assetId": "aetherfall.warden.graph",
-  "name": "Aether Warden Graph",
-  "revision": 1,
+  "name": "Aetherfall Warden Silhouette",
+  "revision": 24,
   "nodes": [
     {
-      "nodeId": "shape",
+      "nodeId": "torso",
       "typeId": "rekall.modeling.primitive.frustum",
       "typeVersion": 1,
       "parameters": {
-        "radiusBottom": 0.75,
-        "radiusTop": 0.35,
-        "depth": 2,
-        "segments": 12
+        "radiusBottom": 0.52,
+        "radiusTop": 0.66,
+        "depth": 2.35,
+        "segments": 28,
+        "capBottom": true,
+        "capTop": true
+      }
+    },
+    {
+      "nodeId": "torso-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          1.82,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          0.68
+        ]
+      }
+    },
+    {
+      "nodeId": "head",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.48,
+        "segments": 32,
+        "rings": 20
+      }
+    },
+    {
+      "nodeId": "head-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          3.25,
+          0
+        ],
+        "scale": [
+          0.82,
+          1,
+          0.9
+        ]
+      }
+    },
+    {
+      "nodeId": "coat-tail",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.36,
+        "depth": 1.45,
+        "segments": 28,
+        "hemisphereRings": 7
+      }
+    },
+    {
+      "nodeId": "coat-tail-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -0.36,
+          0.35,
+          0.16
+        ],
+        "rotation": [
+          6,
+          0,
+          5
+        ],
+        "scale": [0.78, 1, 0.5]
+      }
+    },
+    {
+      "nodeId": "coat-tails",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
+      "nodeId": "arm-l-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -0.9,
+          2.15,
+          0
+        ],
+        "rotation": [
+          6,
+          8,
+          18
+        ]
+      }
+    },
+    {
+      "nodeId": "arm-r-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0.9,
+          2.15,
+          0
+        ],
+        "rotation": [
+          6,
+          -8,
+          -18
+        ]
+      }
+    },
+    {
+      "nodeId": "breastplate",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.22,
+        "depth": 1.2,
+        "segments": 28,
+        "hemisphereRings": 7
+      }
+    },
+    {
+      "nodeId": "breastplates",
+      "typeId": "rekall.modeling.array",
+      "typeVersion": 1,
+      "parameters": { "count": 2, "offset": [0, -0.3, 0.035], "relativeOffset": false, "instanceMode": false }
+    },
+    {
+      "nodeId": "breastplate-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          2.3,
+          -0.5
+        ],
+        "rotation": [
+          -8,
+          0,
+          90
+        ],
+        "scale": [1, 0.82, 0.5]
+      }
+    },
+    {
+      "nodeId": "belt",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 1.46,
+        "sizeY": 0.22,
+        "sizeZ": 0.58
+      }
+    },
+    {
+      "nodeId": "belt-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          1.05,
+          0
+        ]
+      }
+    },
+    {
+      "nodeId": "gorget",
+      "typeId": "rekall.modeling.primitive.torus",
+      "typeVersion": 1,
+      "parameters": {
+        "majorRadius": 0.48,
+        "minorRadius": 0.09,
+        "majorSegments": 36,
+        "minorSegments": 12
+      }
+    },
+    {
+      "nodeId": "gorget-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          2.9,
+          0
+        ],
+        "rotation": [
+          90,
+          0,
+          0
+        ],
+        "scale": [
+          1.2,
+          1,
+          0.85
+        ]
+      }
+    },
+    {
+      "nodeId": "rivet",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.075,
+        "segments": 12,
+        "rings": 6
+      }
+    },
+    {
+      "nodeId": "rivet-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -0.48,
+          2.22,
+          -0.61
+        ],
+        "scale": [
+          1,
+          0.7,
+          0.45
+        ]
+      }
+    },
+    {
+      "nodeId": "rivet-array",
+      "typeId": "rekall.modeling.array",
+      "typeVersion": 1,
+      "parameters": {
+        "count": 4,
+        "offset": [
+          0.32,
+          0.0,
+          0.0
+        ],
+        "relativeOffset": false,
+        "instanceMode": false
+      }
+    },
+    {
+      "nodeId": "faceplate",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.16,
+        "depth": 0.42,
+        "segments": 32,
+        "hemisphereRings": 8
+      }
+    },
+    {
+      "nodeId": "faceplate-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          3.2,
+          -0.44
+        ],
+        "rotation": [
+          -5,
+          0,
+          90
+        ],
+        "scale": [1, 0.9, 0.48]
+      }
+    },
+    {
+      "nodeId": "tasset",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 0.46,
+        "sizeY": 1.08,
+        "sizeZ": 0.24
+      }
+    },
+    {
+      "nodeId": "tasset-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -0.47,
+          0.55,
+          -0.36
+        ],
+        "rotation": [
+          -9,
+          0,
+          -5
+        ]
+      }
+    },
+    {
+      "nodeId": "tassets",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "x",
+        "origin": 0,
+        "mergeDistance": 0,
+        "bisect": false
+      }
+    },
+    {
+      "nodeId": "greave",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": {
+        "radiusBottom": 0.24,
+        "radiusTop": 0.31,
+        "depth": 1.18,
+        "segments": 20,
+        "capBottom": true,
+        "capTop": true
+      }
+    },
+    {
+      "nodeId": "greave-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -0.42,
+          -0.62,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          -2
+        ],
+        "scale": [
+          0.78,
+          1,
+          0.66
+        ]
+      }
+    },
+    {
+      "nodeId": "greaves",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "x",
+        "origin": 0,
+        "mergeDistance": 0,
+        "bisect": false
+      }
+    },
+    {
+      "nodeId": "boot",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.27,
+        "depth": 0.72,
+        "segments": 28,
+        "hemisphereRings": 7
+      }
+    },
+    {
+      "nodeId": "boot-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -0.42,
+          -1.28,
+          -0.16
+        ],
+        "rotation": [
+          90,
+          0,
+          -2
+        ],
+        "scale": [0.86, 1, 0.74]
+      }
+    },
+    {
+      "nodeId": "boots",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "x",
+        "origin": 0,
+        "mergeDistance": 0,
+        "bisect": false
+      }
+    },
+    {
+      "nodeId": "belt-buckle",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 0.38,
+        "sizeY": 0.32,
+        "sizeZ": 0.18
+      }
+    },
+    {
+      "nodeId": "belt-buckle-inset",
+      "typeId": "rekall.modeling.inset",
+      "typeVersion": 1,
+      "parameters": {
+        "thickness": 0.045,
+        "depth": -0.02,
+        "individual": true,
+        "boundary": true
+      }
+    },
+    {
+      "nodeId": "belt-buckle-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          1.05,
+          -0.38
+        ]
+      }
+    },
+    {
+      "nodeId": "cloth-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "cloth-material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": {
+        "materialAssetId": "aetherfall.warden-cloth.material",
+        "slotName": "Charcoal Cloth"
+      }
+    },
+    {
+      "nodeId": "armor-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "armor-material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": {
+        "materialAssetId": "aetherfall.warden-steel.material",
+        "slotName": "Aged Steel"
+      }
+    },
+    {
+      "nodeId": "leather-hard-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "leather-bevel",
+      "typeId": "rekall.modeling.bevel",
+      "typeVersion": 1,
+      "parameters": {
+        "width": 0.025,
+        "segments": 4,
+        "profile": 0.46,
+        "clampOverlap": true,
+        "hardenNormals": true
+      }
+    },
+    {
+      "nodeId": "leather-post-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "leather-material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": {
+        "materialAssetId": "aetherfall.warden-leather.material",
+        "slotName": "Blackened Leather"
+      }
+    },
+    {
+      "nodeId": "trim-hard-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "trim-bevel",
+      "typeId": "rekall.modeling.bevel",
+      "typeVersion": 1,
+      "parameters": {
+        "width": 0.018,
+        "segments": 4,
+        "profile": 0.52,
+        "clampOverlap": true,
+        "hardenNormals": true
+      }
+    },
+    {
+      "nodeId": "trim-smooth-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "trim-post-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "trim-material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": {
+        "materialAssetId": "aetherfall.warden-bronze.material",
+        "slotName": "Antique Bronze Trim"
+      }
+    },
+    {
+      "nodeId": "join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "soften",
+      "typeId": "rekall.modeling.bevel",
+      "typeVersion": 1,
+      "parameters": {
+        "width": 0.04,
+        "segments": 7,
+        "profile": 0.5,
+        "clampOverlap": true,
+        "hardenNormals": true
+      }
+    },
+    {
+      "nodeId": "weather",
+      "typeId": "rekall.modeling.deform.noise",
+      "typeVersion": 1,
+      "parameters": {
+        "amplitude": 0.025,
+        "frequency": 3.1,
+        "seed": 901,
+        "axis": "z"
+      }
+    },
+    {
+      "nodeId": "normals",
+      "typeId": "rekall.modeling.weighted_normals",
+      "typeVersion": 1,
+      "parameters": {
+        "attribute": "normal.authored",
+        "faceAreaWeight": 1.0,
+        "cornerAngleWeight": 1.0,
+        "smoothAttribute": "normal.smooth",
+        "sharpAttribute": "normal.sharp"
+      }
+    },
+    {
+      "nodeId": "uv",
+      "typeId": "rekall.modeling.project_uv",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "xy",
+        "scaleU": 0.35,
+        "scaleV": 0.35,
+        "projection": "box"
       }
     },
     {
@@ -20,12 +612,1845 @@
       "typeId": "rekall.modeling.output.mesh",
       "typeVersion": 1,
       "parameters": {}
+    },
+    {
+      "nodeId": "arm-l",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.28,
+        "hemisphereRings": 7,
+        "segments": 28,
+        "depth": 0.92
+      }
+    },
+    {
+      "nodeId": "arm-r",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.28,
+        "hemisphereRings": 7,
+        "segments": 28,
+        "depth": 0.92
+      }
+    },
+    {
+      "nodeId": "forearm-body-l",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.245,
+        "depth": 0.82,
+        "segments": 28,
+        "hemisphereRings": 7
+      }
+    },
+    {
+      "nodeId": "forearm-body-l-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-1.19, 1.42, -0.01],
+        "rotation": [6, 7, 12],
+        "scale": [0.92, 1, 0.82]
+      }
+    },
+    {
+      "nodeId": "forearm-body-r",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.245,
+        "depth": 0.82,
+        "segments": 28,
+        "hemisphereRings": 7
+      }
+    },
+    {
+      "nodeId": "forearm-body-r-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [1.19, 1.42, -0.01],
+        "rotation": [6, -7, -12],
+        "scale": [0.92, 1, 0.82]
+      }
+    },
+    {
+      "nodeId": "back-ridge",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeZ": 0.18,
+        "sizeY": 1.55,
+        "sizeX": 0.22
+      }
+    },
+    {
+      "nodeId": "back-ridge-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "rotation": [
+          6,
+          0,
+          0
+        ],
+        "translation": [
+          0,
+          2.0,
+          0.62
+        ]
+      }
+    },
+    {
+      "nodeId": "cloak-clasp",
+      "typeId": "rekall.modeling.primitive.torus",
+      "typeVersion": 1,
+      "parameters": {
+        "minorSegments": 10,
+        "minorRadius": 0.065,
+        "majorSegments": 32,
+        "majorRadius": 0.31
+      }
+    },
+    {
+      "nodeId": "cloak-clasp-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "scale": [
+          1.0,
+          1.0,
+          0.72
+        ],
+        "rotation": [
+          90,
+          0,
+          0
+        ],
+        "translation": [
+          0,
+          2.63,
+          0.55
+        ]
+      }
+    },
+    {
+      "nodeId": "cloth-smooth-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "cloth-bevel",
+      "typeId": "rekall.modeling.bevel",
+      "typeVersion": 1,
+      "parameters": {
+        "clampOverlap": true,
+        "profile": 0.5,
+        "hardenNormals": true,
+        "width": 0.04,
+        "segments": 5
+      }
+    },
+    {
+      "nodeId": "cloth-post-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "armor-smooth-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "armor-post-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "auto-smooth",
+      "typeId": "rekall.modeling.auto_smooth",
+      "typeVersion": 1,
+      "parameters": {
+        "angleDegrees": 55.0,
+        "sharpAttribute": "normal.sharp"
+      }
+    },
+    {
+      "nodeId": "cuirass-profile",
+      "typeId": "rekall.modeling.curve.source",
+      "typeVersion": 1,
+      "parameters": {
+        "document": {
+          "assetId": "aetherfall.warden.cuirass-profile",
+          "name": "Warden Layered Cuirass Profile",
+          "revision": 1,
+          "schemaVersion": 1,
+          "splines": [
+            {
+              "splineId": 1,
+              "controlPoints": [
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 0.5,
+                    "x": 0.68
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 1,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 0.5,
+                    "x": 0.68
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 0.5,
+                    "x": 0.68
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 0.62,
+                    "x": 0.84
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 2,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 0.62,
+                    "x": 0.84
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 0.62,
+                    "x": 0.84
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 0.76,
+                    "x": 0.78
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 3,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 0.76,
+                    "x": 0.78
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 0.76,
+                    "x": 0.78
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 0.92,
+                    "x": 0.7
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 4,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 0.92,
+                    "x": 0.7
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 0.92,
+                    "x": 0.7
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 1.22,
+                    "x": 0.72
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 5,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 1.22,
+                    "x": 0.72
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 1.22,
+                    "x": 0.72
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 1.58,
+                    "x": 0.86
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 6,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 1.58,
+                    "x": 0.86
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 1.58,
+                    "x": 0.86
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 1.92,
+                    "x": 0.94
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 7,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 1.92,
+                    "x": 0.94
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 1.92,
+                    "x": 0.94
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 2.18,
+                    "x": 0.88
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 8,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 2.18,
+                    "x": 0.88
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 2.18,
+                    "x": 0.88
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 2.44,
+                    "x": 0.72
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 9,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 2.44,
+                    "x": 0.72
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 2.44,
+                    "x": 0.72
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 2.62,
+                    "x": 0.57
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 10,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 2.62,
+                    "x": 0.57
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 2.62,
+                    "x": 0.57
+                  }
+                }
+              ],
+              "cyclic": false,
+              "kind": "Poly"
+            }
+          ]
+        },
+        "resolution": 1
+      }
+    },
+    {
+      "nodeId": "cuirass-revolve",
+      "typeId": "rekall.modeling.curve.revolve",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "y",
+        "materialAssetId": "aetherfall.warden-steel.material",
+        "angleDegrees": 360.0,
+        "segments": 40,
+        "weldDistance": 1E-06,
+        "slotName": "Layered Cuirass"
+      }
+    },
+    {
+      "nodeId": "cuirass-shape",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "scale": [
+          1.0,
+          1.0,
+          0.78
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    {
+      "nodeId": "thigh-guard",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": {
+        "segments": 24,
+        "capTop": true,
+        "capBottom": true,
+        "depth": 0.82,
+        "radiusBottom": 0.28,
+        "radiusTop": 0.36
+      }
+    },
+    {
+      "nodeId": "thigh-guard-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "rotation": [
+          0,
+          0,
+          -3
+        ],
+        "scale": [
+          0.86,
+          1.0,
+          0.72
+        ],
+        "translation": [
+          -0.42,
+          0.16,
+          -0.03
+        ]
+      }
+    },
+    {
+      "nodeId": "thigh-guards",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "mergeDistance": 0,
+        "bisect": false,
+        "axis": "x",
+        "origin": 0
+      }
+    },
+    {
+      "nodeId": "thigh-underlayer",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.29, "depth": 0.92, "segments": 28, "hemisphereRings": 7 }
+    },
+    {
+      "nodeId": "thigh-underlayer-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.42, 0.18, 0.03],
+        "rotation": [0, 0, -2],
+        "scale": [0.88, 1, 0.72]
+      }
+    },
+    {
+      "nodeId": "thigh-underlayers",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
+      "nodeId": "shin-underlayer",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.245, "depth": 0.88, "segments": 28, "hemisphereRings": 7 }
+    },
+    {
+      "nodeId": "shin-underlayer-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.42, -0.74, 0.04],
+        "rotation": [0, 0, -2],
+        "scale": [0.82, 1, 0.68]
+      }
+    },
+    {
+      "nodeId": "shin-underlayers",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
+      "nodeId": "bracer",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": {
+        "segments": 20,
+        "capTop": true,
+        "capBottom": true,
+        "depth": 0.66,
+        "radiusBottom": 0.29,
+        "radiusTop": 0.23
+      }
+    },
+    {
+      "nodeId": "bracer-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "rotation": [
+          5,
+          7,
+          16
+        ],
+        "scale": [
+          0.9,
+          1.0,
+          0.78
+        ],
+        "translation": [
+          -1.22,
+          1.38,
+          -0.04
+        ]
+      }
+    },
+    {
+      "nodeId": "bracers",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "mergeDistance": 0,
+        "bisect": false,
+        "axis": "x",
+        "origin": 0
+      }
+    },
+    {
+      "nodeId": "gauntlet",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.29,
+        "rings": 14,
+        "segments": 24
+      }
+    },
+    {
+      "nodeId": "gauntlet-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "rotation": [
+          4,
+          5,
+          14
+        ],
+        "scale": [
+          0.78,
+          0.86,
+          0.7
+        ],
+        "translation": [
+          -1.34,
+          1.08,
+          -0.02
+        ]
+      }
+    },
+    {
+      "nodeId": "gauntlets",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "mergeDistance": 0,
+        "bisect": false,
+        "axis": "x",
+        "origin": 0
+      }
+    },
+    {
+      "nodeId": "shoulder-shell",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.46, "segments": 32, "rings": 18 }
+    },
+    {
+      "nodeId": "shoulder-shell-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.86, 2.48, 0.0],
+        "rotation": [0, 0, -5],
+        "scale": [1.05, 0.52, 0.88]
+      }
+    },
+    {
+      "nodeId": "shoulder-shells",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
+      "nodeId": "shoulder-lamella",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.43, "segments": 32, "rings": 18 }
+    },
+    {
+      "nodeId": "shoulder-lamella-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.87, 2.37, -0.04],
+        "rotation": [0, 0, -5],
+        "scale": [1.03, 0.28, 0.82]
+      }
+    },
+    {
+      "nodeId": "shoulder-lamellas",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
+      "nodeId": "abdomen-plate",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": { "sizeX": 1.08, "sizeY": 0.2, "sizeZ": 0.18 }
+    },
+    {
+      "nodeId": "abdomen-plate-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [0, 1.76, -0.53],
+        "rotation": [-10, 0, 0],
+        "scale": [1, 1, 1]
+      }
+    },
+    {
+      "nodeId": "abdomen-plates",
+      "typeId": "rekall.modeling.array",
+      "typeVersion": 1,
+      "parameters": { "count": 4, "offset": [0, -0.23, 0.035], "relativeOffset": false, "instanceMode": false }
+    },
+    {
+      "nodeId": "knee-cop",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.3, "segments": 28, "rings": 16 }
+    },
+    {
+      "nodeId": "knee-cop-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.42, -0.16, -0.27],
+        "rotation": [-8, 0, -2],
+        "scale": [0.9, 0.72, 0.45]
+      }
+    },
+    {
+      "nodeId": "knee-cops",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
+      "nodeId": "helmet-crest",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.09, "depth": 0.44, "segments": 24, "hemisphereRings": 6 }
+    },
+    {
+      "nodeId": "helmet-crest-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [0, 3.65, 0.02],
+        "rotation": [0, 0, 0],
+        "scale": [0.65, 1, 0.8]
+      }
+    },
+    {
+      "nodeId": "helmet-brow",
+      "typeId": "rekall.modeling.primitive.torus",
+      "typeVersion": 1,
+      "parameters": { "majorRadius": 0.32, "minorRadius": 0.045, "majorSegments": 36, "minorSegments": 8 }
+    },
+    {
+      "nodeId": "helmet-brow-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [0, 3.42, -0.37],
+        "rotation": [90, 0, 0],
+        "scale": [1.12, 0.58, 0.72]
+      }
+    },
+    {
+      "nodeId": "helmet-crown",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.5, "segments": 36, "rings": 22 }
+    },
+    {
+      "nodeId": "helmet-crown-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [0, 3.29, 0.03],
+        "rotation": [0, 0, 0],
+        "scale": [0.84, 0.88, 0.92]
+      }
+    },
+    {
+      "nodeId": "helmet-cheek",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.08, "depth": 0.42, "segments": 24, "hemisphereRings": 6 }
+    },
+    {
+      "nodeId": "helmet-cheek-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.26, 3.15, -0.45],
+        "rotation": [-6, 0, -8],
+        "scale": [0.75, 1, 0.55]
+      }
+    },
+    {
+      "nodeId": "helmet-cheeks",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
+      "nodeId": "helmet-nose",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": { "sizeX": 0.11, "sizeY": 0.42, "sizeZ": 0.1 }
+    },
+    {
+      "nodeId": "helmet-nose-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [0, 3.18, -0.54],
+        "rotation": [-6, 0, 0],
+        "scale": [1, 1, 1]
+      }
+    },
+    {
+      "nodeId": "sternum-ridge",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.085, "depth": 0.95, "segments": 24, "hemisphereRings": 6 }
+    },
+    {
+      "nodeId": "sternum-ridge-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [0, 2.03, -0.62],
+        "rotation": [-5, 0, 0],
+        "scale": [0.75, 1, 0.55]
+      }
+    },
+    {
+      "nodeId": "eye-slit",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeZ": 0.04,
+        "sizeX": 0.48,
+        "sizeY": 0.07
+      }
+    },
+    {
+      "nodeId": "eye-slit-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          3.3,
+          -0.535
+        ],
+        "rotation": [
+          -7,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "nodeId": "aether-material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": {
+        "slotName": "Restrained Aether",
+        "materialAssetId": "aetherfall.warden-aether.material"
+      }
+    },
+    {
+      "nodeId": "cuirass-flute",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.038, "depth": 1.05, "segments": 18, "hemisphereRings": 5 }
+    },
+    {
+      "nodeId": "cuirass-flute-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.34, 2.03, -0.665],
+        "rotation": [-4, 0, 0],
+        "scale": [0.72, 1, 0.5]
+      }
+    },
+    {
+      "nodeId": "cuirass-flutes",
+      "typeId": "rekall.modeling.array",
+      "typeVersion": 1,
+      "parameters": { "count": 5, "offset": [0.17, 0, 0], "relativeOffset": false, "instanceMode": false }
+    },
+    {
+      "nodeId": "mail-ring",
+      "typeId": "rekall.modeling.primitive.torus",
+      "typeVersion": 1,
+      "parameters": { "majorRadius": 0.065, "minorRadius": 0.014, "majorSegments": 16, "minorSegments": 5 }
+    },
+    {
+      "nodeId": "mail-ring-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.48, 0.78, -0.58],
+        "rotation": [90, 0, 0],
+        "scale": [1, 1, 1]
+      }
+    },
+    {
+      "nodeId": "mail-row",
+      "typeId": "rekall.modeling.array",
+      "typeVersion": 1,
+      "parameters": { "count": 7, "offset": [0.16, 0, 0], "relativeOffset": false, "instanceMode": false }
+    },
+    {
+      "nodeId": "mail-field",
+      "typeId": "rekall.modeling.array",
+      "typeVersion": 1,
+      "parameters": { "count": 4, "offset": [0, -0.15, 0.015], "relativeOffset": false, "instanceMode": false }
+    },
+    {
+      "nodeId": "helmet-rivet",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.038, "segments": 16, "rings": 9 }
+    },
+    {
+      "nodeId": "helmet-rivet-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.25, 3.45, -0.47],
+        "rotation": [0, 0, 0],
+        "scale": [1, 0.72, 0.72]
+      }
+    },
+    {
+      "nodeId": "helmet-rivets",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
+      "nodeId": "greave-ridge",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": { "radius": 0.045, "depth": 0.68, "segments": 18, "hemisphereRings": 5 }
+    },
+    {
+      "nodeId": "greave-ridge-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [-0.42, -0.66, -0.43],
+        "rotation": [-5, 0, 0],
+        "scale": [0.72, 1, 0.52]
+      }
+    },
+    {
+      "nodeId": "greave-ridges",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": { "axis": "x", "origin": 0, "mergeDistance": 0, "bisect": false }
+    },
+    {
+      "nodeId": "body-skin",
+      "typeId": "rekall.modeling.skin.envelope_weights",
+      "typeVersion": 1,
+      "parameters": {
+        "maximumInfluences": 4,
+        "fallbackToNearest": true,
+        "envelopes": [
+          { "jointIndex": 0, "head": [0, -1.7, 0], "tail": [0, -0.7, 0], "headRadius": 0.62, "tailRadius": 0.65, "falloff": 0.55, "weight": 0.9 },
+          { "jointIndex": 1, "head": [0, -0.65, 0], "tail": [0, 1.2, 0], "headRadius": 0.72, "tailRadius": 0.82, "falloff": 0.58, "weight": 1.1 },
+          { "jointIndex": 2, "head": [0, 1.0, 0], "tail": [0, 2.85, 0], "headRadius": 0.78, "tailRadius": 0.72, "falloff": 0.6, "weight": 1.15 },
+          { "jointIndex": 3, "head": [0, 2.78, 0], "tail": [0, 3.82, 0], "headRadius": 0.52, "tailRadius": 0.48, "falloff": 0.35, "weight": 1.25 },
+          { "jointIndex": 4, "head": [-0.52, 2.52, 0], "tail": [-1.06, 1.72, 0], "headRadius": 0.48, "tailRadius": 0.34, "falloff": 0.34, "weight": 1.3 },
+          { "jointIndex": 5, "head": [-1.0, 1.78, 0], "tail": [-1.43, 0.95, 0], "headRadius": 0.35, "tailRadius": 0.38, "falloff": 0.3, "weight": 1.35 },
+          { "jointIndex": 6, "head": [0.52, 2.52, 0], "tail": [1.06, 1.72, 0], "headRadius": 0.48, "tailRadius": 0.34, "falloff": 0.34, "weight": 1.3 },
+          { "jointIndex": 7, "head": [1.0, 1.78, 0], "tail": [1.43, 0.95, 0], "headRadius": 0.35, "tailRadius": 0.38, "falloff": 0.3, "weight": 1.35 },
+          { "jointIndex": 8, "head": [-0.42, 0.72, 0], "tail": [-0.42, -0.24, 0], "headRadius": 0.5, "tailRadius": 0.38, "falloff": 0.32, "weight": 1.3 },
+          { "jointIndex": 9, "head": [0.42, 0.72, 0], "tail": [0.42, -0.24, 0], "headRadius": 0.5, "tailRadius": 0.38, "falloff": 0.32, "weight": 1.3 },
+          { "jointIndex": 10, "head": [-0.42, -0.18, 0], "tail": [-0.42, -1.08, 0], "headRadius": 0.39, "tailRadius": 0.32, "falloff": 0.3, "weight": 1.38 },
+          { "jointIndex": 11, "head": [-0.42, -1.02, 0], "tail": [-0.42, -1.5, -0.24], "headRadius": 0.34, "tailRadius": 0.31, "falloff": 0.26, "weight": 1.42 },
+          { "jointIndex": 12, "head": [0.42, -0.18, 0], "tail": [0.42, -1.08, 0], "headRadius": 0.39, "tailRadius": 0.32, "falloff": 0.3, "weight": 1.38 },
+          { "jointIndex": 13, "head": [0.42, -1.02, 0], "tail": [0.42, -1.5, -0.24], "headRadius": 0.34, "tailRadius": 0.31, "falloff": 0.26, "weight": 1.42 }
+        ]
+      }
     }
   ],
   "links": [
     {
-      "linkId": "shape-output",
-      "fromNodeId": "shape",
+      "linkId": "tx1",
+      "fromNodeId": "torso",
+      "fromPortId": "geometry",
+      "toNodeId": "torso-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "tx2",
+      "fromNodeId": "head",
+      "fromPortId": "geometry",
+      "toNodeId": "head-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "coat-tail-x",
+      "fromNodeId": "coat-tail",
+      "fromPortId": "geometry",
+      "toNodeId": "coat-tail-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "coat-tail-mirror",
+      "fromNodeId": "coat-tail-x",
+      "fromPortId": "geometry",
+      "toNodeId": "coat-tails",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "plate-x",
+      "fromNodeId": "breastplate",
+      "fromPortId": "geometry",
+      "toNodeId": "breastplate-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "plate-mirror",
+      "fromNodeId": "breastplate-x",
+      "fromPortId": "geometry",
+      "toNodeId": "breastplates",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "tx11",
+      "fromNodeId": "belt",
+      "fromPortId": "geometry",
+      "toNodeId": "belt-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "tx14",
+      "fromNodeId": "gorget",
+      "fromPortId": "geometry",
+      "toNodeId": "gorget-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "rivet-x",
+      "fromNodeId": "rivet",
+      "fromPortId": "geometry",
+      "toNodeId": "rivet-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "rivet-array",
+      "fromNodeId": "rivet-x",
+      "fromPortId": "geometry",
+      "toNodeId": "rivet-array",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "faceplate-x",
+      "fromNodeId": "faceplate",
+      "fromPortId": "geometry",
+      "toNodeId": "faceplate-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "tasset-x",
+      "fromNodeId": "tasset",
+      "fromPortId": "geometry",
+      "toNodeId": "tasset-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "tassets",
+      "fromNodeId": "tasset-x",
+      "fromPortId": "geometry",
+      "toNodeId": "tassets",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "greave-x",
+      "fromNodeId": "greave",
+      "fromPortId": "geometry",
+      "toNodeId": "greave-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "greaves",
+      "fromNodeId": "greave-x",
+      "fromPortId": "geometry",
+      "toNodeId": "greaves",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "boot-x",
+      "fromNodeId": "boot",
+      "fromPortId": "geometry",
+      "toNodeId": "boot-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "boots",
+      "fromNodeId": "boot-x",
+      "fromPortId": "geometry",
+      "toNodeId": "boots",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "belt-buckle-inset",
+      "fromNodeId": "belt-buckle",
+      "fromPortId": "geometry",
+      "toNodeId": "belt-buckle-inset",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "belt-buckle-x",
+      "fromNodeId": "belt-buckle-inset",
+      "fromPortId": "geometry",
+      "toNodeId": "belt-buckle-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-torso",
+      "fromNodeId": "torso-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-coat-tails",
+      "fromNodeId": "coat-tails",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-breastplate",
+      "fromNodeId": "breastplates",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-belt",
+      "fromNodeId": "belt-x",
+      "fromPortId": "geometry",
+      "toNodeId": "leather-hard-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-faceplate",
+      "fromNodeId": "faceplate-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-tassets",
+      "fromNodeId": "tassets",
+      "fromPortId": "geometry",
+      "toNodeId": "leather-hard-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-greaves",
+      "fromNodeId": "greaves",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-boots",
+      "fromNodeId": "boots",
+      "fromPortId": "geometry",
+      "toNodeId": "leather-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-buckle",
+      "fromNodeId": "belt-buckle-x",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-hard-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "j-cloth",
+      "fromNodeId": "cloth-material",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "j-armor",
+      "fromNodeId": "armor-material",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "leather-hard-bevel",
+      "fromNodeId": "leather-hard-join",
+      "fromPortId": "geometry",
+      "toNodeId": "leather-bevel",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "leather-hard-post",
+      "fromNodeId": "leather-bevel",
+      "fromPortId": "geometry",
+      "toNodeId": "leather-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "leather-assign",
+      "fromNodeId": "leather-post-join",
+      "fromPortId": "geometry",
+      "toNodeId": "leather-material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "j-leather",
+      "fromNodeId": "leather-material",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "trim-hard-bevel",
+      "fromNodeId": "trim-hard-join",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-bevel",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "trim-hard-post",
+      "fromNodeId": "trim-bevel",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "trim-smooth-post",
+      "fromNodeId": "trim-smooth-join",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "trim-assign",
+      "fromNodeId": "trim-post-join",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "j-trim",
+      "fromNodeId": "trim-material",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "uv",
+      "fromNodeId": "normals",
+      "fromPortId": "geometry",
+      "toNodeId": "uv",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "tx7",
+      "fromNodeId": "arm-l",
+      "fromPortId": "geometry",
+      "toNodeId": "arm-l-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "tx8",
+      "fromNodeId": "arm-r",
+      "fromPortId": "geometry",
+      "toNodeId": "arm-r-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "forearm-body-l-x",
+      "fromNodeId": "forearm-body-l",
+      "fromPortId": "geometry",
+      "toNodeId": "forearm-body-l-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "forearm-body-r-x",
+      "fromNodeId": "forearm-body-r",
+      "fromPortId": "geometry",
+      "toNodeId": "forearm-body-r-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "back-ridge-x",
+      "fromNodeId": "back-ridge",
+      "fromPortId": "geometry",
+      "toNodeId": "back-ridge-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-back-ridge",
+      "fromNodeId": "back-ridge-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloak-clasp-x",
+      "fromNodeId": "cloak-clasp",
+      "fromPortId": "geometry",
+      "toNodeId": "cloak-clasp-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-head-smooth",
+      "fromNodeId": "head-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-arm-l-smooth",
+      "fromNodeId": "arm-l-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-arm-r-smooth",
+      "fromNodeId": "arm-r-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-forearm-l-smooth",
+      "fromNodeId": "forearm-body-l-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-forearm-r-smooth",
+      "fromNodeId": "forearm-body-r-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-hard-bevel",
+      "fromNodeId": "cloth-join",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-bevel",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-hard-post",
+      "fromNodeId": "cloth-bevel",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-smooth-post",
+      "fromNodeId": "cloth-smooth-join",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cloth-assign-v2",
+      "fromNodeId": "cloth-post-join",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-gorget-smooth",
+      "fromNodeId": "gorget-x",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-rivets-smooth",
+      "fromNodeId": "rivet-array",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-clasp-smooth",
+      "fromNodeId": "cloak-clasp-x",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-hard-bevel",
+      "fromNodeId": "armor-join",
+      "fromPortId": "geometry",
+      "toNodeId": "soften",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-hard-post",
+      "fromNodeId": "soften",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-smooth-post",
+      "fromNodeId": "armor-smooth-join",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "armor-assign-v2",
+      "fromNodeId": "armor-post-join",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "join-weather-v2",
+      "fromNodeId": "join",
+      "fromPortId": "geometry",
+      "toNodeId": "weather",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "auto-smooth-input",
+      "fromNodeId": "weather",
+      "fromPortId": "geometry",
+      "toNodeId": "auto-smooth",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "normals",
+      "fromNodeId": "auto-smooth",
+      "fromPortId": "geometry",
+      "toNodeId": "normals",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cuirass-profile-revolve",
+      "fromNodeId": "cuirass-profile",
+      "fromPortId": "curve",
+      "toNodeId": "cuirass-revolve",
+      "toPortId": "curve"
+    },
+    {
+      "linkId": "cuirass-revolve-shape",
+      "fromNodeId": "cuirass-revolve",
+      "fromPortId": "geometry",
+      "toNodeId": "cuirass-shape",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cuirass-armor-smooth",
+      "fromNodeId": "cuirass-shape",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "thigh-x",
+      "fromNodeId": "thigh-guard",
+      "fromPortId": "geometry",
+      "toNodeId": "thigh-guard-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "thigh-mirror",
+      "fromNodeId": "thigh-guard-x",
+      "fromPortId": "geometry",
+      "toNodeId": "thigh-guards",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "thigh-smooth",
+      "fromNodeId": "thigh-guards",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "thigh-underlayer-x",
+      "fromNodeId": "thigh-underlayer",
+      "fromPortId": "geometry",
+      "toNodeId": "thigh-underlayer-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "thigh-underlayer-mirror",
+      "fromNodeId": "thigh-underlayer-x",
+      "fromPortId": "geometry",
+      "toNodeId": "thigh-underlayers",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "thigh-underlayer-cloth",
+      "fromNodeId": "thigh-underlayers",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shin-underlayer-x",
+      "fromNodeId": "shin-underlayer",
+      "fromPortId": "geometry",
+      "toNodeId": "shin-underlayer-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shin-underlayer-mirror",
+      "fromNodeId": "shin-underlayer-x",
+      "fromPortId": "geometry",
+      "toNodeId": "shin-underlayers",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shin-underlayer-cloth",
+      "fromNodeId": "shin-underlayers",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "bracer-x",
+      "fromNodeId": "bracer",
+      "fromPortId": "geometry",
+      "toNodeId": "bracer-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "bracer-mirror",
+      "fromNodeId": "bracer-x",
+      "fromPortId": "geometry",
+      "toNodeId": "bracers",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "bracer-smooth",
+      "fromNodeId": "bracers",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "gauntlet-x",
+      "fromNodeId": "gauntlet",
+      "fromPortId": "geometry",
+      "toNodeId": "gauntlet-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "gauntlet-mirror",
+      "fromNodeId": "gauntlet-x",
+      "fromPortId": "geometry",
+      "toNodeId": "gauntlets",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "gauntlet-smooth",
+      "fromNodeId": "gauntlets",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shoulder-shell-x",
+      "fromNodeId": "shoulder-shell",
+      "fromPortId": "geometry",
+      "toNodeId": "shoulder-shell-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shoulder-shell-mirror",
+      "fromNodeId": "shoulder-shell-x",
+      "fromPortId": "geometry",
+      "toNodeId": "shoulder-shells",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shoulder-shell-smooth",
+      "fromNodeId": "shoulder-shells",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shoulder-lamella-x",
+      "fromNodeId": "shoulder-lamella",
+      "fromPortId": "geometry",
+      "toNodeId": "shoulder-lamella-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shoulder-lamella-mirror",
+      "fromNodeId": "shoulder-lamella-x",
+      "fromPortId": "geometry",
+      "toNodeId": "shoulder-lamellas",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "shoulder-lamella-smooth",
+      "fromNodeId": "shoulder-lamellas",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "abdomen-plate-x",
+      "fromNodeId": "abdomen-plate",
+      "fromPortId": "geometry",
+      "toNodeId": "abdomen-plate-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "abdomen-plate-array",
+      "fromNodeId": "abdomen-plate-x",
+      "fromPortId": "geometry",
+      "toNodeId": "abdomen-plates",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "abdomen-plate-hard",
+      "fromNodeId": "abdomen-plates",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "knee-cop-x",
+      "fromNodeId": "knee-cop",
+      "fromPortId": "geometry",
+      "toNodeId": "knee-cop-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "knee-cop-mirror",
+      "fromNodeId": "knee-cop-x",
+      "fromPortId": "geometry",
+      "toNodeId": "knee-cops",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "knee-cop-smooth",
+      "fromNodeId": "knee-cops",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-crest-x",
+      "fromNodeId": "helmet-crest",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-crest-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-crest-smooth",
+      "fromNodeId": "helmet-crest-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-brow-x",
+      "fromNodeId": "helmet-brow",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-brow-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-brow-smooth",
+      "fromNodeId": "helmet-brow-x",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-crown-x",
+      "fromNodeId": "helmet-crown",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-crown-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-crown-smooth",
+      "fromNodeId": "helmet-crown-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-cheek-x",
+      "fromNodeId": "helmet-cheek",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-cheek-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-cheek-mirror",
+      "fromNodeId": "helmet-cheek-x",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-cheeks",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-cheek-smooth",
+      "fromNodeId": "helmet-cheeks",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-nose-x",
+      "fromNodeId": "helmet-nose",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-nose-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-nose-hard",
+      "fromNodeId": "helmet-nose-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "sternum-ridge-x",
+      "fromNodeId": "sternum-ridge",
+      "fromPortId": "geometry",
+      "toNodeId": "sternum-ridge-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "sternum-ridge-smooth",
+      "fromNodeId": "sternum-ridge-x",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cuirass-flute-x",
+      "fromNodeId": "cuirass-flute",
+      "fromPortId": "geometry",
+      "toNodeId": "cuirass-flute-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cuirass-flute-array",
+      "fromNodeId": "cuirass-flute-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cuirass-flutes",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cuirass-flute-smooth",
+      "fromNodeId": "cuirass-flutes",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "mail-ring-x",
+      "fromNodeId": "mail-ring",
+      "fromPortId": "geometry",
+      "toNodeId": "mail-ring-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "mail-row-array",
+      "fromNodeId": "mail-ring-x",
+      "fromPortId": "geometry",
+      "toNodeId": "mail-row",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "mail-field-array",
+      "fromNodeId": "mail-row",
+      "fromPortId": "geometry",
+      "toNodeId": "mail-field",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "mail-field-smooth",
+      "fromNodeId": "mail-field",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-rivet-x",
+      "fromNodeId": "helmet-rivet",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-rivet-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-rivet-mirror",
+      "fromNodeId": "helmet-rivet-x",
+      "fromPortId": "geometry",
+      "toNodeId": "helmet-rivets",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "helmet-rivet-smooth",
+      "fromNodeId": "helmet-rivets",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "greave-ridge-x",
+      "fromNodeId": "greave-ridge",
+      "fromPortId": "geometry",
+      "toNodeId": "greave-ridge-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "greave-ridge-mirror",
+      "fromNodeId": "greave-ridge-x",
+      "fromPortId": "geometry",
+      "toNodeId": "greave-ridges",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "greave-ridge-smooth",
+      "fromNodeId": "greave-ridges",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "eye-slit-x",
+      "fromNodeId": "eye-slit",
+      "fromPortId": "geometry",
+      "toNodeId": "eye-slit-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "eye-slit-material",
+      "fromNodeId": "eye-slit-x",
+      "fromPortId": "geometry",
+      "toNodeId": "aether-material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "j-eye",
+      "fromNodeId": "aether-material",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "uv-body-skin",
+      "fromNodeId": "uv",
+      "fromPortId": "geometry",
+      "toNodeId": "body-skin",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "body-skin-out",
+      "fromNodeId": "body-skin",
       "fromPortId": "geometry",
       "toNodeId": "output",
       "toPortId": "input"

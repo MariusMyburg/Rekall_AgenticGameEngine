@@ -69,23 +69,123 @@ public sealed class RekallAgeModifierStackEvaluator
         {
             "rekall.modifier.transform" => _executor.Execute(source, new("transform", RekallAgeGeometryDomain.Point,
                 Select(source, RekallAgeGeometryDomain.Point, selection), VectorParameters(modifier.Parameters))).Mesh,
+            "rekall.modifier.deform.taper" => _executor.Execute(source, new("taper_points", RekallAgeGeometryDomain.Point,
+                Select(source, RekallAgeGeometryDomain.Point, selection), new JsonObject
+                {
+                    ["axis"] = ReadString(modifier.Parameters, "axis", "y"),
+                    ["minimum"] = ReadNumber(modifier.Parameters, "minimum", 0),
+                    ["maximum"] = ReadNumber(modifier.Parameters, "maximum", 1),
+                    ["startScale"] = ReadNumber(modifier.Parameters, "startScale", 1),
+                    ["endScale"] = ReadNumber(modifier.Parameters, "endScale", 0.5),
+                    ["centerX"] = ReadNumber(modifier.Parameters, "centerX", 0),
+                    ["centerY"] = ReadNumber(modifier.Parameters, "centerY", 0),
+                    ["centerZ"] = ReadNumber(modifier.Parameters, "centerZ", 0)
+                })).Mesh,
+            "rekall.modifier.deform.bend" => _executor.Execute(source, new("bend_points", RekallAgeGeometryDomain.Point,
+                Select(source, RekallAgeGeometryDomain.Point, selection), new JsonObject
+                {
+                    ["axis"] = ReadString(modifier.Parameters, "axis", "y"),
+                    ["bendAxis"] = ReadString(modifier.Parameters, "bendAxis", "z"),
+                    ["minimum"] = ReadNumber(modifier.Parameters, "minimum", 0),
+                    ["maximum"] = ReadNumber(modifier.Parameters, "maximum", 1),
+                    ["angleDegrees"] = ReadNumber(modifier.Parameters, "angleDegrees", 45),
+                    ["centerX"] = ReadNumber(modifier.Parameters, "centerX", 0),
+                    ["centerY"] = ReadNumber(modifier.Parameters, "centerY", 0),
+                    ["centerZ"] = ReadNumber(modifier.Parameters, "centerZ", 0)
+                })).Mesh,
             "rekall.modifier.triangulate" => _executor.Execute(source, new("triangulate_faces", RekallAgeGeometryDomain.Face,
                 Select(source, RekallAgeGeometryDomain.Face, selection), new JsonObject())).Mesh,
             "rekall.modifier.extrude" => _executor.Execute(source, new("extrude_faces", RekallAgeGeometryDomain.Face,
                 Select(source, RekallAgeGeometryDomain.Face, selection), VectorParameters(modifier.Parameters))).Mesh,
             "rekall.modifier.subdivide" => _executor.Execute(source, new("subdivide_faces", RekallAgeGeometryDomain.Face,
                 Select(source, RekallAgeGeometryDomain.Face, selection), new JsonObject())).Mesh,
-            "rekall.modifier.subdivide_smooth" => _executor.Execute(source, new("subdivide_smooth", RekallAgeGeometryDomain.Face,
-                source.Topology.FaceIds, new JsonObject())).Mesh,
+            "rekall.modifier.subdivide_smooth" => ExecuteSmoothSubdivision(source, modifier.Parameters),
             "rekall.modifier.merge_by_distance" => _executor.Execute(source, new("merge_by_distance", RekallAgeGeometryDomain.Point,
                 Select(source, RekallAgeGeometryDomain.Point, selection), new JsonObject { ["distance"] = ReadNumber(modifier.Parameters, "distance", 0.0001) })).Mesh,
+            "rekall.modifier.bevel" => _executor.Execute(source, new("bevel_edges", RekallAgeGeometryDomain.Edge,
+                Select(source, RekallAgeGeometryDomain.Edge, selection), new JsonObject
+                {
+                    ["width"] = ReadNumber(modifier.Parameters, "width", 0.05), ["segments"] = ReadInteger(modifier.Parameters, "segments", 1),
+                    ["profile"] = ReadNumber(modifier.Parameters, "profile", 0.5), ["clampOverlap"] = ReadBoolean(modifier.Parameters, "clampOverlap", true),
+                    ["hardenNormals"] = ReadBoolean(modifier.Parameters, "hardenNormals", false),
+                    ["weightAttribute"] = ReadString(modifier.Parameters, "weightAttribute", ""),
+                    ["materialIndex"] = ReadInteger(modifier.Parameters, "materialIndex", -1)
+                })).Mesh,
+            "rekall.modifier.skin.linear_weights" => _executor.Execute(source, new("assign_linear_skin_weights", RekallAgeGeometryDomain.Point,
+                Select(source, RekallAgeGeometryDomain.Point, selection), new JsonObject
+                {
+                    ["axis"] = ReadString(modifier.Parameters, "axis", "y"),
+                    ["minimum"] = ReadNumber(modifier.Parameters, "minimum", 0),
+                    ["maximum"] = ReadNumber(modifier.Parameters, "maximum", 1),
+                    ["jointA"] = ReadInteger(modifier.Parameters, "jointA", 0),
+                    ["jointB"] = ReadInteger(modifier.Parameters, "jointB", 1)
+                })).Mesh,
+            "rekall.modifier.skin.envelope_weights" => _executor.Execute(source, new("assign_envelope_skin_weights", RekallAgeGeometryDomain.Point,
+                Select(source, RekallAgeGeometryDomain.Point, selection), new JsonObject
+                {
+                    ["envelopes"] = modifier.Parameters["envelopes"]?.DeepClone() ?? new JsonArray(),
+                    ["maximumInfluences"] = ReadInteger(modifier.Parameters, "maximumInfluences", 4),
+                    ["fallbackToNearest"] = ReadBoolean(modifier.Parameters, "fallbackToNearest", true)
+                })).Mesh,
+            "rekall.modifier.solidify" => _executor.Execute(source, new("solidify", RekallAgeGeometryDomain.Face,
+                Select(source, RekallAgeGeometryDomain.Face, selection), new JsonObject
+                {
+                    ["thickness"] = ReadNumber(modifier.Parameters, "thickness", 0.05), ["offset"] = ReadNumber(modifier.Parameters, "offset", 0),
+                    ["rim"] = ReadBoolean(modifier.Parameters, "rim", true), ["evenThickness"] = ReadBoolean(modifier.Parameters, "evenThickness", true)
+                })).Mesh,
+            "rekall.modifier.mirror" => RekallAgeModelingGraphEvaluator.ExecuteMirrorModifier(source, new JsonObject
+                {
+                    ["axis"] = ReadString(modifier.Parameters, "axis", "x"), ["origin"] = ReadNumber(modifier.Parameters, "origin", 0),
+                    ["mergeDistance"] = ReadNumber(modifier.Parameters, "mergeDistance", 0), ["bisect"] = ReadBoolean(modifier.Parameters, "bisect", false)
+                }),
+            "rekall.modifier.array" => RekallAgeModelingGraphEvaluator.ExecuteArrayModifier(source, new JsonObject
+                {
+                    ["count"] = ReadInteger(modifier.Parameters, "count", 2),
+                    ["offset"] = new JsonArray(ReadNumber(modifier.Parameters, "x", 1), ReadNumber(modifier.Parameters, "y", 0), ReadNumber(modifier.Parameters, "z", 0)),
+                    ["relativeOffset"] = ReadBoolean(modifier.Parameters, "relativeOffset", false), ["instanceMode"] = ReadBoolean(modifier.Parameters, "instanceMode", false)
+                }),
+            "rekall.modifier.auto_smooth" => _executor.Execute(source, new("auto_smooth", RekallAgeGeometryDomain.Face,
+                source.Topology.FaceIds, new JsonObject
+                {
+                    ["angleDegrees"] = ReadNumber(modifier.Parameters, "angleDegrees", 60),
+                    ["sharpAttribute"] = ReadString(modifier.Parameters, "sharpAttribute", "normal.sharp")
+                })).Mesh,
+            "rekall.modifier.weighted_normals" => _executor.Execute(source, new("weighted_normals", RekallAgeGeometryDomain.Face,
+                Select(source, RekallAgeGeometryDomain.Face, selection), new JsonObject
+                {
+                    ["attribute"] = ReadString(modifier.Parameters, "attribute", "normal.authored"),
+                    ["faceAreaWeight"] = ReadNumber(modifier.Parameters, "faceAreaWeight", 1),
+                    ["cornerAngleWeight"] = ReadNumber(modifier.Parameters, "cornerAngleWeight", 1),
+                    ["smoothAttribute"] = ReadString(modifier.Parameters, "smoothAttribute", "normal.smooth"),
+                    ["sharpAttribute"] = ReadString(modifier.Parameters, "sharpAttribute", "normal.sharp")
+                })).Mesh,
             _ => throw new RekallAgeMeshOperationException("REKALL_MODIFIER_TYPE_UNKNOWN", $"Modifier type '{modifier.TypeId}' is not executable.")
         };
     }
 
+    private RekallAgeMeshAsset ExecuteSmoothSubdivision(RekallAgeMeshAsset source, JsonObject parameters)
+    {
+        var levels = ReadInteger(parameters, "levels", 1);
+        if (levels < 1 || levels > 6)
+            throw new RekallAgeMeshOperationException("REKALL_MODIFIER_PARAMETER_INVALID", "Smooth subdivision levels must be from 1 through 6.");
+        var creaseAttribute = ReadString(parameters, "creaseAttribute", "crease.edge");
+        var current = source;
+        for (var level = 0; level < levels; level++)
+            current = _executor.Execute(current, new("subdivide_smooth", RekallAgeGeometryDomain.Face, current.Topology.FaceIds,
+                new JsonObject { ["creaseAttribute"] = creaseAttribute })).Mesh;
+        return current;
+    }
+
     private static IReadOnlyList<ulong> Select(RekallAgeMeshAsset mesh, RekallAgeGeometryDomain domain, string selection)
     {
-        if (selection.Length == 0) return domain == RekallAgeGeometryDomain.Point ? mesh.Topology.PointIds : mesh.Topology.FaceIds;
+        if (selection.Length == 0) return domain switch
+        {
+            RekallAgeGeometryDomain.Point => mesh.Topology.PointIds,
+            RekallAgeGeometryDomain.Edge => mesh.Topology.EdgeIds,
+            RekallAgeGeometryDomain.Face => mesh.Topology.FaceIds,
+            RekallAgeGeometryDomain.Corner => mesh.Topology.CornerIds,
+            _ => throw new RekallAgeMeshOperationException("REKALL_MODIFIER_DOMAIN_UNSUPPORTED", $"Modifier selection domain '{domain}' is unsupported.")
+        };
         var found = mesh.SelectionSets.SingleOrDefault(item => item.Name == selection && item.Domain == domain);
         return found?.ElementIds is { Count: > 0 } ids ? ids : throw new RekallAgeMeshOperationException("REKALL_MODIFIER_SELECTION_MISSING", $"Selection '{selection}' has no {domain} elements.");
     }
@@ -97,6 +197,8 @@ public sealed class RekallAgeModifierStackEvaluator
     private static string Canonical(JsonObject parameters) => "{" + string.Join(",", parameters.OrderBy(item => item.Key, StringComparer.Ordinal).Select(item => JsonSerializer.Serialize(item.Key) + ":" + (item.Value?.ToJsonString(RekallAgeModelingJson.Options) ?? "null"))) + "}";
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     private static double ReadNumber(JsonObject parameters, string key, double fallback) => parameters[key] is JsonValue value && value.TryGetValue<double>(out var number) ? number : fallback;
+    private static int ReadInteger(JsonObject parameters, string key, int fallback) => parameters[key] is JsonValue value && value.TryGetValue<int>(out var number) ? number : fallback;
+    private static bool ReadBoolean(JsonObject parameters, string key, bool fallback) => parameters[key] is JsonValue value && value.TryGetValue<bool>(out var result) ? result : fallback;
     private static string ReadString(JsonObject parameters, string key, string fallback) => parameters[key] is JsonValue value && value.TryGetValue<string>(out var text) ? text : fallback;
     private static RekallAgeModelingGraphDiagnostic Error(string code, string message, string? id = null) => new(code, RekallAgeModelingDiagnosticSeverity.Error, message, id);
     private static RekallAgeModifierStackEvaluationReport Failure(RekallAgeModifierStackAsset stack, Stopwatch stopwatch,

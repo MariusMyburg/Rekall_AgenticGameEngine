@@ -1,0 +1,755 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.hollow-sentinel.graph",
+  "name": "Hollow Sentinel Silhouette",
+  "revision": 3,
+  "nodes": [
+    {
+      "nodeId": "body",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": {
+        "radiusBottom": 0.72,
+        "radiusTop": 0.38,
+        "depth": 2.3,
+        "segments": 20,
+        "capBottom": true,
+        "capTop": true
+      }
+    },
+    {
+      "nodeId": "body-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          1.35,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          0.8
+        ]
+      }
+    },
+    {
+      "nodeId": "head",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.42,
+        "segments": 28,
+        "rings": 16
+      }
+    },
+    {
+      "nodeId": "head-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          2.72,
+          -0.18
+        ],
+        "scale": [
+          0.8,
+          1.15,
+          0.75
+        ]
+      }
+    },
+    {
+      "nodeId": "arm-l-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -0.72,
+          1.25,
+          -0.1
+        ],
+        "rotation": [
+          5,
+          0,
+          14
+        ]
+      }
+    },
+    {
+      "nodeId": "arm-r-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0.72,
+          1.25,
+          -0.1
+        ],
+        "rotation": [
+          5,
+          0,
+          -14
+        ]
+      }
+    },
+    {
+      "nodeId": "spine",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 0.18,
+        "sizeY": 2.2,
+        "sizeZ": 0.32
+      }
+    },
+    {
+      "nodeId": "spine-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          1.35,
+          0.65
+        ],
+        "rotation": [
+          -12,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "nodeId": "breastplate",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 1.18,
+        "sizeY": 0.86,
+        "sizeZ": 0.28
+      }
+    },
+    {
+      "nodeId": "breastplate-inset",
+      "typeId": "rekall.modeling.inset",
+      "typeVersion": 1,
+      "parameters": {
+        "thickness": 0.065,
+        "depth": -0.03,
+        "individual": true,
+        "boundary": true
+      }
+    },
+    {
+      "nodeId": "breastplate-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          1.78,
+          -0.53
+        ],
+        "rotation": [
+          -10,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "nodeId": "pauldron-l",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.48,
+        "segments": 24,
+        "rings": 14
+      }
+    },
+    {
+      "nodeId": "pauldron-l-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -0.72,
+          2.02,
+          -0.06
+        ],
+        "scale": [
+          1.05,
+          0.42,
+          0.78
+        ]
+      }
+    },
+    {
+      "nodeId": "pauldrons",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "x",
+        "origin": 0,
+        "mergeDistance": 0,
+        "bisect": false
+      }
+    },
+    {
+      "nodeId": "gorget",
+      "typeId": "rekall.modeling.primitive.torus",
+      "typeVersion": 1,
+      "parameters": {
+        "majorRadius": 0.4,
+        "minorRadius": 0.07,
+        "majorSegments": 32,
+        "minorSegments": 10
+      }
+    },
+    {
+      "nodeId": "gorget-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          2.36,
+          -0.02
+        ],
+        "rotation": [
+          90,
+          0,
+          0
+        ],
+        "scale": [
+          1.22,
+          1,
+          0.82
+        ]
+      }
+    },
+    {
+      "nodeId": "waist",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 1.05,
+        "sizeY": 0.18,
+        "sizeZ": 0.54
+      }
+    },
+    {
+      "nodeId": "waist-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          0.92,
+          -0.02
+        ]
+      }
+    },
+    {
+      "nodeId": "join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "soften",
+      "typeId": "rekall.modeling.bevel",
+      "typeVersion": 1,
+      "parameters": {
+        "width": 0.038,
+        "segments": 3,
+        "profile": 0.5,
+        "clampOverlap": true,
+        "hardenNormals": true
+      }
+    },
+    {
+      "nodeId": "weather",
+      "typeId": "rekall.modeling.deform.noise",
+      "typeVersion": 1,
+      "parameters": {
+        "amplitude": 0.04,
+        "frequency": 3.6,
+        "seed": 119,
+        "axis": "x"
+      }
+    },
+    {
+      "nodeId": "normals",
+      "typeId": "rekall.modeling.weighted_normals",
+      "typeVersion": 1,
+      "parameters": {
+        "attribute": "normal.weighted",
+        "faceAreaWeight": 1.0
+      }
+    },
+    {
+      "nodeId": "uv",
+      "typeId": "rekall.modeling.project_uv",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "xy",
+        "scaleU": 0.38,
+        "scaleV": 0.38,
+        "projection": "box"
+      }
+    },
+    {
+      "nodeId": "material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": {
+        "materialAssetId": "aetherfall.wet-slate.material",
+        "slotName": "Charred Husk"
+      }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "arm-l",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "depth": 1.85,
+        "segments": 20,
+        "hemisphereRings": 5,
+        "radius": 0.22
+      }
+    },
+    {
+      "nodeId": "arm-r",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "depth": 1.85,
+        "segments": 20,
+        "hemisphereRings": 5,
+        "radius": 0.22
+      }
+    },
+    {
+      "nodeId": "leg",
+      "typeId": "rekall.modeling.primitive.capsule",
+      "typeVersion": 1,
+      "parameters": {
+        "depth": 1.72,
+        "segments": 20,
+        "hemisphereRings": 5,
+        "radius": 0.25
+      }
+    },
+    {
+      "nodeId": "leg-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "scale": [
+          0.82,
+          1,
+          0.76
+        ],
+        "translation": [
+          -0.34,
+          -0.18,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          -3
+        ]
+      }
+    },
+    {
+      "nodeId": "legs",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "bisect": false,
+        "axis": "x",
+        "mergeDistance": 0,
+        "origin": 0
+      }
+    },
+    {
+      "nodeId": "boot",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeZ": 0.72,
+        "sizeX": 0.46,
+        "sizeY": 0.38
+      }
+    },
+    {
+      "nodeId": "boot-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -0.34,
+          -1.08,
+          -0.16
+        ],
+        "rotation": [
+          0,
+          0,
+          -2
+        ]
+      }
+    },
+    {
+      "nodeId": "boots",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "bisect": false,
+        "axis": "x",
+        "mergeDistance": 0,
+        "origin": 0
+      }
+    },
+    {
+      "nodeId": "horn",
+      "typeId": "rekall.modeling.primitive.cone",
+      "typeVersion": 1,
+      "parameters": {
+        "depth": 0.58,
+        "segments": 16,
+        "capBottom": true,
+        "radius": 0.1
+      }
+    },
+    {
+      "nodeId": "horn-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "scale": [
+          0.8,
+          1,
+          0.8
+        ],
+        "translation": [
+          -0.28,
+          3.15,
+          -0.1
+        ],
+        "rotation": [
+          0,
+          0,
+          -24
+        ]
+      }
+    },
+    {
+      "nodeId": "horns",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "bisect": false,
+        "axis": "x",
+        "mergeDistance": 0,
+        "origin": 0
+      }
+    },
+    {
+      "nodeId": "smooth-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "post-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    {
+      "linkId": "tx1",
+      "fromNodeId": "body",
+      "fromPortId": "geometry",
+      "toNodeId": "body-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "tx2",
+      "fromNodeId": "head",
+      "fromPortId": "geometry",
+      "toNodeId": "head-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "tx5",
+      "fromNodeId": "spine",
+      "fromPortId": "geometry",
+      "toNodeId": "spine-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "plate-inset",
+      "fromNodeId": "breastplate",
+      "fromPortId": "geometry",
+      "toNodeId": "breastplate-inset",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "plate-x",
+      "fromNodeId": "breastplate-inset",
+      "fromPortId": "geometry",
+      "toNodeId": "breastplate-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "pauldron-x",
+      "fromNodeId": "pauldron-l",
+      "fromPortId": "geometry",
+      "toNodeId": "pauldron-l-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "pauldron-mirror",
+      "fromNodeId": "pauldron-l-x",
+      "fromPortId": "geometry",
+      "toNodeId": "pauldrons",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "gorget-x",
+      "fromNodeId": "gorget",
+      "fromPortId": "geometry",
+      "toNodeId": "gorget-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "waist-x",
+      "fromNodeId": "waist",
+      "fromPortId": "geometry",
+      "toNodeId": "waist-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "j1",
+      "fromNodeId": "body-x",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "j5",
+      "fromNodeId": "spine-x",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "j6",
+      "fromNodeId": "breastplate-x",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "j9",
+      "fromNodeId": "waist-x",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "normals",
+      "fromNodeId": "weather",
+      "fromPortId": "geometry",
+      "toNodeId": "normals",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "uv",
+      "fromNodeId": "normals",
+      "fromPortId": "geometry",
+      "toNodeId": "uv",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "mat",
+      "fromNodeId": "uv",
+      "fromPortId": "geometry",
+      "toNodeId": "material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "out",
+      "fromNodeId": "material",
+      "fromPortId": "geometry",
+      "toNodeId": "output",
+      "toPortId": "input"
+    },
+    {
+      "linkId": "tx3",
+      "fromNodeId": "arm-l",
+      "fromPortId": "geometry",
+      "toNodeId": "arm-l-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "tx4",
+      "fromNodeId": "arm-r",
+      "fromPortId": "geometry",
+      "toNodeId": "arm-r-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "leg-x",
+      "fromNodeId": "leg",
+      "fromPortId": "geometry",
+      "toNodeId": "leg-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "legs",
+      "fromNodeId": "leg-x",
+      "fromPortId": "geometry",
+      "toNodeId": "legs",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "boot-x",
+      "fromNodeId": "boot",
+      "fromPortId": "geometry",
+      "toNodeId": "boot-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "boots",
+      "fromNodeId": "boot-x",
+      "fromPortId": "geometry",
+      "toNodeId": "boots",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "hard-boots",
+      "fromNodeId": "boots",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "horn-x",
+      "fromNodeId": "horn",
+      "fromPortId": "geometry",
+      "toNodeId": "horn-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "horns",
+      "fromNodeId": "horn-x",
+      "fromPortId": "geometry",
+      "toNodeId": "horns",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "hard-horns",
+      "fromNodeId": "horns",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "smooth-head",
+      "fromNodeId": "head-x",
+      "fromPortId": "geometry",
+      "toNodeId": "smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "smooth-arm-l",
+      "fromNodeId": "arm-l-x",
+      "fromPortId": "geometry",
+      "toNodeId": "smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "smooth-arm-r",
+      "fromNodeId": "arm-r-x",
+      "fromPortId": "geometry",
+      "toNodeId": "smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "smooth-pauldrons",
+      "fromNodeId": "pauldrons",
+      "fromPortId": "geometry",
+      "toNodeId": "smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "smooth-gorget",
+      "fromNodeId": "gorget-x",
+      "fromPortId": "geometry",
+      "toNodeId": "smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "smooth-legs",
+      "fromNodeId": "legs",
+      "fromPortId": "geometry",
+      "toNodeId": "smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "hard-bevel",
+      "fromNodeId": "join",
+      "fromPortId": "geometry",
+      "toNodeId": "soften",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "hard-post",
+      "fromNodeId": "soften",
+      "fromPortId": "geometry",
+      "toNodeId": "post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "smooth-post",
+      "fromNodeId": "smooth-join",
+      "fromPortId": "geometry",
+      "toNodeId": "post-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "post-weather",
+      "fromNodeId": "post-join",
+      "fromPortId": "geometry",
+      "toNodeId": "weather",
+      "toPortId": "geometry"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mesh",
+      "nodeId": "output",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

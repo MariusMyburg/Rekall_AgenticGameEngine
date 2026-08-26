@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-warden-mantle-model",
+  "displayName": "Aetherfall Warden Deformable Mantle",
+  "revision": 6,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-warden-mantle-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "aaa69182f359789532fc0bef7bcf99258d7e75b895d521a1073ae02d612140fe",
+    "sourceLogicalRevision": 6,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-warden-mantle-model/094d4e7610bd36458f32863a3a581733bb34b4d91bd0f358b52c8cf4fc36e790.age.compiled-mesh.json",
+    "compiledContentHash": "094d4e7610bd36458f32863a3a581733bb34b4d91bd0f358b52c8cf4fc36e790",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-26T10:27:35.4994438+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

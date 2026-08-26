@@ -60,6 +60,9 @@
                             <Separator Width="30" Margin="0,5" />
                             <Button Content="P" Width="36" Height="36" Command="{Binding PreviewMeshOperationCommand}" ToolTip="Preview semantic operation" />
                             <Button Content="✓" Width="36" Height="36" Command="{Binding ApplyMeshOperationCommand}" ToolTip="Apply semantic operation" />
+                            <Separator Width="30" Margin="0,5" />
+                            <Button Content="⛶" Width="36" Height="36" Command="{Binding FrameSelectedMeshViewportCommand}" ToolTip="Frame selected (reset pan/zoom)" />
+                            <Button Content="⬚/◆" Width="36" Height="36" FontSize="10" Command="{Binding ToggleMeshViewportProjectionCommand}" ToolTip="Toggle orthographic / perspective" />
                         </StackPanel>
                     </Border>
 

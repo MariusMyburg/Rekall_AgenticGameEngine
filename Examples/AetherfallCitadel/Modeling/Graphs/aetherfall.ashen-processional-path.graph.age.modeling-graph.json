@@ -1,0 +1,15 @@
+{
+  "schemaVersion":1,"assetId":"aetherfall.ashen-processional-path.graph","name":"Ashen Processional Path","revision":1,
+  "nodes":[
+    {"nodeId":"grid","typeId":"rekall.modeling.primitive.grid","typeVersion":1,"parameters":{"sizeX":5,"sizeY":44,"segmentsX":12,"segmentsY":44}},
+    {"nodeId":"ruts","typeId":"rekall.modeling.deform.noise","typeVersion":1,"parameters":{"amplitude":0.14,"frequency":0.45,"seed":271,"axis":"z"}},
+    {"nodeId":"broken-edges","typeId":"rekall.modeling.deform.noise","typeVersion":1,"parameters":{"amplitude":1.2,"frequency":0.25,"seed":733,"axis":"x"}},
+    {"nodeId":"place","typeId":"rekall.modeling.transform","typeVersion":1,"parameters":{"translation":[0,0.42,12],"rotation":[-90,3,0],"scale":[1,1,1]}},
+    {"nodeId":"uv","typeId":"rekall.modeling.project_uv","typeVersion":1,"parameters":{"axis":"xz","scaleU":0.22,"scaleV":0.17,"offsetU":0.37,"offsetV":0.19}},
+    {"nodeId":"material","typeId":"rekall.modeling.material.assign","typeVersion":1,"parameters":{"materialAssetId":"aetherfall.wet-slate.material","slotName":"Ashen Path"}},
+    {"nodeId":"output","typeId":"rekall.modeling.output.mesh","typeVersion":1,"parameters":{}}
+  ],
+  "links":[
+    {"linkId":"1","fromNodeId":"grid","fromPortId":"geometry","toNodeId":"ruts","toPortId":"geometry"},{"linkId":"2","fromNodeId":"ruts","fromPortId":"geometry","toNodeId":"broken-edges","toPortId":"geometry"},{"linkId":"2b","fromNodeId":"broken-edges","fromPortId":"geometry","toNodeId":"place","toPortId":"geometry"},{"linkId":"3","fromNodeId":"place","fromPortId":"geometry","toNodeId":"uv","toPortId":"geometry"},{"linkId":"4","fromNodeId":"uv","fromPortId":"geometry","toNodeId":"material","toPortId":"geometry"},{"linkId":"5","fromNodeId":"material","fromPortId":"geometry","toNodeId":"output","toPortId":"input"}
+  ],"outputs":[{"name":"mesh","nodeId":"output","portId":"geometry"}],"exposedParameters":[]
+}

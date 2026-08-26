@@ -45,6 +45,14 @@ public sealed class CaptureRuntimeViewportCommandTests
         Assert.EndsWith("Main_runtime_003.png", result.Value.ScreenshotPath, StringComparison.Ordinal);
         Assert.True(File.Exists(result.Value.ScreenshotPath));
         Assert.Contains(result.Value.ScreenshotPath, context.Transaction.ChangedResources);
+        Assert.Equal(1, result.Value.DrawCount);
+        Assert.Equal(0, result.Value.DispatchCount);
+        Assert.Equal(2, result.Value.SuggestedCommands.Count);
+        Assert.Contains(result.Value.SuggestedCommands, command =>
+            command.Contains("rekall.render.compare_quality_presets", StringComparison.Ordinal));
+        Assert.Contains(result.Value.SuggestedCommands, command =>
+            command.Contains("rekall.render.performance.inspect_scene_budget", StringComparison.Ordinal));
+        Assert.All(result.Value.SuggestedCommands, command => Assert.InRange(command.Length, 1, 512));
     }
 
     [Fact]

@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace Rekall.Age.Rendering;
 
 public sealed record RekallAgeRuntimeViewportAssetSet(
@@ -11,10 +13,38 @@ public sealed record RekallAgeRuntimeViewportAssetSet(
     public IReadOnlyDictionary<string, RekallAgeRuntimeFontAsset> Fonts { get; init; } =
         new Dictionary<string, RekallAgeRuntimeFontAsset>(StringComparer.Ordinal);
 
+    public IReadOnlyDictionary<string, RekallAgeRuntimeMaterialAsset> Materials { get; init; } =
+        new Dictionary<string, RekallAgeRuntimeMaterialAsset>(StringComparer.Ordinal);
+
     public static RekallAgeRuntimeViewportAssetSet Empty { get; } = new(
         new Dictionary<string, RekallAgeRgbaImage>(StringComparer.Ordinal),
         new Dictionary<string, IReadOnlyList<RekallAgeVulkanSceneMesh>>(StringComparer.Ordinal),
         Array.Empty<RekallAgeRuntimeViewportAssetIssue>());
+}
+
+public sealed record RekallAgeRuntimeMaterialAsset(string AssetId)
+{
+    public string? BaseColorTextureAssetId { get; init; }
+
+    public string? MetallicRoughnessTextureAssetId { get; init; }
+
+    public string? NormalTextureAssetId { get; init; }
+
+    public string? OcclusionTextureAssetId { get; init; }
+
+    public string? EmissiveTextureAssetId { get; init; }
+
+    public Vector4 BaseColorFactor { get; init; } = Vector4.One;
+
+    public float MetallicFactor { get; init; }
+
+    public float RoughnessFactor { get; init; } = 1;
+
+    public float NormalScale { get; init; } = 1;
+
+    public float OcclusionStrength { get; init; } = 1;
+
+    public Vector4 EmissiveFactor { get; init; }
 }
 
 public sealed record RekallAgeRuntimeFontAsset(string AssetId, string Path);

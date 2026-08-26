@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\Rekall.Age.Rendering.Abstractions\Rekall.Age.Rendering.Abstractions.csproj" />
     <ProjectReference Include="..\Rekall.Age.World\Rekall.Age.World.csproj" />
   </ItemGroup>
 

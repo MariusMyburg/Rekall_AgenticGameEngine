@@ -116,7 +116,7 @@ The first production frame graph is:
 11. exposure, bloom, tone mapping, color grading, sharpening, and upscale
 12. screen-space UI composition and presentation
 
-The graph declares reads, writes, formats, extents, lifetimes, queue intent, and dependencies. Vulkan execution owns synchronization and resource transitions; authored content never manipulates barriers or native handles.
+The graph declares reads, writes, formats, extents, lifetimes, queue intent, and dependencies. Diagnostic GPU readback is graph-visible too: the froxel image declares transfer-source usage, a bounded host-readback destination declares transfer-destination usage, and an ordered transfer pass depends on completed fog integration. Vulkan execution owns synchronization and resource transitions; authored content never manipulates barriers or native handles.
 
 ### Renderer storage
 
@@ -129,8 +129,10 @@ Following the useful Godot separation, CPU scene documents and runtime facts do 
 - particle simulations and instance buffers
 - animation skin/morph buffers
 - environment and post-process resources
+- temporal histories whose lifetime spans frames in one renderer session
 
 Stores use stable asset/content identities and bounded invalidation. Hot reload replaces only affected resources and retains the last valid representation on compilation/import failure.
+The native renderer session owns its Vulkan instance/device and persistent temporal images until that session is disposed. The render graph declares those images as persistent resources, includes them in persistent memory estimates, and treats their prior-frame contents as valid inputs only after the owning execution path has initialized them.
 
 ## Physically Based Shading
 
@@ -160,7 +162,7 @@ Later milestones add spot/point shadow atlases, cached static shadows, contact s
 
 ## Atmosphere, Fog, and Post-Processing
 
-The foundation supports inexpensive analytic height/distance fog on lower tiers and froxel volumetric fog on higher tiers. Volumetric fog includes bounded grid dimensions, light injection, density volumes, anisotropic scattering, temporal reprojection, camera-cut reset, and optional filtering.
+The foundation supports inexpensive analytic height/distance fog on lower tiers and froxel volumetric fog on higher tiers. Scene rendering, shadows, fog, and fog history consume one resolved effective-camera fact: an authored non-default pose remains authoritative, while a null/zero default camera is auto-framed once from actual scene bounds. That fact carries the exact view/projection matrices, orientation basis, near/far range, perspective tangent or orthographic half-height/aspect extents, and orthographic per-pixel origins. Because the Vulkan scene projection flips `M22`, framebuffer UV Y reconstructs through the inverse camera-up axis for perspective rays, orthographic origins, and temporal-history projection; both fog paths therefore sample stored opaque depth and stop at the same visible surfaces the scene rendered. Volumetric fog includes bounded grid dimensions, oriented local density volumes, one deterministically selected visible canonical `DirectionalLight`/`Rekall.DirectionalLight` variant (case-insensitive, priority then entity ID), explicit no-directional-light injection with zero energy, anisotropic phase scattering, per-froxel cascade shadow lookup, persistent GPU history sampling and reprojection, truthful camera-cut/grid reset, and optional filtering. Point, spot, custom, and foreign-namespace light variants never masquerade as the directional fog/shadow source; there is no synthetic directional fallback in the high-fidelity path. Unsupported volume shapes degrade deterministically with stable observation facts and dropped entity IDs. Fog debug slices come from a graph-declared transfer readback of the executed GPU froxel image.
 
 The HDR post stack executes authored standard passes rather than treating their names as metadata only:
 
@@ -182,6 +184,8 @@ Particle behavior is authored data. The renderer/simulation provides generic exe
 - quad, mesh, ribbon/trail, and beam rendering modes delivered incrementally
 - flipbook animation, soft-particle depth fading, lit/unlit materials, emissive HDR output, and optional collision/depth interaction
 - effect LOD, distance culling, capacity limits, and overflow observations
+
+The first native quad implementation uses graph-declared persistent ping-pong state, per-frame emitter and active-index buffers, GPU-authored indirect arguments, and a particle-only fragment-count buffer for overdraw evidence. Its executable order is fog integration, particle upload/simulation, transparent particle draw into scene HDR and fragment-count accumulation, then bloom/tone mapping. Persistent state is initialized to zero on first use or discontinuity and reused only for consecutive frames with matching resolved emitter/range topology fingerprints. Reports distinguish planned spawn count from the post-submit GPU indirect active count. Particle bounds derive from the executed destination-state readback, while overdraw derives only from particle fragment-shader atomic counts. Counter allocation and readback use the render extent; debug conversion first builds an authentic render-resolution heat map, records its checksum/dimensions, then explicitly resolves it to the output extent. Curves support up to four ordered authored time keys in the native compute path. Every authored numeric value packed into GPU floats, including the engine particle simulation timestep, must be finite and within the inclusive `float` range; the timestep must additionally be non-negative. Out-of-range inputs reject with a stable category diagnostic, and direction normalization occurs in double precision before packing. Fixed 256-wide compute work-group and storage-descriptor limits, storage range, and compute queue support are checked before particle allocation; invalid pack inputs, unsupported draw modes, and bounded overflow remain explicit diagnostics. Particle-only scenes are independently drawable only when the resolved plan has executable capacity. Disabled and zero-emission sets remain quiet truthful clear captures; rejected, culled, or unsupported-only sets clear without particle execution while preserving their resolved `REKALL_PARTICLE_*` diagnostics in a non-executed report.
 
 Game modules emit generic custom facts or add/update emitter entities. The engine never contains an Aetherfall-specific hit, dash, weapon, or boss effect.
 

@@ -53,7 +53,7 @@ public sealed class MeshAuthoringClosedLoopTests
         var compiled = await CallAsync(server, "rekall.mesh.inspect_compiled", new { projectRoot = root, assetId = "agent-world", maximumTriangles = 64 });
         var compiledValue = compiled.Content.GetProperty("value");
         Assert.True(compiledValue.GetProperty("triangleCount").GetInt32() >= 9);
-        Assert.Equal(3, compiledValue.GetProperty("surfaceCount").GetInt32());
+        Assert.Equal(2, compiledValue.GetProperty("surfaceCount").GetInt32());
         Assert.Equal(
             [0, 1],
             compiledValue.GetProperty("surfaces").EnumerateArray()

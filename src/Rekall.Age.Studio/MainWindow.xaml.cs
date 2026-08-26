@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using Rekall.Age.Editor.Contracts;
+using Rekall.Age.Workflows;
 using Serilog;
 
 namespace Rekall.Age.Studio;
@@ -24,6 +25,15 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _viewModel.CodexApprovalHandler = RequestCodexApprovalAsync;
+        _viewModel.CodexAuthenticationLauncher = authenticationUri =>
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(authenticationUri.AbsoluteUri)
+            {
+                UseShellExecute = true
+            });
+            return ValueTask.CompletedTask;
+        };
         DataContext = _viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _previewTimer = new DispatcherTimer(DispatcherPriority.Background)
@@ -87,6 +97,36 @@ public partial class MainWindow : Window
             if (_viewModel.RefreshMeshAssetsCommand.CanExecute(null)) _viewModel.RefreshMeshAssetsCommand.Execute(null);
             if (_viewModel.RefreshModelingGraphsCommand.CanExecute(null)) _viewModel.RefreshModelingGraphsCommand.Execute(null);
         }
+    }
+
+    private async ValueTask<RekallAgeCodexApprovalDecision> RequestCodexApprovalAsync(
+        RekallAgeCodexApprovalRequest request,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!RekallAgeCodexApprovalPresenter.TryFormat(request, out var summary))
+        {
+            return RekallAgeCodexApprovalDecision.Decline;
+        }
+        var choice = await Dispatcher.InvokeAsync(() => MessageBox.Show(
+            this,
+            $"Codex requests approval for this action:\n\n{summary}\n\nAllow this action?",
+            "Codex approval",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question));
+        return choice switch
+        {
+            MessageBoxResult.Yes => RekallAgeCodexApprovalDecision.Accept,
+            MessageBoxResult.Cancel => RekallAgeCodexApprovalDecision.Cancel,
+            _ => RekallAgeCodexApprovalDecision.Decline
+        };
+    }
+
+    private async void OnApplyOpenAiApiKeyClick(object sender, RoutedEventArgs e)
+    {
+        var sessionKey = OpenAiApiKeyInput.Password;
+        OpenAiApiKeyInput.Clear();
+        await _viewModel.ApplyOpenAiApiKeyAsync(sessionKey);
     }
 
     private void ApplyLayout(RekallAgeStudioLayout layout)
@@ -332,5 +372,78 @@ public partial class MainWindow : Window
             return;
         }
         base.OnClosing(e);
+    }
+}
+
+internal static class RekallAgeCodexApprovalPresenter
+{
+    private const int MaximumSummaryCharacters = 1_200;
+    private static readonly IReadOnlyDictionary<string, string> Labels =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["command"] = "Command", ["cwd"] = "Working directory",
+            ["path"] = "Path", ["filePath"] = "Path", ["reason"] = "Reason",
+            ["server"] = "MCP server", ["serverName"] = "MCP server", ["mcpServer"] = "MCP server",
+            ["tool"] = "MCP tool", ["toolName"] = "MCP tool", ["message"] = "Message"
+        };
+
+    internal static bool TryFormat(RekallAgeCodexApprovalRequest request, out string summary)
+    {
+        var supported = request.Method.Equals("item/commandExecution/requestApproval", StringComparison.Ordinal)
+            || request.Method.Equals("item/fileChange/requestApproval", StringComparison.Ordinal)
+            || request.Method.Equals("mcpServer/elicitation/request", StringComparison.Ordinal);
+        if (!supported || request.Parameters.ValueKind != System.Text.Json.JsonValueKind.Object)
+        {
+            summary = string.Empty;
+            return false;
+        }
+
+        var facts = new List<string>();
+        Collect(request.Parameters, facts);
+        summary = string.Join(Environment.NewLine, facts.Distinct(StringComparer.Ordinal));
+        if (summary.Length > MaximumSummaryCharacters)
+        {
+            summary = summary[..(MaximumSummaryCharacters - 1)] + "…";
+        }
+        return summary.Length > 0;
+    }
+
+    private static void Collect(System.Text.Json.JsonElement element, List<string> facts)
+    {
+        if (facts.Sum(item => item.Length) >= MaximumSummaryCharacters) return;
+        if (element.ValueKind == System.Text.Json.JsonValueKind.Object)
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                if (Labels.TryGetValue(property.Name, out var label)
+                    && TryDisplayValue(property.Value, out var value))
+                {
+                    facts.Add($"{label}: {value}");
+                }
+                if (property.Value.ValueKind is System.Text.Json.JsonValueKind.Object or System.Text.Json.JsonValueKind.Array)
+                {
+                    Collect(property.Value, facts);
+                }
+            }
+        }
+        else if (element.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray()) Collect(item, facts);
+        }
+    }
+
+    private static bool TryDisplayValue(System.Text.Json.JsonElement element, out string value)
+    {
+        value = element.ValueKind switch
+        {
+            System.Text.Json.JsonValueKind.String => element.GetString() ?? string.Empty,
+            System.Text.Json.JsonValueKind.Array => string.Join(" ", element.EnumerateArray()
+                .Where(item => item.ValueKind == System.Text.Json.JsonValueKind.String)
+                .Select(item => item.GetString())),
+            _ => string.Empty
+        };
+        value = value.ReplaceLineEndings(" ");
+        if (value.Length > 300) value = value[..299] + "…";
+        return !string.IsNullOrWhiteSpace(value);
     }
 }

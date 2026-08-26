@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-resonance-halo-model",
+  "displayName": "High Resolution Resonance Halo",
+  "revision": 1,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-resonance-halo-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "0793df3e3da63a47189f660b1ac73ade1eb8e412b0c4a7dbabca90b215580c9b",
+    "sourceLogicalRevision": 1,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-resonance-halo-model/63f3ad72651212e595647b9dad5667319eb7d96d988e95c5fcc3b6c30ac88f56.age.compiled-mesh.json",
+    "compiledContentHash": "63f3ad72651212e595647b9dad5667319eb7d96d988e95c5fcc3b6c30ac88f56",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-25T16:29:31.0474753+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

@@ -1,0 +1,769 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.broken-arch.graph",
+  "name": "Broken Processional Arch",
+  "revision": 5,
+  "nodes": [
+    {
+      "nodeId": "wall",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 8.5,
+        "sizeY": 7.5,
+        "sizeZ": 1.6
+      }
+    },
+    {
+      "nodeId": "wall-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          3.75,
+          0
+        ]
+      }
+    },
+    {
+      "nodeId": "door",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 3.3,
+        "sizeY": 4.2,
+        "sizeZ": 3
+      }
+    },
+    {
+      "nodeId": "door-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          1.7,
+          0
+        ]
+      }
+    },
+    {
+      "nodeId": "cut-door",
+      "typeId": "rekall.modeling.boolean",
+      "typeVersion": 1,
+      "parameters": {
+        "operation": "difference"
+      }
+    },
+    {
+      "nodeId": "buttress",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 1.45,
+        "sizeY": 4.1,
+        "sizeZ": 3.1
+      }
+    },
+    {
+      "nodeId": "buttress-l",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -4.35,
+          2.05,
+          0.8
+        ],
+        "rotation": [
+          -8,
+          0,
+          -4
+        ]
+      }
+    },
+    {
+      "nodeId": "buttress-r",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          4.35,
+          2.05,
+          0.8
+        ],
+        "rotation": [
+          -8,
+          0,
+          4
+        ]
+      }
+    },
+    {
+      "nodeId": "arch-curve",
+      "typeId": "rekall.modeling.curve.source",
+      "typeVersion": 1,
+      "parameters": {
+        "resolution": 8,
+        "document": {
+          "schemaVersion": 1,
+          "assetId": "aetherfall.broken-arch",
+          "name": "Broken Processional Arch Curve",
+          "revision": 1,
+          "splines": [
+            {
+              "splineId": 7001,
+              "kind": "CubicBezier",
+              "cyclic": false,
+              "controlPoints": [
+                {
+                  "controlPointId": 7101,
+                  "position": {
+                    "x": -2.0,
+                    "y": 3.65,
+                    "z": -0.92
+                  },
+                  "handleIn": {
+                    "x": -2.0,
+                    "y": 3.65,
+                    "z": -0.92
+                  },
+                  "handleOut": {
+                    "x": -2.0,
+                    "y": 4.9,
+                    "z": -0.92
+                  },
+                  "radius": 1.08,
+                  "tiltRadians": -0.08
+                },
+                {
+                  "controlPointId": 7102,
+                  "position": {
+                    "x": 0.0,
+                    "y": 5.85,
+                    "z": -0.92
+                  },
+                  "handleIn": {
+                    "x": -1.1,
+                    "y": 5.85,
+                    "z": -0.92
+                  },
+                  "handleOut": {
+                    "x": 1.1,
+                    "y": 5.85,
+                    "z": -0.92
+                  },
+                  "radius": 1.22,
+                  "tiltRadians": 0.0
+                },
+                {
+                  "controlPointId": 7103,
+                  "position": {
+                    "x": 2.0,
+                    "y": 3.65,
+                    "z": -0.92
+                  },
+                  "handleIn": {
+                    "x": 2.0,
+                    "y": 4.9,
+                    "z": -0.92
+                  },
+                  "handleOut": {
+                    "x": 2.0,
+                    "y": 3.65,
+                    "z": -0.92
+                  },
+                  "radius": 1.08,
+                  "tiltRadians": 0.08
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "nodeId": "arch-resample",
+      "typeId": "rekall.modeling.curve.resample",
+      "typeVersion": 1,
+      "parameters": {
+        "count": 96
+      }
+    },
+    {
+      "nodeId": "arch-ring",
+      "typeId": "rekall.modeling.curve.profile_sweep",
+      "typeVersion": 1,
+      "parameters": {
+        "profile": "rectangle",
+        "profileWidth": 0.58,
+        "profileHeight": 0.38,
+        "capStart": true,
+        "capEnd": true,
+        "materialAssetId": "aetherfall.ruin-trim.material",
+        "slotName": "Inner Archivolt"
+      }
+    },
+    {
+      "nodeId": "arch-ring-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          0,
+          -0.22
+        ]
+      }
+    },
+    {
+      "nodeId": "arch-outer-ring",
+      "typeId": "rekall.modeling.curve.profile_sweep",
+      "typeVersion": 1,
+      "parameters": {
+        "profile": "rectangle",
+        "profileWidth": 0.92,
+        "profileHeight": 0.22,
+        "capStart": true,
+        "capEnd": true,
+        "materialAssetId": "aetherfall.ruin-trim.material",
+        "slotName": "Outer Archivolt"
+      }
+    },
+    {
+      "nodeId": "arch-outer-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          0,
+          -0.10
+        ]
+      }
+    },
+    {
+      "nodeId": "keystone",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": {
+        "radiusBottom": 0.5,
+        "radiusTop": 0.34,
+        "depth": 0.72,
+        "segments": 6,
+        "capBottom": true,
+        "capTop": true
+      }
+    },
+    {
+      "nodeId": "keystone-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          5.92,
+          -0.98
+        ],
+        "rotation": [
+          90,
+          0,
+          0
+        ],
+        "scale": [
+          1.2,
+          1,
+          0.65
+        ]
+      }
+    },
+    {
+      "nodeId": "coping",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 1.12,
+        "sizeY": 0.38,
+        "sizeZ": 1.92
+      }
+    },
+    {
+      "nodeId": "coping-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -3.45,
+          7.58,
+          0
+        ]
+      }
+    },
+    {
+      "nodeId": "coping-array",
+      "typeId": "rekall.modeling.array",
+      "typeVersion": 1,
+      "parameters": {
+        "count": 7,
+        "offset": [
+          1.15,
+          0,
+          0
+        ],
+        "relativeOffset": false,
+        "instanceMode": false
+      }
+    },
+    {
+      "nodeId": "engaged-column",
+      "typeId": "rekall.modeling.primitive.cylinder",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.38,
+        "depth": 6.2,
+        "segments": 24,
+        "capBottom": true,
+        "capTop": true
+      }
+    },
+    {
+      "nodeId": "engaged-column-l",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -3.15,
+          3.1,
+          -1.02
+        ]
+      }
+    },
+    {
+      "nodeId": "engaged-column-r",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          3.15,
+          3.1,
+          -1.02
+        ]
+      }
+    },
+    {
+      "nodeId": "finial",
+      "typeId": "rekall.modeling.primitive.cone",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.52,
+        "depth": 1.25,
+        "segments": 20,
+        "capBottom": true
+      }
+    },
+    {
+      "nodeId": "finial-l",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          -3.15,
+          6.8,
+          -1.02
+        ]
+      }
+    },
+    {
+      "nodeId": "finial-r",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          3.15,
+          6.8,
+          -1.02
+        ]
+      }
+    },
+    {
+      "nodeId": "mass-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "mass-material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": {
+        "materialAssetId": "aetherfall.ruin-mass.material",
+        "slotName": "Arch Structural Mass"
+      }
+    },
+    {
+      "nodeId": "trim-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "trim-material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": {
+        "materialAssetId": "aetherfall.ruin-trim.material",
+        "slotName": "Arch Carved Trim"
+      }
+    },
+    {
+      "nodeId": "join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "bevel",
+      "typeId": "rekall.modeling.bevel",
+      "typeVersion": 1,
+      "parameters": {
+        "width": 0.075,
+        "segments": 2,
+        "profile": 0.5,
+        "clampOverlap": true,
+        "hardenNormals": true
+      }
+    },
+    {
+      "nodeId": "weather-x",
+      "typeId": "rekall.modeling.deform.noise",
+      "typeVersion": 1,
+      "parameters": {
+        "amplitude": 0.1,
+        "frequency": 2.4,
+        "seed": 607,
+        "axis": "x"
+      }
+    },
+    {
+      "nodeId": "weather-y",
+      "typeId": "rekall.modeling.deform.noise",
+      "typeVersion": 1,
+      "parameters": {
+        "amplitude": 0.08,
+        "frequency": 2.8,
+        "seed": 811,
+        "axis": "y"
+      }
+    },
+    {
+      "nodeId": "normals",
+      "typeId": "rekall.modeling.weighted_normals",
+      "typeVersion": 1,
+      "parameters": {
+        "attribute": "normal.weighted",
+        "faceAreaWeight": 1.0
+      }
+    },
+    {
+      "nodeId": "uv",
+      "typeId": "rekall.modeling.project_uv",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "xy",
+        "scaleU": 0.16,
+        "scaleV": 0.16,
+        "projection": "box"
+      }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    {
+      "linkId": "1",
+      "fromNodeId": "wall",
+      "fromPortId": "geometry",
+      "toNodeId": "wall-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "2",
+      "fromNodeId": "door",
+      "fromPortId": "geometry",
+      "toNodeId": "door-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "3",
+      "fromNodeId": "wall-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cut-door",
+      "toPortId": "a"
+    },
+    {
+      "linkId": "4",
+      "fromNodeId": "door-x",
+      "fromPortId": "geometry",
+      "toNodeId": "cut-door",
+      "toPortId": "b"
+    },
+    {
+      "linkId": "8",
+      "fromNodeId": "buttress",
+      "fromPortId": "geometry",
+      "toNodeId": "buttress-l",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "9",
+      "fromNodeId": "buttress",
+      "fromPortId": "geometry",
+      "toNodeId": "buttress-r",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "arch-curve-resample",
+      "fromNodeId": "arch-curve",
+      "fromPortId": "curve",
+      "toNodeId": "arch-resample",
+      "toPortId": "curve"
+    },
+    {
+      "linkId": "arch-resample-sweep",
+      "fromNodeId": "arch-resample",
+      "fromPortId": "curve",
+      "toNodeId": "arch-ring",
+      "toPortId": "curve"
+    },
+    {
+      "linkId": "arch-x",
+      "fromNodeId": "arch-ring",
+      "fromPortId": "geometry",
+      "toNodeId": "arch-ring-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "arch-resample-outer",
+      "fromNodeId": "arch-resample",
+      "fromPortId": "curve",
+      "toNodeId": "arch-outer-ring",
+      "toPortId": "curve"
+    },
+    {
+      "linkId": "arch-outer-x",
+      "fromNodeId": "arch-outer-ring",
+      "fromPortId": "geometry",
+      "toNodeId": "arch-outer-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "key-x",
+      "fromNodeId": "keystone",
+      "fromPortId": "geometry",
+      "toNodeId": "keystone-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "coping-x",
+      "fromNodeId": "coping",
+      "fromPortId": "geometry",
+      "toNodeId": "coping-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "coping-array",
+      "fromNodeId": "coping-x",
+      "fromPortId": "geometry",
+      "toNodeId": "coping-array",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "column-l",
+      "fromNodeId": "engaged-column",
+      "fromPortId": "geometry",
+      "toNodeId": "engaged-column-l",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "column-r",
+      "fromNodeId": "engaged-column",
+      "fromPortId": "geometry",
+      "toNodeId": "engaged-column-r",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "finial-l",
+      "fromNodeId": "finial",
+      "fromPortId": "geometry",
+      "toNodeId": "finial-l",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "finial-r",
+      "fromNodeId": "finial",
+      "fromPortId": "geometry",
+      "toNodeId": "finial-r",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "10",
+      "fromNodeId": "cut-door",
+      "fromPortId": "geometry",
+      "toNodeId": "mass-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "11",
+      "fromNodeId": "buttress-l",
+      "fromPortId": "geometry",
+      "toNodeId": "mass-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "12",
+      "fromNodeId": "buttress-r",
+      "fromPortId": "geometry",
+      "toNodeId": "mass-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "arch-join",
+      "fromNodeId": "arch-ring-x",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "arch-outer-join",
+      "fromNodeId": "arch-outer-x",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "key-join",
+      "fromNodeId": "keystone-x",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "coping-join",
+      "fromNodeId": "coping-array",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "column-l-join",
+      "fromNodeId": "engaged-column-l",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "column-r-join",
+      "fromNodeId": "engaged-column-r",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "finial-l-join",
+      "fromNodeId": "finial-l",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "finial-r-join",
+      "fromNodeId": "finial-r",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "mass-assign",
+      "fromNodeId": "mass-join",
+      "fromPortId": "geometry",
+      "toNodeId": "mass-material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "trim-assign",
+      "fromNodeId": "trim-join",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "mass-final",
+      "fromNodeId": "mass-material",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "trim-final",
+      "fromNodeId": "trim-material",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "join-bevel",
+      "fromNodeId": "join",
+      "fromPortId": "geometry",
+      "toNodeId": "bevel",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "13",
+      "fromNodeId": "bevel",
+      "fromPortId": "geometry",
+      "toNodeId": "weather-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "14",
+      "fromNodeId": "weather-x",
+      "fromPortId": "geometry",
+      "toNodeId": "weather-y",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "normal",
+      "fromNodeId": "weather-y",
+      "fromPortId": "geometry",
+      "toNodeId": "normals",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "15",
+      "fromNodeId": "normals",
+      "fromPortId": "geometry",
+      "toNodeId": "uv",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "17",
+      "fromNodeId": "uv",
+      "fromPortId": "geometry",
+      "toNodeId": "output",
+      "toPortId": "input"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mesh",
+      "nodeId": "output",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

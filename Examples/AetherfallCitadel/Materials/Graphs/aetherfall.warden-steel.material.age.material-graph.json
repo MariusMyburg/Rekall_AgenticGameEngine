@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.warden-steel.material",
+  "name": "Warden Aged Steel",
+  "revision": 3,
+  "nodes": [
+    { "nodeId": "uv", "typeId": "rekall.material.coordinate.uv", "typeVersion": 1, "parameters": {} },
+    { "nodeId": "color", "typeId": "rekall.material.texture.sample", "typeVersion": 1, "parameters": { "textureAssetId": "asset_aetherfall-warden-blackened-steel-albedo-v1_38ff2b50" } },
+    { "nodeId": "normal-texture", "typeId": "rekall.material.texture.sample", "typeVersion": 1, "parameters": { "textureAssetId": "asset_aetherfall-warden-blackened-steel-normal-v1_43104c91" } },
+    { "nodeId": "normal", "typeId": "rekall.material.normal.map", "typeVersion": 1, "parameters": { "strength": 0.55 } },
+    { "nodeId": "pbr", "typeId": "rekall.material.surface.pbr", "typeVersion": 1, "parameters": { "roughness": 0.58, "metallic": 0.64 } },
+    { "nodeId": "output", "typeId": "rekall.material.output", "typeVersion": 1, "parameters": {} }
+  ],
+  "links": [
+    { "linkId": "uv-color", "fromNodeId": "uv", "fromPortId": "uv", "toNodeId": "color", "toPortId": "uv" },
+    { "linkId": "uv-normal", "fromNodeId": "uv", "fromPortId": "uv", "toNodeId": "normal-texture", "toPortId": "uv" },
+    { "linkId": "color-pbr", "fromNodeId": "color", "fromPortId": "color", "toNodeId": "pbr", "toPortId": "baseColor" },
+    { "linkId": "normaltex-normal", "fromNodeId": "normal-texture", "fromPortId": "color", "toNodeId": "normal", "toPortId": "color" },
+    { "linkId": "normal-pbr", "fromNodeId": "normal", "fromPortId": "normal", "toNodeId": "pbr", "toPortId": "normal" },
+    { "linkId": "pbr-output", "fromNodeId": "pbr", "fromPortId": "surface", "toNodeId": "output", "toPortId": "surface" }
+  ],
+  "output": { "name": "surface", "nodeId": "output", "portId": "surface" },
+  "exposedParameters": []
+}

@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.World;
 
 namespace Rekall.Age.Runtime.Abstractions;
@@ -12,6 +13,8 @@ public sealed record RekallAgeRuntimeWorld(
     RekallAgeRuntimeSubsystemViews Subsystems,
     IReadOnlyList<RekallAgeRuntimeObservation> Observations)
 {
+    public double DeltaSeconds { get; init; } = 1.0 / 60.0;
+
     public IReadOnlyList<string> SystemsRun { get; init; } = Array.Empty<string>();
 
     public string? ProjectRoot { get; init; }
@@ -322,6 +325,21 @@ public sealed record RekallAgeRuntimeRenderView(
     public IReadOnlyList<RekallAgeRuntimeGpuWorkload> GpuWorkloads { get; init; } =
         Array.Empty<RekallAgeRuntimeGpuWorkload>();
 
+    public IReadOnlyList<RekallAgeRuntimeRenderQualityProfile> QualityProfiles { get; init; } =
+        Array.Empty<RekallAgeRuntimeRenderQualityProfile>();
+
+    public IReadOnlyList<RekallAgeRuntimeEnvironment3D> Environments { get; init; } =
+        Array.Empty<RekallAgeRuntimeEnvironment3D>();
+
+    public IReadOnlyList<RekallAgeRuntimeShadowSettings> ShadowSettings { get; init; } =
+        Array.Empty<RekallAgeRuntimeShadowSettings>();
+
+    public IReadOnlyList<RekallAgeRuntimeFogVolume> FogVolumes { get; init; } =
+        Array.Empty<RekallAgeRuntimeFogVolume>();
+
+    public IReadOnlyList<RekallAgeRuntimeParticleEmitter> ParticleEmitters { get; init; } =
+        Array.Empty<RekallAgeRuntimeParticleEmitter>();
+
     public static RekallAgeRuntimeRenderView Empty { get; } = new(
         Array.Empty<RekallAgeRuntimeRenderCamera>(),
         Array.Empty<RekallAgeRuntimeRenderSprite>(),
@@ -387,7 +405,9 @@ public sealed record RekallAgeRuntimeRenderLight(
     double Intensity,
     string ProjectionSource = RekallAgeRuntimeProjectionSources.Authored,
     string? Color = null,
-    string Layer = "default");
+    string Layer = "default",
+    double Range = 10,
+    int Priority = 0);
 
 public sealed record RekallAgeRuntimeRenderUiLayer(
     string EntityId,
@@ -414,6 +434,108 @@ public sealed record RekallAgeRuntimeRenderPostProcessPass(
     double Intensity = 1,
     double Radius = 1,
     string BlendMode = "add");
+
+public sealed record RekallAgeRuntimeRenderQualityProfile(
+    string EntityId,
+    string EntityName,
+    RekallAgeRenderQualityIntent Intent)
+{
+    public string ProjectionSource { get; init; } = RekallAgeRuntimeProjectionSources.Authored;
+}
+
+public sealed record RekallAgeRuntimeEnvironment3D(
+    string EntityId,
+    string EntityName,
+    string? SkyAssetId,
+    double AmbientEnergy,
+    double Exposure,
+    string ToneMapper,
+    double WhitePoint,
+    string? ColorGradeAssetId,
+    string BackgroundPolicy)
+{
+    public string ProjectionSource { get; init; } = RekallAgeRuntimeProjectionSources.Authored;
+
+    public string AmbientSkyColor { get; init; } = "#ffffff";
+
+    public string AmbientGroundColor { get; init; } = "#ffffff";
+
+    public string? BackgroundColor { get; init; }
+}
+
+public sealed record RekallAgeRuntimeShadowSettings(
+    string EntityId,
+    string EntityName,
+    int CascadeCount,
+    int AtlasResolution,
+    double MaximumDistance,
+    string SplitPolicy,
+    double Bias,
+    double NormalBias,
+    string Filter,
+    bool Stabilization)
+{
+    public string ProjectionSource { get; init; } = RekallAgeRuntimeProjectionSources.Authored;
+}
+
+public sealed record RekallAgeRuntimeFogVolume(
+    string EntityId,
+    string EntityName,
+    string Shape,
+    double Density,
+    string Albedo,
+    string Emission,
+    double Anisotropy,
+    double HeightFalloff,
+    double BlendDistance,
+    int Priority)
+{
+    public string ProjectionSource { get; init; } = RekallAgeRuntimeProjectionSources.Authored;
+
+    public RekallAgeRuntimeTransform Transform { get; init; } = RekallAgeRuntimeTransform.Identity;
+}
+
+public sealed record RekallAgeRuntimeParticleBurst(double TimeSeconds, int Count);
+
+public sealed record RekallAgeRuntimeParticleScalarKey(double NormalizedAge, double Value);
+
+public sealed record RekallAgeRuntimeParticleColorKey(double NormalizedAge, string Color);
+
+public sealed record RekallAgeRuntimeParticleEmitter(
+    string EntityId,
+    string EntityName,
+    bool Enabled,
+    string SimulationSpace,
+    int Capacity,
+    double SpawnRate,
+    IReadOnlyList<RekallAgeRuntimeParticleBurst> Bursts,
+    double LifetimeSeconds,
+    uint DeterministicSeed,
+    RekallAgeRuntimeVector3 VelocityDirection,
+    double VelocityConeDegrees,
+    double MinimumSpeed,
+    double MaximumSpeed,
+    RekallAgeRuntimeVector3 Gravity,
+    double Drag,
+    IReadOnlyList<RekallAgeRuntimeParticleScalarKey> SizeCurve,
+    IReadOnlyList<RekallAgeRuntimeParticleColorKey> ColorCurve,
+    string DrawMode,
+    bool Lit,
+    double EmissiveIntensity,
+    double SoftParticleFade,
+    string? TextureAssetId,
+    int FlipbookColumns,
+    int FlipbookRows,
+    double FlipbookFramesPerSecond,
+    string BlendMode,
+    int Priority,
+    double VisibilityDistance,
+    string Layer)
+{
+    public string ProjectionSource { get; init; } = RekallAgeRuntimeProjectionSources.Authored;
+
+    public RekallAgeRuntimeTransform Transform { get; init; } = RekallAgeRuntimeTransform.Identity;
+}
 
 [Flags]
 public enum RekallAgeRuntimeGpuBufferUsage

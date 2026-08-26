@@ -23,7 +23,7 @@ This keeps the existing renderer path intact. It does not require mesh shaders, 
 Initial properties:
 
 - `enabled`: opt-in switch, default `true`.
-- `targetPixelError`: distance/detail knob for future screen-space selection.
+- `targetPixelError`: distance/detail knob for current screen-space-inspired selection.
 - `clusterTriangleCount`: CPU cluster size, default `128`.
 - `maxSelectedTriangles`: per-renderable triangle cap, default `0` meaning no cap.
 - `maxLodLevel`: maximum reduction level, default `8`.
@@ -35,9 +35,12 @@ The CPU MVP reduces triangle pressure deterministically:
 
 1. Build ordinary `RekallAgeVulkanSceneMesh` data from existing primitives, authored geometry, or imported GLB assets.
 2. If virtual geometry is disabled or missing, return the ordinary meshes.
-3. If enabled, build progressively reduced triangle levels from the source mesh.
-4. Pick a level from camera distance and `maxSelectedTriangles`.
-5. Return selected mesh chunks with preserved material bindings and entity identity.
+3. Compact each surface to referenced vertices and analyze indexed/geometric connectivity, including render seams and disconnected coincident components.
+4. Build progressively reduced connected-cluster levels; reject candidates that worsen component count, boundary edges, or maximum edge use.
+5. Pick a level from camera distance, `targetPixelError`, `clusterTriangleCount`, and the whole-renderable `maxSelectedTriangles` cap, apportioned deterministically across material surfaces.
+6. Return selected mesh chunks with preserved material bindings and entity identity, plus source count, selected LOD, and truthful budget-satisfaction metadata.
+
+Stable imported/model geometry is reduced before material base-color materialization and cached by source identity, settings, and distance-LOD bucket. Web and OpenXR retain their mesh builder across frames; the Windows player also incorporates virtual-geometry selection into its static-geometry cache signature. Skinned and morph-target meshes currently remain at source resolution because their vertex-indexed deformation payloads require explicit remapping.
 
 This is not a final Nanite-quality simplifier. It is a bounded, inspectable near-term performance step that makes dense meshes cheaper to submit today.
 
@@ -49,6 +52,7 @@ Performance budget inspection should report both source and selected virtual geo
 - source triangles
 - selected triangles
 - reduced triangles
+- per-renderable maximum and budget-satisfaction state
 
 Budget blockers should evaluate selected triangles, because those are the triangles sent to the current draw path.
 
@@ -73,6 +77,9 @@ The implementation should cover:
 - built-in component schema exposure
 - runtime frame propagation from `Rekall.VirtualGeometry`
 - Vulkan mesh builder triangle reduction for imported meshes
+- topology preservation across split seams and coincident disconnected open/closed components
+- whole-renderable multi-surface caps and explicit impossible-cap reporting
+- materialized asset cache reuse and distance/pixel-error output monotonicity
 - performance budget reporting selected and reduced virtual geometry triangles
 
 ## References

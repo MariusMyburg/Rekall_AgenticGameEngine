@@ -150,7 +150,23 @@ public sealed class VulkanScenePreparedFrameTests
             System.Numerics.Matrix4x4.CreateTranslation(1, 2, 3),
             new System.Numerics.Vector3(0.1f, 0.2f, 0.3f),
             new System.Numerics.Vector4(0.4f, 0.5f, 0.6f, 0.7f),
-            new System.Numerics.Vector4(8, 9, 10, 1));
+            new System.Numerics.Vector4(8, 9, 10, 1),
+            AdditionalLightColor: new System.Numerics.Vector4(2, 1, 0, 1),
+            AdditionalLightPosition: new System.Numerics.Vector4(1, 2, 3, 1),
+            AdditionalLightParameters: new System.Numerics.Vector4(7, 4, 0, 0),
+            EnvironmentParameters: new System.Numerics.Vector4(0.55f, -0.35f, 11.2f, 1))
+        {
+            EnvironmentAmbientSkyColor = new(0.35f, 0.5f, 0.8f, 1),
+            EnvironmentAmbientGroundColor = new(0.3f, 0.2f, 0.1f, 1),
+            PointLights =
+            [
+                new("one", new(2, 1, 0, 1), new(1, 2, 3, 1), new(7, 4, 0, 0)),
+                new("two", new(0, 3, 1, 1), new(4, 5, 6, 1), new(8, 3, 0, 0)),
+                new("three", new(1, 0, 4, 1), new(7, 8, 9, 1), new(9, 2, 0, 0)),
+                new("four", new(2, 2, 2, 1), new(10, 11, 12, 1), new(10, 1, 0, 0)),
+                new("five", new(5, 4, 3, 1), new(13, 14, 15, 1), new(11, 0, 0, 0))
+            ]
+        };
 
         var uniform = RekallAgeVulkanSceneUniformUploadBuilder.BuildFrameUniform(frame);
         var push = RekallAgeVulkanSceneUniformUploadBuilder.BuildDrawPushConstants(
@@ -171,6 +187,24 @@ public sealed class VulkanScenePreparedFrameTests
         Assert.Equal(0.2f, uniform.LightY);
         Assert.Equal(0.6f, uniform.LightB);
         Assert.Equal(10, uniform.LightPositionZ);
+        Assert.Equal(5, uniform.AdditionalLightDirectionPad);
+        Assert.Equal(7, uniform.AdditionalLightRange);
+        Assert.Equal(3, uniform.AdditionalLight2G);
+        Assert.Equal(6, uniform.AdditionalLight2PositionZ);
+        Assert.Equal(9, uniform.AdditionalLight3Range);
+        Assert.Equal(12, uniform.AdditionalLight4PositionZ);
+        var uniformBytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(
+            System.Runtime.InteropServices.MemoryMarshal.CreateReadOnlySpan(in uniform, 1));
+        Assert.Equal(1_280, uniformBytes.Length);
+        Assert.Equal(5, System.BitConverter.ToSingle(uniformBytes.Slice(656, sizeof(float))));
+        Assert.Equal(0.55f, uniform.EnvironmentAmbientEnergy);
+        Assert.Equal(-0.35f, uniform.EnvironmentExposure);
+        Assert.Equal(11.2f, uniform.EnvironmentWhitePoint);
+        Assert.Equal(1, uniform.EnvironmentToneMapper);
+        Assert.Equal(0.35f, uniform.EnvironmentAmbientSkyR);
+        Assert.Equal(0.8f, uniform.EnvironmentAmbientSkyB);
+        Assert.Equal(0.3f, uniform.EnvironmentAmbientGroundR);
+        Assert.Equal(0.1f, uniform.EnvironmentAmbientGroundB);
         Assert.Equal(0.8f, push.RoughnessFactor);
         Assert.Equal(3, push.EmissiveStrength);
         Assert.Equal(0.1f, push.AtmosphereRayleighR);

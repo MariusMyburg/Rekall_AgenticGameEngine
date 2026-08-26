@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.wet-slate-terrain.graph",
+  "name": "Wet Slate Terrain Sheet",
+  "revision": 1,
+  "nodes": [
+    { "nodeId": "grid", "typeId": "rekall.modeling.primitive.grid", "typeVersion": 1, "parameters": { "sizeX": 68, "sizeY": 96, "segmentsX": 48, "segmentsY": 64 } },
+    { "nodeId": "breakup", "typeId": "rekall.modeling.deform.noise", "typeVersion": 1, "parameters": { "amplitude": 0.72, "frequency": 0.19, "seed": 417, "axis": "z" } },
+    { "nodeId": "horizontal", "typeId": "rekall.modeling.transform", "typeVersion": 1, "parameters": { "translation": [0, -0.45, 9], "rotation": [-90, 0, 0], "scale": [1, 1, 1] } },
+    { "nodeId": "uv", "typeId": "rekall.modeling.project_uv", "typeVersion": 1, "parameters": { "attribute": "uv.generated", "axis": "xz", "scaleU": 0.11, "scaleV": 0.11 } },
+    { "nodeId": "material", "typeId": "rekall.modeling.material.assign", "typeVersion": 1, "parameters": { "materialAssetId": "aetherfall.wet-slate.material", "slotName": "Wet Slate" } },
+    { "nodeId": "output", "typeId": "rekall.modeling.output.mesh", "typeVersion": 1, "parameters": {} }
+  ],
+  "links": [
+    { "linkId": "grid-breakup", "fromNodeId": "grid", "fromPortId": "geometry", "toNodeId": "breakup", "toPortId": "geometry" },
+    { "linkId": "breakup-horizontal", "fromNodeId": "breakup", "fromPortId": "geometry", "toNodeId": "horizontal", "toPortId": "geometry" },
+    { "linkId": "horizontal-uv", "fromNodeId": "horizontal", "fromPortId": "geometry", "toNodeId": "uv", "toPortId": "geometry" },
+    { "linkId": "uv-material", "fromNodeId": "uv", "fromPortId": "geometry", "toNodeId": "material", "toPortId": "geometry" },
+    { "linkId": "material-output", "fromNodeId": "material", "fromPortId": "geometry", "toNodeId": "output", "toPortId": "input" }
+  ],
+  "outputs": [{ "name": "mesh", "nodeId": "output", "portId": "geometry" }],
+  "exposedParameters": []
+}

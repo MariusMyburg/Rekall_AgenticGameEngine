@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.Core.Commands;
@@ -31,13 +30,17 @@ public sealed class RekallAgeProjectAgentSession
 {
     private readonly IRekallAgeLanguageModelClient _modelClient;
     private readonly RekallAgeCommandRegistry _registry;
+    private readonly string _actorId;
 
     public RekallAgeProjectAgentSession(
         IRekallAgeLanguageModelClient modelClient,
-        RekallAgeCommandRegistry registry)
+        RekallAgeCommandRegistry registry,
+        string actorId = "rekall-studio-agent")
     {
         _modelClient = modelClient ?? throw new ArgumentNullException(nameof(modelClient));
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        ArgumentException.ThrowIfNullOrWhiteSpace(actorId);
+        _actorId = actorId;
     }
 
     public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
@@ -60,7 +63,7 @@ public sealed class RekallAgeProjectAgentSession
             projectRoot,
             request.SceneName,
             _registry,
-            new RekallAgeMcpAgentToolExecutor(_registry, "rekall-studio-agent", progressiveDiscovery: true));
+            new RekallAgeMcpAgentToolExecutor(_registry, _actorId, progressiveDiscovery: true));
         var agent = new RekallAgeLanguageModelAgent(_modelClient, tools);
         var scopedTask = RekallAgeAgentTaskComposer.Compose(projectRoot, request.SceneName, request.Task);
         var result = await agent.RunAsync(
@@ -410,11 +413,7 @@ public sealed class RekallAgeProjectAgentSession
         RekallAgeCommandRegistry registry,
         IRekallAgeAgentToolExecutor inner) : IRekallAgeAgentToolExecutor
     {
-        private const int MaximumEncodedGatewayArgumentsCharacters = 1_000_000;
-        private readonly string _projectRoot = Normalize(projectRoot);
-        private readonly string _sceneName = sceneName;
-        private readonly IReadOnlySet<string> _projectScopedTools = ToolsWithProperty(registry, "ProjectRoot");
-        private readonly IReadOnlySet<string> _sceneScopedTools = ToolsWithProperty(registry, "SceneName");
+        private readonly RekallAgeProjectCommandScope _scope = new(projectRoot, registry, sceneName);
 
         public IReadOnlyList<RekallAgeLanguageModelTool> Tools => inner.Tools;
 
@@ -423,199 +422,29 @@ public sealed class RekallAgeProjectAgentSession
             JsonObject arguments,
             CancellationToken cancellationToken)
         {
-            var scopedArguments = (JsonObject)arguments.DeepClone();
-            ApplyScopeDefaults(name, scopedArguments);
-            if (name.Equals("rekall.tools.execute", StringComparison.Ordinal)
-                && scopedArguments["name"] is JsonValue targetValue
-                && targetValue.TryGetValue<string>(out var targetName))
+            var scoped = _scope.Apply(name, arguments);
+            if (!scoped.Succeeded)
             {
-                if (!TryReadGatewayArguments(
-                    scopedArguments["arguments"],
-                    out var targetArguments,
-                    out var gatewayArgumentError))
+                var errors = new JsonArray();
+                foreach (var error in scoped.Errors)
                 {
-                    return ValueTask.FromResult<JsonNode>(gatewayArgumentError!);
-                }
-
-                ApplyScopeDefaults(targetName, targetArguments);
-                scopedArguments["arguments"] = targetArguments;
-            }
-
-            foreach (var candidate in FindProjectRoots(scopedArguments))
-            {
-                string normalized;
-                try
-                {
-                    normalized = Normalize(candidate);
-                }
-                catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-                {
-                    return ValueTask.FromResult<JsonNode>(ScopeViolation(candidate));
-                }
-
-                if (!normalized.Equals(_projectRoot, PathComparison))
-                {
-                    return ValueTask.FromResult<JsonNode>(ScopeViolation(candidate));
-                }
-            }
-
-            return inner.ExecuteAsync(name, scopedArguments, cancellationToken);
-        }
-
-        private void ApplyScopeDefaults(string toolName, JsonObject arguments)
-        {
-            if (_projectScopedTools.Contains(toolName)
-                && (!arguments.TryGetPropertyValue("projectRoot", out var suppliedRoot) || suppliedRoot is null))
-            {
-                arguments["projectRoot"] = _projectRoot;
-            }
-            if (_sceneScopedTools.Contains(toolName)
-                && (!arguments.TryGetPropertyValue("sceneName", out var suppliedScene) || suppliedScene is null))
-            {
-                arguments["sceneName"] = _sceneName;
-            }
-        }
-
-        private static bool TryReadGatewayArguments(
-            JsonNode? node,
-            out JsonObject arguments,
-            out JsonObject? error)
-        {
-            if (node is JsonObject objectArguments)
-            {
-                arguments = (JsonObject)objectArguments.DeepClone();
-                error = null;
-                return true;
-            }
-
-            if (node is JsonValue encoded
-                && encoded.TryGetValue<string>(out var json))
-            {
-                if (json.Length > MaximumEncodedGatewayArgumentsCharacters)
-                {
-                    arguments = new JsonObject();
-                    error = GatewayArgumentError(
-                        "REKALL_AGENT_ARGUMENTS_TOO_LARGE",
-                        $"Encoded gateway arguments exceed the {MaximumEncodedGatewayArgumentsCharacters:N0}-character Studio safety limit.");
-                    return false;
-                }
-
-                try
-                {
-                    if (JsonNode.Parse(json) is JsonObject decoded)
+                    errors.Add(new JsonObject
                     {
-                        arguments = decoded;
-                        error = null;
-                        return true;
-                    }
+                        ["code"] = error.Code,
+                        ["message"] = error.Message,
+                        ["target"] = error.Target
+                    });
                 }
-                catch (JsonException)
+
+                return ValueTask.FromResult<JsonNode>(new JsonObject
                 {
-                    // Return the same bounded fail-closed diagnostic as other invalid shapes.
-                }
+                    ["ok"] = false,
+                    ["summary"] = scoped.ErrorSummary,
+                    ["errors"] = errors
+                });
             }
 
-            arguments = new JsonObject();
-            if (node is null)
-            {
-                error = null;
-                return true;
-            }
-
-            error = GatewayArgumentError(
-                "REKALL_AGENT_ARGUMENTS_INVALID",
-                "Gateway arguments must be a JSON object or a JSON string encoding an object.");
-            return false;
+            return inner.ExecuteAsync(name, scoped.Arguments, cancellationToken);
         }
-
-        private static JsonObject GatewayArgumentError(string code, string message) => new()
-        {
-            ["ok"] = false,
-            ["summary"] = message,
-            ["errors"] = new JsonArray(new JsonObject
-            {
-                ["code"] = code,
-                ["message"] = message,
-                ["target"] = "rekall.tools.execute.arguments"
-            })
-        };
-
-        private static IReadOnlySet<string> ToolsWithProperty(
-            RekallAgeCommandRegistry registry,
-            string propertyName) =>
-            registry.RegisteredCommands
-                .Where(command => command.RequestType.GetProperties().Any(property =>
-                    property.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase)))
-                .Select(command => command.Schema.Name)
-                .ToHashSet(StringComparer.Ordinal);
-
-        private JsonObject ScopeViolation(string candidate) => new()
-        {
-            ["ok"] = false,
-            ["summary"] = "The embedded agent attempted to operate outside the open project.",
-            ["errors"] = new JsonArray(new JsonObject
-            {
-                ["code"] = "REKALL_AGENT_PROJECT_SCOPE_VIOLATION",
-                ["message"] = "ProjectRoot arguments must resolve to the project opened in Studio.",
-                ["target"] = candidate
-            })
-        };
-
-        private static IEnumerable<string> FindProjectRoots(JsonNode node)
-        {
-            if (node is JsonObject value)
-            {
-                foreach (var property in value)
-                {
-                    if (property.Key.Equals("projectRoot", StringComparison.OrdinalIgnoreCase)
-                        && property.Value is JsonValue scalar
-                        && scalar.TryGetValue<string>(out var root)
-                        && !string.IsNullOrWhiteSpace(root))
-                    {
-                        yield return root;
-                    }
-
-                    if (property.Key.Equals("arguments", StringComparison.OrdinalIgnoreCase)
-                        && property.Value is JsonValue encoded
-                        && encoded.TryGetValue<string>(out var json)
-                        && json.Length <= 1_000_000)
-                    {
-                        JsonNode? decoded = null;
-                        try
-                        {
-                            decoded = JsonNode.Parse(json);
-                        }
-                        catch (JsonException)
-                        {
-                            // The inner executor returns its bounded malformed-argument diagnostic.
-                        }
-
-                        if (decoded is not null)
-                        {
-                            foreach (var nested in FindProjectRoots(decoded)) yield return nested;
-                        }
-                    }
-
-                    if (property.Value is not null)
-                    {
-                        foreach (var nested in FindProjectRoots(property.Value)) yield return nested;
-                    }
-                }
-            }
-            else if (node is JsonArray array)
-            {
-                foreach (var item in array.Where(item => item is not null))
-                {
-                    foreach (var nested in FindProjectRoots(item!)) yield return nested;
-                }
-            }
-        }
-
-        private static string Normalize(string path) =>
-            Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
-
-        private static StringComparison PathComparison => OperatingSystem.IsWindows()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
     }
 }

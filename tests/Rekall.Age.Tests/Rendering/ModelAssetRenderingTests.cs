@@ -1,9 +1,11 @@
 using System.Text.Json.Nodes;
+using System.Text.Json;
 using Rekall.Age.Assets;
 using Rekall.Age.AssetPipeline;
 using Rekall.Age.Core.Persistence;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Modeling;
+using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime;
@@ -22,6 +24,51 @@ namespace Rekall.Age.Tests.Rendering;
 /// </summary>
 public sealed class ModelAssetRenderingTests
 {
+    [Fact]
+    public async Task RuntimeFramePreservesCompiledProceduralSkinBindings()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var mesh = await new RekallAgeMeshPrimitiveFactory().CreateAsync("box", "weighted-mesh", "Weighted Mesh", default);
+        var pointCount = mesh.Topology.PointIds.Count;
+        mesh = mesh with
+        {
+            Attributes = mesh.Attributes.Concat(
+            [
+                new RekallAgeGeometryAttribute(
+                    "skin.joints", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.Int4,
+                    Enumerable.Range(0, pointCount).Select(_ => JsonSerializer.SerializeToElement(new[] { 0, 1, 0, 0 }, RekallAgeModelingJson.Options)).ToArray(),
+                    "joint-indices-0", RekallAgeGeometryInterpolation.Nearest),
+                new RekallAgeGeometryAttribute(
+                    "skin.weights", RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.Float4,
+                    Enumerable.Range(0, pointCount).Select(_ => JsonSerializer.SerializeToElement(new[] { 0.25, 0.75, 0d, 0d }, RekallAgeModelingJson.Options)).ToArray(),
+                    "joint-weights-0", RekallAgeGeometryInterpolation.NormalizedLinear)
+            ]).ToArray()
+        };
+        await new RekallAgeMeshAssetStore().SaveAsync(root, mesh, default);
+        await new RekallAgeModelPublishingService().PublishAsync(
+            root,
+            new("weighted-model", "Weighted Model", new(RekallAgeModelSourceKind.Mesh, mesh.AssetId), RekallAgeDocumentRevision.Missing),
+            RekallAgeTransaction.Begin("publish weighted model"),
+            default);
+        var entity = RekallAgeEntityDocument.Create("Weighted Instance", ["model-asset"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D"))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.ModelAssetReference", new JsonObject { ["assetId"] = "weighted-model" }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer"));
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(
+            new RekallAgeRuntimeWorldBuilder().Build(RekallAgeSceneDocument.Create("Main", ["world"]).AddEntity(entity), root),
+            320, 180, false);
+
+        var geometry = Assert.Single(frame.Renderables).GeometryMesh;
+        var property = geometry!.GetType().GetProperty("SkinBindings");
+        Assert.NotNull(property);
+        var bindings = Assert.IsAssignableFrom<System.Collections.IEnumerable>(property.GetValue(geometry)).Cast<object>().ToArray();
+        Assert.Equal(geometry.Vertices.Count, bindings.Length);
+        var first = Assert.IsType<JsonObject>(JsonSerializer.SerializeToNode(bindings[0], RekallAgeModelingJson.Options));
+        Assert.Equal(1, first["joint1"]!.GetValue<int>());
+        Assert.Equal(0.75, first["weight1"]!.GetValue<double>());
+    }
+
     [Fact]
     public async Task RuntimeFrameResolvesPlacedModelAssetThroughCompiledSnapshot()
     {
@@ -45,6 +92,29 @@ public sealed class ModelAssetRenderingTests
         // each, unshared per-face for correct flat-shaded normals), not the topologically-minimal 8.
         Assert.Equal(24, geometry.Vertices.Count);
         Assert.NotEmpty(geometry.Indices);
+    }
+
+    [Fact]
+    public async Task RebuiltFramesReuseUnchangedCompiledModelGeometry()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await PublishBoxModelAssetAsync(root, "stable-model");
+        var entity = RekallAgeEntityDocument.Create("Stable Instance", ["model-asset"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D"))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.ModelAssetReference",
+                new JsonObject { ["assetId"] = "stable-model" }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer"));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"]).AddEntity(entity),
+            root);
+        var builder = new RekallAgeRuntimeRenderFrameBuilder();
+
+        var first = Assert.Single(builder.Build(world, 320, 180, false).Renderables).GeometryMesh;
+        var second = Assert.Single(builder.Build(world, 320, 180, false).Renderables).GeometryMesh;
+
+        Assert.NotNull(first);
+        Assert.Same(first, second);
     }
 
     [Fact]

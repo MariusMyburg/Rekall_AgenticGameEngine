@@ -29,6 +29,7 @@ internal static class AetherfallReset
             .WithComponentNumber(AetherfallConstants.WardenStateType, "pulseCooldown", 0)
             .WithComponentNumber(AetherfallConstants.WardenStateType, "invulnerability", 0)
             .WithComponentNumber(AetherfallConstants.WardenStateType, "shardCount", 0)
+            .WithComponentBoolean(AetherfallConstants.WardenStateType, "combatStarted", false)
             .WithComponentString(AetherfallConstants.WardenStateType, "objectivePhase", "arrival")
             .WithComponentString(AetherfallConstants.WardenStateType, "phase", "playing")
             .WithComponentNumber(AetherfallConstants.WardenStateType, "facingX", 0)

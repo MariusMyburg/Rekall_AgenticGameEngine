@@ -27,6 +27,16 @@ public sealed record RekallAgeVulkanSceneMesh(
     int? VirtualGeometrySourceTriangleCount = null,
     int VirtualGeometryLodLevel = 0)
 {
+    public bool CastShadows { get; init; } = true;
+
+    public bool ReceiveShadows { get; init; } = true;
+
+    public uint ShadowLayerMask { get; init; } = uint.MaxValue;
+
+    public string AlphaMode { get; init; } = "opaque";
+
+    public float AlphaCutoff { get; init; } = 0.5f;
+
     public int? SkinIndex { get; init; }
 
     public IReadOnlyList<RekallAgeVulkanSceneSkinBinding> SkinBindings { get; init; } =
@@ -42,6 +52,8 @@ public sealed record RekallAgeVulkanSceneMesh(
     public RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline { get; init; }
 
     public string? MaterialAssetId { get; init; }
+
+    public bool VirtualGeometryBudgetSatisfied { get; init; } = true;
 }
 
 public sealed record RekallAgeVulkanSceneMorphTarget(

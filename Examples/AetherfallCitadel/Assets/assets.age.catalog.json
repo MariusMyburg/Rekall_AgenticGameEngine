@@ -1,6 +1,90 @@
 {
   "assets": [
     {
+      "id": "aetherfall-warden-idle",
+      "name": "aetherfall-warden-idle",
+      "displayName": "Aetherfall Warden Guarded Idle",
+      "kind": "animation",
+      "sourcePath": "Assets/animation/aetherfall-warden-idle.age.animation.json",
+      "importedPath": "Assets/animation/aetherfall-warden-idle.age.animation.json",
+      "contentHash": "beac6941b224257664157282c76f1345f664cfd291e4f29a1d9c6f1082d4ed32",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "aetherfall-warden-presentation",
+      "name": "aetherfall-warden-presentation",
+      "displayName": "Aetherfall Warden Presentation Motion",
+      "kind": "animation",
+      "sourcePath": "Assets/animation/aetherfall-warden-presentation.age.animation.json",
+      "importedPath": "Assets/animation/aetherfall-warden-presentation.age.animation.json",
+      "contentHash": "13cb06ca0c2b3de433185e7c7928b2b8c7931251f8f18e89b441885c9f0559b0",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "aetherfall-warden-walk",
+      "name": "aetherfall-warden-walk",
+      "displayName": "Aetherfall Warden Armored Walk",
+      "kind": "animation",
+      "sourcePath": "Assets/animation/aetherfall-warden-walk.age.animation.json",
+      "importedPath": "Assets/animation/aetherfall-warden-walk.age.animation.json",
+      "contentHash": "95238389afc055ebea6ca339c7305fcff8c9f0ce7ee075d08bcc55eb3b5fc64e",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "aetherfall-warden-pulse",
+      "name": "aetherfall-warden-pulse",
+      "displayName": "Aetherfall Warden Aether Pulse Cast",
+      "kind": "animation",
+      "sourcePath": "Assets/animation/aetherfall-warden-pulse.age.animation.json",
+      "importedPath": "Assets/animation/aetherfall-warden-pulse.age.animation.json",
+      "contentHash": "4db3a6ffc0dfa6f22086b4b8e28598c33a9b7b45ffde40e4cd7bce447e76bc14",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "aetherfall-warden-dash",
+      "name": "aetherfall-warden-dash",
+      "displayName": "Aetherfall Warden Aether Dash Lunge",
+      "kind": "animation",
+      "sourcePath": "Assets/animation/aetherfall-warden-dash.age.animation.json",
+      "importedPath": "Assets/animation/aetherfall-warden-dash.age.animation.json",
+      "contentHash": "bab4efad9c6c0e8efe58e70e7eca5d5ef2f0f7d09ff2ca72522fde0556c98f26",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "aetherfall-ashen-processional-path-model",
+      "name": "aetherfall-ashen-processional-path-model",
+      "displayName": "Ashen Processional Path",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-ashen-processional-path-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-ashen-processional-path-model\\45947c204c0bd0fb2ec3f13be92cde6ba85a410fc94a5daeb6f701a5d3fb7566.age.compiled-mesh.json",
+      "contentHash": "45947c204c0bd0fb2ec3f13be92cde6ba85a410fc94a5daeb6f701a5d3fb7566",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-ashen-processional-path-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-ashen-processional-path-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-ashen-processional-path-model/45947c204c0bd0fb2ec3f13be92cde6ba85a410fc94a5daeb6f701a5d3fb7566.age.compiled-mesh.json",
+        "compiledContentHash": "45947c204c0bd0fb2ec3f13be92cde6ba85a410fc94a5daeb6f701a5d3fb7566"
+      }
+    },
+    {
       "id": "aetherfall-bridge-model",
       "name": "aetherfall-bridge-model",
       "displayName": "Citadel Bridge Segment",
@@ -20,13 +104,32 @@
       }
     },
     {
+      "id": "aetherfall-broken-arch-model",
+      "name": "aetherfall-broken-arch-model",
+      "displayName": "Broken Processional Arch",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-broken-arch-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-broken-arch-model\\369966ec49b66735db31c8ccd0bb3f56230f35624df0ab1d284a9af7bca99413.age.compiled-mesh.json",
+      "contentHash": "369966ec49b66735db31c8ccd0bb3f56230f35624df0ab1d284a9af7bca99413",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-broken-arch-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-broken-arch-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-broken-arch-model/369966ec49b66735db31c8ccd0bb3f56230f35624df0ab1d284a9af7bca99413.age.compiled-mesh.json",
+        "compiledContentHash": "369966ec49b66735db31c8ccd0bb3f56230f35624df0ab1d284a9af7bca99413"
+      }
+    },
+    {
       "id": "aetherfall-conduit-model",
       "name": "aetherfall-conduit-model",
       "displayName": "Aether Conduit",
       "kind": "model",
-      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-conduit-mesh.age.mesh.json",
-      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\aetherfall-ultimate-3d\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-conduit-model\\56aba95867bcec25a0358c7b586728e8d08c0e2ec038b000bd61584b286cb497.age.compiled-mesh.json",
-      "contentHash": "56aba95867bcec25a0358c7b586728e8d08c0e2ec038b000bd61584b286cb497",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-conduit-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-conduit-model\\e93f633d2c40df10e08d28f65ee18c65d05ee699b59cc26637285c87c32e2130.age.compiled-mesh.json",
+      "contentHash": "e93f633d2c40df10e08d28f65ee18c65d05ee699b59cc26637285c87c32e2130",
       "glbMetadata": null,
       "textureMetadata": null,
       "provenance": null,
@@ -34,8 +137,8 @@
         "modelDocumentPath": "Assets/Models/aetherfall-conduit-model.age.model.json",
         "sourceKind": "Mesh",
         "sourceAssetId": "aetherfall-conduit-mesh",
-        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-conduit-model/56aba95867bcec25a0358c7b586728e8d08c0e2ec038b000bd61584b286cb497.age.compiled-mesh.json",
-        "compiledContentHash": "56aba95867bcec25a0358c7b586728e8d08c0e2ec038b000bd61584b286cb497"
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-conduit-model/e93f633d2c40df10e08d28f65ee18c65d05ee699b59cc26637285c87c32e2130.age.compiled-mesh.json",
+        "compiledContentHash": "e93f633d2c40df10e08d28f65ee18c65d05ee699b59cc26637285c87c32e2130"
       }
     },
     {
@@ -77,6 +180,25 @@
       }
     },
     {
+      "id": "aetherfall-hollow-sentinel-model",
+      "name": "aetherfall-hollow-sentinel-model",
+      "displayName": "Hollow Sentinel",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-hollow-sentinel-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-hollow-sentinel-model\\eddaa32178db734ae553e832ec76213827da8a43e7c6def67bbc53cf1252b895.age.compiled-mesh.json",
+      "contentHash": "eddaa32178db734ae553e832ec76213827da8a43e7c6def67bbc53cf1252b895",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-hollow-sentinel-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-hollow-sentinel-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-hollow-sentinel-model/eddaa32178db734ae553e832ec76213827da8a43e7c6def67bbc53cf1252b895.age.compiled-mesh.json",
+        "compiledContentHash": "eddaa32178db734ae553e832ec76213827da8a43e7c6def67bbc53cf1252b895"
+      }
+    },
+    {
       "id": "aetherfall-lancer-model",
       "name": "aetherfall-lancer-model",
       "displayName": "Court Lancer",
@@ -112,6 +234,63 @@
         "sourceAssetId": "aetherfall-orbiter-mesh",
         "compiledOutputPath": "Assets/Models/Compiled/aetherfall-orbiter-model/28deb57b6496d0f397ff9eb53fa958d89f06dd927571b29809faae4d771dc6e2.age.compiled-mesh.json",
         "compiledContentHash": "28deb57b6496d0f397ff9eb53fa958d89f06dd927571b29809faae4d771dc6e2"
+      }
+    },
+    {
+      "id": "aetherfall-resonance-halo-model",
+      "name": "aetherfall-resonance-halo-model",
+      "displayName": "High Resolution Resonance Halo",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-resonance-halo-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-resonance-halo-model\\63f3ad72651212e595647b9dad5667319eb7d96d988e95c5fcc3b6c30ac88f56.age.compiled-mesh.json",
+      "contentHash": "63f3ad72651212e595647b9dad5667319eb7d96d988e95c5fcc3b6c30ac88f56",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-resonance-halo-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-resonance-halo-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-resonance-halo-model/63f3ad72651212e595647b9dad5667319eb7d96d988e95c5fcc3b6c30ac88f56.age.compiled-mesh.json",
+        "compiledContentHash": "63f3ad72651212e595647b9dad5667319eb7d96d988e95c5fcc3b6c30ac88f56"
+      }
+    },
+    {
+      "id": "aetherfall-rubble-boulder-model",
+      "name": "aetherfall-rubble-boulder-model",
+      "displayName": "Fractured Slate Boulder",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-rubble-boulder-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-rubble-boulder-model\\2d669b03111f36cb23aa124ba8b5b31735f194c09199977b2241ba229b68bb75.age.compiled-mesh.json",
+      "contentHash": "2d669b03111f36cb23aa124ba8b5b31735f194c09199977b2241ba229b68bb75",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-rubble-boulder-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-rubble-boulder-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-rubble-boulder-model/2d669b03111f36cb23aa124ba8b5b31735f194c09199977b2241ba229b68bb75.age.compiled-mesh.json",
+        "compiledContentHash": "2d669b03111f36cb23aa124ba8b5b31735f194c09199977b2241ba229b68bb75"
+      }
+    },
+    {
+      "id": "aetherfall-ruin-dressing-scatter-model",
+      "name": "aetherfall-ruin-dressing-scatter-model",
+      "displayName": "Ruin Dressing Scatter Cluster",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-ruin-dressing-scatter-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-ruin-dressing-scatter-model\\80d109551aa1527d3ba9b8ebf2c11bd99c6831daf9958a012948b4bdfb5dff2b.age.compiled-mesh.json",
+      "contentHash": "80d109551aa1527d3ba9b8ebf2c11bd99c6831daf9958a012948b4bdfb5dff2b",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-ruin-dressing-scatter-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-ruin-dressing-scatter-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-ruin-dressing-scatter-model/80d109551aa1527d3ba9b8ebf2c11bd99c6831daf9958a012948b4bdfb5dff2b.age.compiled-mesh.json",
+        "compiledContentHash": "80d109551aa1527d3ba9b8ebf2c11bd99c6831daf9958a012948b4bdfb5dff2b"
       }
     },
     {
@@ -172,6 +351,44 @@
       }
     },
     {
+      "id": "aetherfall-warden-dark-model",
+      "name": "aetherfall-warden-dark-model",
+      "displayName": "Aetherfall Dark Warden",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-warden-dark-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-dark-model\\0b7cc522cebde5e826b08594a4099246b639d9b61ffea28afb38dc21c39368a7.age.compiled-mesh.json",
+      "contentHash": "0b7cc522cebde5e826b08594a4099246b639d9b61ffea28afb38dc21c39368a7",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-warden-dark-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-warden-dark-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-dark-model/0b7cc522cebde5e826b08594a4099246b639d9b61ffea28afb38dc21c39368a7.age.compiled-mesh.json",
+        "compiledContentHash": "0b7cc522cebde5e826b08594a4099246b639d9b61ffea28afb38dc21c39368a7"
+      }
+    },
+    {
+      "id": "aetherfall-warden-mantle-model",
+      "name": "aetherfall-warden-mantle-model",
+      "displayName": "Aetherfall Warden Deformable Mantle",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-warden-mantle-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-mantle-model\\094d4e7610bd36458f32863a3a581733bb34b4d91bd0f358b52c8cf4fc36e790.age.compiled-mesh.json",
+      "contentHash": "094d4e7610bd36458f32863a3a581733bb34b4d91bd0f358b52c8cf4fc36e790",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-warden-mantle-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-warden-mantle-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-mantle-model/094d4e7610bd36458f32863a3a581733bb34b4d91bd0f358b52c8cf4fc36e790.age.compiled-mesh.json",
+        "compiledContentHash": "094d4e7610bd36458f32863a3a581733bb34b4d91bd0f358b52c8cf4fc36e790"
+      }
+    },
+    {
       "id": "aetherfall-warden-model",
       "name": "aetherfall-warden-model",
       "displayName": "Aether Warden",
@@ -189,6 +406,352 @@
         "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-model/77652c52ce47be1c60dae13cd66a20657d1d9086eaec382a5968d94ba51c455f.age.compiled-mesh.json",
         "compiledContentHash": "77652c52ce47be1c60dae13cd66a20657d1d9086eaec382a5968d94ba51c455f"
       }
+    },
+    {
+      "id": "aetherfall-warden-pauldron-model",
+      "name": "aetherfall-warden-pauldron-model",
+      "displayName": "Aetherfall Warden Layered Pauldron",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-warden-pauldron-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-pauldron-model\\35f963f16842c4c14bfae9f4ee1a228a2aab5812a6f84781a04a4d58196de536.age.compiled-mesh.json",
+      "contentHash": "35f963f16842c4c14bfae9f4ee1a228a2aab5812a6f84781a04a4d58196de536",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-warden-pauldron-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-warden-pauldron-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-pauldron-model/35f963f16842c4c14bfae9f4ee1a228a2aab5812a6f84781a04a4d58196de536.age.compiled-mesh.json",
+        "compiledContentHash": "35f963f16842c4c14bfae9f4ee1a228a2aab5812a6f84781a04a4d58196de536"
+      }
+    },
+    {
+      "id": "aetherfall-warden-runeblade-model",
+      "name": "aetherfall-warden-runeblade-model",
+      "displayName": "Aetherfall Warden Runeblade",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-warden-runeblade-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-warden-runeblade-model\\b018795467694fefffd2e1cad368d3558f57926b0c8e5010c8b739d96af58438.age.compiled-mesh.json",
+      "contentHash": "b018795467694fefffd2e1cad368d3558f57926b0c8e5010c8b739d96af58438",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-warden-runeblade-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-warden-runeblade-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-warden-runeblade-model/b018795467694fefffd2e1cad368d3558f57926b0c8e5010c8b739d96af58438.age.compiled-mesh.json",
+        "compiledContentHash": "b018795467694fefffd2e1cad368d3558f57926b0c8e5010c8b739d96af58438"
+      }
+    },
+    {
+      "id": "aetherfall-weathered-ruin-model",
+      "name": "aetherfall-weathered-ruin-model",
+      "displayName": "Weathered Ruin Wall",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-weathered-ruin-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-weathered-ruin-model\\103f69b99900bad7dbf3167b2d3b1297250d0875b9c3ca68d0040980e77fdd64.age.compiled-mesh.json",
+      "contentHash": "103f69b99900bad7dbf3167b2d3b1297250d0875b9c3ca68d0040980e77fdd64",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-weathered-ruin-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-weathered-ruin-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-weathered-ruin-model/103f69b99900bad7dbf3167b2d3b1297250d0875b9c3ca68d0040980e77fdd64.age.compiled-mesh.json",
+        "compiledContentHash": "103f69b99900bad7dbf3167b2d3b1297250d0875b9c3ca68d0040980e77fdd64"
+      }
+    },
+    {
+      "id": "aetherfall-wet-slate-terrain-model",
+      "name": "aetherfall-wet-slate-terrain-model",
+      "displayName": "Wet Slate Terrain",
+      "kind": "model",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Modeling\\Meshes\\aetherfall-wet-slate-terrain-mesh.age.mesh.json",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Models\\Compiled\\aetherfall-wet-slate-terrain-model\\05217ad245838581a8a0508058de76a67b05c899e35494f0364019308b207556.age.compiled-mesh.json",
+      "contentHash": "05217ad245838581a8a0508058de76a67b05c899e35494f0364019308b207556",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": {
+        "modelDocumentPath": "Assets/Models/aetherfall-wet-slate-terrain-model.age.model.json",
+        "sourceKind": "Mesh",
+        "sourceAssetId": "aetherfall-wet-slate-terrain-mesh",
+        "compiledOutputPath": "Assets/Models/Compiled/aetherfall-wet-slate-terrain-model/05217ad245838581a8a0508058de76a67b05c899e35494f0364019308b207556.age.compiled-mesh.json",
+        "compiledContentHash": "05217ad245838581a8a0508058de76a67b05c899e35494f0364019308b207556"
+      }
+    },
+    {
+      "id": "asset_aetherfall-warden-blackened-steel-albedo-v1_38ff2b50",
+      "name": "aetherfall-warden-blackened-steel-albedo-v1",
+      "displayName": "Aetherfall Warden Blackened Steel Albedo V1",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\SourceTextures\\aetherfall-warden-blackened-steel-albedo-v1.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_aetherfall-warden-blackened-steel-albedo-v1_38ff2b50.png",
+      "contentHash": "38ff2b50827bb05241ac6e0905c6a06677868ba1eb1f6e46e246874c4f87ea2c",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_aetherfall-warden-blackened-steel-normal-v1_43104c91",
+      "name": "aetherfall-warden-blackened-steel-normal-v1",
+      "displayName": "Aetherfall Warden Blackened Steel Normal V1",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\SourceTextures\\aetherfall-warden-blackened-steel-normal-v1.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_aetherfall-warden-blackened-steel-normal-v1_43104c91.png",
+      "contentHash": "43104c918db65db5f3f850231ec5e44c8d7888bbc9f9592c7fca064cb398e6d5",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_aetherfall-weathered-masonry-albedo-v2_d174a66a",
+      "name": "aetherfall-weathered-masonry-albedo-v2",
+      "displayName": "Aetherfall Weathered Masonry Albedo V2",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\SourceTextures\\aetherfall-weathered-masonry-albedo-v2.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_aetherfall-weathered-masonry-albedo-v2_d174a66a.png",
+      "contentHash": "d174a66ab4f194c8b1b19593c12a384b65f277504681ec63f4e1efcded1e0b94",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_aetherfall-wet-slate-albedo-v2_b446bcf3",
+      "name": "aetherfall-wet-slate-albedo-v2",
+      "displayName": "Aetherfall Wet Slate Albedo V2",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\SourceTextures\\aetherfall-wet-slate-albedo-v2.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_aetherfall-wet-slate-albedo-v2_b446bcf3.png",
+      "contentHash": "b446bcf398c16e594760381df1398097e4921637ec33fc50b983439fc7710055",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_citadel-aether-emissive_ecb27b3a",
+      "name": "citadel-aether-emissive",
+      "displayName": "Citadel Aether Emissive",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\SourceTextures\\citadel-aether-emissive.ppm",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_citadel-aether-emissive_ecb27b3a.ppm",
+      "contentHash": "ecb27b3aff792f71de7c33e178e737d4c3b303e9e9e84d37a3888a29915cad64",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_citadel-aether-emissive-v1_b30b5718",
+      "name": "citadel-aether-emissive-v1",
+      "displayName": "Citadel Aether Emissive V1",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Textures\\CitadelObsidian\\citadel-aether-emissive-v1.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_citadel-aether-emissive-v1_b30b5718.png",
+      "contentHash": "b30b571873d5cc6384d7a4263aba838b183b7631cc11727a83eee7562d76646f",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_citadel-irregular-masonry-albedo-v1_eead99b7",
+      "name": "citadel-irregular-masonry-albedo-v1",
+      "displayName": "Citadel Irregular Masonry Albedo V1",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Textures\\CitadelMasonry\\citadel-irregular-masonry-albedo-v1.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_citadel-irregular-masonry-albedo-v1_eead99b7.png",
+      "contentHash": "eead99b75d8b89b125e223690cc694a49555c62630f37c81404e1eced19c6b04",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_citadel-irregular-masonry-normal-dx-v1_39fadc77",
+      "name": "citadel-irregular-masonry-normal-dx-v1",
+      "displayName": "Citadel Irregular Masonry Normal DX V1",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Textures\\CitadelMasonry\\citadel-irregular-masonry-normal-dx-v1.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_citadel-irregular-masonry-normal-dx-v1_39fadc77.png",
+      "contentHash": "39fadc7732f1bb6d4c29f33deec23b729815f1c2943350321f955028b2fa2b67",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_citadel-obsidian-albedo-v1_d4ec000a",
+      "name": "citadel-obsidian-albedo-v1",
+      "displayName": "Citadel Obsidian Albedo V1",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Textures\\CitadelObsidian\\citadel-obsidian-albedo-v1.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_citadel-obsidian-albedo-v1_d4ec000a.png",
+      "contentHash": "d4ec000aa7ec8f9b3ce5b6a8a90ac5aabb2453b3d446aa5639434eade1ddab1b",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_citadel-obsidian-base_229f4ba8",
+      "name": "citadel-obsidian-base",
+      "displayName": "Citadel Obsidian Base",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\SourceTextures\\citadel-obsidian-base.ppm",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_citadel-obsidian-base_229f4ba8.ppm",
+      "contentHash": "229f4ba8ccbd4f5a2aa2320edcda8beada902034717db9bba3a29ff874acc7af",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_citadel-obsidian-normal_391f0aba",
+      "name": "citadel-obsidian-normal",
+      "displayName": "Citadel Obsidian Normal",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\SourceTextures\\citadel-obsidian-normal.ppm",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_citadel-obsidian-normal_391f0aba.ppm",
+      "contentHash": "391f0aba338466a8f6ab53f0c73480c68d4fa88382217396db1c381daf69e430",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_citadel-obsidian-normal-dx-v1_6fa94a83",
+      "name": "citadel-obsidian-normal-dx-v1",
+      "displayName": "Citadel Obsidian Normal DX V1",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Textures\\CitadelObsidian\\citadel-obsidian-normal-dx-v1.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_citadel-obsidian-normal-dx-v1_6fa94a83.png",
+      "contentHash": "6fa94a839210a5965bfce245657ea10c6348f9decb8c0b5b0ff0960d43c9176c",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_citadel-wet-slate-normal-dx-v1_e6bcce70",
+      "name": "citadel-wet-slate-normal-dx-v1",
+      "displayName": "Citadel Wet Slate Normal DX V1",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Textures\\CitadelObsidian\\citadel-wet-slate-normal-dx-v1.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_citadel-wet-slate-normal-dx-v1_e6bcce70.png",
+      "contentHash": "e6bcce70cbc79b4ce780710592d2168159e80b5d5b1a7604d6c1f7aebcadda67",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_citadel-wet-slate-terrain-v1_5e17814a",
+      "name": "citadel-wet-slate-terrain-v1",
+      "displayName": "Citadel Wet Slate Terrain V1",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\Textures\\CitadelObsidian\\citadel-wet-slate-terrain-v1.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_citadel-wet-slate-terrain-v1_5e17814a.png",
+      "contentHash": "5e17814a45086f810d038c13f82172997e494835689b0418c6d51fb13a442cfa",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
     }
   ]
 }

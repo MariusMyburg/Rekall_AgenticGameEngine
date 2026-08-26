@@ -246,6 +246,86 @@ public sealed class ModuleHostWindowsIsolationTests
     }
 
     [Fact]
+    public async Task StagedWorkerPayloadCompletesFiniteProtocolBeforeContainment()
+    {
+        Assert.True(OperatingSystem.IsWindows());
+        var projectRoot = await CreateModuleAsync();
+        var hostRoot = await CreateRealHostPayloadAsync();
+        await using var staged = await new RekallAgeModuleHostStager(TestPaths.CreateTempDirectory()).StageAsync(
+            projectRoot,
+            hostRoot,
+            CancellationToken.None);
+        var result = await RunStagedWorkerProcessAsync(
+            staged,
+            [
+                RekallAgeModuleHostEnvelope.Request(
+                    1,
+                    RekallAgeModuleHostOperations.Initialize,
+                    new RekallAgeModuleHostInitializeRequest(staged.LoadPlanPath)),
+                RekallAgeModuleHostEnvelope.Request(2, RekallAgeModuleHostOperations.Shutdown, new { })
+            ],
+            RekallAgeModuleHostProtocol.StartupTimeout,
+            CancellationToken.None);
+
+        Assert.All(result.Responses, response => Assert.True(response.Ok, response.Error?.Message));
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(string.Empty, result.StandardError);
+    }
+
+    [Fact]
+    public async Task StagedWorkerHarnessKillsHungPartialResponseAndReleasesSessionTree()
+    {
+        Assert.True(OperatingSystem.IsWindows());
+        var projectRoot = await CreateModuleAsync(source => source.Replace(
+            "var frame = (int)state.Numbers[\"frame\"];",
+            "System.Threading.Thread.Sleep(30000); var frame = (int)state.Numbers[\"frame\"];",
+            StringComparison.Ordinal));
+        var hostRoot = await CreateRealHostPayloadAsync();
+        var sessionsRoot = TestPaths.CreateTempDirectory();
+        var staged = await new RekallAgeModuleHostStager(sessionsRoot).StageAsync(
+            projectRoot,
+            hostRoot,
+            CancellationToken.None);
+        var stagingRoot = staged.Root;
+        var processId = 0;
+        var responses = new List<RekallAgeModuleHostEnvelope>();
+        try
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+                await RunStagedWorkerProcessAsync(
+                    staged,
+                    [
+                        RekallAgeModuleHostEnvelope.Request(
+                            1,
+                            RekallAgeModuleHostOperations.Initialize,
+                            new RekallAgeModuleHostInitializeRequest(staged.LoadPlanPath)),
+                        RekallAgeModuleHostEnvelope.Request(
+                            2,
+                            RekallAgeModuleHostOperations.PlayableCreate,
+                            new RekallAgeModuleHostPlayableCreateRequest(new RekallAgePlayableModuleContext("Cleanup", []))),
+                        RekallAgeModuleHostEnvelope.Request(3, RekallAgeModuleHostOperations.PlayableRender, new { }),
+                        RekallAgeModuleHostEnvelope.Request(4, RekallAgeModuleHostOperations.Shutdown, new { })
+                    ],
+                    TimeSpan.FromSeconds(10),
+                    CancellationToken.None,
+                    startedProcessId => processId = startedProcessId,
+                    responses.Add));
+        }
+        finally
+        {
+            await staged.DisposeAsync();
+        }
+
+        Assert.Equal(
+            [RekallAgeModuleHostOperations.Initialize, RekallAgeModuleHostOperations.PlayableCreate],
+            responses.Select(response => response.Operation));
+        Assert.True(processId > 0);
+        Assert.False(IsProcessRunning(processId));
+        Assert.False(Directory.Exists(stagingRoot));
+        Assert.Empty(Directory.EnumerateDirectories(sessionsRoot, "session-*", SearchOption.TopDirectoryOnly));
+    }
+
+    [Fact]
     public async Task NoCapabilityAppContainerWorkerCompletesFiniteProtocolInsideKillOnCloseJob()
     {
         Assert.True(OperatingSystem.IsWindows());
@@ -312,6 +392,127 @@ public sealed class ModuleHostWindowsIsolationTests
         return root;
     }
 
+    private static async Task<StagedWorkerProcessResult> RunStagedWorkerProcessAsync(
+        RekallAgeModuleHostStagedSession staged,
+        IReadOnlyList<RekallAgeModuleHostEnvelope> requests,
+        TimeSpan timeout,
+        CancellationToken cancellationToken,
+        Action<int>? processStarted = null,
+        Action<RekallAgeModuleHostEnvelope>? responseReceived = null)
+    {
+        System.Diagnostics.Process? process = null;
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(timeout);
+        try
+        {
+            deadline.Token.ThrowIfCancellationRequested();
+            process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(staged.HostExecutablePath)
+            {
+                WorkingDirectory = staged.Root,
+                UseShellExecute = false,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            }) ?? throw new InvalidOperationException("The staged module-host process did not start.");
+            processStarted?.Invoke(process.Id);
+            deadline.Token.ThrowIfCancellationRequested();
+
+            var codec = new RekallAgeModuleHostFrameCodec();
+            foreach (var request in requests)
+            {
+                await codec.WriteAsync(process.StandardInput.BaseStream, request, deadline.Token);
+            }
+
+            await process.StandardInput.BaseStream.FlushAsync(deadline.Token);
+            process.StandardInput.Close();
+            var responses = new List<RekallAgeModuleHostEnvelope>(requests.Count);
+            for (var index = 0; index < requests.Count; index++)
+            {
+                var response = await codec.ReadAsync(process.StandardOutput.BaseStream, deadline.Token);
+                responses.Add(response);
+                responseReceived?.Invoke(response);
+            }
+
+            await process.WaitForExitAsync(deadline.Token);
+            var standardError = await process.StandardError.ReadToEndAsync(deadline.Token);
+            return new StagedWorkerProcessResult(responses, standardError, process.ExitCode);
+        }
+        finally
+        {
+            if (process is not null)
+            {
+                await TerminateAndDisposeProcessAsync(process);
+            }
+        }
+    }
+
+    private static async Task TerminateAndDisposeProcessAsync(System.Diagnostics.Process process)
+    {
+        try
+        {
+            try
+            {
+                process.StandardInput.Close();
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or ObjectDisposedException or IOException)
+            {
+            }
+
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+
+            using var exitTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            try
+            {
+                await process.WaitForExitAsync(exitTimeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+
+                using var fallbackTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                try
+                {
+                    await process.WaitForExitAsync(fallbackTimeout.Token);
+                }
+                catch (OperationCanceledException exception)
+                {
+                    throw new TimeoutException(
+                        $"Staged module-host process '{process.Id}' did not exit after process-tree termination.",
+                        exception);
+                }
+            }
+        }
+        finally
+        {
+            process.Dispose();
+        }
+    }
+
+    private static bool IsProcessRunning(int processId)
+    {
+        System.Diagnostics.Process? process = null;
+        try
+        {
+            process = System.Diagnostics.Process.GetProcessById(processId);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        finally
+        {
+            process?.Dispose();
+        }
+    }
+
     private static async Task<IReadOnlyList<RekallAgeModuleHostEnvelope>> RunRestrictedWorkerAsync(
         string projectRoot,
         IReadOnlyList<RekallAgeModuleHostEnvelope> requests)
@@ -376,6 +577,7 @@ public sealed class ModuleHostWindowsIsolationTests
             "Rekall.Age.ModuleHost.runtimeconfig.json",
             "Rekall.Age.Modules.dll",
             "Rekall.Age.Core.dll",
+            "Rekall.Age.Rendering.Abstractions.dll",
             "Rekall.Age.Runtime.Abstractions.dll",
             "Rekall.Age.World.dll"
         };
@@ -407,4 +609,9 @@ public sealed class ModuleHostWindowsIsolationTests
     private sealed record RestrictedWorkerResult(
         IReadOnlyList<RekallAgeModuleHostEnvelope> Responses,
         string StandardError);
+
+    private sealed record StagedWorkerProcessResult(
+        IReadOnlyList<RekallAgeModuleHostEnvelope> Responses,
+        string StandardError,
+        int ExitCode);
 }

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.broken-arch",
+  "name": "Broken Processional Arch Curve",
+  "revision": 1,
+  "splines": [
+    {
+      "splineId": 7001,
+      "kind": "CubicBezier",
+      "cyclic": false,
+      "controlPoints": [
+        {
+          "controlPointId": 7101,
+          "position": { "x": -2.0, "y": 3.65, "z": -0.92 },
+          "handleIn": { "x": -2.0, "y": 3.65, "z": -0.92 },
+          "handleOut": { "x": -2.0, "y": 4.9, "z": -0.92 },
+          "radius": 1.08,
+          "tiltRadians": -0.08
+        },
+        {
+          "controlPointId": 7102,
+          "position": { "x": 0.0, "y": 5.85, "z": -0.92 },
+          "handleIn": { "x": -1.1, "y": 5.85, "z": -0.92 },
+          "handleOut": { "x": 1.1, "y": 5.85, "z": -0.92 },
+          "radius": 1.22,
+          "tiltRadians": 0.0
+        },
+        {
+          "controlPointId": 7103,
+          "position": { "x": 2.0, "y": 3.65, "z": -0.92 },
+          "handleIn": { "x": 2.0, "y": 4.9, "z": -0.92 },
+          "handleOut": { "x": 2.0, "y": 3.65, "z": -0.92 },
+          "radius": 1.08,
+          "tiltRadians": 0.08
+        }
+      ]
+    }
+  ]
+}

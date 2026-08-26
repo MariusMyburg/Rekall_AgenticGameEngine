@@ -92,6 +92,7 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new InspectSceneMeshGeometryCommand());
         registry.Register(new InspectStereoRenderPlanCommand());
         registry.Register(new InspectScenePerformanceBudgetCommand());
+        registry.Register(new CompareQualityPresetsCommand());
         registry.Register(new ApplyVirtualGeometryToSceneCommand());
         registry.Register(new InspectVirtualGeometrySceneCommand());
         registry.Register(new InspectSceneVisibilityCommand());
@@ -165,6 +166,15 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new EvaluateModelingGraphCommand(modelingGraphRuntime));
         registry.Register(new BakeModelingGraphCommand(modelingGraphRuntime));
         registry.Register(new InspectModelingEvaluationCommand(modelingGraphRuntime));
+        registry.Register(new CreateCurveAssetCommand());
+        registry.Register(new ReplaceCurveAssetCommand());
+        registry.Register(new InspectCurveAssetCommand());
+        registry.Register(new ListCurveAssetsCommand());
+        registry.Register(new EvaluateCurveAssetCommand());
+        registry.Register(new CreateRigAssetCommand());
+        registry.Register(new ReplaceRigAssetCommand());
+        registry.Register(new InspectRigAssetCommand());
+        registry.Register(new ListRigAssetsCommand());
         registry.Register(new SearchMaterialNodeTypesCommand());
         registry.Register(new InspectMaterialNodeTypeCommand());
         registry.Register(new CreateMaterialGraphCommand());

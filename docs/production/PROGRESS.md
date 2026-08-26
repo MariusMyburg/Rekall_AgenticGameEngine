@@ -4,10 +4,258 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-24 13:54 Africa/Johannesburg
+Last verified: 2026-08-26 16:24 Africa/Johannesburg
 
-Branch: `codex/model-asset-games` (based exactly on `1c269fe`, which merged
-`codex/web-scene-bootstrap` into `master`)
+Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
+commit `01f48ff`)
+
+The current Warden material/form slice resolves the washed-out hero response
+from evidence rather than global exposure changes. Controlled Vulkan captures
+showed the unshadowed 4.2 Warden softbox was not the primary source; the nearby
+8.5 Arrival Hearth practical dominated and clipped the dark steel. The authored
+scene now uses a restrained 2.1 practical plus 0.8 readability fill. AGE's
+ordinary image import and material-graph pipeline binds a new blackened-steel
+albedo and tangent-space normal source end to end; executable acceptance loads
+both graph dependencies and verifies their binding on the real compiled Warden
+steel surface. The editable Warden graph advances to revision 24 / 128 reachable
+nodes with array-authored cuirass fluting, a 28-ring mail field, mirrored helmet
+rivets, and mirrored greave ridges. It bakes 22,396 points / 25,282 faces /
+95,036 corners and rebuilds the stable live-linked model at revision 29. The
+hero is scaled from 0.58 to 0.68 for gameplay readability. Aetherfall passes
+46/46; project/scene validation report zero issues; both modules are restricted-
+host ready. High 2560x1440 `desktop60` passes at 8.546048 ms with 99 draws,
+221,394 triangles, 1,172,208 vertices, and 11 textures. Native proof is
+`Proof/Captures/WardenMaterialFormFinal/vulkan-scene-1280x720-20260826141949883.png`:
+320 draws, four dispatches, 65 renderables, 10,532 colors, luminance 0.080, and
+zero missing assets, fallbacks, or observations. This materially improves the
+previous white procedural read but is not final visual acceptance: anatomy and
+armor remain visibly constructed from simple masses, the mail grid is coarse at
+gameplay distance, and the environment still needs richer coherent assets,
+ability animation, combat encounters, IK/foot planting, and stronger composition.
+
+The current Godot/Blender-informed animation slice connects AGE's existing
+generic animation ecosystem to its native named-joint rigs. Ordinary animation
+tracks may now target `Rekall.RigPose` with stable `jointId` plus translation,
+rotation, or scale. Runtime sampling normalizes and spherically interpolates
+quaternions, mixer blending uses hemisphere correction, and blend identity
+keeps different joints separate. Aetherfall replaces code-only limb sine waves
+with three inspectable assets: presentation, guarded idle, and an authored
+armored walk. Its agent module writes semantic movement-derived mixer weights
+at pre-animation priority -5 while retaining gameplay root/facing and upper-
+body state. Runtime animation passes 31/31, Aetherfall passes 45/45,
+validation/trust are clean, and the native High frame has 13,067 colors, 320
+draws, four dispatches, 65 renderables, and zero observations or fallbacks.
+High 2560x1440 `desktop60` passes at 6.626656 ms with 1,095,508 vertices.
+The clip pipeline is now reusable and inspectable, but original-size review is
+still not the requested visual target: the Warden is too bright, too procedural,
+and too small in composition. Fitted forms, surface detail, material/lighting
+restraint, ability clips, IK/foot planting, and Studio animation editing remain
+active priorities.
+
+The current Warden anatomy slice expands the generic editable character graph
+to revision 23 / 115 reachable nodes and its native rig to 14 stable named
+joints. Segmented forearms, thigh/shin underlayers, shoulder lamellae, shaped
+torso and helmet construction now bake to 18,622 points / 21,368 faces / 79,696
+corners. Agent-authored semantic movement emits 13 pose deltas with real knee
+and foot rotation. The resulting 83,574,368-byte compiled artifact exposed a
+generic category error: compiled meshes reused the 64 MiB limit for ordinary
+editable JSON. The content-addressed compiled store now has a separate bounded
+256 MiB budget; ordinary documents remain at 64 MiB, and the stable Warden
+publishes as model revision 28. Native moving High Vulkan evidence has 12,734
+colors, luminance 0.110, 325 draws, four dispatches, 66 renderables, and zero
+fallbacks or observations. Aetherfall passes 45/45, validation/trust are clean,
+and 2560x1440 High `desktop60` passes at 6.753984 ms with 99 draws, 213,882
+triangles and 1,095,508 vertices. Original-size review confirms stable,
+materially richer construction but also that it is still a procedural
+intermediate. Production anatomy, fitted armor/cloth, high-frequency surface
+detail, authored animation/IK, and more revealing composition remain active.
+A versioned binary compiled-mesh format is queued to remove pretty-JSON size
+inflation without delaying current playable work. Provider-neutral Tripo/Meshy
+generation and normalized GLB import remain explicitly queued after the native
+Aetherfall milestone.
+
+The current Aetherfall fidelity slice separates the Warden's equipment into
+five inspectable authored surfaces. Graph revision 22 routes belt, tassets, and
+boots to blackened leather, and buckle, gorget, rivets, cloak clasp, and helmet
+brow to restrained antique bronze while retaining steel, cloth, and aether.
+The 93-node graph validates cleanly, bakes 12,898 points / 15,126 faces / 55,816
+corners, and rebuilds the stable model at revision 27. Acceptance proves exact
+graph ownership and five compiled material slots; Aetherfall passes 45/45 and
+project/scene validation is clean. High Vulkan native evidence reports 313
+draws, four dispatches, 65 renderables, 11,950 colors, luminance 0.112, and zero
+fallbacks or observations. This improves material readability but does not yet
+meet the final character target: anatomy, armor silhouette, surface wear,
+cloth construction, and production animation remain active visual priorities.
+
+The current Blender/Godot-informed deformation checkpoint replaces the
+Warden's two-joint demonstration with generic multi-joint envelope authoring.
+`assign_envelope_skin_weights`, its modeling node, and its modifier calculate
+influence from tapered bone segments, retain the deterministic strongest four,
+and publish normalized canonical joint bindings. The live Aetherfall consumer
+now has ten named joints, uses at least six of them in its baked mesh, emits
+nine named runtime pose deltas, and proves actual renderer-built vertex change.
+Its native High Vulkan proof is stable with 11,785 colors, mean luminance
+0.114, 305 render-work draws, four dispatches, and no missing assets,
+fallbacks, or observations. The same 23 MB graph bake also exposed and drove a
+generic transaction-journal repair: bounded history now retains the newest
+entries that fit, preserves the current entry and snapshot-backed exact
+preimages, and returns a clean CLI result after mutation. Focused skin tests
+pass 12/12, transaction history passes 8/8, combined Aetherfall evidence passes
+44/44, validation and module trust are clean, and 2560x1440 High `desktop60`
+passes at 8.066848 ms GPU time. This is functional deformation infrastructure;
+the Warden remains visibly intermediate and still needs higher-detail anatomy,
+clothing, materials, and production locomotion/combat animation.
+
+The first follow-on gameplay-motion slice removes the Warden's state-agnostic
+idle-only pose. Its agent-authored module now derives facing, stride, pelvis
+bob, body lean, arm counter-swing, and pulse/dash accents from semantic
+movement and ordinary agent-owned component state. A deterministic nine-frame
+movement proof requires a readable leg-matrix term above 0.15; the former pose
+failed at 0.012555 and the new pose passes. Combined Aetherfall acceptance is
+45/45 and restricted module trust remains clean. This uses existing generic
+AGE contracts correctly and therefore does not add a genre-specific animation
+behavior to engine core. Production clips, foot planting, IK, bone
+attachment authoring UI, and richer secondary motion remain open.
+
+The current Godot/Blender-informed articulation slice adds generic named-joint
+attachments. Native rig evaluation now publishes pose-global matrices
+separately from skin matrices, and `Rekall.RigAttachment` composes any ordinary
+child entity as `local * jointPoseGlobal * parentWorld` in the shared world-
+transform resolver. Stable joint IDs, per-frame parent-pose caching, disabled
+passthrough, and four typed diagnostic fallbacks make the contract inspectable
+without adding humanoid or equipment behavior to engine core. Aetherfall binds
+its runeblade to `forearm_r` and pauldron to `upper_arm_l`; acceptance changes
+only joint deltas and proves rendered equipment motion with unchanged local
+transforms, while existing root motion still carries the blade exactly 2.5
+units. The moving RTX 5090 High Vulkan proof has 12,771 colors, luminance 0.115,
+313 draws, four dispatches, 66 renderables, and zero observations or asset
+fallbacks. Release is warning-free, affected contracts pass 82/82, Aetherfall
+passes 45/45, validation/trust are clean, and 2560x1440 High `desktop60`
+measures 6.860352 ms GPU time. Studio sockets, imported-skeleton targets,
+constraints/IK, physics handoff, production clips, and final character art
+remain open.
+
+The current deformation-authoring checkpoint adds two generic, inspectable
+modeling contracts. `assign_linear_skin_weights` and its graph/modifier
+surfaces author normalized two-joint point bindings from geometry along any
+local axis, preserve an existing complete pair, and fail closed on missing
+pairs, duplicate semantics, incompatible types, or unrelated canonical-name
+collisions. `taper_points` and its graph/modifier surfaces linearly scale planes
+perpendicular to X/Y/Z around an authored center and range, giving agents a
+reusable silhouette tool rather than a character-specific cape generator.
+Aetherfall's mantle now comes from a nine-node stored graph: a 16x24 cloth
+grid, hang transform, taper, deterministic folds, solidify, skin weights, UVs,
+and weighted normals. Revision-checked bake and Model Asset rebuild produce 850
+editable points / 848 faces and 3,392 compiled skinned vertices / 1,696
+triangles, versus the former hand-shaped 40-point mesh. Runtime acceptance
+proves a weighted vertex changes between frames 1 and 30. Modeling passes
+246/246, Aetherfall passes 42/42, project and scene validation are clean, and
+High `desktop60` at 2560x1440 passes at 97 draws, 195,210 triangles, 836,424
+vertices, and nine textures. The fresh frame-30 RTX 5090 capture is informative
+with 11,773 colors, mean luminance 0.100, 301 render-work draws, and zero
+observations or fallbacks. This closes a real procedural weighting and simple-
+deform gap; it does not make the Warden production quality. The capture still
+reads as a blockout because body silhouette, authored materials, garment
+construction, and animation remain too coarse. Those are the next visible
+character milestone, alongside native rig documents, bind poses, constraints,
+paint/normalize/prune tools, and Studio rig visualization.
+
+The current Blender/Godot-informed modeling tranche removes AGE's complete-edge
+bevel restriction. `bevel_edges` now accepts arbitrary selected two-face
+manifold edges, closes neighboring transition regions and affected vertex caps,
+preserves typed point/edge/face/corner attributes and provenance, scales widths
+from an optional edge-domain Float weight, supports an explicit generated-face
+material slot, and makes `hardenNormals` author smooth bevel faces while source
+planes retain their hard policy. The same parameters are published through the
+canonical operation, procedural-node, modifier, agent, and Studio descriptor
+surfaces. A new generic `select_edges_by_angle` operation and
+`rekall.modeling.selection.edge_angle` node create reusable named selections
+from adjacent-face angle, so agents can construct useful bevel selections
+inside ordinary graphs instead of hand-authoring topology IDs. Aetherfall's
+runeblade is the first live consumer: its 26-node graph selects hard edges before
+a three-segment bevel, bakes cleanly to 2,048 points / 2,422 faces, and compiles
+to 8,892 vertices / 4,048 triangles. The fresh High Vulkan proof is informative
+with 11,681 colors, mean luminance 0.100, 65 renderables, 301 render-work draws,
+and zero observations or fallbacks; original-size review finds no cracks or
+exploded topology. Focused bevel/normal/modifier/Aetherfall evidence is green.
+The review-driven closure now also derives strip winding from incident source
+faces, traces cap cycles from actual topology rather than geometric sorting,
+keeps representative selected-edge subsets closed and consistently wound,
+preserves the implicit smooth default across joins, canonicalizes production
+`normal.smooth` semantics, and reports attribute invalidation when bevel creates
+new smoothing or material data. Incompatible same-name smoothing attributes
+now fail closed, and source-edge/cap-boundary indexes keep the operation linear
+in ordinary topology traversal. Focused modeling evidence passes 78/78 and the
+complete Aetherfall selection passes 42/42; project and scene validation are
+clean. High `desktop60` passes at 97 draws, 193,570 triangles, 833,144 vertices,
+nine textures, and 5.548224 ms measured GPU time.
+This is a substantial production bevel foundation, not Blender parity: custom
+profiles, offset modes, vertex-only bevel, miter policies, exact independent
+corner treatment for unequal incident weights, broader non-manifold policy,
+interactive edit-mode preview, and a full Studio selection overlay remain.
+The frame also remains visually prototype-grade; split/skinned anatomy and
+deformable clothing are still the next character-fidelity milestone.
+
+The current animation checkpoint makes an ordinary authored timeline capable
+of driving a complete entity hierarchy instead of forcing every attachment to
+own an unsynchronized clip. Animation tracks may address an exact entity ID or
+a bounded slash-separated direct-child ID/name path relative to the clip owner;
+the same targeting works for simple clips, weighted mixers, and state-graph
+mixers. Missing, ambiguous, invalid, or conflicting targets fail closed with
+structured runtime observations. Aetherfall now uses one 1.4-second Warden
+timeline to coordinate root yaw, pauldron roll, runeblade roll, and two-axis
+mantle motion, removing the pauldron and blade child clocks. A fresh native High
+capture proves the feature in the installed Vulkan renderer, and High
+`desktop60` passes at 97 draws, 193,762 triangles, 833,624 vertices, nine
+textures, and 5.111776 ms. Runtime animation passes 28/28, state-graph runtime
+passes 10/10, module metadata passes 11/11, and the complete Aetherfall
+selection passes 42/42 after its two
+shared-project suites were placed in one non-parallel collection to prevent
+module receipt rebuild/load races. Gameplay remains 2/4/4/5 and validation is
+clean. This produces coherent rigid attachment motion, not a production
+character: the Warden's major body masses remain fused into a largely rigid
+baked mesh. The next visible capability target is a split/deformable character
+body plus deeper Blender-inspired non-destructive modeling, beginning with the
+remaining bevel/chamfer subset, weighting, profile/material, and Studio gaps.
+
+The current character-authoring checkpoint expands the live Warden from 89 to
+101 generic modeling nodes through the normal graph, bake, and Model Asset
+pipeline. Paired thigh guards, tapered bracers, gauntlet forms, and a separately
+materialed facial slit now join the existing curve-revolved cuirass, layered
+armor, cloth, bevel, split-normal, UV, mantle, and weapon work. The graph
+evaluates cleanly to 10,978 points and 13,416 faces; the compiled asset contains
+48,532 vertices and 21,700 triangles across stable steel/cloth/aether surfaces.
+A fresh native High frame confirms the additions resolve in the gameplay view,
+but the honest visual verdict remains prototype-grade because stance,
+composition, environmental prop fidelity, and material breakup are still weak.
+High `desktop60` passes at 97 draws, 193,762 triangles, 833,624 vertices, nine
+textures, and 4.767552 ms. Gameplay remains 2/4/4/5 and validation is clean.
+This checkpoint deliberately advances visible functionality without claiming
+the requested final Diablo/Alan Wake-class result.
+
+The current Aetherfall engine-driven milestone replaces unsafe triangle-stride
+virtual geometry with topology-checked connected clustering. Material surfaces
+are compacted to referenced vertices; render seams retain distinct normal/UV
+payloads; coincident disconnected open and closed components remain separate;
+and candidates are rejected when component, boundary, or edge-use topology
+worsens. Cluster size and pixel error now affect actual output through maximum
+distance LOD. Whole-renderable triangle budgets are apportioned across material
+surfaces and report explicit unsatisfied state when no safe result fits. Stable
+source reductions are cached before material color materialization for repeated
+assets, Web, OpenXR, and Windows. Seventeen static Aetherfall ruins consume the
+generic component; fresh frame-30 inspection selects 62,202 of 100,368 source
+triangles, reducing 38,166, and all 17 satisfy their 5,228 cap. A fresh native
+High Vulkan capture after the final reducer mutation is informative, visually
+topology-clean, and pixel-identical to the preceding 62,202-selection frame.
+High `desktop60` passes at 96 draws, 192,166 triangles, 778,804 vertices, nine
+textures, and 5.009344 ms measured GPU time. Focused virtual-geometry evidence
+passes 30/30, renderer/Web/OpenXR/cache integration passes 110/110, combined
+Aetherfall acceptance passes 42/42, gameplay remains 2/4/4/5 with Warden
+movement at `0.506840`, and both validators report zero issues. This closes safe
+static CPU LOD selection, cache reuse, and multi-surface budgeting, not GPU page
+streaming, skinned/morph LOD remapping, or final visual acceptance; the recovered
+budget is next allocated to richer characters, clothing, ruins, props,
+materials, animation, and composition.
 
 Current execution order is governed by
 [`STRATEGIC-PRIORITIES.md`](STRATEGIC-PRIORITIES.md). The immediate acceptance
@@ -2934,6 +3182,15 @@ behavior.
   animation, TANGENT/sparse/quantized morph accessors, broader complex
   transform fixtures, richer graph curves, and interruptible or hierarchical
   graph policies.
+- Studio has no animation-authoring surface: creating or editing a
+  `Rekall.RigPose`-track clip asset, previewing a rig, or composing
+  `Rekall.AnimationMixer` layers is engine/JSON-only today (proven by the
+  ability-driven authored rig animation checkpoint below, which only exists as
+  hand-authored clip JSON and CLI/runtime acceptance). Every engine capability
+  that reaches gameplay should also reach Studio's editing surface; the next
+  Studio slice should add a rig/clip preview and a mixer-layer editor to the
+  3D workspace (or a dedicated animation workspace) so this is not left as a
+  standing engine/tooling gap.
 - Expand Studio asset/module workflows and run broader installed game-creation
   benchmarks beyond the fixed gauntlet. Deterministic WPF automation,
   schema-guided editing, transactional undo/redo, embedded Ollama authoring,
@@ -3121,6 +3378,75 @@ behavior.
   `0CD2E7AA3AB10D941004E455A69E6EEAF532E47425B5DA52417D89F73A50EE9B`.
 
 ## Recently completed
+
+- Generic curve screw/helix authoring is accepted end to end. Signed
+  `pitchPerTurn`, multi-turn open topology, and axial-offset provenance now
+  compile through the standard curve/graph/mesh/Model Asset path. Aetherfall's
+  two live conduits replace ruin proxies with a raised core and counter-wound
+  1,080-degree coils. The retained native High frame is
+  `Examples/AetherfallCitadel/Proof/Captures/CurveScrew/vulkan-scene-1280x720-20260826051445564.png`;
+  all 22 high-fidelity tests pass, gameplay remains 2/4/4/5, validation is
+  clean, and `desktop60` passes at 6.656480 ms. Generated LOD variants are now
+  the immediate scalability requirement because the detailed source scene is
+  at 1,214,504 of 1,250,000 allowed vertices. Tripo/Meshy generation/import
+  remains researched and queued behind the native Aetherfall milestone through
+  the documented provider-neutral asynchronous job boundary.
+
+- Generic typed curve revolution is accepted end to end. AGE now publishes
+  `rekall.modeling.curve.revolve@1` with bounded X/Y/Z partial/full rings,
+  welded poles, seam UVs, source/angle provenance, materials, and smooth-normal
+  intent. The live Warden cuirass and paired ruin capitals were patched,
+  evaluated, baked, and rebuilt through public commands. The retained native
+  High frame is
+  `Examples/AetherfallCitadel/Proof/Captures/CurveRevolve/vulkan-scene-1280x720-20260826043723828.png`;
+  consolidated tests pass 85/85, gameplay remains 2/4/4/5, validation is
+  clean, and `desktop60` passes at 6.374784 ms. A detected 2,799,400-vertex
+  whole-ruin bevel multiplication was removed by composing the already-smooth
+  capital after that legacy modifier; the final scene submits 1,158,440
+  vertices. Screw/helix, explicit caps, fields, multi-spline output, mesh Spin,
+  modifier and Studio gizmo workflows remain queued. The documented Tripo/
+  Meshy provider-neutral asynchronous import evaluation remains deferred until
+  after the native Aetherfall milestone.
+
+- Generic split-normal authoring is accepted end to end. AGE stores face
+  `normal.smooth` and edge `normal.sharp` policy, classifies sharpness from a
+  bounded angle, and builds deterministic split smooth fans with area and
+  corner-angle weighting. The Warden (55 degrees) and weathered ruin (35
+  degrees) now publish `normal.authored` through their real procedural graph,
+  baked mesh, and Model Asset chains. The retained native High frame is
+  `Examples/AetherfallCitadel/Proof/Captures/SplitNormals/vulkan-scene-1280x720-20260826035849526.png`;
+  focused tests pass 80/80, gameplay remains 2/4/4/5, validation is clean, and
+  `desktop60` passes at 5.307360 ms. The external Tripo/Meshy generation study
+  remains explicitly queued after native Aetherfall modeling acceptance behind
+  a provider-neutral asynchronous job and normalized GLB import contract.
+
+- Native Vulkan SSAO now executes as a truthful graphics pass after opaque HDR
+  and before fog. High uses eight deterministic depth taps and Epic twelve,
+  with background rejection and a conservative occlusion floor. The RTX 5090
+  High Aetherfall capture at
+  `Examples/AetherfallCitadel/Proof/Captures/NativeSsao/vulkan-scene-1280x720-20260826032647150.png`
+  is clean and informative: 11,551 distinct colors, 17.0% dominant-color share,
+  mean luminance 0.100, 226 render-work draws, four dispatches, zero runtime or
+  asset diagnostics, and no black-dot noise. The focused consolidated suite is
+  72/72; gameplay remains 2/4/4/5; validation is clean; and High desktop60 is
+  within every configured budget at 4.810080 ms, including 0.011712 ms for
+  `ssao-resolve`. The remaining AO work is explicitly the higher-fidelity
+  normal-aware, half-resolution, bilateral/temporal path rather than more
+  hardening of this playable first slice.
+
+The native procedural skin-binding slice is acceptance-green. AGE now
+validates paired point-domain `Int4` joint indices and `Float4` weights,
+normalizes them, preserves them through mesh operations, expands them during
+cook, projects them through live-linked Model Assets, and reuses the existing
+morph-before-skin renderer. Aetherfall's shaped 40-point/28-quad mantle is the
+first editable weighted consumer. Focused compiler/model/renderer/animation
+tests pass 74/74; the complete high-fidelity game class passes 17/17; strict
+gameplay proofs pass 2/4/4/5; project/scene validation reports zero issues; and
+High `desktop60` passes at 71 draws, 193,124 triangles, 748,520 vertices, seven
+textures, and 4.665 ms measured GPU time. The retained real Vulkan frame has
+11,471 distinct colors and zero observations, missing assets, unsupported
+assets, or fallbacks. This closes native weight transport and deformation, not
+the remaining rig-document, weight-paint, constraint, or final-fidelity work.
 
 The freshly assembled `3a84dbc` product now passes the complete installed
 distribution acceptance in one clean run. The first attempt isolated a bug in
@@ -5339,7 +5665,270 @@ Final Release verification passed 1,688/1,688 engine tests and 55/55 Studio
 tests, and independent reviews report no remaining Critical or Important
 findings.
 
-## Evidence index
+## 2026-08-25 Windows AppContainer and Studio repository gates restored
+
+The high-fidelity branch's renderer Task 6 gate exposed exactly eight failures
+in `ModuleHostWindowsIsolationTests`. Phase 1 evidence showed that native
+containment was already established correctly: the staged executable and load
+plan existed, the profile had zero capabilities, the process was assigned to a
+kill-on-close job with an active-process limit of one and a 512 MiB memory
+limit, and the broker successfully wrote the first typed request. The worker
+then exited with CLR code `0xE0434352`; bounded stderr identified a
+`FileNotFoundException` for `Rekall.Age.Rendering.Abstractions` while the source-
+generated JSON context was resolving `host.initialize`. Because no response
+frame was written, the broker observed a truncated frame/transport EOF.
+
+The complete-output executable path passed the same finite initialize/shutdown
+protocol. A new staged-but-uncontained regression then reproduced the EOF,
+isolating the defect to the manifest-backed payload inventory rather than
+AppContainer, job assignment, stdio inheritance, protocol framing, or timing.
+Commit `bf292d2` had added the rendering-contract project as a worker runtime
+dependency without adding its assembly to the real isolation fixture's exact
+host-payload allowlist. The repair adds that one dependency to the verified
+manifest inventory. The stager still checks and copies exact size/SHA-256
+entries; no capability, ACL, handle, timeout, retry, protocol, or unrestricted
+fallback changed.
+
+The independent regression passed 1/1 after its witnessed RED. The complete
+Windows isolation class passed 9/9, followed by ten consecutive passes (90/90)
+with zero worker processes and zero staged `session-*` trees remaining. The
+broader module selection passed 185/185. The complete engine project passed
+1,813/1,813 with zero failures or skips and again left no worker/session
+residue. These results complete the AppContainer/module and
+`Rekall.Age.Tests` engine gates; they do not complete overall repository
+verification.
+
+Fix Round 1 hardened the staged-worker regression so launch, every framed
+write, the explicit flush, both finite-session reads, exit, and stderr drain
+share one bounded cancellation deadline. Its `finally` path closes stdin,
+terminates the process tree when necessary, awaits bounded exit, and only then
+allows staged-session disposal. A deliberately hung module returned partial
+initialize/create responses before timing out; the harness test proved that
+this failure path leaves zero workers and zero `session-*` trees. The expanded
+10-test class then passed ten consecutive times (100/100), and the complete
+engine project passed its new total of 1,814/1,814 with zero failures or skips.
+This strengthens the completed engine gate but does not change the open Studio
+status below.
+
+The Studio follow-up is now complete. Its initial 30-second exact reproduction
+again recorded
+`HeadlessAutomationCreatesProjectAndCompletesAgentGauntlet` as incomplete, and
+a bounded three-turn diagnostic exposed the repeated boundary: engine discovery
+passed, then two consecutive `rekall.workflow.agent_authoring_gauntlet` calls
+failed `package-created` because module build found no module projects. Studio
+had created a valid but zero-entity scene; the gauntlet used scene-file
+existence as its preservation test, mislabeled that empty scene as authored,
+and skipped the blueprint plus agent-owned playable module. With no requested
+turn limit, the deterministic model repeated the failed terminal tool while the
+agent ledger and transcript continued to grow. The earlier 31:06 and five-minute
+evidence remains retained at
+`.superpowers/sdd/2026-08-24-high-fidelity-forward-plus-foundation/task-5a-evidence/task-5a-studio-viewmodel-isolation.trx`
+and
+`.superpowers/sdd/2026-08-24-high-fidelity-forward-plus-foundation/task-5a-evidence/35827907-8866-4a94-b4c7-9a394a02628f/Sequence_a2412baa567843ee99ae5a061543f113.xml`;
+the adjacent dump is
+`testhost_57332_20260825T020605_hangdump.dmp`.
+
+The fixed invariant is content-based and preserves the data-loss guarantee: a
+loaded scene with authored entities is never replaced, while an existing empty
+editor scene receives the same generic blueprint, agent-owned playable module,
+deterministic assertions, package, audit, and proof capture as a fresh scene.
+`GauntletAuthorsAnExistingEmptyEditorSceneBeforePackaging` witnessed the root
+cause RED in 83 ms with `REKALL_MODULE_PROJECTS_MISSING`, then passed the real
+end-to-end gauntlet in 8 seconds. The full four-test gauntlet class passed 4/4
+in 26.5 seconds, and the original unmodified Studio automation passed three
+consecutive runs at 9 seconds each.
+
+Final verification is zero-failure: the complete Studio project passed 65/65
+in 46.6 seconds; the complete engine project passed its new total of
+1,815/1,815 in 4 minutes 6 seconds with zero skips; and `Rekall.AGE.sln` built
+in 5.47 seconds with zero warnings and zero errors. The exact Studio and engine
+TRX files are retained under
+`.superpowers/sdd/2026-08-24-high-fidelity-forward-plus-foundation/task-5b-evidence/`.
+Post-run checks found zero Rekall test/worker/player processes, zero staged
+`session-*` trees in the current engine roots, and zero current-run Studio
+automation roots. Task 5B is complete and Task 6/final delivery are unblocked.
+
+Fix Round 1 closes the review gap in that result. The generic gauntlet blueprint
+now attaches an agent-owned `Game.Modules.AgentGauntlet.GauntletState` and a
+semantic action map. The agent-authored module registers the component and a
+runtime system that consumes `agent.gauntlet.advance` with the engine delta
+time. The workflow builds the module and runs a deterministic one-frame
+`rekall.runtime.inspect_scene` checkpoint after authoring: component existence,
+exact `progress` delta `1`, and exact `Position2D.X` delta `1` must all pass
+before package/audit/capture. The regression verifies the generated module
+project/source, attached state, exact runtime results, package archive, ready
+audit, and nonblank captured proof artifact; authored non-empty scene
+preservation remains green.
+
+The final Fix Round 1 gates passed gauntlet 4/4, the original Studio test three
+consecutive times, Studio 65/65, engine 1,815/1,815, and the solution build with
+zero warnings/errors. A tracked clean-checkout record now preserves the exact
+root-cause ledger, commands, local timestamps/timings/counts, failed
+environmental-gate chronology, raw artifact hashes, and residue audit:
+[`docs/production/evidence/2026-08-25-task-5b-studio-gauntlet.md`](evidence/2026-08-25-task-5b-studio-gauntlet.md).
+
+## Native rig, bend deformation, and grounded Warden checkpoint
+
+- AGE now owns a versioned native rig document with stable named joints,
+  parent hierarchy, bind-local matrices, strict validation, deterministic bind
+  and pose evaluation, revision-safe create/replace/inspect/list commands, and
+  a generic `Rekall.RigPose` runtime component. The renderer resolves named
+  finite joint deltas into skin matrices and emits typed observations for
+  missing, malformed, or incompatible rig state.
+- Generic `bend_points`, `rekall.modeling.deform.bend`, and
+  `rekall.modifier.deform.bend` curve cross-sections through an authored range
+  around an explicit origin. Aetherfall consumes the primitive for its mantle;
+  the character module consumes the native named rig for delta-time-driven
+  chest breathing and weight shift. Runtime acceptance compares actual rendered
+  vertices at distinct frames, not merely component presence.
+- The Warden construction was pruned of duplicate cape, blade, spike, and
+  placeholder branches, grounded at 0.58 world scale, relit with a restrained
+  warm softbox, and rebuilt with higher-segment armor/cloth bevels. The compact
+  73-node source graph compiles 44,696 vertices across the steel, cloth, and
+  restrained-aether surfaces while explicitly excluding the obsolete toy-like
+  branches.
+- Verification is zero-failure for the 257-test modeling selection and the
+  24-test Aetherfall high-fidelity acceptance class (281 combined). Project and Main scene
+  validation report zero issues; both gameplay modules pass the
+  `windows-appcontainer-restricted` trust inspection. Native High Vulkan capture
+  on the RTX 5090 reports 301 render-work draws, four dispatches, zero asset
+  fallbacks, and zero observations.
+- The 2560x1440 High `desktop60` budget passes at 6.496608 ms GPU frame time,
+  97 scene draws, 194,378 triangles, 828,116 vertices, and nine textures. This
+  proves the current engine slice; the player character still needs materially
+  richer anatomy, armor construction, surface detail, animation, and closer
+  composition before final visual acceptance.
+- The provider-neutral Tripo/Meshy generation/import evaluation remains on the
+  post-Aetherfall list. Its current recommendation is to migrate the existing
+  Tripo proof first and use Meshy as the second-adapter breadth benchmark, with
+  explicit cost/consent, provenance/licensing, resumable jobs, and ordinary AGE
+  edit/reimport/cook/package acceptance.
+
+## Rounded Warden construction checkpoint
+
+- The Warden's duplicate external arm was traced to a pauldron graph that also
+  authored an upper arm, elbow, vambrace, and spike. The rebuilt generic
+  pauldron graph is now a bounded layered shell with a rolled rim, boss, and
+  rivets; focused acceptance prevents those obsolete body-part nodes from
+  returning and constrains the authored mesh height.
+- The 71-node main graph replaces box coat panels, box boots, and the flat inset
+  box faceplate with mirrored capsule coat tails, capsule boots, and a rounded
+  capsule visor. Smooth branches feed their dedicated armor/cloth joins rather
+  than the hard-surface bevel chain. This improves the gameplay silhouette
+  using existing AGE primitives and records the content rules as executable
+  acceptance instead of adding Warden-specific engine behavior.
+- Native proof is
+  `Examples/AetherfallCitadel/Proof/Captures/RoundedVisor/vulkan-scene-1280x720-20260826110408142.png`:
+  High Vulkan on RTX 5090, 301 render-work draws, four dispatches, zero asset
+  fallbacks, and zero observations. The full Aetherfall class passes 24/24;
+  project and scene validation have zero issues; both modules are restricted
+  and ready.
+- The 2560x1440 High `desktop60` inspection passes with no blockers or warnings
+  at 6.335008 ms measured GPU time, 97 scene draws, 197,410 triangles, 835,052
+  vertices, and nine textures. The next visual slice is materially richer hero
+  anatomy, armor layering, material variation/wear, and animation at a more
+  revealing gameplay composition—not further edge-case hardening of this pass.
+
+## Layered Warden and isometric framing checkpoint
+
+- The editable Warden consumer expands from 71 to 84 reachable graph nodes
+  using only generic AGE construction: mirrored shoulder shells and knee cops,
+  arrayed abdominal/chest lames, plus a capsule crest and torus brow. The first
+  short paired-chest experiment was rejected by native image review; the
+  accepted form uses two overlapping full-width rounded plates. An invalid
+  intermediate capsule was diagnosed through the evaluator's exact
+  `depth >= diameter` contract and never replaced the last-good mesh.
+- The authored camera and agent-authored presentation system now use a closer
+  14.5-unit height, 15-unit follow offset, 40-degree pitch, and 38-degree FOV.
+  A deterministic runtime acceptance proves the FOV and relative Warden-camera
+  offset after module execution, while the existing input/HUD presentation
+  acceptance remains green. The left pauldron is also reduced and seated more
+  tightly against the shoulder.
+- Native High proof is
+  `Examples/AetherfallCitadel/Proof/Captures/LayeredWardenLames/vulkan-scene-1280x720-20260826112335288.png`:
+  11,760 distinct colors, 305 render-work draws, four dispatches, zero
+  observations, and zero asset fallbacks. This is a visible composition and
+  construction gain, not a claim of final photoreal character quality.
+- Relevant gameplay plus high-fidelity acceptance passes 44/44, the solution
+  builds with zero warnings/errors, project and scene validation have zero
+  issues, and both modules are restricted-host ready. High 2560x1440
+  `desktop60` passes at 8.642528 ms GPU time, 203,638 triangles, 873,116
+  vertices, 97 scene draws, and nine textures.
+
+## Studio orbit/pan/zoom viewport camera checkpoint
+
+- Studio's mesh-editing viewport previously had no camera at all: a fixed
+  axonometric projection with no way to rotate, pan, or zoom the view. It now
+  has a real orbit camera. Middle-mouse drag orbits (yaw always turns around
+  world-up, independent of pitch — Blender's default orbit convention), shift
+  + middle-drag pans, the scroll wheel dollies zoom, and toolbar buttons offer
+  "Frame Selected" (reset pan/zoom) and an orthographic/perspective toggle.
+  Left-button gizmo drag and element selection are completely unchanged.
+- `RekallAgeStudioMeshViewportRenderer.Project` is now camera-aware:
+  `RekallAgeStudioViewportCamera.Identity` reproduces the original fixed
+  projection exactly (proven by a 4-point regression test), so orbiting is a
+  rotation *relative to* the same well-tuned default framing, not a
+  fundamentally different view. Zoom/pan are applied in `Render` after
+  auto-fit rather than inside `Project`, because baking them into `Project`
+  let the auto-fit step's own re-normalization silently cancel them back out
+  — caught empirically by the first implementation's zoom/pan tests going red.
+- This is sub-project 2 (of two identified during the 2026-08-26 brainstorm)
+  from the Studio 3D-modeling-parity audit, and its first slice: sub-project 1
+  (the animation workspace) was intentionally reordered behind it since real
+  camera navigation is a prerequisite for any interactive 3D authoring tool,
+  including the eventual gizmo-based pose editor. See
+  `docs/superpowers/specs/2026-08-26-studio-3d-viewport-navigation-design.md`
+  and `docs/superpowers/plans/2026-08-26-studio-3d-viewport-navigation.md`.
+- Remaining modeling-parity gaps identified by the same audit, still open: a
+  visual node-graph canvas (today's "Procedural Geometry" panel is a flat
+  parameter-form list with no wiring view), modal direct-manipulation mesh
+  tools (extrude/bevel/inset are combo-box-plus-form, not drag gestures), a
+  materials/UV panel depth audit, and the animation workspace itself (see the
+  "Studio has no animation-authoring surface" gap above).
+- Verified: full `Rekall.Age.Studio.Tests` suite 98/98 (92 before this slice),
+  no regressions; `Rekall.Age.Tests` Aetherfall filter unaffected at 50/50;
+  solution builds Release with 0 warnings/errors.
+
+## Ability-driven authored rig animation checkpoint
+
+- `ability.pulse` and `ability.dash` now drive authored motion instead of only
+  toggling particles. Two ordinary reusable animation-clip assets
+  (`aetherfall-warden-pulse`, `aetherfall-warden-dash`) hold named-joint
+  quaternion rotation tracks for `upper_arm_r`/`forearm_r` (pulse cast) and
+  `upper_arm_l`/`upper_arm_r`/`leg_l`/`leg_r` (dash lunge), authored in the
+  same `Rekall.RigPose`-track format as the existing idle/walk/presentation
+  clips.
+- `AetherfallRulesSystem` derives each ability's blend and clip-sample time
+  directly from its existing cooldown timer (`elapsed = cooldownMaxSeconds -
+  cooldownRemaining`, clamped to a short authored animation window) with no
+  extra state: the mixer gains an `aether-pulse`/`aether-dash` layer at weight
+  1 the instant the ability fires, fading to 0 as `guarded-idle`/`armored-walk`
+  resume. `authoritativeTimeSeconds` pins the exact clip sample time so
+  playback is deterministic for runtime inspection.
+- This is the generic engine feature (named-joint clip assets plus a
+  weighted/authoritative mixer) doing the animating; the rules module only
+  selects layers and a sample time. An earlier attempt also hard-coded the arm
+  pose procedurally in `Rekall.RigPose` from the module and was reverted:
+  `RekallAgeTransformAnimationSystem` blends mixer-layer clip samples that
+  target the same joint/property (`BlendRigRotations`, weight-normalized
+  across only the active clip layers) and then overwrites that joint's
+  rotation outright — it does not fold the module's procedural rotation in as
+  an implicit base sample. Procedural and clip-driven posing already coexist
+  on the same skeleton (pelvis/chest/head stay continuously procedural for
+  breathing/weight-shift while the idle/walk/pulse/dash clips own the limbs),
+  but for one joint+property pair the clip is authoritative, not blended with
+  procedural code, once any layer with nonzero weight targets it. Making the
+  procedural value an implicit weighted base for that case is a plausible
+  small generic mixer feature, not attempted here.
+- Runtime acceptance (`WardenAbilitiesDriveReusableAuthoredRigClips`) proves,
+  for both abilities, the exact mixer layer/clip/weight, a nonzero
+  `authoritativeTimeSeconds`, no animation-related error/blocking observation,
+  and a real rendered `upper_arm_r` pose-matrix delta versus an idle/walk
+  baseline — not merely component presence. Full Aetherfall acceptance passes
+  48/48; the solution builds Release with zero warnings/errors; project and
+  scene validation report zero issues.
+
+## Layered Warden and isometric framing checkpoint
 
 - `docs/production/2026-08-17-engine-maturity-audit.md`
 - `docs/production/2026-08-17-ollama-authoring-benchmark.md`

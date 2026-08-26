@@ -17,7 +17,14 @@ public sealed record CaptureRuntimeViewportRequest(
     bool DebugOverlay = true,
     string BackendId = "software",
     string? PreferredDeviceType = "discrete-gpu",
-    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null);
+    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null)
+{
+    public string? QualityPreset { get; init; }
+
+    public RekallAgeRenderQualityOverrides? QualityOverrides { get; init; }
+
+    public bool IncludeGpuTimings { get; init; }
+}
 
 public sealed record CaptureRuntimeViewportResult(
     bool Captured,
@@ -49,6 +56,23 @@ public sealed record CaptureRuntimeViewportResult(
         Array.Empty<RekallAgeRuntimeInputAction>();
 
     public double ElapsedSeconds { get; init; }
+
+    public RekallAgeResolvedRenderFeaturePlan? QualityPlan { get; init; }
+
+    public RekallAgeHighFidelityFrameReport? HighFidelityFrame { get; init; }
+
+    public RekallAgePointLightSelectionReport? Lighting { get; init; }
+
+    public RekallAgeGpuFrameTimingReport GpuTimings { get; init; } =
+        RekallAgeGpuFrameTimingReport.Unavailable(0);
+
+    public long ResourceBytes { get; init; }
+
+    public int DrawCount { get; init; }
+
+    public int DispatchCount { get; init; }
+
+    public IReadOnlyList<string> SuggestedCommands { get; init; } = Array.Empty<string>();
 }
 
 public sealed record CaptureRuntimeViewportCulledRenderable(
@@ -160,6 +184,7 @@ public sealed class CaptureRuntimeViewportCommand
             request.Width,
             request.Height,
             request.DebugOverlay);
+        frame = ApplyQualityPlan(frame, world, request);
         var assets = await new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(
             request.ProjectRoot,
             frame,
@@ -218,7 +243,12 @@ public sealed class CaptureRuntimeViewportCommand
             BuildLayoutDiagnostics(frame, assets))
         {
             InputActions = world.Subsystems.Input.Actions,
-            ElapsedSeconds = world.ElapsedTime.TotalSeconds
+            ElapsedSeconds = world.ElapsedTime.TotalSeconds,
+            QualityPlan = frame.ResolvedQualityPlan,
+            GpuTimings = RekallAgeGpuFrameTimingReport.Unavailable(frame.FrameIndex),
+            ResourceBytes = EstimatedResourceBytes(frame.ResolvedQualityPlan),
+            DrawCount = frame.Renderables.Count,
+            SuggestedCommands = BuildSuggestedCommands(request)
         };
 
         context.Transaction.RecordChangedResource(capture.ScreenshotPath);
@@ -291,7 +321,17 @@ public sealed class CaptureRuntimeViewportCommand
             BuildLayoutDiagnostics(frame, assets))
         {
             InputActions = inputActions,
-            ElapsedSeconds = elapsedSeconds
+            ElapsedSeconds = elapsedSeconds,
+            QualityPlan = frame.ResolvedQualityPlan,
+            HighFidelityFrame = capture.HighFidelityFrame,
+            Lighting = capture.HighFidelityFrame?.Lighting,
+            GpuTimings = capture.HighFidelityFrame?.GpuTimings
+                ?? RekallAgeGpuFrameTimingReport.Unavailable(frame.FrameIndex),
+            ResourceBytes = capture.HighFidelityFrame?.ResourceBytes
+                ?? EstimatedResourceBytes(frame.ResolvedQualityPlan),
+            DrawCount = capture.HighFidelityFrame?.DrawCount ?? capture.DrawCallCount,
+            DispatchCount = capture.HighFidelityFrame?.DispatchCount ?? 0,
+            SuggestedCommands = BuildSuggestedCommands(request)
         };
 
         if (capture.Captured)
@@ -360,7 +400,11 @@ public sealed class CaptureRuntimeViewportCommand
             BuildLayoutDiagnostics(frame, RekallAgeRuntimeViewportAssetSet.Empty))
         {
             InputActions = inputActions,
-            ElapsedSeconds = elapsedSeconds
+            ElapsedSeconds = elapsedSeconds,
+            QualityPlan = frame.ResolvedQualityPlan,
+            GpuTimings = RekallAgeGpuFrameTimingReport.Unavailable(frame.FrameIndex),
+            ResourceBytes = EstimatedResourceBytes(frame.ResolvedQualityPlan),
+            SuggestedCommands = BuildSuggestedCommands(request)
         };
 
         if (capture.Captured)
@@ -418,6 +462,181 @@ public sealed class CaptureRuntimeViewportCommand
 
         return errors;
     }
+
+    private static RekallAgeRuntimeViewportFrame ApplyQualityPlan(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeWorld world,
+        CaptureRuntimeViewportRequest request) => ApplyQualityPlan(
+            frame,
+            world,
+            request.QualityPreset,
+            request.QualityOverrides,
+            request.IncludeGpuTimings,
+            request.BackendId);
+
+    internal static RekallAgeRuntimeViewportFrame ApplyQualityPlan(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeWorld world,
+        string? qualityPreset,
+        RekallAgeRenderQualityOverrides? overrides,
+        bool includeGpuTimings,
+        string backendId)
+    {
+        var bounded = BoundOverrides(overrides);
+        overrides = bounded.Overrides;
+        var authored = world.Subsystems.Rendering.QualityProfiles
+            .OrderBy(profile => profile.EntityName, StringComparer.Ordinal)
+            .ThenBy(profile => profile.EntityId, StringComparer.Ordinal)
+            .Select(profile => profile.Intent)
+            .FirstOrDefault()
+            ?? new RekallAgeRenderQualityIntent();
+        var intent = new RekallAgeRenderQualityIntent(
+            Preset: string.IsNullOrWhiteSpace(qualityPreset) ? authored.Preset : qualityPreset,
+            ResolutionScale: overrides?.ResolutionScale ?? authored.ResolutionScale,
+            ShadowCascadeCount: overrides?.ShadowCascadeCount ?? authored.ShadowCascadeCount,
+            ShadowResolution: overrides?.ShadowResolution ?? authored.ShadowResolution,
+            FogMode: overrides?.FogMode ?? authored.FogMode,
+            Bloom: overrides?.Bloom ?? authored.Bloom,
+            Ssao: overrides?.Ssao ?? authored.Ssao,
+            MaximumActiveParticles: overrides?.MaximumActiveParticles ?? authored.MaximumActiveParticles,
+            AutomaticScaling: authored.AutomaticScaling,
+            TargetFramesPerSecond: authored.TargetFramesPerSecond)
+        {
+            EnableGpuTimestamps = includeGpuTimings
+        };
+        var normalizedBackendId = NormalizeBackendId(backendId);
+        var capabilities = RekallAgeRenderingDeviceCapabilities.DesktopBaseline(normalizedBackendId);
+        if (!normalizedBackendId.Equals("vulkan", StringComparison.Ordinal))
+        {
+            capabilities = capabilities with { SupportsTimestampQueries = false };
+        }
+
+        var resolved = new RekallAgeRenderQualityProfileResolver().Resolve(
+            intent,
+            capabilities,
+            frame.Width,
+            frame.Height);
+        if (bounded.Degradations.Count > 0)
+        {
+            resolved = resolved with
+            {
+                Degradations = bounded.Degradations.Concat(resolved.Degradations).ToArray()
+            };
+        }
+
+        return frame with
+        {
+            ResolvedQualityPlan = resolved
+        };
+    }
+
+    private static (
+        RekallAgeRenderQualityOverrides? Overrides,
+        IReadOnlyList<RekallAgeRenderFeatureDegradation> Degradations) BoundOverrides(
+        RekallAgeRenderQualityOverrides? overrides)
+    {
+        if (overrides is null)
+        {
+            return (null, []);
+        }
+
+        var degradations = new List<RekallAgeRenderFeatureDegradation>();
+        var resolutionScale = ClampFiniteOverride(
+            overrides.ResolutionScale,
+            0.25,
+            2,
+            "resolutionScale",
+            degradations);
+        var shadowCascadeCount = ClampOverride(
+            overrides.ShadowCascadeCount,
+            1,
+            4,
+            "shadowCascadeCount",
+            degradations);
+        var shadowResolution = ClampOverride(
+            overrides.ShadowResolution,
+            128,
+            8_192,
+            "shadowResolution",
+            degradations);
+        var maximumActiveParticles = ClampOverride(
+            overrides.MaximumActiveParticles,
+            0,
+            RekallAgeVulkanParticlePlanner.MaximumGlobalCapacity,
+            "maximumActiveParticles",
+            degradations);
+        return (
+            overrides with
+            {
+                ResolutionScale = resolutionScale,
+                ShadowCascadeCount = shadowCascadeCount,
+                ShadowResolution = shadowResolution,
+                MaximumActiveParticles = maximumActiveParticles
+            },
+            degradations);
+    }
+
+    private static double? ClampFiniteOverride(
+        double? requested,
+        double minimum,
+        double maximum,
+        string feature,
+        ICollection<RekallAgeRenderFeatureDegradation> degradations)
+    {
+        if (!requested.HasValue || !double.IsFinite(requested.Value))
+        {
+            return requested;
+        }
+
+        var resolved = Math.Clamp(requested.Value, minimum, maximum);
+        AddOverrideClamp(feature, requested.Value, resolved, degradations);
+        return resolved;
+    }
+
+    private static int? ClampOverride(
+        int? requested,
+        int minimum,
+        int maximum,
+        string feature,
+        ICollection<RekallAgeRenderFeatureDegradation> degradations)
+    {
+        if (!requested.HasValue)
+        {
+            return null;
+        }
+
+        var resolved = Math.Clamp(requested.Value, minimum, maximum);
+        AddOverrideClamp(feature, requested.Value, resolved, degradations);
+        return resolved;
+    }
+
+    private static void AddOverrideClamp(
+        string feature,
+        object requested,
+        object resolved,
+        ICollection<RekallAgeRenderFeatureDegradation> degradations)
+    {
+        if (Equals(requested, resolved))
+        {
+            return;
+        }
+
+        var requestedValue = ToInvariantString(requested);
+        var resolvedValue = ToInvariantString(resolved);
+        degradations.Add(new RekallAgeRenderFeatureDegradation(
+            "REKALL_RENDER_QUALITY_OVERRIDE_CLAMPED",
+            feature,
+            requestedValue,
+            resolvedValue,
+            $"The caller-scoped {feature} override was clamped from '{requestedValue}' to bounded value '{resolvedValue}'."));
+    }
+
+    private static string ToInvariantString(object value) => value is IFormattable formattable
+        ? formattable.ToString(null, CultureInfo.InvariantCulture)
+        : value.ToString() ?? string.Empty;
+
+    private static long EstimatedResourceBytes(RekallAgeResolvedRenderFeaturePlan? plan) =>
+        plan is null ? 0 : checked(plan.EstimatedTransientBytes + plan.EstimatedPersistentBytes);
 
     private static string NormalizeBackendId(string backendId)
     {
@@ -996,7 +1215,306 @@ public sealed class CaptureRuntimeViewportCommand
             RekallAgeViewportFrameAnalysis.NotAnalyzed,
             EmptyLayoutDiagnostics())
         {
-            ElapsedSeconds = 0
+            ElapsedSeconds = 0,
+            GpuTimings = RekallAgeGpuFrameTimingReport.Unavailable(Math.Max(0, request.Frames)),
+            SuggestedCommands = BuildSuggestedCommands(request)
         };
+    }
+
+    private static IReadOnlyList<string> BuildSuggestedCommands(CaptureRuntimeViewportRequest request)
+    {
+        var projectRoot = BoundedCommandValue(request.ProjectRoot);
+        var sceneName = BoundedCommandValue(request.SceneName);
+        return
+        [
+            BoundCommand($"command execute rekall.render.compare_quality_presets with projectRoot='{projectRoot}', sceneName='{sceneName}', presets=['Performance','High'], frames={Math.Max(0, request.Frames)}, width={Math.Max(1, request.Width)}, and height={Math.Max(1, request.Height)}."),
+            BoundCommand($"command execute rekall.render.performance.inspect_scene_budget with projectRoot='{projectRoot}', sceneName='{sceneName}', frames={Math.Max(0, request.Frames)}, width={Math.Max(1, request.Width)}, and height={Math.Max(1, request.Height)}.")
+        ];
+    }
+
+    private static string BoundedCommandValue(string? value)
+    {
+        var sanitized = (value ?? string.Empty)
+            .Replace('\r', ' ')
+            .Replace('\n', ' ')
+            .Replace("'", "''", StringComparison.Ordinal);
+        return sanitized.Length <= 160 ? sanitized : sanitized[..160];
+    }
+
+    private static string BoundCommand(string command) =>
+        command.Length <= 512 ? command : command[..512];
+}
+
+public sealed record CompareQualityPresetsRequest(
+    string ProjectRoot,
+    string SceneName,
+    IReadOnlyList<string> Presets,
+    int Frames = 0,
+    string OutputDirectory = "QualityCaptures",
+    int Width = 320,
+    int Height = 180,
+    string BackendId = "vulkan",
+    RekallAgeRenderQualityOverrides? Overrides = null,
+    bool IncludeGpuTimings = false,
+    IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null);
+
+public sealed record RekallAgeQualityPresetCapture(
+    string RequestedPreset,
+    string ResolvedPreset,
+    int FrameIndex,
+    string ScreenshotPath,
+    bool NonBlank,
+    int OutputWidth,
+    int OutputHeight,
+    int RenderWidth,
+    int RenderHeight,
+    long ResourceBytes,
+    int DrawCount,
+    int DispatchCount,
+    IReadOnlyList<RekallAgeRenderFeatureDegradation> Degradations,
+    RekallAgeGpuFrameTimingReport GpuTimings,
+    RekallAgeViewportFrameAnalysis FrameAnalysis)
+{
+    internal RekallAgeHighFidelityFrameReport? HighFidelityFrame { get; init; }
+}
+
+public sealed record CompareQualityPresetsResult(
+    string SceneName,
+    int FrameIndex,
+    IReadOnlyList<RekallAgeQualityPresetCapture> Captures,
+    IReadOnlyList<string> NextCommands);
+
+/// <summary>
+/// Captures identical deterministic runtime input at multiple render-quality presets without editing authored content.
+/// </summary>
+public sealed class CompareQualityPresetsCommand
+    : IRekallAgeCommand<CompareQualityPresetsRequest, CompareQualityPresetsResult>
+{
+    private static readonly HashSet<string> SupportedPresets = new(
+        ["Performance", "Low", "Medium", "High", "Ultra", "Epic"],
+        StringComparer.OrdinalIgnoreCase);
+    private readonly Func<QualityPresetCaptureSession> _captureSessionFactory;
+
+    public CompareQualityPresetsCommand()
+        : this(CreateIsolatedNativeSession)
+    {
+    }
+
+    internal CompareQualityPresetsCommand(CaptureRuntimeViewportCommand capture)
+        : this(() => new QualityPresetCaptureSession(capture, null))
+    {
+    }
+
+    private CompareQualityPresetsCommand(Func<QualityPresetCaptureSession> captureSessionFactory)
+    {
+        _captureSessionFactory = captureSessionFactory;
+    }
+
+    public string Name => "rekall.render.compare_quality_presets";
+
+    public RekallAgeCommandSchema Schema => new(
+        Name,
+        "Captures aligned deterministic frames for bounded render-quality presets without mutating authored scene content.",
+        typeof(CompareQualityPresetsRequest).FullName!,
+        typeof(CompareQualityPresetsResult).FullName!);
+
+    public async ValueTask<RekallAgeCommandResult<CompareQualityPresetsResult>> ExecuteAsync(
+        CompareQualityPresetsRequest request,
+        RekallAgeCommandContext context)
+    {
+        var errors = Validate(request);
+        if (errors.Count > 0)
+        {
+            return RekallAgeCommandResult<CompareQualityPresetsResult>.Failure(
+                EmptyComparison(request),
+                "Quality preset comparison requires two to six distinct supported presets and bounded capture inputs.",
+                errors);
+        }
+
+        var captures = new List<RekallAgeQualityPresetCapture>(request.Presets.Count);
+        foreach (var requestedPreset in request.Presets)
+        {
+            using var captureSession = _captureSessionFactory();
+            var canonicalPreset = SupportedPresets.Single(value =>
+                value.Equals(requestedPreset.Trim(), StringComparison.OrdinalIgnoreCase));
+            var outputDirectory = Path.Combine(
+                request.OutputDirectory,
+                canonicalPreset.ToLowerInvariant());
+            var captureRequest = new CaptureRuntimeViewportRequest(
+                    request.ProjectRoot,
+                    request.SceneName,
+                    request.Frames,
+                    outputDirectory,
+                    request.Width,
+                    request.Height,
+                    DebugOverlay: false,
+                    request.BackendId,
+                    Inputs: request.Inputs)
+                {
+                    QualityPreset = canonicalPreset,
+                    QualityOverrides = request.Overrides,
+                    IncludeGpuTimings = request.IncludeGpuTimings
+                };
+            if (request.IncludeGpuTimings
+                && request.BackendId.Equals("vulkan", StringComparison.OrdinalIgnoreCase))
+            {
+                var warmupRequest = captureRequest with
+                {
+                    Frames = Math.Max(0, request.Frames - 1)
+                };
+                var warmup = await captureSession.Capture.ExecuteAsync(warmupRequest, context);
+                if (!warmup.Ok || !warmup.Value.Captured)
+                {
+                    var nested = warmup.Errors.Count > 0
+                        ? warmup.Errors
+                        : [new RekallAgeCommandError(
+                            "REKALL_RENDER_QUALITY_CAPTURE_FAILED",
+                            $"Preset '{canonicalPreset}' did not produce a timing warmup capture.",
+                            canonicalPreset)];
+                    return RekallAgeCommandResult<CompareQualityPresetsResult>.Failure(
+                        new CompareQualityPresetsResult(request.SceneName, request.Frames, captures, BuildNextCommands(request)),
+                        $"Quality preset comparison timing warmup stopped at '{canonicalPreset}'.",
+                        nested);
+                }
+            }
+
+            var capture = await captureSession.Capture.ExecuteAsync(captureRequest, context);
+            if (!capture.Ok || !capture.Value.Captured)
+            {
+                var nested = capture.Errors.Count > 0
+                    ? capture.Errors
+                    : [new RekallAgeCommandError(
+                        "REKALL_RENDER_QUALITY_CAPTURE_FAILED",
+                        $"Preset '{canonicalPreset}' did not produce a capture.",
+                        canonicalPreset)];
+                return RekallAgeCommandResult<CompareQualityPresetsResult>.Failure(
+                    new CompareQualityPresetsResult(request.SceneName, request.Frames, captures, BuildNextCommands(request)),
+                    $"Quality preset comparison stopped at '{canonicalPreset}'.",
+                    nested);
+            }
+
+            var quality = capture.Value.QualityPlan
+                ?? throw new InvalidOperationException("Runtime viewport capture did not return its resolved quality plan.");
+            captures.Add(new RekallAgeQualityPresetCapture(
+                quality.RequestedPreset,
+                quality.ResolvedPreset,
+                capture.Value.FrameIndex,
+                capture.Value.ScreenshotPath,
+                capture.Value.NonBlank,
+                quality.OutputWidth,
+                quality.OutputHeight,
+                quality.RenderWidth,
+                quality.RenderHeight,
+                capture.Value.ResourceBytes,
+                capture.Value.DrawCount,
+                capture.Value.DispatchCount,
+                quality.Degradations,
+                capture.Value.GpuTimings,
+                capture.Value.FrameAnalysis)
+            {
+                HighFidelityFrame = capture.Value.HighFidelityFrame
+            });
+        }
+
+        var frameIndex = captures.Count == 0 ? request.Frames : captures[0].FrameIndex;
+        return RekallAgeCommandResult<CompareQualityPresetsResult>.Success(
+            new CompareQualityPresetsResult(
+                request.SceneName,
+                frameIndex,
+                captures,
+                BuildNextCommands(request)),
+            $"Compared {captures.Count} quality presets for scene '{request.SceneName}' at frame {frameIndex}.");
+    }
+
+    private static IReadOnlyList<RekallAgeCommandError> Validate(CompareQualityPresetsRequest request)
+    {
+        var errors = new List<RekallAgeCommandError>();
+        if (request.Presets is null || request.Presets.Count is < 2 or > 6)
+        {
+            errors.Add(new RekallAgeCommandError(
+                "REKALL_RENDER_QUALITY_PRESET_COUNT_INVALID",
+                "Quality comparison accepts two to six presets.",
+                request.Presets?.Count.ToString(CultureInfo.InvariantCulture) ?? "null"));
+        }
+        else
+        {
+            foreach (var preset in request.Presets)
+            {
+                if (string.IsNullOrWhiteSpace(preset) || !SupportedPresets.Contains(preset.Trim()))
+                {
+                    errors.Add(new RekallAgeCommandError(
+                        "REKALL_RENDER_QUALITY_PRESET_UNSUPPORTED",
+                        "Preset must be one of Performance, Low, Medium, High, Ultra, or Epic.",
+                        preset ?? string.Empty));
+                }
+            }
+
+            if (request.Presets
+                    .Select(preset => preset?.Trim() ?? string.Empty)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count() != request.Presets.Count)
+            {
+                errors.Add(new RekallAgeCommandError(
+                    "REKALL_RENDER_QUALITY_PRESET_DUPLICATE",
+                    "Quality comparison presets must be distinct.",
+                    string.Join(",", request.Presets)));
+            }
+        }
+
+        if (request.Frames < 0 || request.Width <= 0 || request.Height <= 0)
+        {
+            errors.Add(new RekallAgeCommandError(
+                "REKALL_RENDER_QUALITY_COMPARE_INVALID_REQUEST",
+                "Frame count must be non-negative and dimensions must be positive.",
+                $"frames={request.Frames}; resolution={request.Width}x{request.Height}"));
+        }
+
+        var backendId = string.IsNullOrWhiteSpace(request.BackendId)
+            ? string.Empty
+            : request.BackendId.Trim().ToLowerInvariant();
+        if (backendId is not "software" and not "vulkan")
+        {
+            errors.Add(new RekallAgeCommandError(
+                "REKALL_RENDER_QUALITY_COMPARE_BACKEND_UNSUPPORTED",
+                "Quality comparison backend must be 'software' or 'vulkan'.",
+                $"requested={request.BackendId}; resolved=unavailable"));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.OutputDirectory))
+        {
+            errors.Add(new RekallAgeCommandError(
+                "REKALL_RENDER_QUALITY_COMPARE_INVALID_REQUEST",
+                "Output directory is required.",
+                request.SceneName));
+        }
+
+        return errors;
+    }
+
+    private static IReadOnlyList<string> BuildNextCommands(CompareQualityPresetsRequest request) =>
+        [
+            $"command execute rekall.render.capture_runtime_viewport with projectRoot='{request.ProjectRoot}', sceneName='{request.SceneName}', frames={request.Frames}, and the selected qualityPreset.",
+            $"command execute rekall.render.performance.inspect_scene_budget with projectRoot='{request.ProjectRoot}', sceneName='{request.SceneName}', frames={request.Frames}, width={request.Width}, and height={request.Height}."
+        ];
+
+    private static CompareQualityPresetsResult EmptyComparison(CompareQualityPresetsRequest request) =>
+        new(request.SceneName, Math.Max(0, request.Frames), [], BuildNextCommands(request));
+
+    private static QualityPresetCaptureSession CreateIsolatedNativeSession()
+    {
+        var clearCapture = new RekallAgeNativeVulkanRenderPassSubmission();
+        var sceneCapture = new RekallAgeNativeVulkanSceneCapture(clearCapture);
+        return new QualityPresetCaptureSession(
+            new CaptureRuntimeViewportCommand(clearCapture, sceneCapture),
+            sceneCapture);
+    }
+
+    private sealed class QualityPresetCaptureSession(
+        CaptureRuntimeViewportCommand capture,
+        IDisposable? owner) : IDisposable
+    {
+        public CaptureRuntimeViewportCommand Capture { get; } = capture;
+
+        public void Dispose() => owner?.Dispose();
     }
 }

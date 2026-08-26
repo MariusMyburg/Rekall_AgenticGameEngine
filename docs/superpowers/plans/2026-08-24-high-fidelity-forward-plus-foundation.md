@@ -147,7 +147,7 @@ Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj --no-restore --
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/Rekall.Age.Rendering.Abstractions src/Rekall.Age.Runtime.Abstractions src/Rekall.Age.Runtime src/Rekall.Age.Rendering/RekallAgeRenderQualityProfileResolver.cs tests/Rekall.Age.Tests/Rendering
@@ -174,7 +174,7 @@ Cover `Performance`, `High`, and `Epic`. High must order these named passes:
 
 ```csharp
 Assert.Equal(
-    ["depth-normal", "shadow-directional", "cluster-build", "opaque-hdr", "fog-integrate", "transparent-particles", "bloom", "tone-map", "ui", "present"],
+    ["depth-normal", "shadow-directional", "cluster-build", "opaque-hdr", "fog-integrate", "fog-debug-readback", "transparent-particles", "bloom", "tone-map", "ui", "present"],
     graph.Passes.Select(pass => pass.Name));
 Assert.All(graph.Passes, pass => Assert.All(pass.Reads, resource => Assert.Contains(graph.Resources, item => item.Name == resource)));
 ```
@@ -335,17 +335,24 @@ git commit -m "feat: add scalable cascaded scene shadows"
 - Modify: `src/Rekall.Age.Runtime/RekallAgeRuntimeProjectionBuilder.cs`
 - Modify: `src/Rekall.Age.Rendering.Abstractions/RekallAgeRenderWorldContracts.cs`
 - Modify: `src/Rekall.Age.Rendering/RekallAgeRuntimeRenderFrameBuilder.cs`
+- Modify: `src/Rekall.Age.Rendering/RekallAgeHighFidelityRenderGraph.cs`
+- Modify: `src/Rekall.Age.Rendering/RekallAgeHighFidelityRenderGraphBuilder.cs`
+- Modify: `src/Rekall.Age.Rendering/RekallAgeRenderQualityProfileResolver.cs`
+- Modify: `src/Rekall.Age.Rendering/RekallAgeNativeVulkanSceneCapture.cs`
 - Modify: `src/Rekall.Age.Rendering/RekallAgeVulkanHighFidelityFrameRenderer.cs`
+- Modify: `src/Rekall.Age.Rendering/Shaders/rekall_fog.frag`
 - Test: `tests/Rekall.Age.Tests/Rendering/VulkanFogPlannerTests.cs`
 - Test: `tests/Rekall.Age.Tests/Rendering/ViewportContractTests.cs`
+- Test: `tests/Rekall.Age.Tests/Rendering/HighFidelityRenderGraphTests.cs`
+- Test: `tests/Rekall.Age.Tests/Rendering/VulkanHighFidelityCaptureTests.cs`
 
 **Interfaces:**
-- Consumes: projected `Rekall.FogVolume` values, camera, light/shadow resources, depth, previous fog history, and resolved fog quality.
-- Produces: ordered bounded fog volumes plus analytic or froxel dispatch plans and history reset facts.
+- Consumes: projected `Rekall.FogVolume` values, the scene renderer's resolved effective camera, one selected directional-light injection fact or explicit none, cascade shadow resources, opaque depth, previous fog history, and resolved fog quality.
+- Produces: ordered bounded fog volumes plus analytic or froxel dispatch plans, a persistent GPU-history resource, reset/reuse facts, and graph-declared GPU-readback debug evidence.
 
 - [ ] **Step 1: Write failing projection/planner tests**
 
-Test global and local box/sphere volumes, density/albedo/emission/anisotropy clamping, priority ordering, exact preset grids, and camera-cut history reset.
+Test global and rotated local box/sphere volumes, unsupported-shape degradation with stable entity IDs, density/albedo/emission/anisotropy clamping, priority ordering, exact preset grids, and camera/grid history reset.
 
 - [ ] **Step 2: Implement generic fog projection and planning**
 
@@ -363,7 +370,7 @@ Performance/Low resolve to analytic distance/height fog. Medium and above resolv
 
 - [ ] **Step 3: Implement light/shadow-aware froxel integration**
 
-Inject density and direct light into the 3D grid, integrate along view depth, temporally reproject with an explicit camera-cut reset, and composite before transparent particles. Clamp volume counts and return affected entity IDs on overflow.
+Resolve one effective camera from authored pose plus actual scene bounds and use it unchanged for scene/shadow uniforms, fog push constants, and history continuity; default/null cameras auto-frame once, perspective rays use its projection tangent/aspect, and orthographic rays use parallel direction plus per-pixel origins from its half extents. Match the Vulkan scene projection's flipped `M22` by reconstructing framebuffer UV Y through inverse camera-up in CPU helpers, analytic/froxel shaders, and temporal-history projection. Store/sample opaque depth in both shaders and stop integration at opaque surfaces. Select only the case-insensitive canonical `DirectionalLight` or `Rekall.DirectionalLight` variant by shadow priority then stable entity ID and use that exact direction/color/entity for shadow planning, frame UBOs, fog planning, shader injection, and reports; point, spot, custom, and foreign-namespace light variants are excluded, while no directional light injects zero energy with no synthetic fallback. Evaluate anisotropic phase and cascade shadow lookup from that selection, and local volumes through packed world-to-local transforms. Keep one initialized 3D history image per native renderer session, bind/sample/reproject it on reusable frames, and clear/reset it on camera cuts or grid changes. Declare and budget the history plus `fog-froxel` transfer-source and `fog-debug-readback` transfer-destination resources in the render graph, execute their dependency-ordered readback pass, derive debug slices from the returned GPU cells, record injection and composite as two dispatches, and composite before transparent particles. Clamp supported volume counts and return affected entity IDs on overflow; reject unsupported shapes with a stable degradation code and dropped IDs.
 
 - [ ] **Step 4: Add fog debug slices and tests**
 
@@ -379,7 +386,152 @@ git commit -m "feat: render scalable atmospheric fog volumes"
 
 ---
 
+### Task 5A: Windows AppContainer Module-Host Zero-Failure Gate
+
+**Files:**
+- Modify: `tests/Rekall.Age.Tests/Modules/ModuleHostWindowsIsolationTests.cs`
+- Modify: `docs/production/PROGRESS.md`
+- Modify: `docs/superpowers/plans/2026-08-24-high-fidelity-forward-plus-foundation.md`
+
+**Root cause and invariant:**
+- Commit `bf292d2` made `Rekall.Age.Rendering.Abstractions.dll` a declared worker
+  runtime dependency, but the Windows isolation fixture's manifest-backed real
+  host payload retained its earlier eight-file allowlist. The stager correctly
+  copied only that verified inventory, so the CLR terminated the worker with
+  `0xE0434352` and a `FileNotFoundException` before `host.initialize` could
+  write a response; the broker's truncated-frame/`EndOfStreamException` was
+  downstream evidence, not a codec or AppContainer defect.
+- A real restricted-worker payload must contain every runtime assembly required
+  by the worker's dependency graph, and every file must still cross the
+  boundary only through the existing size/SHA-256 verified manifest and
+  immutable stager. Do not compensate with broader ACLs/capabilities,
+  unrestricted fallback, retries, relaxed timeouts, or protocol changes.
+
+- [x] **Phase 1:** reproduce all 8/8 failures and capture launch, stage, profile,
+  job, exit, stderr, stdio, and protocol evidence. Native launch completed with
+  zero capabilities, a one-process/512 MiB kill-on-close job, and present staged
+  inputs; the worker exited `0xE0434352` with bounded stderr naming the omitted
+  rendering-contract assembly before its first response frame.
+- [x] **Pattern/hypothesis:** compare the complete-output executable path, which
+  passed finite typed initialize/shutdown with exit 0 and empty stderr, against
+  the staged path. A staged-but-uncontained worker reproduced the same EOF,
+  proving the inventory boundary independently of AppContainer.
+- [x] **RED/GREEN:** add
+  `StagedWorkerPayloadCompletesFiniteProtocolBeforeContainment`; witness its
+  truncated-frame RED, add only `Rekall.Age.Rendering.Abstractions.dll` to the
+  exact manifest fixture, then witness 1/1 GREEN.
+- [x] **Security and race gate:** run the complete 9-test Windows isolation class
+  once and then ten consecutive times (90/90). Secret scrubbing, unstaged
+  read/write denial, child/network denial, bounded 64 KiB stderr, typed framing,
+  request timeout/crash classification, no-capability profile, and job limits
+  all remained effective. Dedicated roots ended with zero module-host processes
+  and zero `session-*` trees.
+- [x] **Engine/module-host gate:** `FullyQualifiedName~Module` passed 185/185 and the
+  complete `Rekall.Age.Tests` project passed 1,813/1,813 with zero failures or
+  skips; both post-run checks found zero module-host processes/session trees.
+  No Studio code or test fixture was affected. An additional Studio isolation
+  check passed all 35 non-ViewModel tests and identified the unrelated existing
+  long-running `HeadlessAutomationCreatesProjectAndCompletesAgentGauntlet` case
+  with the test runner's five-minute hang evidence. This completes Task 5A's
+  AppContainer and engine gates only; overall repository/Studio verification is
+  still open and is tracked as the blocking follow-up below.
+- [x] **Fix Round 1 cleanup hardening:** put direct staged-worker launch,
+  writes, flush, finite-session reads, exit, and stderr drain under one bounded
+  deadline; always close stdin, kill any live process tree, await bounded exit,
+  and dispose the process before staged-session disposal. A deliberately hung
+  partial-response worker proved the failure cleanup path. The expanded class
+  passed ten consecutive times (100/100), the complete engine project passed
+  its new total of 1,814/1,814, and both residue checks found zero workers and
+  zero `session-*` trees. The historical Task 5A engine result above remains
+  1,813/1,813; the extra test is this cleanup regression.
+
+**Architecture decision:** retain the existing no-capability AppContainer,
+explicit three-handle inheritance, immutable verified staging, typed framed
+protocol, and kill-on-close job unchanged. The repair belongs at the payload
+inventory source that omitted a declared dependency.
+
+**Verification commands:**
+
+```powershell
+dotnet build src/Rekall.Age.ModuleHost/Rekall.Age.ModuleHost.csproj -c Debug --no-restore
+dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Debug --no-build --filter "FullyQualifiedName~ModuleHostWindowsIsolationTests"
+1..10 | ForEach-Object { dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Debug --no-build --filter "FullyQualifiedName~ModuleHostWindowsIsolationTests" }
+dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Debug --no-build --filter "FullyQualifiedName~Module"
+dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Debug --no-build
+dotnet build Rekall.AGE.sln -c Debug --no-restore
+```
+
+---
+
+### Task 5B: Studio Headless-Gauntlet Verification Follow-up — COMPLETE
+
+**Status:** COMPLETE. Task 6 and final repository delivery are unblocked.
+
+**Observed evidence:**
+- The complete Studio project remained CPU-active for 31:06 without returning a
+  result; its responsive testhost had consumed 30:21 CPU and 1.60 GiB working
+  set when the bounded diagnostic run was stopped.
+- All Studio classes except `StudioViewModelTests` passed 35/35 in 1.66 seconds.
+- A five-minute per-test blame run passed 10 ViewModel tests, then recorded
+  `StudioViewModelTests.HeadlessAutomationCreatesProjectAndCompletesAgentGauntlet`
+  as incomplete. This is not a Task 5A module-host failure, but it keeps the
+  overall repository gate open.
+- Evidence:
+  `.superpowers/sdd/2026-08-24-high-fidelity-forward-plus-foundation/task-5a-evidence/task-5a-studio-viewmodel-isolation.trx`,
+  `.superpowers/sdd/2026-08-24-high-fidelity-forward-plus-foundation/task-5a-evidence/35827907-8866-4a94-b4c7-9a394a02628f/Sequence_a2412baa567843ee99ae5a061543f113.xml`,
+  and the adjacent `testhost_57332_20260825T020605_hangdump.dmp`.
+
+- [x] Apply systematic debugging to the headless gauntlet's CPU-active path and
+  identify the first non-progressing boundary.
+- [x] Add a witnessed RED regression for that root cause and implement one fix
+  without weakening the gauntlet or hiding it behind a retry/skip.
+- [x] Run the complete Studio project to an actual zero-failure result.
+- [x] Reconfirm the complete engine project, update the tracked verification
+  evidence, and only then unblock Task 6/final delivery.
+
+**Resolution:** Studio project creation persisted an intentionally empty scene,
+but the gauntlet treated scene-file existence as proof of authored content. It
+therefore skipped both generic blueprint and agent-owned playable-module
+authoring, failed `package-created` at module build with
+`REKALL_MODULE_PROJECTS_MISSING`, and the no-limit deterministic agent repeated
+the failed terminal workflow indefinitely. The gauntlet now preserves a scene
+only when the loaded document has authored entities; an existing empty editor
+scene follows the same complete author/build/package/audit path as a newly
+created scene. Authored non-empty scenes remain preserved.
+
+The focused empty-editor-scene regression had a witnessed 83 ms RED and passed
+in 8 seconds after the one-line invariant repair. All four gauntlet tests passed
+4/4 in 26.5 seconds. The original unmodified Studio case passed three
+consecutive runs in 9 seconds each. The complete Studio project passed 65/65 in
+46.6 seconds, the complete engine project passed its new total of 1,815/1,815
+in 4 minutes 6 seconds, and the complete solution built with zero warnings and
+zero errors in 5.47 seconds. Post-run checks found zero Rekall test/worker/player
+processes, zero staged `session-*` trees in the current engine roots, and zero
+current-run Studio automation roots.
+
+**Fix Round 1 closure:** The gauntlet-authored route now satisfies the mandatory
+runtime gameplay checkpoint rather than proving only playable-adapter text. Its
+generic marker owns `Game.Modules.AgentGauntlet.GauntletState` and a semantic
+input map; its agent-authored module consumes the semantic action with the
+engine delta time and changes both component state and `Position2D`. After the
+latest scene/module mutation, the workflow builds modules and requires exact
+`rekall.runtime.inspect_scene` assertions of `progress delta = 1` and
+`position2d.x delta = 1` before the unchanged package, audit, and nonblank proof
+capture. The expanded regression verifies generated project/source, attached
+state, exact runtime results, archive, audit, capture, and proof output.
+
+Final Fix Round 1 gates passed: gauntlet class 4/4, the original Studio case
+three consecutive times, Studio 65/65, engine 1,815/1,815, and the solution
+build with zero warnings/errors. The tracked phase ledger, commands, exact
+timestamps/timings/counts, raw artifact hashes, environmental gate chronology,
+and residue audit are in
+[`docs/production/evidence/2026-08-25-task-5b-studio-gauntlet.md`](../../production/evidence/2026-08-25-task-5b-studio-gauntlet.md).
+
+---
+
 ### Task 6: Generic GPU Particle Emitters
+
+**Unblocked by:** completed Task 5B Studio headless-gauntlet verification.
 
 **Files:**
 - Create: `src/Rekall.Age.Rendering/RekallAgeVulkanParticlePlanner.cs`
@@ -398,25 +550,27 @@ git commit -m "feat: render scalable atmospheric fog volumes"
 - Consumes: `Rekall.ParticleEmitter3D`, deterministic frame/delta/seed, depth, camera basis, and resolved particle capacity.
 - Produces: `RekallAgeVulkanParticlePlan` with stable emitter ranges, simulation dispatches, bounds, material/draw mode, and overflow observations.
 
-- [ ] **Step 1: Write failing deterministic planner tests**
+- [x] **Step 1: Write failing deterministic planner tests**
 
 Assert the same emitter/seed/frame produces identical spawn ranges and that capacity overflow selects emitters by authored priority then stable entity ID. Reject unbounded lifetime, non-finite curves, and capacities above the safety ceiling.
 
-- [ ] **Step 2: Project the authored emitter contract**
+- [x] **Step 2: Project the authored emitter contract**
 
 Support continuous rate, bounded bursts, lifetime, deterministic seed, local/world simulation, velocity cone, gravity/drag, size/color curves, quad/mesh mode, lit/unlit, emissive intensity, soft-particle fade, texture/flipbook, priority, and visibility distance.
 
-- [ ] **Step 3: Implement persistent GPU state and compute simulation**
+- [x] **Step 3: Implement persistent GPU state and compute simulation**
 
 Allocate double-buffered particle state per resolved global capacity. Dispatch simulation with `DeltaSeconds`, recycle dead particles deterministically, and generate an indirect draw count without CPU readback.
 
-- [ ] **Step 4: Render particles after fog integration**
+- [x] **Step 4: Render particles after fog integration**
 
 Implement camera-facing quads first, depth testing without depth writes, alpha/additive modes, HDR emissive output, soft depth intersection, and layer/camera masking. Mesh/ribbon/beam modes remain explicit later capability flags, not silent quad substitutions.
 
-- [ ] **Step 5: Add particle bounds/overdraw debug views and run tests**
+- [x] **Step 5: Add particle bounds/overdraw debug views and run tests**
 
 Run the particle, projection, render-graph, and high-fidelity capture suites. Assert disabled emitters and zero spawn rate allocate no active slots.
+
+Executable contract note: active particles add graph-authoritative `particle-upload` and `particle-simulate` passes after fog, followed by the existing transparent/HDR pass. State A/B are persistent initialized history inputs whose exact source/destination alternates with renderer-session history; emitter, active-index, and indirect buffers remain bounded per-frame resources. Empty frames retain the pre-particle topology and allocate no particle resources.
 
 - [ ] **Step 6: Commit**
 
@@ -541,6 +695,40 @@ Use modeling graphs, mesh bake, model publish, material graphs, texture catalog 
 - [ ] **Step 4: Author lighting, shadows, fog, particles, animation, and post**
 
 Configure a shadowed directional key, bounded accent lights, global height fog, local court fog volumes, conduit/projectile/impact/dash/mote/activation emitters, HDR emissive materials, bloom, tone map, and grade. Animation remains in agent-authored assets/modules and consumes `DeltaSeconds`.
+
+2026-08-26 playable result: the native Vulkan path now resolves Performance/
+Low/Medium/High point-light budgets of 2/4/8/16, uploads sixteen real GPU light
+slots, terminates fragment light work at the selected count, and reports
+selected/dropped entity IDs through capture and performance inspection.
+Aetherfall High retains all nine authored practicals while
+Performance deterministically reports seven drops. This completes the bounded
+many-light bridge; true screen/depth cluster assignment, per-cluster lists, and
+per-cluster overflow facts remain before the architecture is fully Forward+.
+
+2026-08-26 environment/UV result: `Rekall.Environment3D` now authors separate
+sky and ground ambient colors with backward-compatible white defaults. Native
+Vulkan and the Windows player consume the same normal-oriented hemispherical
+term. Aetherfall's real-player inspection then identified collapsed planar UVs
+on six genuinely three-dimensional assets; their ordinary graphs now use
+face-aware box projection and were rebaked/rebuilt through AGE's public
+revision-checked commands. The accepted aligned capture is recorded in
+`Proof/ACCEPTANCE.md`; this improves material continuity and indirect form
+readability but does not complete the final visual bar.
+
+2026-08-26 background/fog result: environment authoring now carries an optional
+`backgroundColor` fallback through runtime and viewport contracts. One shared
+resolver drives both native Vulkan and the Windows player, removing their
+unrelated hard-coded scene clears while preserving camera-clear behavior for
+`camera`/`clear` policies and legacy scenes without the property. Aetherfall's
+authored fallback plus corrected global height-fog scale turns the opening frame
+from a black void into continuous terrain with atmospheric depth. The accepted
+capture and exact metrics are in `Proof/ACCEPTANCE.md`. True sky/cubemap sampling
+and the now-dominant coarse model silhouettes remain subsequent visible work.
+The playable validation gate also uncovered 288 false blockers caused by the
+built-in authoring schemas lagging the renderer. Environment, shadow, fog,
+particle, mesh-shadow, and point-light range/priority/shadow properties now have
+discoverable schemas and reserved-type catalog entries; Aetherfall validates
+with zero issues rather than teaching agents to delete functional render data.
 
 - [ ] **Step 5: Re-run strict gameplay assertions after the final mutation**
 

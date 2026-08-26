@@ -8,6 +8,8 @@ namespace Rekall.Age.AssetPipeline;
 
 public sealed class RekallAgePublishedModelOutputStore
 {
+    public const long MaximumCompiledOutputBytes = 256L * 1024L * 1024L;
+
     private const string CompiledFileSuffix = ".age.compiled-mesh.json";
     private const string RelativeCompiledDirectory = "Assets/Models/Compiled";
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -55,7 +57,7 @@ public sealed class RekallAgePublishedModelOutputStore
         await RekallAgeAtomicFile.WriteAllTextAsync(
             stagedPath,
             contents,
-            RekallAgePersistedJson.MaximumDocumentBytes,
+            MaximumCompiledOutputBytes,
             cancellationToken).ConfigureAwait(false);
 
         return new RekallAgeStagedModelOutput(
@@ -90,7 +92,7 @@ public sealed class RekallAgePublishedModelOutputStore
             var revision = await RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
                 finalPath,
                 validated.Contents,
-                RekallAgePersistedJson.MaximumDocumentBytes,
+                MaximumCompiledOutputBytes,
                 RekallAgeDocumentRevision.Missing,
                 cancellationToken).ConfigureAwait(false);
             return new(revision, true);
@@ -109,7 +111,7 @@ public sealed class RekallAgePublishedModelOutputStore
         CancellationToken cancellationToken)
     {
         var existing = await RekallAgeBoundedFileSnapshot.ReadAsync(
-            finalPath, RekallAgePersistedJson.MaximumDocumentBytes, cancellationToken).ConfigureAwait(false);
+            finalPath, MaximumCompiledOutputBytes, cancellationToken).ConfigureAwait(false);
         if (!string.Equals(existing.Revision, expectedHash, StringComparison.Ordinal))
         {
             throw new InvalidDataException(
@@ -125,10 +127,12 @@ public sealed class RekallAgePublishedModelOutputStore
         string contentHash,
         CancellationToken cancellationToken)
     {
-        var snapshot = await RekallAgePersistedJson.ReadAsync<RekallAgeCompiledMeshSnapshot>(
+        var document = await RekallAgeBoundedFileSnapshot.ReadAsync(
             GetFinalPath(projectRoot, assetId, contentHash),
-            JsonOptions,
+            MaximumCompiledOutputBytes,
             cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        var snapshot = DeserializeAndValidate(document.Bytes);
         ValidateSnapshot(snapshot);
         return snapshot;
     }
@@ -141,7 +145,7 @@ public sealed class RekallAgePublishedModelOutputStore
     {
         var snapshot = await RekallAgeBoundedFileSnapshot.ReadAsync(
             GetFinalPath(projectRoot, assetId, contentHash),
-            RekallAgePersistedJson.MaximumDocumentBytes,
+            MaximumCompiledOutputBytes,
             cancellationToken).ConfigureAwait(false);
         return ComputeHash(snapshot.Bytes);
     }
@@ -180,7 +184,7 @@ public sealed class RekallAgePublishedModelOutputStore
         var assetId = ValidateStagedOutput(projectRoot, staged);
         var stagedFile = await RekallAgeBoundedFileSnapshot.ReadAsync(
             staged.Path,
-            RekallAgePersistedJson.MaximumDocumentBytes,
+            MaximumCompiledOutputBytes,
             cancellationToken).ConfigureAwait(false);
         var snapshot = DeserializeAndValidate(stagedFile.Bytes);
         if (!string.Equals(ComputeHash(stagedFile.Bytes), staged.ContentHash, StringComparison.Ordinal))
@@ -217,10 +221,10 @@ public sealed class RekallAgePublishedModelOutputStore
 
     private static void EnsureWithinMaximumSize(ReadOnlySpan<byte> bytes)
     {
-        if (bytes.Length > RekallAgePersistedJson.MaximumDocumentBytes)
+        if (bytes.Length > MaximumCompiledOutputBytes)
         {
             throw new InvalidDataException(
-                $"REKALL_MODEL_OUTPUT_TOO_LARGE: Compiled model output is {bytes.Length} bytes; the maximum is {RekallAgePersistedJson.MaximumDocumentBytes} bytes.");
+                $"REKALL_MODEL_OUTPUT_TOO_LARGE: Compiled model output is {bytes.Length} bytes; the maximum is {MaximumCompiledOutputBytes} bytes.");
         }
     }
 

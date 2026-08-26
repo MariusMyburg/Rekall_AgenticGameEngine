@@ -32,6 +32,8 @@ public sealed record RekallAgeVulkanSceneCaptureResult(
 {
     public IReadOnlyList<RekallAgeVulkanShaderPipelineUse> ShaderPipelines { get; init; } =
         Array.Empty<RekallAgeVulkanShaderPipelineUse>();
+
+    public RekallAgeHighFidelityFrameReport? HighFidelityFrame { get; init; }
 }
 
 public sealed record RekallAgeVulkanShaderPipelineUse(

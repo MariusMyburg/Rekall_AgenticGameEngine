@@ -1,0 +1,300 @@
+#version 450
+
+layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
+
+struct FogVolume
+{
+    mat4 worldToLocal;
+    vec4 positionShape;
+    vec4 extentsDensity;
+    vec4 albedoAnisotropy;
+    vec4 emissionHeightFalloff;
+    vec4 blendPriorityPadding;
+};
+
+layout(set = 0, binding = 0, rgba16f) uniform image3D fogGrid;
+layout(std430, set = 0, binding = 1) readonly buffer FogVolumeBuffer
+{
+    FogVolume values[];
+} volumes;
+layout(set = 0, binding = 2, rgba16f) uniform image2D sceneHdr;
+layout(set = 0, binding = 3) uniform sampler2D sceneDepth;
+layout(set = 0, binding = 4) uniform FogFrameUniform
+{
+    mat4 viewProjection;
+    vec4 lightDirection;
+    vec4 lightColor;
+    vec4 lightPosition;
+    vec4 cameraPosition;
+    mat4 shadowViewProjection[4];
+    vec4 shadowSplits;
+    vec4 shadowParameters0;
+    vec4 shadowParameters1;
+    vec4 shadowCameraForward;
+    vec4 additionalLightDirection;
+    vec4 additionalLightColor;
+    vec4 additionalLightPosition;
+} frame;
+#ifdef REKALL_FOG_DIRECTIONAL_SHADOWS
+layout(set = 0, binding = 5) uniform sampler2DArrayShadow directionalShadowAtlas;
+#endif
+layout(set = 0, binding = 6) uniform sampler3D fogHistory;
+layout(set = 0, binding = 7) uniform FogHistoryUniform
+{
+    vec4 cameraPositionNear;
+    vec4 cameraForwardFar;
+    vec4 cameraRight;
+    vec4 cameraUp;
+    vec4 projection;
+    vec4 parameters;
+} history;
+
+layout(push_constant) uniform FogParameters
+{
+    vec4 cameraPositionNear;
+    vec4 cameraForwardFar;
+    vec4 cameraRight;
+    vec4 cameraUp;
+    vec4 projection;
+    vec4 execution;
+} parameters;
+
+vec3 viewRay(vec2 uv)
+{
+    if (parameters.projection.z > 0.5)
+    {
+        return normalize(parameters.cameraForwardFar.xyz);
+    }
+
+    vec2 ndc = uv * 2.0 - 1.0;
+    return normalize(
+        parameters.cameraForwardFar.xyz
+        + parameters.cameraRight.xyz * ndc.x * parameters.projection.x * parameters.projection.y
+        - parameters.cameraUp.xyz * ndc.y * parameters.projection.x);
+}
+
+vec3 viewOrigin(vec2 uv)
+{
+    if (parameters.projection.z <= 0.5)
+    {
+        return parameters.cameraPositionNear.xyz;
+    }
+
+    vec2 ndc = uv * 2.0 - 1.0;
+    return parameters.cameraPositionNear.xyz
+        + parameters.cameraRight.xyz * ndc.x * parameters.projection.x * parameters.projection.y
+        - parameters.cameraUp.xyz * ndc.y * parameters.projection.x;
+}
+
+float linearViewDepth(float depth)
+{
+    float nearPlane = max(parameters.cameraPositionNear.w, 0.001);
+    float farPlane = max(parameters.cameraForwardFar.w, nearPlane + 0.001);
+    if (parameters.projection.z > 0.5)
+    {
+        return mix(nearPlane, farPlane, depth);
+    }
+
+    return nearPlane * farPlane / max(farPlane - depth * (farPlane - nearPlane), 0.000001);
+}
+
+float opaqueDistance(vec2 uv)
+{
+    float depth = texture(sceneDepth, uv).r;
+    if (depth >= 0.999999)
+    {
+        return parameters.cameraForwardFar.w;
+    }
+
+    vec3 ray = viewRay(uv);
+    float forwardDistance = linearViewDepth(depth);
+    return forwardDistance / max(dot(ray, normalize(parameters.cameraForwardFar.xyz)), 0.000001);
+}
+
+float boundedInfluence(FogVolume volume, vec3 worldPosition)
+{
+    int shape = int(volume.positionShape.w + 0.5);
+    if (shape == 0)
+    {
+        return 1.0;
+    }
+
+    vec3 extents = max(volume.extentsDensity.xyz, vec3(0.001));
+    vec3 local = (volume.worldToLocal * vec4(worldPosition, 1.0)).xyz;
+    float signedDistance;
+    if (shape == 2)
+    {
+        signedDistance = length(local / extents) - 1.0;
+        signedDistance *= max(max(extents.x, extents.y), extents.z);
+    }
+    else
+    {
+        vec3 q = abs(local) - extents;
+        signedDistance = length(max(q, vec3(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
+    }
+
+    float blendDistance = max(volume.blendPriorityPadding.x, 0.0001);
+    return 1.0 - smoothstep(-blendDistance, 0.0, signedDistance);
+}
+
+float sampleDirectionalShadow(vec3 worldPosition)
+{
+#ifndef REKALL_FOG_DIRECTIONAL_SHADOWS
+    return 1.0;
+#else
+    int cascadeCount = int(frame.shadowParameters0.x + 0.5);
+    float viewDepth = dot(worldPosition - frame.cameraPosition.xyz, normalize(frame.shadowCameraForward.xyz));
+    if (cascadeCount <= 0 || viewDepth <= 0.0 || viewDepth > frame.shadowParameters1.y)
+    {
+        return 1.0;
+    }
+
+    int cascadeIndex = 0;
+    if (cascadeCount > 1 && viewDepth > frame.shadowSplits.x) cascadeIndex = 1;
+    if (cascadeCount > 2 && viewDepth > frame.shadowSplits.y) cascadeIndex = 2;
+    if (cascadeCount > 3 && viewDepth > frame.shadowSplits.z) cascadeIndex = 3;
+    vec4 clip = frame.shadowViewProjection[cascadeIndex] * vec4(worldPosition, 1.0);
+    vec3 ndc = clip.xyz / max(abs(clip.w), 0.000001);
+    vec2 uv = ndc.xy * 0.5 + 0.5;
+    float referenceDepth = ndc.z - frame.shadowParameters0.z;
+    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))) || referenceDepth <= 0.0 || referenceDepth >= 1.0)
+    {
+        return 1.0;
+    }
+
+    return texture(directionalShadowAtlas, vec4(uv, float(cascadeIndex), referenceDepth));
+#endif
+}
+
+vec4 blendTemporalHistory(vec3 worldPosition, vec4 currentValue)
+{
+    float historyWeight = clamp(history.parameters.x, 0.0, 0.95);
+    if (historyWeight <= 0.0)
+    {
+        return currentValue;
+    }
+
+    vec3 delta = worldPosition - history.cameraPositionNear.xyz;
+    vec3 previousForward = normalize(history.cameraForwardFar.xyz);
+    float previousDepth = dot(delta, previousForward);
+    float nearPlane = max(history.cameraPositionNear.w, 0.001);
+    float farPlane = max(history.cameraForwardFar.w, nearPlane + 0.001);
+    if (previousDepth <= nearPlane || previousDepth >= farPlane)
+    {
+        return currentValue;
+    }
+
+    vec2 ndc;
+    if (history.projection.z > 0.5)
+    {
+        ndc = vec2(
+            dot(delta, history.cameraRight.xyz) / max(history.projection.x * history.projection.y, 0.000001),
+            -dot(delta, history.cameraUp.xyz) / max(history.projection.x, 0.000001));
+    }
+    else
+    {
+        ndc = vec2(
+            dot(delta, history.cameraRight.xyz) / max(previousDepth * history.projection.x * history.projection.y, 0.000001),
+            -dot(delta, history.cameraUp.xyz) / max(previousDepth * history.projection.x, 0.000001));
+    }
+
+    float normalizedDepth = sqrt(clamp((previousDepth - nearPlane) / (farPlane - nearPlane), 0.0, 1.0));
+    vec3 historyUv = vec3(ndc * 0.5 + 0.5, normalizedDepth);
+    if (any(lessThan(historyUv, vec3(0.0))) || any(greaterThan(historyUv, vec3(1.0))))
+    {
+        return currentValue;
+    }
+
+    return mix(currentValue, texture(fogHistory, historyUv), historyWeight);
+}
+
+void injectFroxel(ivec3 cell, ivec3 size)
+{
+    vec3 uvw = (vec3(cell) + 0.5) / vec3(size);
+    float nearPlane = max(parameters.cameraPositionNear.w, 0.001);
+    float farPlane = max(parameters.cameraForwardFar.w, nearPlane + 0.001);
+    float viewDepth = mix(nearPlane, farPlane, uvw.z * uvw.z);
+    vec3 rayDirection = viewRay(uvw.xy);
+    float rayDistance = viewDepth / max(dot(rayDirection, normalize(parameters.cameraForwardFar.xyz)), 0.000001);
+    vec3 worldPosition = viewOrigin(uvw.xy) + rayDirection * rayDistance;
+    if (rayDistance >= opaqueDistance(uvw.xy))
+    {
+        imageStore(fogGrid, cell, vec4(0.0, 0.0, 0.0, 1.0));
+        return;
+    }
+
+    float density = 0.0;
+    vec3 scattering = vec3(0.0);
+    vec3 emission = vec3(0.0);
+    float anisotropy = 0.0;
+    int volumeCount = int(parameters.execution.x + 0.5);
+    for (int index = 0; index < volumeCount; ++index)
+    {
+        FogVolume volume = volumes.values[index];
+        float influence = boundedInfluence(volume, worldPosition);
+        float heightAttenuation = exp(-max(volume.emissionHeightFalloff.w, 0.0) * max(worldPosition.y, 0.0));
+        float localDensity = max(volume.extentsDensity.w, 0.0) * influence * heightAttenuation;
+        density += localDensity;
+        scattering += volume.albedoAnisotropy.rgb * localDensity;
+        emission += volume.emissionHeightFalloff.rgb * influence;
+        anisotropy += volume.albedoAnisotropy.w * localDensity;
+    }
+
+    anisotropy = density > 0.000001 ? clamp(anisotropy / density, -0.95, 0.95) : 0.0;
+    float stepLength = farPlane / max(float(size.z), 1.0);
+    float transmittance = exp(-density * stepLength);
+    vec3 lighting = emission;
+    if (dot(frame.lightColor.rgb, frame.lightColor.rgb) > 0.000001
+        && dot(frame.lightDirection.xyz, frame.lightDirection.xyz) > 0.000001)
+    {
+        vec3 lightDirection = normalize(-frame.lightDirection.xyz);
+        float phaseCosine = dot(-rayDirection, lightDirection);
+        float phase = (1.0 - anisotropy * anisotropy)
+            / max(4.0 * 3.14159265 * pow(1.0 + anisotropy * anisotropy - 2.0 * anisotropy * phaseCosine, 1.5), 0.0001);
+        lighting += scattering * frame.lightColor.rgb * phase * sampleDirectionalShadow(worldPosition);
+    }
+    vec4 currentValue = vec4(lighting * (1.0 - transmittance), transmittance);
+    imageStore(fogGrid, cell, blendTemporalHistory(worldPosition, currentValue));
+}
+
+void compositeFroxel(ivec2 pixel, ivec2 size)
+{
+    ivec3 gridSize = imageSize(fogGrid);
+    vec2 uv = (vec2(pixel) + 0.5) / vec2(size);
+    ivec2 gridPixel = clamp(ivec2(uv * vec2(gridSize.xy)), ivec2(0), gridSize.xy - ivec2(1));
+    float surfaceDistance = opaqueDistance(uv);
+    float nearPlane = max(parameters.cameraPositionNear.w, 0.001);
+    float farPlane = max(parameters.cameraForwardFar.w, nearPlane + 0.001);
+    vec3 integrated = vec3(0.0);
+    float transmittance = 1.0;
+    for (int z = 0; z < gridSize.z; ++z)
+    {
+        float normalizedDepth = (float(z) + 0.5) / float(gridSize.z);
+        float viewDepth = mix(nearPlane, farPlane, normalizedDepth * normalizedDepth);
+        vec3 rayDirection = viewRay(uv);
+        float rayDistance = viewDepth / max(dot(rayDirection, normalize(parameters.cameraForwardFar.xyz)), 0.000001);
+        if (rayDistance >= surfaceDistance) break;
+        vec4 sampleValue = imageLoad(fogGrid, ivec3(gridPixel, z));
+        integrated += transmittance * sampleValue.rgb;
+        transmittance *= clamp(sampleValue.a, 0.0, 1.0);
+    }
+
+    vec4 scene = imageLoad(sceneHdr, pixel);
+    imageStore(sceneHdr, pixel, vec4(scene.rgb * transmittance + integrated, scene.a));
+}
+
+void main()
+{
+    int stage = int(parameters.execution.y + 0.5);
+    if (stage == 0)
+    {
+        ivec3 cell = ivec3(gl_GlobalInvocationID.xyz);
+        ivec3 size = imageSize(fogGrid);
+        if (all(lessThan(cell, size))) injectFroxel(cell, size);
+        return;
+    }
+
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(sceneHdr);
+    if (gl_GlobalInvocationID.z == 0 && all(lessThan(pixel, size))) compositeFroxel(pixel, size);
+}

@@ -1,0 +1,199 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.warden-mantle.graph",
+  "name": "Aetherfall Warden Deformable Mantle",
+  "revision": 3,
+  "nodes": [
+    {
+      "nodeId": "cloth-grid",
+      "typeId": "rekall.modeling.primitive.grid",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeX": 1.65,
+        "sizeY": 2.75,
+        "segmentsX": 24,
+        "segmentsY": 32
+      }
+    },
+    {
+      "nodeId": "hang",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          -1.375,
+          0
+        ]
+      }
+    },
+    {
+      "nodeId": "silhouette",
+      "typeId": "rekall.modeling.deform.taper",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "y",
+        "minimum": -2.75,
+        "maximum": 0,
+        "startScale": 0.62,
+        "endScale": 1.0,
+        "center": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "nodeId": "cloth-folds",
+      "typeId": "rekall.modeling.deform.noise",
+      "typeVersion": 1,
+      "parameters": {
+        "amplitude": 0.045,
+        "frequency": 4.2,
+        "seed": 2508,
+        "axis": "z"
+      }
+    },
+    {
+      "nodeId": "thickness",
+      "typeId": "rekall.modeling.solidify",
+      "typeVersion": 1,
+      "parameters": {
+        "thickness": 0.025,
+        "offset": 0,
+        "rim": true,
+        "evenThickness": true
+      }
+    },
+    {
+      "nodeId": "skin",
+      "typeId": "rekall.modeling.skin.linear_weights",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "y",
+        "minimum": -2.75,
+        "maximum": 0,
+        "jointA": 1,
+        "jointB": 0
+      }
+    },
+    {
+      "nodeId": "uv",
+      "typeId": "rekall.modeling.project_uv",
+      "typeVersion": 1,
+      "parameters": {
+        "projection": "box",
+        "axis": "xy",
+        "scaleU": 0.4166666667,
+        "scaleV": 0.2777777778
+      }
+    },
+    {
+      "nodeId": "normals",
+      "typeId": "rekall.modeling.weighted_normals",
+      "typeVersion": 1,
+      "parameters": {
+        "attribute": "normal.authored",
+        "faceAreaWeight": 1,
+        "cornerAngleWeight": 1
+      }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.modeling.output.mesh",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "cape-bend",
+      "typeId": "rekall.modeling.deform.bend",
+      "typeVersion": 1,
+      "parameters": {
+        "minimum": -2.75,
+        "angleDegrees": 18.0,
+        "axis": "y",
+        "maximum": 0.0,
+        "bendAxis": "z",
+        "origin": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "links": [
+    {
+      "linkId": "grid-hang",
+      "fromNodeId": "cloth-grid",
+      "fromPortId": "geometry",
+      "toNodeId": "hang",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "hang-taper",
+      "fromNodeId": "hang",
+      "fromPortId": "geometry",
+      "toNodeId": "silhouette",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "folds-thickness",
+      "fromNodeId": "cloth-folds",
+      "fromPortId": "geometry",
+      "toNodeId": "thickness",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "thickness-skin",
+      "fromNodeId": "thickness",
+      "fromPortId": "geometry",
+      "toNodeId": "skin",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "skin-uv",
+      "fromNodeId": "skin",
+      "fromPortId": "geometry",
+      "toNodeId": "uv",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "uv-normals",
+      "fromNodeId": "uv",
+      "fromPortId": "geometry",
+      "toNodeId": "normals",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "normals-output",
+      "fromNodeId": "normals",
+      "fromPortId": "geometry",
+      "toNodeId": "output",
+      "toPortId": "input"
+    },
+    {
+      "linkId": "taper-bend",
+      "fromNodeId": "silhouette",
+      "fromPortId": "geometry",
+      "toNodeId": "cape-bend",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "bend-folds",
+      "fromNodeId": "cape-bend",
+      "fromPortId": "geometry",
+      "toNodeId": "cloth-folds",
+      "toPortId": "geometry"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "mesh",
+      "nodeId": "output",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

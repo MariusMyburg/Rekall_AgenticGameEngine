@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall-ashen-processional-path-model",
+  "displayName": "Ashen Processional Path",
+  "revision": 5,
+  "source": {
+    "kind": "Mesh",
+    "assetId": "aetherfall-ashen-processional-path-mesh",
+    "outputName": null
+  },
+  "buildState": 0,
+  "lastSuccessfulBuild": {
+    "sourceFileRevision": "6d765d42877d5ff379d65666ddaf3e5a579fe376d701cc88117eff3a91df87bc",
+    "sourceLogicalRevision": 5,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-ashen-processional-path-model/45947c204c0bd0fb2ec3f13be92cde6ba85a410fc94a5daeb6f701a5d3fb7566.age.compiled-mesh.json",
+    "compiledContentHash": "45947c204c0bd0fb2ec3f13be92cde6ba85a410fc94a5daeb6f701a5d3fb7566",
+    "compilerVersion": "rekall-age-model-compiler-v1",
+    "builtAtUtc": "2026-08-25T17:39:42.5714355+00:00",
+    "diagnostics": []
+  },
+  "frozen": false
+}

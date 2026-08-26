@@ -1,0 +1,67 @@
+{
+  "sources": [
+    {
+      "assetId": "asset_aetherfall-weathered-masonry-albedo-v2_d174a66a",
+      "sourcePath": "Examples/AetherfallCitadel/Assets/SourceTextures/aetherfall-weathered-masonry-albedo-v2.png",
+      "kind": "texture",
+      "contentHash": "d174a66ab4f194c8b1b19593c12a384b65f277504681ec63f4e1efcded1e0b94"
+    },
+    {
+      "assetId": "asset_aetherfall-wet-slate-albedo-v2_b446bcf3",
+      "sourcePath": "Examples/AetherfallCitadel/Assets/SourceTextures/aetherfall-wet-slate-albedo-v2.png",
+      "kind": "texture",
+      "contentHash": "b446bcf398c16e594760381df1398097e4921637ec33fc50b983439fc7710055"
+    }
+  ],
+  "imported": [
+    {
+      "assetId": "asset_aetherfall-weathered-masonry-albedo-v2_d174a66a",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_aetherfall-weathered-masonry-albedo-v2_d174a66a.png",
+      "kind": "texture",
+      "contentHash": "d174a66ab4f194c8b1b19593c12a384b65f277504681ec63f4e1efcded1e0b94",
+      "mimeType": "image/png",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      }
+    },
+    {
+      "assetId": "asset_aetherfall-wet-slate-albedo-v2_b446bcf3",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_aetherfall-wet-slate-albedo-v2_b446bcf3.png",
+      "kind": "texture",
+      "contentHash": "b446bcf398c16e594760381df1398097e4921637ec33fc50b983439fc7710055",
+      "mimeType": "image/png",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1254,
+        "height": 1254,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      }
+    }
+  ],
+  "cookedArtifacts": [
+    {
+      "assetId": "asset_aetherfall-weathered-masonry-albedo-v2_d174a66a",
+      "artifactPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_aetherfall-weathered-masonry-albedo-v2_d174a66a.png",
+      "artifactKind": "raw-copy",
+      "contentHash": "d174a66ab4f194c8b1b19593c12a384b65f277504681ec63f4e1efcded1e0b94"
+    },
+    {
+      "assetId": "asset_aetherfall-wet-slate-albedo-v2_b446bcf3",
+      "artifactPath": "F:\\Dev\\Rekall_AGE\\.worktrees\\high-fidelity-forward-plus\\Examples\\AetherfallCitadel\\Assets\\texture\\asset_aetherfall-wet-slate-albedo-v2_b446bcf3.png",
+      "artifactKind": "raw-copy",
+      "contentHash": "b446bcf398c16e594760381df1398097e4921637ec33fc50b983439fc7710055"
+    }
+  ],
+  "dependencies": []
+}

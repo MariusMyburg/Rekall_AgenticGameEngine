@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "durationSeconds": 0.18,
+  "tracks": [
+    { "component": "Rekall.RigPose", "jointId": "upper_arm_r", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [-0.522687, -0.121869, 0, 0.843437] }, { "time": 0.1, "value": [-0.454649, -0.086016, 0, 0.886414] }, { "time": 0.18, "value": [0.039989, 0, 0, 0.999200] }
+    ] },
+    { "component": "Rekall.RigPose", "jointId": "forearm_r", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [-0.406203, 0, 0, 0.913792] }, { "time": 0.1, "value": [-0.284694, 0, 0, 0.958590] }, { "time": 0.18, "value": [0.149438, 0, 0, 0.988771] }
+    ] }
+  ]
+}

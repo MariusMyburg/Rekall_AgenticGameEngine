@@ -14,6 +14,8 @@ public sealed record RekallAgeStudioAutomationOptions(
     string Task,
     string EvidencePath)
 {
+    public string Provider { get; init; } = "ollama";
+
     public bool TreatGauntletAsTerminalSuccess { get; init; } = true;
 
     public int? MaxTurns { get; init; }
@@ -61,6 +63,7 @@ public static class RekallAgeStudioAutomation
         var projectRoot = Read("--project");
         var projectName = Read("--project-name");
         var sceneName = Read("--scene") ?? "Main";
+        var provider = Read("--provider") ?? "ollama";
         var model = Read("--model");
         var task = Read("--task");
         var evidencePath = Read("--evidence");
@@ -79,6 +82,12 @@ public static class RekallAgeStudioAutomation
             return false;
         }
 
+        if (provider is not "ollama" and not "openai" and not "codex")
+        {
+            error = "--provider must be exactly ollama, openai, or codex.";
+            return false;
+        }
+
         int? maxTurns = null;
         if (maxTurnsText is not null)
         {
@@ -93,50 +102,83 @@ public static class RekallAgeStudioAutomation
         options = new RekallAgeStudioAutomationOptions(
             projectRoot!, projectName!, sceneName, model!, task!, evidencePath!)
         {
+            Provider = provider,
             TreatGauntletAsTerminalSuccess = !arguments.Contains("--require-task-specific-completion", StringComparer.Ordinal),
             MaxTurns = maxTurns
         };
         return true;
     }
 
-    public static async Task<RekallAgeStudioAutomationResult> RunAsync(
+    public static Task<RekallAgeStudioAutomationResult> RunAsync(
         RekallAgeStudioAutomationOptions options,
         IRekallAgeLanguageModelClient? languageModelClient,
+        CancellationToken cancellationToken) =>
+        RunCoreAsync(options, languageModelClient, languageModelProviderCatalog: null, cancellationToken);
+
+    internal static Task<RekallAgeStudioAutomationResult> RunWithCatalogAsync(
+        RekallAgeStudioAutomationOptions options,
+        RekallAgeLanguageModelProviderCatalog languageModelProviderCatalog,
+        CancellationToken cancellationToken) =>
+        RunCoreAsync(options, languageModelClient: null, languageModelProviderCatalog, cancellationToken);
+
+    private static async Task<RekallAgeStudioAutomationResult> RunCoreAsync(
+        RekallAgeStudioAutomationOptions options,
+        IRekallAgeLanguageModelClient? languageModelClient,
+        RekallAgeLanguageModelProviderCatalog? languageModelProviderCatalog,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(options);
         cancellationToken.ThrowIfCancellationRequested();
         var projectRoot = Path.GetFullPath(options.ProjectRoot);
         var evidencePath = Path.GetFullPath(options.EvidencePath);
-        await using var viewModel = new RekallAgeStudioViewModel(
-            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
-            languageModelClient);
+        var workbenchSession = new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create());
+        await using var viewModel = languageModelProviderCatalog is null
+            ? new RekallAgeStudioViewModel(workbenchSession, languageModelClient)
+            : new RekallAgeStudioViewModel(
+                workbenchSession,
+                languageModelProviderCatalog,
+                new RekallAgeStudioPreviewSession());
         viewModel.ProjectPathInput = projectRoot;
         viewModel.ProjectNameInput = options.ProjectName;
         viewModel.SceneNameInput = options.SceneName;
-        viewModel.SelectedOllamaModel = options.Model;
+        string? providerFailure = null;
+        if (languageModelClient is null)
+        {
+            viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(
+                provider => provider.Id.Equals(options.Provider, StringComparison.Ordinal));
+            await viewModel.WaitForLanguageModelProviderTransitionAsync();
+            if (viewModel.ProviderStatus.StartsWith("REKALL_", StringComparison.Ordinal))
+            {
+                providerFailure = viewModel.ProviderStatus;
+            }
+        }
+        viewModel.SelectedLanguageModel = options.Model;
         viewModel.AgentTaskInput = options.Task;
         viewModel.TreatGauntletAsTerminalSuccess = options.TreatGauntletAsTerminalSuccess;
         viewModel.AgentMaxTurns = options.MaxTurns;
 
-        var projectCommand = File.Exists(Path.Combine(projectRoot, "rekall.project.json"))
-            ? viewModel.OpenCommand
-            : viewModel.CreateCommand;
-        await ((RekallAgeAsyncCommand)projectCommand).ExecuteAsync(null);
-        cancellationToken.ThrowIfCancellationRequested();
-        await ((RekallAgeAsyncCommand)viewModel.RunAgentCommand).ExecuteAsync(null);
+        if (providerFailure is null)
+        {
+            var projectCommand = File.Exists(Path.Combine(projectRoot, "rekall.project.json"))
+                ? viewModel.OpenCommand
+                : viewModel.CreateCommand;
+            await ((RekallAgeAsyncCommand)projectCommand).ExecuteAsync(null);
+            cancellationToken.ThrowIfCancellationRequested();
+            await ((RekallAgeAsyncCommand)viewModel.RunAgentCommand).ExecuteAsync(null);
+        }
 
         var packageArchivePath = ResolvePackageArchivePath(projectRoot);
         var nonblankViewport = viewModel.ViewportImage is { PixelWidth: > 0, PixelHeight: > 0 }
             && viewModel.ViewportRenderableCount > 0;
+        var status = providerFailure ?? viewModel.StatusText;
         var result = new RekallAgeStudioAutomationResult(
             IsSuccessful(
-                viewModel.StatusText,
+                status,
                 nonblankViewport,
                 viewModel.ViewportVisuallyInformative,
                 !options.TreatGauntletAsTerminalSuccess,
                 packageArchivePath),
-            viewModel.StatusText,
+            status,
             projectRoot,
             options.SceneName,
             nonblankViewport,

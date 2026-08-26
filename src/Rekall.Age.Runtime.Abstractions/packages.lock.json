@@ -5,6 +5,12 @@
       "rekall.age.core": {
         "type": "Project"
       },
+      "rekall.age.rendering.abstractions": {
+        "type": "Project",
+        "dependencies": {
+          "Rekall.Age.World": "[0.1.0-preview.1, )"
+        }
+      },
       "rekall.age.world": {
         "type": "Project",
         "dependencies": {

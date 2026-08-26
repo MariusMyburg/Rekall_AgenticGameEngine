@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "durationSeconds": 0.33,
+  "tracks": [
+    { "component": "Rekall.RigPose", "jointId": "upper_arm_r", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [-0.281733, 0.187792, 0, 0.940980] }, { "time": 0.16, "value": [-0.140867, 0.093896, 0, 0.985462] }, { "time": 0.33, "value": [0.039989, 0, 0, 0.999200] }
+    ] },
+    { "component": "Rekall.RigPose", "jointId": "upper_arm_l", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [-0.281733, -0.187792, 0, 0.940980] }, { "time": 0.16, "value": [-0.140867, -0.093896, 0, 0.985462] }, { "time": 0.33, "value": [-0.039989, 0, 0, 0.999200] }
+    ] },
+    { "component": "Rekall.RigPose", "jointId": "leg_l", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [0.216773, 0, -0.017499, 0.976058] }, { "time": 0.16, "value": [0.108386, 0, -0.017499, 0.993957] }, { "time": 0.33, "value": [0, 0, -0.017499, 0.999847] }
+    ] },
+    { "component": "Rekall.RigPose", "jointId": "leg_r", "property": "rotation", "interpolation": "smooth", "keys": [
+      { "time": 0, "value": [-0.216773, 0, 0.017499, 0.976058] }, { "time": 0.16, "value": [-0.108386, 0, 0.017499, 0.993957] }, { "time": 0.33, "value": [0, 0, 0.017499, 0.999847] }
+    ] }
+  ]
+}

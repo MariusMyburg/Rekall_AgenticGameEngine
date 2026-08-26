@@ -2,17 +2,17 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.conduit.graph",
   "name": "Aetherfall Conduit Graph",
-  "revision": 1,
+  "revision": 3,
   "nodes": [
     {
       "nodeId": "shape",
       "typeId": "rekall.modeling.primitive.frustum",
       "typeVersion": 1,
       "parameters": {
-        "radiusBottom": 0.8,
-        "radiusTop": 0.55,
-        "depth": 3.2,
-        "segments": 12
+        "radiusBottom": 0.9,
+        "radiusTop": 0.58,
+        "depth": 3.4,
+        "segments": 32
       }
     },
     {
@@ -20,15 +20,275 @@
       "typeId": "rekall.modeling.output.mesh",
       "typeVersion": 1,
       "parameters": {}
+    },
+    {
+      "nodeId": "body-bevel",
+      "typeId": "rekall.modeling.bevel",
+      "typeVersion": 1,
+      "parameters": {
+        "width": 0.08,
+        "profile": 0.45,
+        "segments": 3,
+        "clampOverlap": true,
+        "hardenNormals": true
+      }
+    },
+    {
+      "nodeId": "body-material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": {
+        "slotName": "Runed Obsidian Body",
+        "materialAssetId": "aetherfall.citadel-obsidian.material"
+      }
+    },
+    {
+      "nodeId": "core",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "segments": 24,
+        "radius": 0.42,
+        "rings": 16
+      }
+    },
+    {
+      "nodeId": "core-material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": {
+        "slotName": "Aether Heart",
+        "materialAssetId": "aetherfall.citadel-obsidian.material"
+      }
+    },
+    {
+      "nodeId": "coil-positive-profile",
+      "typeId": "rekall.modeling.curve.circle",
+      "typeVersion": 1,
+      "parameters": {
+        "segments": 10,
+        "plane": "xy",
+        "radius": 0.065,
+        "center": [
+          0.72,
+          -1.35,
+          0
+        ]
+      }
+    },
+    {
+      "nodeId": "coil-positive",
+      "typeId": "rekall.modeling.curve.revolve",
+      "typeVersion": 1,
+      "parameters": {
+        "angleDegrees": 1080,
+        "pitchPerTurn": 0.9,
+        "segments": 96,
+        "weldDistance": 1E-06,
+        "slotName": "Clockwise Aether Coil",
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "axis": "y",
+        "materialAssetId": "aetherfall.warden-steel.material"
+      }
+    },
+    {
+      "nodeId": "coil-negative-profile",
+      "typeId": "rekall.modeling.curve.circle",
+      "typeVersion": 1,
+      "parameters": {
+        "segments": 10,
+        "plane": "xy",
+        "radius": 0.065,
+        "center": [
+          0.72,
+          1.35,
+          0
+        ]
+      }
+    },
+    {
+      "nodeId": "coil-negative",
+      "typeId": "rekall.modeling.curve.revolve",
+      "typeVersion": 1,
+      "parameters": {
+        "angleDegrees": 1080,
+        "pitchPerTurn": -0.9,
+        "segments": 96,
+        "weldDistance": 1E-06,
+        "slotName": "Counter Aether Coil",
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "axis": "y",
+        "materialAssetId": "aetherfall.warden-steel.material"
+      }
+    },
+    {
+      "nodeId": "detail-join",
+      "typeId": "rekall.modeling.join",
+      "typeVersion": 1,
+      "parameters": {}
+    },
+    {
+      "nodeId": "auto-smooth",
+      "typeId": "rekall.modeling.auto_smooth",
+      "typeVersion": 1,
+      "parameters": {
+        "sharpAttribute": "normal.sharp",
+        "angleDegrees": 45
+      }
+    },
+    {
+      "nodeId": "normals",
+      "typeId": "rekall.modeling.weighted_normals",
+      "typeVersion": 1,
+      "parameters": {
+        "cornerAngleWeight": 1,
+        "attribute": "normal.authored",
+        "faceAreaWeight": 1
+      }
+    },
+    {
+      "nodeId": "uv",
+      "typeId": "rekall.modeling.project_uv",
+      "typeVersion": 1,
+      "parameters": {
+        "projection": "cylindrical",
+        "offsetU": 0,
+        "offsetV": 0,
+        "attribute": "uv.generated",
+        "scaleU": 1,
+        "scaleV": 1,
+        "axis": "xz"
+      }
+    },
+    {
+      "nodeId": "core-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "scale": [
+          1,
+          1,
+          1
+        ],
+        "translation": [
+          0,
+          1.95,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
     }
   ],
   "links": [
     {
-      "linkId": "shape-output",
+      "linkId": "shape-bevel",
       "fromNodeId": "shape",
+      "fromPortId": "geometry",
+      "toNodeId": "body-bevel",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "body-material",
+      "fromNodeId": "body-bevel",
+      "fromPortId": "geometry",
+      "toNodeId": "body-material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "coil-positive-profile",
+      "fromNodeId": "coil-positive-profile",
+      "fromPortId": "curve",
+      "toNodeId": "coil-positive",
+      "toPortId": "curve"
+    },
+    {
+      "linkId": "coil-negative-profile",
+      "fromNodeId": "coil-negative-profile",
+      "fromPortId": "curve",
+      "toNodeId": "coil-negative",
+      "toPortId": "curve"
+    },
+    {
+      "linkId": "join-body",
+      "fromNodeId": "body-material",
+      "fromPortId": "geometry",
+      "toNodeId": "detail-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "join-core",
+      "fromNodeId": "core-material",
+      "fromPortId": "geometry",
+      "toNodeId": "detail-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "join-coil-positive",
+      "fromNodeId": "coil-positive",
+      "fromPortId": "geometry",
+      "toNodeId": "detail-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "join-coil-negative",
+      "fromNodeId": "coil-negative",
+      "fromPortId": "geometry",
+      "toNodeId": "detail-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "join-auto",
+      "fromNodeId": "detail-join",
+      "fromPortId": "geometry",
+      "toNodeId": "auto-smooth",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "auto-normals",
+      "fromNodeId": "auto-smooth",
+      "fromPortId": "geometry",
+      "toNodeId": "normals",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "normals-uv",
+      "fromNodeId": "normals",
+      "fromPortId": "geometry",
+      "toNodeId": "uv",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "uv-output",
+      "fromNodeId": "uv",
       "fromPortId": "geometry",
       "toNodeId": "output",
       "toPortId": "input"
+    },
+    {
+      "linkId": "core-transform",
+      "fromNodeId": "core",
+      "fromPortId": "geometry",
+      "toNodeId": "core-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "core-x-material",
+      "fromNodeId": "core-x",
+      "fromPortId": "geometry",
+      "toNodeId": "core-material",
+      "toPortId": "geometry"
     }
   ],
   "outputs": [

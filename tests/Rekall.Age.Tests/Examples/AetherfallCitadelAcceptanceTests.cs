@@ -9,6 +9,10 @@ using Rekall.Age.Runtime.Abstractions;
 
 namespace Rekall.Age.Tests.Examples;
 
+[CollectionDefinition("Aetherfall Citadel acceptance", DisableParallelization = true)]
+public sealed class AetherfallCitadelAcceptanceCollection;
+
+[Collection("Aetherfall Citadel acceptance")]
 public sealed class AetherfallCitadelAcceptanceTests
 {
     [Fact]
@@ -271,11 +275,20 @@ public sealed class AetherfallCitadelAcceptanceTests
             inputs,
             CancellationToken.None);
         var camera = world.Entities.Single(entity => entity.Name == "CitadelCamera");
+        var playerLight = world.Entities.Single(entity => entity.Name == "Warden Softbox");
         var status = world.Entities.Single(entity => entity.Name == "HudStatus");
         var guardianHud = world.Entities.Single(entity => entity.Name == "HudGuardian");
         var dormantEnemy = world.Entities.Single(entity => entity.Name == "CourtLancer");
 
-        Assert.True(camera.Transform.Position3D.Z > -27);
+        Assert.True(camera.Transform.Position3D.Z > -24);
+        Assert.Equal(14.5, camera.Transform.Position3D.Y, precision: 3);
+        Assert.Equal(40, camera.Transform.Rotation3D.X, precision: 3);
+        Assert.Equal(
+            38,
+            camera.Components.Single(component => component.Type == "Rekall.Camera3D")
+                .Properties["fieldOfView"]!.GetValue<double>(),
+            precision: 3);
+        Assert.True(playerLight.Transform.Position3D.Z > -7);
         Assert.Contains(
             "SHARDS 1",
             status.Components.Single(c => c.Type == "Rekall.Label").Properties["text"]!.GetValue<string>());
@@ -405,6 +418,34 @@ public sealed class AetherfallCitadelAcceptanceTests
             || Math.Abs(lancer.Transform.Position3D.Z - 15) > 0.01,
             $"Expected active lancer movement, found ({lancer.Transform.Position3D.X}, {lancer.Transform.Position3D.Z}).");
         Assert.Contains(world.Entities, entity => entity.Tags.Contains("hostile.projectile"));
+        var hostilePulse = world.Entities.First(entity => entity.Tags.Contains("hostile.projectile"));
+        Assert.Equal(
+            "#a76a45",
+            hostilePulse.Components.Single(component => component.Type == "Rekall.GeometryPrimitive")
+                .Properties["color"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task ArrivalSentinelWaitsUntilThePlayerEngages()
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        await BuildRulesAsync(projectRoot);
+        var inputs = Enumerable.Range(0, 720)
+            .Select(_ => new RekallAgeRuntimeInputFrame { DeltaSeconds = 1.0 / 60.0 })
+            .ToArray();
+
+        var world = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(
+            projectRoot,
+            "Main",
+            inputs.Length,
+            inputs,
+            CancellationToken.None);
+        var warden = world.Entities.Single(entity => entity.Name == "AetherWarden");
+        var state = warden.Components.Single(component =>
+            component.Type == "Game.Modules.AetherfallRules.WardenState");
+
+        Assert.Equal(100, state.Properties["integrity"]!.GetValue<double>());
+        Assert.DoesNotContain(world.Entities, entity => entity.Tags.Contains("hostile.projectile"));
     }
 
     [Fact]

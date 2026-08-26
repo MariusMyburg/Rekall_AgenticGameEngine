@@ -1,4 +1,5 @@
 using Rekall.Age.Assets;
+using Rekall.Age.Modeling;
 using Rekall.Age.Rendering.Abstractions;
 using StbImageSharp;
 using System.Drawing.Text;
@@ -51,6 +52,15 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
             .Distinct(StringComparer.Ordinal)
             .OrderBy(assetId => assetId, StringComparer.Ordinal)
             .ToArray();
+        var materialAssetIds = frame.Renderables
+            .Where(renderable => renderable.Kind.Equals("mesh", StringComparison.Ordinal))
+            .SelectMany(renderable => renderable.GeometryMesh?.Surfaces ?? [])
+            .Select(surface => surface.MaterialAssetId)
+            .Where(assetId => !string.IsNullOrWhiteSpace(assetId))
+            .Select(assetId => assetId!)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(assetId => assetId, StringComparer.Ordinal)
+            .ToArray();
         var modelAssetIds = frame.Renderables
             .Where(renderable => renderable.Kind.Equals("mesh", StringComparison.Ordinal))
             .Select(renderable => renderable.AssetId)
@@ -67,7 +77,8 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
             .Distinct(StringComparer.Ordinal)
             .OrderBy(assetId => assetId, StringComparer.Ordinal)
             .ToArray();
-        if (spriteAssetIds.Length == 0 && textureAssetIds.Length == 0 && modelAssetIds.Length == 0 && fontAssetIds.Length == 0)
+        if (spriteAssetIds.Length == 0 && textureAssetIds.Length == 0 && modelAssetIds.Length == 0
+            && fontAssetIds.Length == 0 && materialAssetIds.Length == 0)
         {
             return RekallAgeRuntimeViewportAssetSet.Empty;
         }
@@ -78,7 +89,31 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
         var textures = new Dictionary<string, RekallAgeRuntimeTextureAsset>(StringComparer.Ordinal);
         var models = new Dictionary<string, IReadOnlyList<RekallAgeVulkanSceneMesh>>(StringComparer.Ordinal);
         var fonts = new Dictionary<string, RekallAgeRuntimeFontAsset>(StringComparer.Ordinal);
+        var materials = new Dictionary<string, RekallAgeRuntimeMaterialAsset>(StringComparer.Ordinal);
         var issues = new List<RekallAgeRuntimeViewportAssetIssue>();
+
+        foreach (var assetId in materialAssetIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                var graph = await new RekallAgeMaterialGraphAssetStore()
+                    .LoadAsync(projectRoot, assetId, cancellationToken)
+                    .ConfigureAwait(false);
+                materials[assetId] = new RekallAgeRuntimeMaterialGraphResolver().Resolve(graph);
+            }
+            catch (Exception ex) when (ex is IOException
+                or InvalidDataException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or System.Text.Json.JsonException)
+            {
+                issues.Add(new RekallAgeRuntimeViewportAssetIssue(
+                    assetId,
+                    "REKALL_RENDER_MATERIAL_UNRESOLVED",
+                    ex.Message));
+            }
+        }
 
         foreach (var assetId in fontAssetIds)
         {
@@ -122,7 +157,17 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
             fonts[assetId] = new RekallAgeRuntimeFontAsset(assetId, asset.ImportedPath);
         }
 
-        foreach (var assetId in spriteAssetIds.Concat(textureAssetIds).Distinct(StringComparer.Ordinal))
+        var materialTextureAssetIds = materials.Values.SelectMany(material => new[]
+        {
+            material.BaseColorTextureAssetId,
+            material.MetallicRoughnessTextureAssetId,
+            material.NormalTextureAssetId,
+            material.OcclusionTextureAssetId,
+            material.EmissiveTextureAssetId
+        })
+            .Where(assetId => !string.IsNullOrWhiteSpace(assetId))
+            .Select(assetId => assetId!);
+        foreach (var assetId in spriteAssetIds.Concat(textureAssetIds).Concat(materialTextureAssetIds).Distinct(StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!catalogById.TryGetValue(assetId, out var asset))
@@ -275,7 +320,8 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
         return new RekallAgeRuntimeViewportAssetSet(images, models, issues.ToArray())
         {
             Textures = textures,
-            Fonts = fonts
+            Fonts = fonts,
+            Materials = materials
         };
     }
 

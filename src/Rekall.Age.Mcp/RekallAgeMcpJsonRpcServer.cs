@@ -19,10 +19,14 @@ public sealed class RekallAgeMcpJsonRpcServer
     private static ILogger Logger => Log.ForContext<RekallAgeMcpJsonRpcServer>();
 
     private readonly RekallAgeCommandRegistry _registry;
+    private readonly RekallAgeProjectCommandScope? _projectScope;
 
-    public RekallAgeMcpJsonRpcServer(RekallAgeCommandRegistry registry)
+    public RekallAgeMcpJsonRpcServer(RekallAgeCommandRegistry registry, string? projectRoot = null)
     {
         _registry = registry;
+        _projectScope = string.IsNullOrWhiteSpace(projectRoot)
+            ? null
+            : new RekallAgeProjectCommandScope(projectRoot, registry);
     }
 
     public async ValueTask<string?> HandleJsonLineAsync(
@@ -111,6 +115,22 @@ public sealed class RekallAgeMcpJsonRpcServer
         var argumentsJson = parameters.TryGetProperty("arguments", out var arguments)
             ? arguments.GetRawText()
             : "{}";
+        if (_projectScope is not null
+            && JsonNode.Parse(argumentsJson) is JsonObject argumentObject)
+        {
+            var scoped = _projectScope.Apply(name, argumentObject);
+            if (!scoped.Succeeded)
+            {
+                Logger.Warning(
+                    "MCP tool rejected by project scope. Tool={Tool} Actor={Actor}",
+                    name,
+                    context.Actor);
+                return SerializeToolResponse(id, CreateScopeFailure(scoped), isError: true);
+            }
+
+            argumentsJson = scoped.Arguments.ToJsonString();
+        }
+
         var toolTransaction = RekallAgeTransaction.Begin(name);
         var toolContext = new RekallAgeCommandContext(context.Actor, toolTransaction, context.CancellationToken);
         Logger.Information("Executing MCP tool. Tool={Tool} Actor={Actor}", name, context.Actor);
@@ -144,6 +164,19 @@ public sealed class RekallAgeMcpJsonRpcServer
             Logger.Warning("MCP tool returned errors. Tool={Tool} Actor={Actor} ErrorCount={ErrorCount}", name, context.Actor, commandResult.Errors.Count);
         }
 
+        return SerializeToolResponse(id, commandResult, !commandResult.Ok);
+    }
+
+    private static JsonObject CreateScopeFailure(RekallAgeProjectCommandScopeResult scoped) => new()
+    {
+        ["ok"] = false,
+        ["summary"] = scoped.ErrorSummary,
+        ["value"] = null,
+        ["errors"] = JsonSerializer.SerializeToNode(scoped.Errors, JsonOptions)
+    };
+
+    private static string SerializeToolResponse(JsonElement id, object structuredContent, bool isError)
+    {
         var result = new
         {
             content = new[]
@@ -151,11 +184,11 @@ public sealed class RekallAgeMcpJsonRpcServer
                 new
                 {
                     type = "text",
-                    text = JsonSerializer.Serialize(commandResult, JsonOptions)
+                    text = JsonSerializer.Serialize(structuredContent, JsonOptions)
                 }
             },
-            structuredContent = commandResult,
-            isError = !commandResult.Ok
+            structuredContent,
+            isError
         };
 
         return SerializeResponse(id, result);

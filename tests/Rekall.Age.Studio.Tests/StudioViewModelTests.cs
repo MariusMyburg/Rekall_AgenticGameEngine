@@ -1,12 +1,22 @@
+using System.Collections.Concurrent;
 using System.IO;
 using System.IO.Compression;
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using Rekall.Age.Agent.Codex;
 using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.Assets;
+using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor;
 using Rekall.Age.Modeling;
+using Rekall.Age.Project;
 using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
+using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Studio;
 using Rekall.Age.Workflows;
 using Rekall.Age.Workflows.Commands;
@@ -18,6 +28,758 @@ namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioViewModelTests
 {
+    [Fact]
+    public void CodexApprovalSummaryShowsAllowlistedActionFactsAndOmitsCredentialLikeFields()
+    {
+        using var document = JsonDocument.Parse(
+            """{"command":["dotnet","build"],"cwd":"C:\\Game","reason":"Build modules","apiKey":"secret-key","token":"secret-token","changes":[{"path":"Scenes/Main.age.scene.json"}],"mcpServer":"rekall-age","toolName":"rekall.build.modules","message":"Compile authored modules"}""");
+        var request = new RekallAgeCodexApprovalRequest(
+            "mcpServer/elicitation/request",
+            document.RootElement.Clone());
+
+        Assert.True(RekallAgeCodexApprovalPresenter.TryFormat(request, out var summary));
+        Assert.Contains("dotnet build", summary, StringComparison.Ordinal);
+        Assert.Contains("C:\\Game", summary, StringComparison.Ordinal);
+        Assert.Contains("Scenes/Main.age.scene.json", summary, StringComparison.Ordinal);
+        Assert.Contains("rekall-age", summary, StringComparison.Ordinal);
+        Assert.Contains("rekall.build.modules", summary, StringComparison.Ordinal);
+        Assert.Contains("Compile authored modules", summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-key", summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-token", summary, StringComparison.Ordinal);
+        Assert.True(summary.Length <= 1_200);
+    }
+
+    [Fact]
+    public void CodexApprovalSummaryFailsClosedForUnknownMethodsOrUninformativeShapes()
+    {
+        using var unknown = JsonDocument.Parse("""{"command":"dangerous"}""");
+        Assert.False(RekallAgeCodexApprovalPresenter.TryFormat(
+            new RekallAgeCodexApprovalRequest("unknown/request", unknown.RootElement.Clone()), out _));
+        Assert.False(RekallAgeCodexApprovalPresenter.TryFormat(
+            new RekallAgeCodexApprovalRequest("unknown/commandExecution/requestApproval", unknown.RootElement.Clone()), out _));
+        Assert.False(RekallAgeCodexApprovalPresenter.TryFormat(
+            new RekallAgeCodexApprovalRequest("item/commandExecution/requestApproval/unsupported", unknown.RootElement.Clone()), out _));
+        using var secretOnly = JsonDocument.Parse("""{"apiKey":"secret"}""");
+        Assert.False(RekallAgeCodexApprovalPresenter.TryFormat(
+            new RekallAgeCodexApprovalRequest("item/commandExecution/requestApproval", secretOnly.RootElement.Clone()), out _));
+    }
+
+    [Fact]
+    public async Task StudioViewModelExposesFailClosedCodexSignInAndCancellationActions()
+    {
+        var viewModel = new RekallAgeStudioViewModel();
+        try
+        {
+            Assert.False(viewModel.SignInCodexCommand.CanExecute(null));
+            Assert.False(viewModel.CancelCodexSignInCommand.CanExecute(null));
+        }
+        finally
+        {
+            await viewModel.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task FreshUnauthenticatedCodexSelectionRetainsRunnerAndRecoversThroughStudioSignIn()
+    {
+        var runner = new UnauthenticatedCodexRunner();
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings(),
+            () => new HttpClient(new ProviderLifecycleHandler(false), disposeHandler: true),
+            () => runner);
+        var root = Path.Combine(Path.GetTempPath(), "rekall-studio-codex-signin-" + Guid.NewGuid().ToString("N"));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+        try
+        {
+            viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(item => item.Id == "codex");
+            await viewModel.WaitForLanguageModelProviderTransitionAsync();
+
+            Assert.Contains(RekallAgeCodexErrorCodes.AuthenticationRequired, viewModel.ProviderStatus, StringComparison.Ordinal);
+            Assert.True(viewModel.SignInCodexCommand.CanExecute(null));
+            viewModel.CodexAuthenticationLauncher = uri =>
+            {
+                runner.LaunchedUri = uri;
+                return ValueTask.CompletedTask;
+            };
+            await ExecuteAsync(viewModel.SignInCodexCommand);
+
+            Assert.Equal("https://chatgpt.com/sign-in", runner.LaunchedUri?.AbsoluteUri);
+            Assert.Equal([RekallAgeCodexProjectAgentRunner.RequiredModel], viewModel.LanguageModels);
+            Assert.Equal(RekallAgeCodexProjectAgentRunner.RequiredModel, viewModel.SelectedLanguageModel);
+            viewModel.ProjectPathInput = root;
+            viewModel.ProjectNameInput = "Codex Sign-In";
+            viewModel.SceneNameInput = "Main";
+            viewModel.AgentTaskInput = "Author a small game.";
+            await ExecuteAsync(viewModel.CreateCommand);
+            Assert.True(viewModel.RunAgentCommand.CanExecute(null));
+
+            viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(item => item.Id == "ollama");
+            await viewModel.WaitForLanguageModelProviderTransitionAsync();
+            Assert.Equal(1, runner.DisposeCount);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task CodexApprovalRequestsRouteToTheStudioHandlerAndDefaultToDecline()
+    {
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            new EmptyModel());
+        using var parameters = JsonDocument.Parse("{\"itemId\":\"change-1\"}");
+        var request = new RekallAgeCodexApprovalRequest(
+            "item/fileChange/requestApproval",
+            parameters.RootElement.Clone());
+
+        Assert.Equal(
+            RekallAgeCodexApprovalDecision.Decline,
+            await viewModel.RouteCodexApprovalAsync(request, CancellationToken.None));
+
+        RekallAgeCodexApprovalRequest? observed = null;
+        viewModel.CodexApprovalHandler = (candidate, _) =>
+        {
+            observed = candidate;
+            return ValueTask.FromResult(RekallAgeCodexApprovalDecision.AcceptForSession);
+        };
+
+        Assert.Equal(
+            RekallAgeCodexApprovalDecision.AcceptForSession,
+            await viewModel.RouteCodexApprovalAsync(request, CancellationToken.None));
+        Assert.Equal(request, observed);
+    }
+
+    [Fact]
+    public async Task ProviderSelectionExposesStableMissingOpenAiCredentialGateWithoutRetainingOllamaModels()
+    {
+        var ollama = new ProviderLifecycleHandler(blockOllamaChat: false);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = " " },
+            () => new HttpClient(ollama, disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+
+        Assert.Equal(["ollama", "openai", "codex"], viewModel.LanguageModelProviders.Select(provider => provider.Id));
+        Assert.Equal(["none", "low", "medium", "high", "xhigh", "max"], viewModel.ReasoningEfforts);
+        Assert.Equal("medium", viewModel.SelectedReasoningEffort);
+        Assert.Equal("ollama", viewModel.SelectedLanguageModelProvider.Id);
+        await ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
+        Assert.Equal(["gemma3:latest", "qwen3.5:35b"], viewModel.LanguageModels);
+        Assert.Equal("qwen3.5:35b", viewModel.SelectedLanguageModel);
+
+        viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "openai");
+        await viewModel.WaitForLanguageModelProviderTransitionAsync();
+
+        Assert.Empty(viewModel.LanguageModels);
+        Assert.Empty(viewModel.SelectedLanguageModel);
+        Assert.Equal(
+            "REKALL_OPENAI_API_KEY_MISSING: OpenAI requires OPENAI_API_KEY or a session-only API key.",
+            viewModel.ProviderStatus);
+        Assert.False(viewModel.RefreshLanguageModelsCommand.CanExecute(null));
+        Assert.DoesNotContain("qwen", viewModel.ProviderStatus, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ProviderSwitchCancelsAndAwaitsTheCurrentRunBeforeDisposingItsLeaseAndLoadingTheExactDefault()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-provider-switch-" + Guid.NewGuid().ToString("N"));
+        var ollama = new ProviderLifecycleHandler(blockOllamaChat: true);
+        var openAi = new ProviderLifecycleHandler(blockOllamaChat: false);
+        var handlers = new Queue<ProviderLifecycleHandler>([ollama, openAi]);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = "session-test-key" },
+            () => new HttpClient(handlers.Dequeue(), disposeHandler: true));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                catalog,
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Provider Switch",
+                SceneNameInput = "Main",
+                AgentTaskInput = "Inspect the open project."
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
+
+            var run = ExecuteAsync(viewModel.RunAgentCommand);
+            await ollama.WaitForChatAsync();
+            viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "openai");
+            await viewModel.WaitForLanguageModelProviderTransitionAsync();
+            await run;
+
+            Assert.Equal(["chat-cancelled", "lease-disposed"], ollama.Events);
+            Assert.Equal("openai", viewModel.SelectedLanguageModelProvider.Id);
+            Assert.Equal(["gpt-5.6-sol", "gpt-5.6-sol-preview"], viewModel.LanguageModels);
+            Assert.Equal("gpt-5.6-sol", viewModel.SelectedLanguageModel);
+            Assert.Equal("OpenAI API ready with 2 models.", viewModel.ProviderStatus);
+            Assert.False(viewModel.IsAgentRunning);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task OpenAiSessionKeyUnlocksTheSelectedProviderWithoutAppearingInInspectableStudioState()
+    {
+        const string secret = "studio-session-secret-must-stay-private";
+        var handlers = new Queue<ProviderLifecycleHandler>(
+            [new(blockOllamaChat: false), new(blockOllamaChat: false)]);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = " " },
+            () => new HttpClient(handlers.Dequeue(), disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+        var missingCredentialDescriptor = viewModel.LanguageModelProviders.Single(
+            provider => provider.Id == "openai");
+        Assert.Equal("required", missingCredentialDescriptor.AuthenticationState);
+        Assert.False(missingCredentialDescriptor.IsAvailable);
+        viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "openai");
+        await viewModel.WaitForLanguageModelProviderTransitionAsync();
+
+        await viewModel.ApplyOpenAiApiKeyAsync(secret);
+
+        Assert.True(viewModel.HasSessionOpenAiCredential);
+        var configuredDescriptor = viewModel.LanguageModelProviders.Single(provider => provider.Id == "openai");
+        Assert.Equal("configured", configuredDescriptor.AuthenticationState);
+        Assert.True(configuredDescriptor.IsAvailable);
+        Assert.Empty(configuredDescriptor.Diagnostics);
+        Assert.Equal(configuredDescriptor, viewModel.SelectedLanguageModelProvider);
+        Assert.Equal("gpt-5.6-sol", viewModel.SelectedLanguageModel);
+        var inspectable = string.Join('\n',
+            [viewModel.ProviderStatus, viewModel.StatusText, .. viewModel.ValidationLines, .. viewModel.AgentLines]);
+        Assert.DoesNotContain(secret, inspectable, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ProviderSwitchCancelsAndAwaitsModelRefreshBeforeDisposingItsLease()
+    {
+        var ollama = new ProviderLifecycleHandler(blockOllamaChat: false, blockOllamaModels: true);
+        var openAi = new ProviderLifecycleHandler(blockOllamaChat: false);
+        var handlers = new Queue<ProviderLifecycleHandler>([ollama, openAi]);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = "session-test-key" },
+            () => new HttpClient(handlers.Dequeue(), disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+
+        var refresh = ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
+        await ollama.WaitForModelsAsync();
+        viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "openai");
+        await viewModel.WaitForLanguageModelProviderTransitionAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await refresh;
+
+        Assert.Equal(["models-cancelled", "lease-disposed"], ollama.Events);
+        Assert.Equal("gpt-5.6-sol", viewModel.SelectedLanguageModel);
+    }
+
+    [Fact]
+    public async Task ProviderDefaultAbsenceLeavesSelectionEmptyWithRequestedAndResolvedDiagnostics()
+    {
+        var handlers = new Queue<ProviderLifecycleHandler>(
+        [
+            new(blockOllamaChat: false),
+            new(blockOllamaChat: false, openAiModels: ["gpt-5.6-sol-preview"])
+        ]);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = "session-test-key" },
+            () => new HttpClient(handlers.Dequeue(), disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+
+        viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(
+            provider => provider.Id == "openai");
+        await viewModel.WaitForLanguageModelProviderTransitionAsync();
+
+        Assert.Equal(["gpt-5.6-sol-preview"], viewModel.LanguageModels);
+        Assert.Empty(viewModel.SelectedLanguageModel);
+        Assert.Equal(
+            "REKALL_LANGUAGE_MODEL_DEFAULT_UNAVAILABLE: OpenAI API did not return its configured default model. "
+            + "Requested: gpt-5.6-sol. Resolved: gpt-5.6-sol-preview.",
+            viewModel.ProviderStatus);
+    }
+
+    [Fact]
+    public async Task RapidProviderSwitchDoesNotPublishStaleModelsWhenTheFinalProviderFails()
+    {
+        var initialOllama = new ProviderLifecycleHandler(blockOllamaChat: false);
+        var staleOpenAi = new ProviderLifecycleHandler(blockOllamaChat: false, pauseModelResponse: true);
+        var failingOllama = new ProviderLifecycleHandler(
+            blockOllamaChat: false,
+            pauseModelResponse: true,
+            modelFailure: new RekallAgeLanguageModelProviderException(
+                "REKALL_TEST_FINAL_PROVIDER_FAILED",
+                "ollama",
+                "The final provider failed model discovery."));
+        var handlers = new Queue<ProviderLifecycleHandler>([initialOllama, staleOpenAi, failingOllama]);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = "session-test-key" },
+            () => new HttpClient(handlers.Dequeue(), disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+
+        viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(
+            provider => provider.Id == "openai");
+        var staleTransition = viewModel.WaitForLanguageModelProviderTransitionAsync();
+        await staleOpenAi.WaitForModelsAsync();
+        viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(
+            provider => provider.Id == "ollama");
+        var finalTransition = viewModel.WaitForLanguageModelProviderTransitionAsync();
+        staleOpenAi.ReleaseModels();
+        await staleTransition;
+        await failingOllama.WaitForModelsAsync();
+
+        Assert.Empty(viewModel.LanguageModels);
+        Assert.Empty(viewModel.SelectedLanguageModel);
+
+        failingOllama.ReleaseModels();
+        await finalTransition;
+
+        Assert.Equal("ollama", viewModel.SelectedLanguageModelProvider.Id);
+        Assert.Empty(viewModel.LanguageModels);
+        Assert.Empty(viewModel.SelectedLanguageModel);
+        Assert.Equal(
+            "REKALL_TEST_FINAL_PROVIDER_FAILED: The final provider failed model discovery.",
+            viewModel.ProviderStatus);
+        Assert.Equal(["lease-disposed"], staleOpenAi.Events);
+    }
+
+    [Fact]
+    public async Task ProviderSwitchAfterFaultedAgentRunReleasesOldLeaseAndLoadsNewProvider()
+    {
+        const string upstreamPayload = "opaque-switch-after-run-payload";
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-switch-after-run-" + Guid.NewGuid().ToString("N"));
+        var ollama = new ProviderLifecycleHandler(
+            blockOllamaChat: false,
+            chatFailure: new InvalidDataException(upstreamPayload));
+        var openAi = new ProviderLifecycleHandler(blockOllamaChat: false);
+        var handlers = new Queue<ProviderLifecycleHandler>([ollama, openAi]);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = "session-test-key" },
+            () => new HttpClient(handlers.Dequeue(), disposeHandler: true));
+        var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession())
+        {
+            ProjectPathInput = root,
+            ProjectNameInput = "Switch After Failed Run",
+            SceneNameInput = "Main",
+            AgentTaskInput = "Inspect the project."
+        };
+        try
+        {
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.RunAgentCommand);
+
+            viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(
+                provider => provider.Id == "openai");
+            await viewModel.WaitForLanguageModelProviderTransitionAsync();
+
+            Assert.Equal("openai", viewModel.SelectedLanguageModelProvider.Id);
+            Assert.Equal(["gpt-5.6-sol", "gpt-5.6-sol-preview"], viewModel.LanguageModels);
+            Assert.Equal("gpt-5.6-sol", viewModel.SelectedLanguageModel);
+            Assert.Equal(["lease-disposed"], ollama.Events);
+            var inspectable = string.Join('\n', [viewModel.ProviderStatus, viewModel.StatusText, .. viewModel.ValidationLines]);
+            Assert.DoesNotContain(upstreamPayload, inspectable, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await viewModel.DisposeAsync();
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ProviderSwitchAfterFaultedModelRefreshReleasesOldLeaseAndLoadsNewProvider()
+    {
+        const string upstreamPayload = "opaque-switch-after-refresh-payload";
+        var ollama = new ProviderLifecycleHandler(
+            blockOllamaChat: false,
+            modelFailure: new InvalidDataException(upstreamPayload));
+        var openAi = new ProviderLifecycleHandler(blockOllamaChat: false);
+        var handlers = new Queue<ProviderLifecycleHandler>([ollama, openAi]);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = "session-test-key" },
+            () => new HttpClient(handlers.Dequeue(), disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+
+        await ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
+        viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(
+            provider => provider.Id == "openai");
+        await viewModel.WaitForLanguageModelProviderTransitionAsync();
+
+        Assert.Equal("openai", viewModel.SelectedLanguageModelProvider.Id);
+        Assert.Equal(["gpt-5.6-sol", "gpt-5.6-sol-preview"], viewModel.LanguageModels);
+        Assert.Equal("gpt-5.6-sol", viewModel.SelectedLanguageModel);
+        Assert.Equal(["lease-disposed"], ollama.Events);
+        var inspectable = string.Join('\n', [viewModel.ProviderStatus, viewModel.StatusText, .. viewModel.ValidationLines]);
+        Assert.DoesNotContain(upstreamPayload, inspectable, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ShutdownCleansUpProviderAndSessionCredentialAfterFaultingAgentRun()
+    {
+        const string sessionCredential = "studio-shutdown-run-session-credential";
+        const string upstreamPayload = "opaque-upstream-run-payload";
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-faulting-run-" + Guid.NewGuid().ToString("N"));
+        var model = new BlockingFaultingModel(upstreamPayload);
+        var preview = new RecordingPreviewSession();
+        RekallAgeStudioViewModel? viewModel = null;
+        try
+        {
+            viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                model,
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Faulting Agent Shutdown",
+                SceneNameInput = "Main",
+                AgentTaskInput = "Inspect the project."
+            };
+            await viewModel.ApplyOpenAiApiKeyAsync(sessionCredential);
+            await ExecuteAsync(viewModel.CreateCommand);
+            var run = ExecuteAsync(viewModel.RunAgentCommand);
+            await model.WaitForChatAsync();
+
+            model.ReleaseChat();
+            await run;
+            await viewModel.DisposeAsync();
+
+            Assert.True(preview.IsDisposed);
+            Assert.False(viewModel.HasSessionOpenAiCredential);
+            Assert.False(viewModel.RefreshLanguageModelsCommand.CanExecute(null));
+            var inspectable = string.Join('\n', [viewModel.ProviderStatus, viewModel.StatusText, .. viewModel.ValidationLines]);
+            Assert.Contains("REKALL_STUDIO_LANGUAGE_MODEL_SHUTDOWN_FAILED", inspectable, StringComparison.Ordinal);
+            Assert.DoesNotContain(sessionCredential, inspectable, StringComparison.Ordinal);
+            Assert.DoesNotContain(upstreamPayload, inspectable, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (viewModel is not null)
+            {
+                try { await viewModel.DisposeAsync(); }
+                catch { }
+            }
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ShutdownCleansUpProviderAndSessionCredentialAfterFaultingModelRefresh()
+    {
+        const string sessionCredential = "studio-shutdown-refresh-session-credential";
+        const string upstreamPayload = "opaque-upstream-refresh-payload";
+        var ollama = new ProviderLifecycleHandler(
+            blockOllamaChat: false,
+            pauseModelResponse: true,
+            modelFailure: new InvalidDataException(upstreamPayload));
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings(),
+            () => new HttpClient(ollama, disposeHandler: true));
+        var preview = new RecordingPreviewSession();
+        var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            preview);
+        try
+        {
+            await viewModel.ApplyOpenAiApiKeyAsync(sessionCredential);
+            var refresh = ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
+            await ollama.WaitForModelsAsync();
+            ollama.ReleaseModels();
+            await refresh;
+            await viewModel.DisposeAsync();
+
+            Assert.True(preview.IsDisposed);
+            Assert.False(viewModel.HasSessionOpenAiCredential);
+            Assert.False(viewModel.RefreshLanguageModelsCommand.CanExecute(null));
+            Assert.Contains("lease-disposed", ollama.Events);
+            var inspectable = string.Join('\n', [viewModel.ProviderStatus, viewModel.StatusText, .. viewModel.ValidationLines]);
+            Assert.Contains("REKALL_STUDIO_LANGUAGE_MODEL_SHUTDOWN_FAILED", inspectable, StringComparison.Ordinal);
+            Assert.DoesNotContain(sessionCredential, inspectable, StringComparison.Ordinal);
+            Assert.DoesNotContain(upstreamPayload, inspectable, StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { await viewModel.DisposeAsync(); }
+            catch { }
+        }
+    }
+
+    [Fact]
+    public async Task ShutdownCleansUpWhenAgentCancellationCallbackThrows()
+    {
+        const string sessionCredential = "studio-shutdown-cancellation-session-credential";
+        const string upstreamPayload = "opaque-cancellation-callback-payload";
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-throwing-cancellation-" + Guid.NewGuid().ToString("N"));
+        var model = new BlockingFaultingModel(upstreamPayload);
+        var preview = new RecordingPreviewSession();
+        RekallAgeStudioViewModel? viewModel = null;
+        try
+        {
+            viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                model,
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Cancellation Cleanup",
+                SceneNameInput = "Main",
+                AgentTaskInput = "Inspect the project."
+            };
+            await viewModel.ApplyOpenAiApiKeyAsync(sessionCredential);
+            await ExecuteAsync(viewModel.CreateCommand);
+            var run = ExecuteAsync(viewModel.RunAgentCommand);
+            await model.WaitForChatAsync();
+
+            var agentCancellation = Assert.IsType<CancellationTokenSource>(
+                typeof(RekallAgeStudioViewModel)
+                    .GetField("_agentCancellation", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+                    .GetValue(viewModel));
+            using var throwingRegistration = agentCancellation.Token.Register(() =>
+            {
+                model.ReleaseChat();
+                throw new InvalidDataException(upstreamPayload);
+            });
+            var shutdown = viewModel.DisposeAsync().AsTask();
+            await Task.WhenAll(run, shutdown);
+
+            Assert.True(preview.IsDisposed);
+            Assert.False(viewModel.HasSessionOpenAiCredential);
+            Assert.False(viewModel.RefreshLanguageModelsCommand.CanExecute(null));
+            var inspectable = string.Join('\n', [viewModel.ProviderStatus, viewModel.StatusText, .. viewModel.ValidationLines]);
+            Assert.Contains("REKALL_STUDIO_LANGUAGE_MODEL_SHUTDOWN_FAILED", inspectable, StringComparison.Ordinal);
+            Assert.DoesNotContain(sessionCredential, inspectable, StringComparison.Ordinal);
+            Assert.DoesNotContain(upstreamPayload, inspectable, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (viewModel is not null)
+            {
+                try { await viewModel.DisposeAsync(); }
+                catch { }
+            }
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task PartialComparisonFailureKeepsUsableTypedEvidenceVisibleWithItsError()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-partial-comparison-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await CreateQualityProjectAsync(root);
+            var registry = new RekallAgeCommandRegistry();
+            registry.Register(new PartialQualityComparisonCommand());
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(registry),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.OpenCommand);
+
+            await ExecuteAsync(viewModel.CompareQualityCommand);
+
+            var comparison = Assert.Single(viewModel.RenderQualityComparisons);
+            Assert.Equal("D:/captures/partial-high.png", comparison.ScreenshotPath);
+            Assert.Equal("High", viewModel.ResolvedQualityPreset);
+            Assert.Single(viewModel.RenderDebugViews);
+            Assert.Contains(viewModel.ValidationLines, line =>
+                line.Contains("REKALL_TEST_PARTIAL_COMPARISON", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DisposeCancelsAndAwaitsActiveQualityCaptureBeforePreviewDependencies()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-cancel-quality-" + Guid.NewGuid().ToString("N"));
+        RekallAgeStudioViewModel? viewModel = null;
+        Task? captureTask = null;
+        Task? disposeTask = null;
+        var command = new CancellationBlockingCaptureCommand();
+        var preview = new RecordingPreviewSession();
+        preview.BlockDispose();
+        try
+        {
+            await CreateQualityProjectAsync(root);
+            var registry = new RekallAgeCommandRegistry();
+            registry.Register(command);
+            viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(registry),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.OpenCommand);
+
+            captureTask = ExecuteAsync(viewModel.CaptureQualityCommand);
+            await command.WaitForStartAsync();
+            var cancellationObserved = command.WaitForCancellationAsync();
+            var previewDisposeEntered = preview.WaitForDisposeAsync();
+            disposeTask = viewModel.DisposeAsync().AsTask();
+
+            var firstLifecycleSignal = await Task.WhenAny(cancellationObserved, previewDisposeEntered);
+
+            Assert.Same(cancellationObserved, firstLifecycleSignal);
+            Assert.False(previewDisposeEntered.IsCompleted);
+        }
+        finally
+        {
+            command.Release();
+            preview.ReleaseDispose();
+            if (captureTask is not null) await captureTask.WaitAsync(TimeSpan.FromSeconds(5));
+            if (disposeTask is not null) await disposeTask.WaitAsync(TimeSpan.FromSeconds(5));
+            else if (viewModel is not null) await viewModel.DisposeAsync();
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+
+        Assert.DoesNotContain(viewModel!.ValidationLines, line =>
+            line.Contains("REKALL_STUDIO_UNEXPECTED_FAILURE", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AttachQualityProfileUsesTheSharedBuiltInComponentContract()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-attach-quality-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Attach Quality",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+
+            Assert.True(viewModel.AttachQualityProfileCommand.CanExecute(null));
+            await ExecuteAsync(viewModel.AttachQualityProfileCommand);
+
+            Assert.True(viewModel.ApplyQualityCommand.CanExecute(null), viewModel.StatusText);
+            Assert.Contains(viewModel.ComponentSchemas, schema => schema.Type == "Rekall.RenderQualityProfile");
+            var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            var profile = Assert.Single(
+                Assert.Single(scene.Entities).Components,
+                component => component.Type == "Rekall.RenderQualityProfile");
+            Assert.Equal("High", profile.Properties["preset"]!.GetValue<string>());
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task QualityControlsPersistGenericComponentMutationsWithoutChangingGameplayState()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-quality-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await new RekallAgeProjectStore().SaveAsync(
+                root,
+                RekallAgeProjectManifest.Create("Quality Controls", ["world", "rendering3d"]),
+                CancellationToken.None);
+            var quality = RekallAgeEntityDocument.Create("Render Settings", ["rendering"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.RenderQualityProfile",
+                    new JsonObject { ["preset"] = "High" }));
+            var gameplay = RekallAgeEntityDocument.Create("Runtime State", ["gameplay"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Game.RuntimeState",
+                    new JsonObject { ["score"] = 41, ["active"] = true }));
+            await new RekallAgeSceneStore().SaveAsync(
+                root,
+                RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+                    .AddEntity(quality)
+                    .AddEntity(gameplay),
+                CancellationToken.None);
+
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.OpenCommand);
+            Assert.Equal(["Performance", "Low", "Medium", "High", "Ultra", "Epic"], viewModel.QualityPresets);
+            Assert.Equal("High", viewModel.RequestedQualityPreset);
+            Assert.Equal("Unavailable", viewModel.ResolvedQualityPreset);
+            Assert.Equal("Unavailable", viewModel.TotalGpuMillisecondsText);
+            viewModel.SelectedQualityPreset = "Epic";
+            viewModel.QualityResolutionScaleInput = "0.8";
+            viewModel.QualityShadowCascadeCountInput = "4";
+            viewModel.QualityShadowResolutionInput = "4096";
+            viewModel.QualityFogModeInput = "froxel-high";
+            viewModel.QualityBloomOverride = false;
+            viewModel.QualitySsaoOverride = true;
+            viewModel.QualityMaximumActiveParticlesInput = "128000";
+
+            await ExecuteAsync(viewModel.ApplyQualityCommand);
+
+            var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            var savedQuality = Assert.Single(
+                scene.GetRequiredEntity(quality.Id).Components,
+                component => component.Type == "Rekall.RenderQualityProfile");
+            Assert.Equal("Epic", savedQuality.Properties["preset"]!.GetValue<string>());
+            Assert.Equal(0.8, savedQuality.Properties["resolutionScale"]!.GetValue<double>());
+            Assert.Equal(4, savedQuality.Properties["shadowCascadeCount"]!.GetValue<int>());
+            Assert.Equal(4096, savedQuality.Properties["shadowResolution"]!.GetValue<int>());
+            Assert.Equal("froxel-high", savedQuality.Properties["fogMode"]!.GetValue<string>());
+            Assert.False(savedQuality.Properties["bloom"]!.GetValue<bool>());
+            Assert.True(savedQuality.Properties["ssao"]!.GetValue<bool>());
+            Assert.Equal(128000, savedQuality.Properties["maximumActiveParticles"]!.GetValue<int>());
+            var savedGameplay = Assert.Single(
+                scene.GetRequiredEntity(gameplay.Id).Components,
+                component => component.Type == "Game.RuntimeState");
+            Assert.Equal(41, savedGameplay.Properties["score"]!.GetValue<int>());
+            Assert.True(savedGameplay.Properties["active"]!.GetValue<bool>());
+
+            var transactions = await new RekallAgeTransactionLogStore().LoadAsync(root, CancellationToken.None);
+            Assert.Contains(transactions.Transactions, transaction =>
+                transaction.Actor == "studio" && transaction.Name.StartsWith("Set render quality", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task PublishedAndPlacedStudioModelSurvivesWindowsPackagingAndPlayableAudit()
     {
@@ -518,6 +1280,93 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task OrbitingMeshViewportChangesRenderedImageWithoutMutatingMeshData()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-orbit-camera-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Orbit Camera Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.SelectedMeshPrimitive = "box";
+            viewModel.MeshPrimitiveAssetIdInput = "hero-box";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            var before = viewModel.MeshViewportImage;
+            var mesh = await new RekallAgeMeshAssetStore().LoadAsync(root, "hero-box", CancellationToken.None);
+
+            viewModel.OrbitMeshViewport(0.4, 0.1);
+
+            Assert.NotSame(before, viewModel.MeshViewportImage);
+            var meshAfterOrbit = await new RekallAgeMeshAssetStore().LoadAsync(root, "hero-box", CancellationToken.None);
+            Assert.Equal(mesh.Revision, meshAfterOrbit.Revision);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task OpeningADifferentMeshAssetResetsCameraButReopeningSameMeshStartsFreshToo()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-orbit-reset-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Orbit Reset Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.SelectedMeshPrimitive = "box";
+            viewModel.MeshPrimitiveAssetIdInput = "box-a";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            viewModel.MeshPrimitiveAssetIdInput = "box-b";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            // box-b is now open at the identity camera (CreateMeshPrimitiveAsync opens what it creates).
+            var identityImageForBoxB = viewModel.MeshViewportImage;
+
+            viewModel.SelectedMeshAssetId = "box-a";
+            await ExecuteAsync(viewModel.OpenMeshAssetCommand);
+            viewModel.OrbitMeshViewport(0.6, 0.2);
+            var orbitedImageForBoxA = viewModel.MeshViewportImage;
+            Assert.NotSame(identityImageForBoxB, orbitedImageForBoxA);
+
+            viewModel.SelectedMeshAssetId = "box-b";
+            await ExecuteAsync(viewModel.OpenMeshAssetCommand);
+
+            // Re-opening box-b must start at the identity camera again, not inherit box-a's orbit.
+            var reopenedBoxBBytes = ToBytes(viewModel.MeshViewportImage!);
+            var identityBoxBBytes = ToBytes(identityImageForBoxB!);
+            Assert.Equal(identityBoxBBytes, reopenedBoxBBytes);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+
+        static byte[] ToBytes(System.Windows.Media.Imaging.BitmapSource image)
+        {
+            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
+            using var stream = new MemoryStream();
+            encoder.Save(stream);
+            return stream.ToArray();
+        }
+    }
+
+    [Fact]
     public async Task ViewModelExposesDistinctEditAndPersistentSimulateModes()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-mode-" + Guid.NewGuid().ToString("N"));
@@ -797,6 +1646,44 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task HeadlessOpenAiAutomationStopsAtTheStableCredentialGateAndWritesEvidence()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-openai-gate-" + Guid.NewGuid().ToString("N"));
+        var evidence = Path.Combine(root, "evidence", "result.json");
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = " " },
+            () => new HttpClient(new ProviderLifecycleHandler(blockOllamaChat: false), disposeHandler: true));
+        try
+        {
+            var result = await RekallAgeStudioAutomation.RunWithCatalogAsync(
+                new RekallAgeStudioAutomationOptions(
+                    root,
+                    "Credential Gate",
+                    "Main",
+                    "gpt-5.6-sol",
+                    "Author a game.",
+                    evidence)
+                {
+                    Provider = "openai"
+                },
+                catalog,
+                CancellationToken.None);
+
+            const string expected =
+                "REKALL_OPENAI_API_KEY_MISSING: OpenAI requires OPENAI_API_KEY or a session-only API key.";
+            Assert.False(result.Succeeded);
+            Assert.Equal(expected, result.Status);
+            Assert.False(File.Exists(Path.Combine(root, "rekall.project.json")));
+            Assert.True(File.Exists(evidence));
+            Assert.Contains(expected, await File.ReadAllTextAsync(evidence), StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task StudioStartsWithAnEmptyOrdinaryLanguageAuthoringRequest()
     {
         await using var viewModel = new RekallAgeStudioViewModel(
@@ -816,6 +1703,7 @@ public sealed class StudioViewModelTests
                 "--project", "game",
                 "--project-name", "Game",
                 "--scene", "Main",
+                "--provider", "openai",
                 "--model", "model",
                 "--task", "Author a game",
                 "--evidence", "evidence.json",
@@ -827,12 +1715,33 @@ public sealed class StudioViewModelTests
 
         Assert.True(parsed, error);
         Assert.Equal("game", options!.ProjectRoot);
+        Assert.Equal("openai", options.Provider);
         Assert.False(options.TreatGauntletAsTerminalSuccess);
         Assert.Equal(40, options.MaxTurns);
         Assert.False(RekallAgeStudioAutomation.TryParse(
             [RekallAgeStudioAutomation.AutomationSwitch, "--project", "game"],
             out _, out var missing));
         Assert.Contains("--model", missing, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AutomationArgumentsAcceptCodexAsAProjectAgentProvider()
+    {
+        var parsed = RekallAgeStudioAutomation.TryParse(
+            [
+                RekallAgeStudioAutomation.AutomationSwitch,
+                "--project", "game",
+                "--project-name", "Game",
+                "--provider", "codex",
+                "--model", "gpt-5.6-sol",
+                "--task", "Author and prove a game",
+                "--evidence", "evidence.json"
+            ],
+            out var options,
+            out var error);
+
+        Assert.True(parsed, error);
+        Assert.Equal("codex", options!.Provider);
     }
 
     [Fact]
@@ -853,6 +1762,12 @@ public sealed class StudioViewModelTests
             Assert.NotEmpty(result.AgentToolExecutions);
             Assert.True(File.Exists(result.PackageArchivePath));
             Assert.True(File.Exists(evidence));
+            Assert.Contains("provider: deterministic", result.AgentTranscript);
+            Assert.Contains("model: deterministic", result.AgentTranscript);
+            Assert.Contains(result.AgentTranscript, line => line.StartsWith("response: deterministic-response-", StringComparison.Ordinal));
+            Assert.Contains("usage: input=200 output=20 cached=unavailable reasoning=unavailable", result.AgentTranscript);
+            Assert.Contains("tools: 2", result.AgentTranscript);
+            Assert.Contains(result.AgentTranscript, line => line.StartsWith("elapsed: ", StringComparison.Ordinal) && line.EndsWith(" ms", StringComparison.Ordinal));
         }
         finally
         {
@@ -1019,6 +1934,211 @@ public sealed class StudioViewModelTests
     private static Task ExecuteAsync(System.Windows.Input.ICommand command) =>
         ((RekallAgeAsyncCommand)command).ExecuteAsync(null);
 
+    private static async Task CreateQualityProjectAsync(string root)
+    {
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Studio Quality", ["world", "rendering3d"]),
+            default);
+        var quality = RekallAgeEntityDocument.Create("Quality", ["rendering"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.RenderQualityProfile",
+                new JsonObject { ["preset"] = "High" }));
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"]).AddEntity(quality),
+            default);
+    }
+
+    private static RekallAgeQualityPresetCapture PartialQualityCapture(bool nonBlank = false) => new(
+        "High",
+        "High",
+        1,
+        "D:/captures/partial-high.png",
+        nonBlank,
+        320,
+        180,
+        320,
+        180,
+        4096,
+        1,
+        0,
+        [],
+        new RekallAgeGpuFrameTimingReport(
+            true,
+            null,
+            1,
+            [new RekallAgeGpuPassTiming("forward", 2_000_000, 2)],
+            2_500_000,
+            2.5,
+            "vulkan-timestamp-query"),
+        RekallAgeViewportFrameAnalysis.NotAnalyzed);
+
+    private sealed class PartialQualityComparisonCommand
+        : IRekallAgeCommand<CompareQualityPresetsRequest, CompareQualityPresetsResult>
+    {
+        public string Name => "rekall.render.compare_quality_presets";
+        public RekallAgeCommandSchema Schema => new(
+            Name,
+            "Returns one usable comparison capture followed by a deterministic failure.",
+            typeof(CompareQualityPresetsRequest).FullName!,
+            typeof(CompareQualityPresetsResult).FullName!);
+
+        public ValueTask<RekallAgeCommandResult<CompareQualityPresetsResult>> ExecuteAsync(
+            CompareQualityPresetsRequest request,
+            RekallAgeCommandContext context)
+        {
+            var value = new CompareQualityPresetsResult(
+                request.SceneName,
+                1,
+                [PartialQualityCapture()],
+                ["command execute rekall.render.performance.inspect_scene_budget"]);
+            var error = new RekallAgeCommandError(
+                "REKALL_TEST_PARTIAL_COMPARISON",
+                "The second requested preset failed after the first capture completed.",
+                "Performance");
+            return ValueTask.FromResult(RekallAgeCommandResult<CompareQualityPresetsResult>.Failure(
+                value,
+                error.Message,
+                [error]));
+        }
+    }
+
+    private sealed class CancellationBlockingCaptureCommand
+        : IRekallAgeCommand<CaptureRuntimeViewportRequest, CaptureRuntimeViewportResult>
+    {
+        private readonly TaskCompletionSource _started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _cancellationObserved = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public string Name => "rekall.render.capture_runtime_viewport";
+        public RekallAgeCommandSchema Schema => new(
+            Name,
+            "Waits deterministically for lifecycle cancellation.",
+            typeof(CaptureRuntimeViewportRequest).FullName!,
+            typeof(CaptureRuntimeViewportResult).FullName!);
+
+        public async ValueTask<RekallAgeCommandResult<CaptureRuntimeViewportResult>> ExecuteAsync(
+            CaptureRuntimeViewportRequest request,
+            RekallAgeCommandContext context)
+        {
+            _started.TrySetResult();
+            using var registration = context.CancellationToken.Register(() => _cancellationObserved.TrySetResult());
+            var signal = await Task.WhenAny(_cancellationObserved.Task, _release.Task);
+            if (ReferenceEquals(signal, _cancellationObserved.Task))
+            {
+                await _release.Task;
+                context.CancellationToken.ThrowIfCancellationRequested();
+            }
+
+            var error = new RekallAgeCommandError("REKALL_TEST_CAPTURE_RELEASED", "The deterministic capture was released by its test.");
+            return RekallAgeCommandResult<CaptureRuntimeViewportResult>.Failure(
+                default!,
+                error.Message,
+                [error]);
+        }
+
+        public Task WaitForStartAsync() => _started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        public Task WaitForCancellationAsync() => _cancellationObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        public void Release() => _release.TrySetResult();
+    }
+
+    private sealed class ProviderLifecycleHandler(
+        bool blockOllamaChat,
+        bool blockOllamaModels = false,
+        IReadOnlyList<string>? openAiModels = null,
+        bool pauseModelResponse = false,
+        Exception? modelFailure = null,
+        Exception? chatFailure = null) : HttpMessageHandler
+    {
+        private readonly TaskCompletionSource _chatStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _modelsStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _modelsRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _disposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly ConcurrentQueue<string> _events = new();
+
+        public IReadOnlyList<string> Events => _events.ToArray();
+
+        public Task WaitForChatAsync() => _chatStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        public Task WaitForModelsAsync() => _modelsStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        public void ReleaseModels() => _modelsRelease.TrySetResult();
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/api/tags", StringComparison.Ordinal))
+            {
+                _modelsStarted.TrySetResult();
+                if (blockOllamaModels)
+                {
+                    var cancellation = Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                    var completed = await Task.WhenAny(cancellation, _disposed.Task);
+                    if (ReferenceEquals(completed, cancellation))
+                    {
+                        _events.Enqueue("models-cancelled");
+                        await cancellation;
+                    }
+
+                    throw new OperationCanceledException("The provider lease was disposed before model refresh cancellation was observed.");
+                }
+                if (pauseModelResponse) await _modelsRelease.Task.WaitAsync(cancellationToken);
+                if (modelFailure is not null) throw modelFailure;
+                return JsonResponse("""
+                    {"models":[{"name":"qwen3.5:35b","size":24000000000},{"name":"gemma3:latest","size":3000}]}
+                    """);
+            }
+
+            if (request.RequestUri.AbsolutePath.EndsWith("/api/chat", StringComparison.Ordinal))
+            {
+                _chatStarted.TrySetResult();
+                if (chatFailure is not null) throw chatFailure;
+                if (blockOllamaChat)
+                {
+                    try
+                    {
+                        await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _events.Enqueue("chat-cancelled");
+                        throw;
+                    }
+                }
+
+                return JsonResponse("""
+                    {"model":"qwen3.5:35b","message":{"role":"assistant","content":"complete"},"done":true,"done_reason":"stop","total_duration":1,"prompt_eval_count":1,"eval_count":1}
+                    """);
+            }
+
+            if (request.RequestUri.AbsolutePath.EndsWith("/models", StringComparison.Ordinal))
+            {
+                _modelsStarted.TrySetResult();
+                if (pauseModelResponse) await _modelsRelease.Task.WaitAsync(cancellationToken);
+                if (modelFailure is not null) throw modelFailure;
+                var models = openAiModels ?? ["gpt-5.6-sol-preview", "gpt-5.6-sol"];
+                return JsonResponse(new JsonObject
+                {
+                    ["data"] = new JsonArray(models.Select(model => new JsonObject { ["id"] = model }).ToArray())
+                }.ToJsonString());
+            }
+
+            throw new InvalidOperationException($"Unexpected provider request: {request.Method} {request.RequestUri.AbsolutePath}");
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            _events.Enqueue("lease-disposed");
+            _disposed.TrySetResult();
+            base.Dispose(disposing);
+        }
+
+        private static HttpResponseMessage JsonResponse(string json) => new(HttpStatusCode.OK)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+    }
+
     private sealed class GauntletModel(string projectRoot) : IRekallAgeLanguageModelClient
     {
         private int _calls;
@@ -1048,8 +2168,36 @@ public sealed class StudioViewModelTests
                 "Run the complete generic proof.",
                 [call],
                 "tool_calls",
-                new RekallAgeLanguageModelUsage(100, 10, 1)));
+                new RekallAgeLanguageModelUsage(100, 10, 1))
+            {
+                ResponseId = $"deterministic-response-{_calls}"
+            });
         }
+    }
+
+    private sealed class BlockingFaultingModel(string failurePayload) : IRekallAgeLanguageModelClient
+    {
+        private readonly TaskCompletionSource _chatStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _releaseChat = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public string ProviderId => "deterministic";
+
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>(
+                [new RekallAgeLanguageModelInfo("qwen3.5:35b", 1)]);
+
+        public async ValueTask<RekallAgeLanguageModelResponse> ChatAsync(
+            RekallAgeLanguageModelRequest request,
+            CancellationToken cancellationToken)
+        {
+            _chatStarted.TrySetResult();
+            await _releaseChat.Task;
+            throw new InvalidDataException(failurePayload);
+        }
+
+        public Task WaitForChatAsync() => _chatStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        public void ReleaseChat() => _releaseChat.TrySetResult();
     }
 
     private sealed class RecordingPreviewSession : IRekallAgeStudioPreviewSession
@@ -1062,6 +2210,7 @@ public sealed class StudioViewModelTests
         public int ResetCount { get; private set; }
         public int StepCount { get; private set; }
         public List<RekallAgeStudioViewportPickRegion> Regions { get; } = [];
+        public bool IsDisposed { get; private set; }
 
         public ValueTask<RekallAgeStudioPreviewFrame> ResetAsync(
             string projectRoot,
@@ -1087,6 +2236,7 @@ public sealed class StudioViewModelTests
 
         public ValueTask DisposeAsync()
         {
+            IsDisposed = true;
             _disposeEntered?.TrySetResult();
             return _disposeBlocked is null ? ValueTask.CompletedTask : new ValueTask(_disposeBlocked.Task);
         }
@@ -1136,6 +2286,61 @@ public sealed class StudioViewModelTests
             return new RekallAgeStudioPreviewFrame(
                 image, frame, 0, 0, "software-live",
                 new RekallAgeStudioViewportInteractionSnapshot(100, 100, Regions));
+        }
+    }
+
+    private sealed class UnauthenticatedCodexRunner : IRekallAgeCodexProjectAgentRunner
+    {
+        private bool _authenticated;
+        public int DisposeCount { get; private set; }
+        public Uri? LaunchedUri { get; set; }
+        public string ProviderId => "codex";
+        public RekallAgeCodexApprovalCallback? ApprovalCallback { get; set; }
+        public RekallAgeLanguageModelProviderDescriptor CurrentProviderDescriptor { get; private set; } =
+            RekallAgeLanguageModelProviderCatalog.DescribeCodexProvider(
+                new RekallAgeCodexAccount(null, true, false));
+
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_authenticated)
+            {
+                return ValueTask.FromException<IReadOnlyList<RekallAgeLanguageModelInfo>>(
+                    new RekallAgeLanguageModelProviderException(
+                        RekallAgeCodexErrorCodes.AuthenticationRequired, "codex",
+                        "Codex authentication is required. Sign in through Codex and retry."));
+            }
+            return ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>(
+                [new RekallAgeLanguageModelInfo(RekallAgeCodexProjectAgentRunner.RequiredModel, 0)]);
+        }
+
+        public async ValueTask<RekallAgeCodexAccount> SignInWithChatGptAsync(
+            RekallAgeCodexAuthenticationLauncher launchAuthentication,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await launchAuthentication(new Uri("https://chatgpt.com/sign-in"));
+            _authenticated = true;
+            var account = new RekallAgeCodexAccount("chatgpt", true, true);
+            CurrentProviderDescriptor = RekallAgeLanguageModelProviderCatalog.DescribeCodexProvider(account);
+            return account;
+        }
+
+        public ValueTask<RekallAgeProjectAgentSessionResult> RunAsync(
+            RekallAgeProjectAgentSessionRequest request,
+            IProgress<RekallAgeLanguageModelAgentProgress>? progress,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromException<RekallAgeProjectAgentSessionResult>(new NotSupportedException());
+
+        public ValueTask<RekallAgeLanguageModelResponse> ChatAsync(
+            RekallAgeLanguageModelRequest request,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromException<RekallAgeLanguageModelResponse>(new NotSupportedException());
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            return ValueTask.CompletedTask;
         }
     }
 

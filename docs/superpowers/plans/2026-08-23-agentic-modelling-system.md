@@ -120,6 +120,15 @@ then grow it into procedural geometry/material graphs and Studio modelling.
 - [ ] Expand generic topology, UV, boolean, subdivision, remesh, and optimization
   operations only behind strict tests.
 
+  **Escalated 2026-08-25:** The first foundation was not a comprehensive
+  modeling system and was visibly insufficient for Aetherfall. The full
+  Blender/Godot-informed capability matrix, four delivery waves, exact Wave 1
+  catalog gate, and real-player acceptance are now governed by
+  `docs/superpowers/specs/2026-08-25-comprehensive-agentic-modeling-design.md`
+  and
+  `docs/superpowers/plans/2026-08-25-comprehensive-agentic-modeling-expansion.md`.
+  This item cannot be closed by the original ten-operation catalog.
+
 ### Task 9: Studio modelling and advanced world authoring
 
 - [x] Add the first persisted procedural-graph browser/viewer with canonical

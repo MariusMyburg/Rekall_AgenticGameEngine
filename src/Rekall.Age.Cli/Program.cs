@@ -17,6 +17,7 @@ using Rekall.Age.Playback.Commands;
 using Rekall.Age.Project;
 using Rekall.Age.Project.Commands;
 using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.Runtime.Commands;
@@ -26,6 +27,7 @@ using Rekall.Age.Workflows;
 using Rekall.Age.Workflows.Commands;
 using Rekall.Age.World;
 using Rekall.Age.World.Commands;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Serilog;
@@ -54,15 +56,23 @@ internal static class RekallAgeCli
             var context = new RekallAgeCommandContext(IsMcpStdio(args) ? "mcp" : "cli", transaction, cancellationToken);
             var exitCode = args switch
             {
-                ["agent", "models", "ollama"] => await ListOllamaModelsAsync(cancellationToken),
-                ["agent", "run", "ollama", var model, var task] =>
-                    await RunOllamaAgentAsync(registry, model, task, "24", cancellationToken),
-                ["agent", "run", "ollama", var model, var task, var maxTurns] =>
-                    await RunOllamaAgentAsync(registry, model, task, maxTurns, cancellationToken),
-                ["agent", "run-project", "ollama", var model, var root, var scene, var task] =>
-                    await RunProjectOllamaAgentAsync(registry, model, root, scene, task, "24", cancellationToken),
-                ["agent", "run-project", "ollama", var model, var root, var scene, var task, var maxTurns] =>
-                    await RunProjectOllamaAgentAsync(registry, model, root, scene, task, maxTurns, cancellationToken),
+                ["agent", "providers"] => ListLanguageModelProviders(),
+                ["agent", "models", var provider] =>
+                    await ListLanguageModelsAsync(registry, provider, cancellationToken),
+                ["agent", "auth", var provider, "status"] =>
+                    await ShowLanguageModelAuthenticationStatusAsync(registry, provider, cancellationToken),
+                ["agent", "auth", var provider, "login"] =>
+                    await SignInLanguageModelProviderAsync(registry, provider, cancellationToken),
+                ["agent", "run", var provider, var model, var task] =>
+                    await RunLanguageModelAgentAsync(registry, provider, model, task, "24", cancellationToken),
+                ["agent", "run", var provider, var model, var task, var maxTurns] =>
+                    await RunLanguageModelAgentAsync(registry, provider, model, task, maxTurns, cancellationToken),
+                ["agent", "run-project", var provider, var model, var root, var scene, var task] =>
+                    await RunProjectLanguageModelAgentAsync(registry, provider, model, root, scene, task, "24", null, cancellationToken),
+                ["agent", "run-project", var provider, var model, var root, var scene, var task, var maxTurns] =>
+                    await RunProjectLanguageModelAgentAsync(registry, provider, model, root, scene, task, maxTurns, null, cancellationToken),
+                ["agent", "run-project", var provider, var model, var root, var scene, var task, "--approval-policy", var approvalPolicy] =>
+                    await RunProjectLanguageModelAgentAsync(registry, provider, model, root, scene, task, "24", approvalPolicy, cancellationToken),
                 ["distribution", "assemble", var output, var cli, var studio, var headless, var windows, var sdk, var readme, var notice, var thirdParty] =>
                     await AssembleDistributionAsync(
                         registry, context, output, cli, studio, headless, windows, sdk, readme, notice, thirdParty),
@@ -99,6 +109,19 @@ internal static class RekallAgeCli
                     await InspectScenePerformanceBudgetAsync(registry, context, root, scene, frames, "1920", "1080", profile),
                 ["render", "performance", "budget", var root, var scene, var profile, var frames, var width, var height] =>
                     await InspectScenePerformanceBudgetAsync(registry, context, root, scene, frames, width, height, profile),
+                ["render", "performance", "budget", var root, var scene, var profile, var frames, var width, var height, var qualityPreset, var overridesJson, var includeGpuTimings] =>
+                    await InspectScenePerformanceBudgetAsync(
+                        registry,
+                        context,
+                        root,
+                        scene,
+                        frames,
+                        width,
+                        height,
+                        profile,
+                        qualityPreset,
+                        overridesJson,
+                        includeGpuTimings),
                 ["render", "virtual-geometry", "inspect", var root, var scene] =>
                     await InspectVirtualGeometrySceneAsync(registry, context, root, scene, "0", "1920", "1080"),
                 ["render", "virtual-geometry", "inspect", var root, var scene, var frames] =>
@@ -206,11 +229,41 @@ internal static class RekallAgeCli
                     await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height, backend, null),
                 ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory, var width, var height, var backend, var inputsJson] =>
                     await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height, backend, inputsJson),
+                ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory, var width, var height, var backend, var inputsJson, var qualityPreset, var overridesJson, var includeGpuTimings] =>
+                    await CaptureRuntimeViewportAsync(
+                        registry,
+                        context,
+                        root,
+                        scene,
+                        frames,
+                        outputDirectory,
+                        width,
+                        height,
+                        backend,
+                        inputsJson,
+                        qualityPreset,
+                        overridesJson,
+                        includeGpuTimings),
+                ["render", "quality", "compare", var root, var scene, var frames, var outputDirectory, var width, var height, var backend, var presets, var overridesJson, var includeGpuTimings] =>
+                    await CompareQualityPresetsAsync(
+                        registry,
+                        context,
+                        root,
+                        scene,
+                        frames,
+                        outputDirectory,
+                        width,
+                        height,
+                        backend,
+                        presets,
+                        overridesJson,
+                        includeGpuTimings),
                 ["render", "glb", "export", var root, var scene, var outputPath] =>
                     await ExportSceneGlbAsync(registry, context, root, scene, outputPath, "0"),
                 ["render", "glb", "export", var root, var scene, var outputPath, var frames] =>
                     await ExportSceneGlbAsync(registry, context, root, scene, outputPath, frames),
                 ["mcp", "stdio"] => await RunMcpStdioAsync(registry, context),
+                ["mcp", "stdio", "--project-root", var root] => await RunMcpStdioAsync(registry, context, root),
                 ["command", "execute", var name, var argumentsJson] =>
                     await ExecuteRegisteredCommandAsync(registry, context, name, argumentsJson),
                 ["studio", "open", var root, var scene] => await OpenStudioModelAsync(root, scene),
@@ -448,6 +501,19 @@ internal static class RekallAgeCli
             Console.Error.WriteLine($"{ex.Code}: {ex.Message}");
             return 1;
         }
+        catch (RekallAgeLanguageModelProviderException ex)
+        {
+            Log.Error(ex, "Language-model provider command failed. Provider={Provider} Code={Code} Args={Args} LogDirectory={LogDirectory}", ex.ProviderId, ex.Code, DescribeInvocation(args), logDirectory);
+            WriteLanguageModelProviderDiagnostic(ex);
+            return 1;
+        }
+        catch (OperationCanceledException) when (
+            IsUserRequestedLanguageModelCancellation(args, cancellationToken))
+        {
+            Log.Information("Language-model command cancelled. Args={Args} LogDirectory={LogDirectory}", DescribeInvocation(args), logDirectory);
+            Console.Error.WriteLine("REKALL_LANGUAGE_MODEL_CANCELLED: The language-model operation was cancelled.");
+            return 1;
+        }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
         {
             Log.Error(ex, "CLI command failed. Args={Args} LogDirectory={LogDirectory}", DescribeInvocation(args), logDirectory);
@@ -619,14 +685,22 @@ internal static class RekallAgeCli
         string frames,
         string width,
         string height,
-        string profile)
+        string profile,
+        string? qualityPreset = null,
+        string? qualityOverridesJson = null,
+        string includeGpuTimings = "false")
     {
         var frameCount = int.Parse(frames, CultureInfo.InvariantCulture);
         var viewportWidth = int.Parse(width, CultureInfo.InvariantCulture);
         var viewportHeight = int.Parse(height, CultureInfo.InvariantCulture);
         var result = await registry.ExecuteAsync<InspectScenePerformanceBudgetRequest, InspectScenePerformanceBudgetResult>(
             "rekall.render.performance.inspect_scene_budget",
-            new InspectScenePerformanceBudgetRequest(root, scene, frameCount, viewportWidth, viewportHeight, profile),
+            new InspectScenePerformanceBudgetRequest(root, scene, frameCount, viewportWidth, viewportHeight, profile)
+            {
+                QualityPreset = qualityPreset,
+                QualityOverrides = ParseQualityOverrides(qualityOverridesJson),
+                IncludeGpuTimings = bool.Parse(includeGpuTimings)
+            },
             context);
         Console.WriteLine(result.Summary);
         Console.WriteLine($"Profile: {result.Value.Profile}; target FPS: {result.Value.TargetFramesPerSecond}");
@@ -636,6 +710,8 @@ internal static class RekallAgeCli
         Console.WriteLine($"Textures: {result.Value.TextureCount}; runtime textures: {result.Value.RuntimeTextureCount}; asset issues: {result.Value.AssetIssueCount}");
         Console.WriteLine($"Stereo: {result.Value.StereoEnabled}; multiview: {result.Value.UsesSinglePassMultiview}; eyes: {result.Value.EyeCount}");
         Console.WriteLine($"Render target pixels: {result.Value.EstimatedRenderTargetPixels}; geometry bytes: {result.Value.EstimatedGeometryBytes}");
+        PrintQualityReport(result.Value.QualityPlan, result.Value.GpuTimings, result.Value.ResourceBytes);
+        Console.WriteLine($"Resource bytes: {result.Value.ResourceBytes}; workload draws: {result.Value.RenderWorkloadDrawCount}; workload dispatches: {result.Value.RenderWorkloadDispatchCount}");
         Console.WriteLine($"Budget: draws {result.Value.Limits.MaxDrawInvocations}, triangles {result.Value.Limits.MaxTriangles}, vertices {result.Value.Limits.MaxVertices}, textures {result.Value.Limits.MaxTextures}, pixels {result.Value.Limits.MaxRenderTargetPixels}");
         foreach (var camera in result.Value.CameraMasks)
         {
@@ -665,6 +741,11 @@ internal static class RekallAgeCli
         foreach (var recommendation in result.Value.Recommendations)
         {
             Console.WriteLine($"Recommendation: {recommendation}");
+        }
+
+        foreach (var command in result.Value.SuggestedCommands)
+        {
+            Console.WriteLine($"Next: {command}");
         }
 
         return result.Ok ? 0 : 1;
@@ -816,7 +897,7 @@ internal static class RekallAgeCli
         foreach (var renderable in result.Value.Renderables)
         {
             Console.WriteLine(
-                $"Virtual geometry: {renderable.EntityName}; enabled: {renderable.Enabled}; meshes: {renderable.MeshCount}; source: {renderable.SourceTriangles}; selected: {renderable.SelectedTriangles}; reduced: {renderable.ReducedTriangles}; lod: {renderable.SelectedLodLevel}; max selected: {renderable.MaxSelectedTriangles}; cluster triangles: {renderable.ClusterTriangleCount}; pixel error: {renderable.TargetPixelError:F3}");
+                $"Virtual geometry: {renderable.EntityName}; enabled: {renderable.Enabled}; meshes: {renderable.MeshCount}; source: {renderable.SourceTriangles}; selected: {renderable.SelectedTriangles}; reduced: {renderable.ReducedTriangles}; lod: {renderable.SelectedLodLevel}; max selected: {renderable.MaxSelectedTriangles}; budget satisfied: {renderable.BudgetSatisfied}; cluster triangles: {renderable.ClusterTriangleCount}; pixel error: {renderable.TargetPixelError:F3}");
         }
 
         foreach (var recommendation in result.Value.Recommendations)
@@ -2243,9 +2324,10 @@ internal static class RekallAgeCli
 
     private static async Task<int> RunMcpStdioAsync(
         RekallAgeCommandRegistry registry,
-        RekallAgeCommandContext context)
+        RekallAgeCommandContext context,
+        string? projectRoot = null)
     {
-        var server = new RekallAgeMcpJsonRpcServer(registry);
+        var server = new RekallAgeMcpJsonRpcServer(registry, projectRoot);
         await server.RunStdioAsync(Console.In, Console.Out, context);
         return 0;
     }
@@ -3139,12 +3221,56 @@ internal static class RekallAgeCli
         return result.Ok ? 0 : 1;
     }
 
-    private static async Task<int> ListOllamaModelsAsync(CancellationToken cancellationToken)
+    private static int ListLanguageModelProviders()
     {
-        using var httpClient = CreateOllamaHttpClient();
-        var client = new RekallAgeOllamaLanguageModelClient(httpClient, ResolveOllamaBaseUri());
-        var models = await client.ListModelsAsync(cancellationToken);
-        Console.WriteLine($"Ollama models: {models.Count}");
+        foreach (var provider in new RekallAgeLanguageModelProviderCatalog().Providers)
+        {
+            var diagnostics = provider.Diagnostics.Count == 0
+                ? "-"
+                : string.Join(',', provider.Diagnostics.Select(diagnostic => diagnostic.Code));
+            Console.WriteLine(
+                $"{provider.Id}\t{provider.DisplayName}\t{provider.DefaultModel}\t{provider.AuthenticationKind}"
+                + $"\t{provider.AuthenticationState}\t{provider.Availability}\t{diagnostics}");
+        }
+
+        return 0;
+    }
+
+    private static bool IsUserRequestedLanguageModelCancellation(
+        IReadOnlyList<string> arguments,
+        CancellationToken cancellationToken) =>
+        cancellationToken.IsCancellationRequested
+        && arguments.Count >= 2
+        && arguments[0].Equals("agent", StringComparison.OrdinalIgnoreCase)
+        && arguments[1] is "models" or "run" or "run-project" or "auth";
+
+    private static void WriteLanguageModelProviderDiagnostic(RekallAgeLanguageModelProviderException error)
+    {
+        Console.Error.WriteLine($"{error.Code}: {error.Message}");
+        if (!string.IsNullOrWhiteSpace(error.RequestedValue))
+        {
+            Console.Error.WriteLine($"Requested: {BoundedLanguageModelDiagnosticValue(error.RequestedValue)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(error.ResolvedValue))
+        {
+            Console.Error.WriteLine($"Resolved: {BoundedLanguageModelDiagnosticValue(error.ResolvedValue)}");
+        }
+    }
+
+    private static string BoundedLanguageModelDiagnosticValue(string value) =>
+        value.Length <= 128 ? value : value[..127] + "…";
+
+    private static async Task<int> ListLanguageModelsAsync(
+        RekallAgeCommandRegistry registry,
+        string provider,
+        CancellationToken cancellationToken)
+    {
+        var catalog = new RekallAgeLanguageModelProviderCatalog();
+        var descriptor = catalog.Providers.SingleOrDefault(item => item.Id.Equals(provider, StringComparison.OrdinalIgnoreCase));
+        await using var lease = catalog.Acquire(provider, registry);
+        var models = await lease.Runner.ListModelsAsync(cancellationToken);
+        Console.WriteLine($"{descriptor?.DisplayName ?? lease.ProviderId} models: {models.Count}");
         foreach (var model in models)
         {
             Console.WriteLine($"{model.Id}\t{model.SizeBytes}");
@@ -3153,8 +3279,66 @@ internal static class RekallAgeCli
         return 0;
     }
 
-    private static async Task<int> RunOllamaAgentAsync(
+    private static async Task<int> ShowLanguageModelAuthenticationStatusAsync(
         RekallAgeCommandRegistry registry,
+        string provider,
+        CancellationToken cancellationToken)
+    {
+        if (!provider.Equals("codex", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new RekallAgeLanguageModelProviderException(
+                "REKALL_CODEX_AUTH_PROVIDER_REQUIRED",
+                provider,
+                "Authentication status is available here only for the Codex-managed provider.",
+                requestedValue: provider,
+                resolvedValue: "codex");
+        }
+
+        await using var lease = new RekallAgeLanguageModelProviderCatalog().Acquire("codex", registry);
+        var runner = (RekallAgeCodexProjectAgentRunner)lease.Runner;
+        var descriptor = await runner.DescribeProviderAsync(cancellationToken);
+        Console.WriteLine($"Provider: {descriptor.Id}");
+        Console.WriteLine($"Authentication: {descriptor.AuthenticationState}");
+        Console.WriteLine($"Availability: {descriptor.Availability}");
+        Console.WriteLine($"Default model: {descriptor.DefaultModel}");
+        foreach (var diagnostic in descriptor.Diagnostics)
+        {
+            Console.WriteLine($"{diagnostic.Code}: {diagnostic.Message}");
+        }
+        return descriptor.IsAvailable ? 0 : 1;
+    }
+
+    private static async Task<int> SignInLanguageModelProviderAsync(
+        RekallAgeCommandRegistry registry,
+        string provider,
+        CancellationToken cancellationToken)
+    {
+        if (!provider.Equals("codex", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new RekallAgeLanguageModelProviderException(
+                "REKALL_CODEX_AUTH_PROVIDER_REQUIRED", provider,
+                "Interactive sign-in is available here only for the Codex-managed provider.",
+                requestedValue: provider, resolvedValue: "codex");
+        }
+
+        await using var lease = new RekallAgeLanguageModelProviderCatalog().Acquire("codex", registry);
+        var runner = (RekallAgeCodexProjectAgentRunner)lease.Runner;
+        Console.WriteLine("Starting Codex ChatGPT sign-in…");
+        var account = await runner.SignInWithChatGptAsync(
+            authenticationUri =>
+            {
+                Process.Start(new ProcessStartInfo(authenticationUri.AbsoluteUri) { UseShellExecute = true });
+                Console.WriteLine("The sign-in page was opened in your browser. Complete it there; press Ctrl+C to cancel.");
+                return ValueTask.CompletedTask;
+            },
+            cancellationToken);
+        Console.WriteLine($"Codex sign-in completed. Authentication: {account.AuthenticationType switch { "chatgpt" => "chatgpt", "apiKey" or "apikey" => "api-key", _ => "authenticated" }}");
+        return 0;
+    }
+
+    private static async Task<int> RunLanguageModelAgentAsync(
+        RekallAgeCommandRegistry registry,
+        string provider,
         string model,
         string taskOrPath,
         string maxTurnsText,
@@ -3169,10 +3353,9 @@ internal static class RekallAgeCli
             return 2;
         }
 
-        using var httpClient = CreateOllamaHttpClient();
-        var modelClient = new RekallAgeOllamaLanguageModelClient(httpClient, ResolveOllamaBaseUri());
-        var tools = new RekallAgeMcpAgentToolExecutor(registry, "rekall-ollama-agent", progressiveDiscovery: true);
-        var agent = new RekallAgeLanguageModelAgent(modelClient, tools);
+        await using var lease = new RekallAgeLanguageModelProviderCatalog().Acquire(provider, registry);
+        var tools = new RekallAgeMcpAgentToolExecutor(registry, $"rekall-{lease.ProviderId}-agent", progressiveDiscovery: true);
+        var agent = new RekallAgeLanguageModelAgent(lease.ModelClient, tools);
         var result = await agent.RunAsync(
             new RekallAgeLanguageModelAgentRequest(
                 model,
@@ -3184,6 +3367,7 @@ internal static class RekallAgeCli
             },
             cancellationToken);
         Console.WriteLine(result.FinalContent);
+        Console.WriteLine($"Provider: {lease.ProviderId}");
         Console.WriteLine("Tool execution trace: " + string.Join(" -> ", result.ToolExecutions.Select(execution =>
             execution.Name == "rekall.tools.execute"
                 ? execution.Arguments["name"]?.GetValue<string>() ?? execution.Name
@@ -3198,13 +3382,15 @@ internal static class RekallAgeCli
         return result.Completed ? 0 : 1;
     }
 
-    private static async Task<int> RunProjectOllamaAgentAsync(
+    private static async Task<int> RunProjectLanguageModelAgentAsync(
         RekallAgeCommandRegistry registry,
+        string provider,
         string model,
         string projectRoot,
         string sceneName,
         string taskOrPath,
         string maxTurnsText,
+        string? approvalPolicy,
         CancellationToken cancellationToken)
     {
         var task = File.Exists(taskOrPath)
@@ -3216,10 +3402,14 @@ internal static class RekallAgeCli
             return 2;
         }
 
-        using var httpClient = CreateOllamaHttpClient();
-        var modelClient = new RekallAgeOllamaLanguageModelClient(httpClient, ResolveOllamaBaseUri());
-        var session = new RekallAgeProjectAgentSession(modelClient, registry);
-        var result = await session.RunAsync(
+        var settings = approvalPolicy is null
+            ? null
+            : new RekallAgeLanguageModelProviderSettings { CodexApprovalPolicy = approvalPolicy };
+        await using var lease = new RekallAgeLanguageModelProviderCatalog().Acquire(
+            provider,
+            registry,
+            settings);
+        var result = await lease.Runner.RunAsync(
             new RekallAgeProjectAgentSessionRequest(projectRoot, sceneName, model, task)
             {
                 MaxTurns = maxTurns,
@@ -3228,6 +3418,7 @@ internal static class RekallAgeCli
             progress: null,
             cancellationToken);
         Console.WriteLine(result.AgentResult.FinalContent);
+        Console.WriteLine($"Provider: {lease.ProviderId}");
         Console.WriteLine("Tool execution trace: " + string.Join(" -> ", result.AgentResult.ToolExecutions.Select(execution =>
             execution.Name == "rekall.tools.execute"
                 ? execution.Arguments["name"]?.GetValue<string>() ?? execution.Name
@@ -3236,17 +3427,6 @@ internal static class RekallAgeCli
         if (failures.Length > 0) Console.WriteLine(failures);
         Console.WriteLine(result.Summary);
         return result.Succeeded ? 0 : 1;
-    }
-
-    private static HttpClient CreateOllamaHttpClient() => new()
-    {
-        Timeout = TimeSpan.FromMinutes(30)
-    };
-
-    private static Uri ResolveOllamaBaseUri()
-    {
-        var configured = Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL");
-        return new Uri(string.IsNullOrWhiteSpace(configured) ? "http://127.0.0.1:11434" : configured, UriKind.Absolute);
     }
 
     private static async Task<int> AssembleDistributionAsync(
@@ -4032,7 +4212,10 @@ internal static class RekallAgeCli
         string width,
         string height,
         string backend,
-        string? inputsJson = null)
+        string? inputsJson = null,
+        string? qualityPreset = null,
+        string? qualityOverridesJson = null,
+        string includeGpuTimings = "false")
     {
         var frameCount = int.Parse(frames, System.Globalization.CultureInfo.InvariantCulture);
         var viewportWidth = int.Parse(width, System.Globalization.CultureInfo.InvariantCulture);
@@ -4049,7 +4232,12 @@ internal static class RekallAgeCli
                 viewportHeight,
                 true,
                 backend,
-                Inputs: inputs),
+                Inputs: inputs)
+            {
+                QualityPreset = qualityPreset,
+                QualityOverrides = ParseQualityOverrides(qualityOverridesJson),
+                IncludeGpuTimings = bool.Parse(includeGpuTimings)
+            },
             context);
 
         Console.WriteLine($"Runtime viewport {scene} frame {result.Value.FrameIndex}: {result.Value.Width}x{result.Value.Height}");
@@ -4058,6 +4246,12 @@ internal static class RekallAgeCli
         Console.WriteLine($"Hardware accelerated: {result.Value.HardwareAccelerated}");
         Console.WriteLine($"Acceleration: {result.Value.AccelerationStatus}");
         Console.WriteLine($"Selected device: {result.Value.SelectedDeviceName ?? "(none)"}");
+        PrintQualityReport(result.Value.QualityPlan, result.Value.GpuTimings, result.Value.ResourceBytes);
+        Console.WriteLine($"Workload: draws={result.Value.DrawCount}; dispatches={result.Value.DispatchCount}");
+        foreach (var command in result.Value.SuggestedCommands)
+        {
+            Console.WriteLine($"Next: {command}");
+        }
         Console.WriteLine(
             $"Input actions: {(result.Value.InputActions.Count == 0 ? "(none)" : string.Join(", ", result.Value.InputActions.Select(action => $"{action.Name}={action.Value:G}")))}");
         Console.WriteLine($"Elapsed simulation: {result.Value.ElapsedSeconds:F3}s");
@@ -4118,6 +4312,119 @@ internal static class RekallAgeCli
         }
 
         return result.Ok && result.Value.Captured && result.Value.NonBlank ? 0 : 1;
+    }
+
+    private static async Task<int> CompareQualityPresetsAsync(
+        RekallAgeCommandRegistry registry,
+        RekallAgeCommandContext context,
+        string root,
+        string scene,
+        string frames,
+        string outputDirectory,
+        string width,
+        string height,
+        string backend,
+        string presets,
+        string? overridesJson,
+        string includeGpuTimings)
+    {
+        var request = new CompareQualityPresetsRequest(
+            root,
+            scene,
+            presets.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries),
+            int.Parse(frames, CultureInfo.InvariantCulture),
+            outputDirectory,
+            int.Parse(width, CultureInfo.InvariantCulture),
+            int.Parse(height, CultureInfo.InvariantCulture),
+            backend,
+            ParseQualityOverrides(overridesJson),
+            bool.Parse(includeGpuTimings));
+        var result = await registry.ExecuteAsync<CompareQualityPresetsRequest, CompareQualityPresetsResult>(
+            "rekall.render.compare_quality_presets",
+            request,
+            context);
+        Console.WriteLine($"Compared quality presets for {scene} at frame {result.Value.FrameIndex}");
+        foreach (var capture in result.Value.Captures)
+        {
+            Console.WriteLine($"Preset: {capture.RequestedPreset} -> {capture.ResolvedPreset}");
+            Console.WriteLine($"  Output: {capture.OutputWidth}x{capture.OutputHeight}; Internal: {capture.RenderWidth}x{capture.RenderHeight}");
+            Console.WriteLine($"  Capture: {capture.ScreenshotPath}; nonblank={capture.NonBlank}");
+            Console.WriteLine($"  Resources: {capture.ResourceBytes} bytes; draws={capture.DrawCount}; dispatches={capture.DispatchCount}");
+            if (capture.GpuTimings.Available)
+            {
+                Console.WriteLine($"  GPU frame: {capture.GpuTimings.TotalMilliseconds!.Value:F6} ms");
+                foreach (var pass in capture.GpuTimings.Passes)
+                {
+                    Console.WriteLine($"  GPU pass: {pass.Name}; {pass.Nanoseconds:F3} ns; {pass.Milliseconds:F6} ms");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"  GPU timings: {capture.GpuTimings.Code}");
+            }
+
+            foreach (var degradation in capture.Degradations)
+            {
+                Console.WriteLine($"  Degradation: {degradation.Code}; feature={degradation.Feature}; Requested={degradation.RequestedValue}; resolved={degradation.ResolvedValue}");
+            }
+        }
+
+        foreach (var command in result.Value.NextCommands)
+        {
+            Console.WriteLine($"Next: {command}");
+        }
+
+        foreach (var error in result.Errors)
+        {
+            Console.WriteLine($"{error.Code}: {error.Message}");
+        }
+
+        return result.Ok && result.Value.Captures.All(capture => capture.NonBlank) ? 0 : 1;
+    }
+
+    private static RekallAgeRenderQualityOverrides? ParseQualityOverrides(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        return System.Text.Json.JsonSerializer.Deserialize<RekallAgeRenderQualityOverrides>(
+            json,
+            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+    }
+
+    private static void PrintQualityReport(
+        RekallAgeResolvedRenderFeaturePlan? quality,
+        RekallAgeGpuFrameTimingReport timings,
+        long resourceBytes)
+    {
+        if (quality is null)
+        {
+            return;
+        }
+
+        Console.WriteLine($"Requested quality: {quality.RequestedPreset}");
+        Console.WriteLine($"Resolved quality: {quality.ResolvedPreset}");
+        Console.WriteLine($"Internal resolution: {quality.RenderWidth}x{quality.RenderHeight}");
+        Console.WriteLine($"Render resources: {resourceBytes} bytes (transient={quality.EstimatedTransientBytes}; persistent={quality.EstimatedPersistentBytes})");
+        if (timings.Available)
+        {
+            Console.WriteLine($"GPU frame: {timings.TotalMilliseconds!.Value:F6} ms");
+            foreach (var pass in timings.Passes)
+            {
+                Console.WriteLine($"GPU pass: {pass.Name}; {pass.Nanoseconds:F3} ns; {pass.Milliseconds:F6} ms");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"GPU timings: {timings.Code}");
+        }
+
+        foreach (var degradation in quality.Degradations)
+        {
+            Console.WriteLine($"Degradation: {degradation.Code}; feature={degradation.Feature}; Requested={degradation.RequestedValue}; resolved={degradation.ResolvedValue}");
+        }
     }
 
     private static async Task<int> ExportSceneGlbAsync(

@@ -54,6 +54,18 @@ public sealed record RekallAgeRuntimeViewportFrame(
 
     public RekallAgeRuntimeViewportCamera? HeadsetCamera { get; init; }
 
+    public RekallAgeResolvedRenderFeaturePlan? ResolvedQualityPlan { get; init; }
+
+    public RekallAgeRuntimeViewportEnvironment? Environment { get; init; }
+
+    public IReadOnlyList<RekallAgeRuntimeViewportFogVolume> FogVolumes { get; init; } =
+        Array.Empty<RekallAgeRuntimeViewportFogVolume>();
+
+    public IReadOnlyList<RekallAgeRuntimeViewportParticleEmitter> ParticleEmitters { get; init; } =
+        Array.Empty<RekallAgeRuntimeViewportParticleEmitter>();
+
+    public double DeltaSeconds { get; init; } = 1.0 / 60.0;
+
     public RekallAgeRuntimeViewportFrame ForHeadsetOutput()
     {
         return HeadsetCamera is null ? this : ForCameraView(HeadsetCamera);
@@ -207,6 +219,93 @@ public sealed record RekallAgeRuntimeViewportPostProcessPass(
     double Radius = 1,
     string BlendMode = "add");
 
+public sealed record RekallAgeRuntimeViewportFogVolume(
+    string EntityId,
+    string EntityName,
+    string Shape,
+    double Density,
+    string Albedo,
+    string Emission,
+    double Anisotropy,
+    double HeightFalloff,
+    double BlendDistance,
+    int Priority,
+    RekallAgeRuntimeViewportTransform Transform);
+
+public sealed record RekallAgeRuntimeViewportParticleBurst(double TimeSeconds, int Count);
+
+public sealed record RekallAgeRuntimeViewportEnvironment(
+    string EntityId,
+    string EntityName,
+    string? SkyAssetId,
+    double AmbientEnergy,
+    double Exposure,
+    string ToneMapper,
+    double WhitePoint,
+    string? ColorGradeAssetId,
+    string BackgroundPolicy)
+{
+    public string AmbientSkyColor { get; init; } = "#ffffff";
+
+    public string AmbientGroundColor { get; init; } = "#ffffff";
+
+    public string? BackgroundColor { get; init; }
+}
+
+public sealed record RekallAgeRuntimeViewportParticleScalarKey(double NormalizedAge, double Value);
+
+public sealed record RekallAgeRuntimeViewportParticleColorKey(double NormalizedAge, string Color);
+
+public sealed record RekallAgeRuntimeViewportParticleEmitter(
+    string EntityId,
+    string EntityName,
+    bool Enabled,
+    string SimulationSpace,
+    int Capacity,
+    double SpawnRate,
+    IReadOnlyList<RekallAgeRuntimeViewportParticleBurst> Bursts,
+    double LifetimeSeconds,
+    uint DeterministicSeed,
+    double VelocityDirectionX,
+    double VelocityDirectionY,
+    double VelocityDirectionZ,
+    double VelocityConeDegrees,
+    double MinimumSpeed,
+    double MaximumSpeed,
+    double GravityX,
+    double GravityY,
+    double GravityZ,
+    double Drag,
+    IReadOnlyList<RekallAgeRuntimeViewportParticleScalarKey> SizeCurve,
+    IReadOnlyList<RekallAgeRuntimeViewportParticleColorKey> ColorCurve,
+    string DrawMode,
+    bool Lit,
+    double EmissiveIntensity,
+    double SoftParticleFade,
+    string? TextureAssetId,
+    int FlipbookColumns,
+    int FlipbookRows,
+    double FlipbookFramesPerSecond,
+    string BlendMode,
+    int Priority,
+    double VisibilityDistance,
+    string Layer,
+    RekallAgeRuntimeViewportTransform Transform);
+
+public sealed record RekallAgeRuntimeViewportTransform(
+    double X,
+    double Y,
+    double Z,
+    double RotationX,
+    double RotationY,
+    double RotationZ,
+    double ScaleX,
+    double ScaleY,
+    double ScaleZ)
+{
+    public static RekallAgeRuntimeViewportTransform Identity { get; } = new(0, 0, 0, 0, 0, 0, 1, 1, 1);
+}
+
 public sealed record RekallAgeRuntimeViewportEye(
     string Name,
     int Index,
@@ -262,7 +361,34 @@ public sealed record RekallAgeRuntimeViewportRenderable(
     RekallAgeRuntimeViewportVirtualGeometry? VirtualGeometry = null,
     RekallAgeRuntimeViewportUiVisual? UiVisual = null,
     RekallAgeRuntimeViewportSkin? Skin = null,
-    RekallAgeRuntimeViewportMorph? Morph = null);
+    RekallAgeRuntimeViewportMorph? Morph = null)
+{
+    public bool CastShadows { get; init; } = true;
+
+    public bool ReceiveShadows { get; init; } = true;
+
+    public uint ShadowLayerMask { get; init; } = uint.MaxValue;
+
+    public uint ShadowCasterMask { get; init; } = uint.MaxValue;
+
+    public uint ShadowReceiverMask { get; init; } = uint.MaxValue;
+
+    public double ShadowMaximumDistance { get; init; } = 100;
+
+    public double ShadowBias { get; init; } = 0.0015;
+
+    public double ShadowNormalBias { get; init; } = 0.02;
+
+    public int ShadowPriority { get; init; }
+
+    public double LightRange { get; init; } = 10;
+
+    public int LightPriority { get; init; }
+
+    public string AlphaMode { get; init; } = "opaque";
+
+    public double AlphaCutoff { get; init; } = 0.5;
+}
 
 public sealed record RekallAgeRuntimeViewportMorph(
     IReadOnlyList<double> Weights,
@@ -360,7 +486,19 @@ public sealed record RekallAgeRuntimeViewportGeometryMesh(
     IReadOnlyList<RekallAgeRuntimeViewportGeometryVertex> Vertices,
     IReadOnlyList<uint> Indices,
     IReadOnlyList<RekallAgeRuntimeViewportTriangleProvenance>? TriangleProvenance = null,
-    IReadOnlyList<RekallAgeRuntimeViewportGeometrySurface>? Surfaces = null);
+    IReadOnlyList<RekallAgeRuntimeViewportGeometrySurface>? Surfaces = null,
+    IReadOnlyList<RekallAgeRuntimeViewportSkinBinding>? SkinBindings = null,
+    int? SkinIndex = null);
+
+public readonly record struct RekallAgeRuntimeViewportSkinBinding(
+    int Joint0,
+    int Joint1,
+    int Joint2,
+    int Joint3,
+    double Weight0,
+    double Weight1,
+    double Weight2,
+    double Weight3);
 
 public sealed record RekallAgeRuntimeViewportGeometrySurface(
     int SurfaceIndex,

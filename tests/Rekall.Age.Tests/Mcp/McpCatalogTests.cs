@@ -44,6 +44,7 @@ public sealed class McpCatalogTests
         registry.Register(new RunSceneCommand());
         registry.Register(new CaptureScreenshotCommand());
         registry.Register(new CaptureRuntimeViewportCommand());
+        registry.Register(new CompareQualityPresetsCommand());
         registry.Register(new InspectRenderingDeviceWorkloadCommand());
         registry.Register(new InspectRuntimeGpuWorkloadCommand());
         registry.Register(new InspectScenePerformanceBudgetCommand());
@@ -118,6 +119,19 @@ public sealed class McpCatalogTests
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.run.scene");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.capture.screenshot");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.capture_runtime_viewport");
+        var compareQuality = Assert.Single(catalog.Tools, tool => tool.Name == "rekall.render.compare_quality_presets");
+        Assert.Equal("rendering", compareQuality.Category);
+        Assert.True(compareQuality.Recommended);
+        Assert.Equal(typeof(CompareQualityPresetsRequest).FullName, compareQuality.RequestType);
+        Assert.NotNull(typeof(CompareQualityPresetsRequest).GetProperty("Presets"));
+        Assert.NotNull(typeof(CompareQualityPresetsRequest).GetProperty("Overrides"));
+        Assert.NotNull(typeof(CompareQualityPresetsRequest).GetProperty("IncludeGpuTimings"));
+        Assert.NotNull(typeof(CaptureRuntimeViewportRequest).GetProperty("QualityPreset"));
+        Assert.NotNull(typeof(CaptureRuntimeViewportRequest).GetProperty("QualityOverrides"));
+        Assert.NotNull(typeof(CaptureRuntimeViewportRequest).GetProperty("IncludeGpuTimings"));
+        Assert.NotNull(typeof(InspectScenePerformanceBudgetRequest).GetProperty("QualityPreset"));
+        Assert.NotNull(typeof(InspectScenePerformanceBudgetRequest).GetProperty("QualityOverrides"));
+        Assert.NotNull(typeof(InspectScenePerformanceBudgetRequest).GetProperty("IncludeGpuTimings"));
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.device.inspect_workload");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.device.inspect_runtime_workload");
         Assert.Contains(catalog.Tools, tool => tool.Name == "rekall.render.performance.inspect_scene_budget");

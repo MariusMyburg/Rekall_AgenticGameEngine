@@ -126,6 +126,8 @@ Implemented foundations:
 - GLB import reports and scene export
 - Tripo3D text-to-model generation and GLB import through the generic asset pipeline
 - generated primitives, meshes, recipes, and extrusions
+- non-destructive taper and bend deformation through mesh operations, modeling graphs, and modifier stacks
+- versioned named-joint rig assets, bind-pose evaluation, runtime rig poses, and skinned Model Asset deformation
 - render layers and camera culling masks
 - runtime viewport capture
 - performance budget inspection
@@ -142,11 +144,13 @@ Implemented foundations:
 
 Important scope note:
 
-- The current virtual geometry system is CPU-side clustered LOD for dense meshes in the Vulkan path. It is inspired by Nanite's goal of making dense scenes practical, but it is not yet GPU mesh-shader virtualized geometry with disk-page streaming and hierarchical occlusion.
+- The current virtual geometry system is topology-checked, distance-aware CPU clustered LOD for dense static meshes. It preserves material/render seams and disconnected coincident components, applies one inspectable cap across all surfaces of a renderable, caches stable reductions across runtime consumers, and reports when a topology-safe result cannot meet the requested cap. It is inspired by Nanite's goal of making dense scenes practical, but it is not yet GPU mesh-shader virtualized geometry with disk-page streaming and hierarchical occlusion.
 - The renderer is Vulkan-first today. Backend-neutral render plans and abstraction boundaries keep room for other backends.
 - Multiplayer is a generic authoritative-session foundation, not a finished matchmaking or internet transport product.
 - VR uses the windowed player as the playable path. Desktop keyboard/mouse input and OpenXR poses/actions share the same generic runtime input stream, while the direct OpenXR submitter remains a diagnostic path.
 - Tripo3D integration is an asset-pipeline bridge: it can request text-to-model generation, poll the provider task, download the returned GLB, and import it as an ordinary model asset. The engine does not use Tripo to author game behavior.
+- Native rigging currently provides generic named hierarchy/bind contracts and runtime matrix deformation. Constraint authoring, automatic/painted multi-joint weights, inverse kinematics, retargeting, Studio rig visualization, and production character tooling remain active modeling work.
+- Tripo and Meshy remain optional future providers behind a planned provider-neutral asynchronous asset-job contract. Neither is intended to bypass AGE's editable mesh, provenance, validation, cook, or packaging pipeline.
 
 ## Production Distribution
 
@@ -1402,21 +1406,23 @@ Virtual geometry is Rekall AGE's dense-mesh performance path.
 
 Current implementation:
 
-- CPU-side clustered LOD
+- topology-checked CPU-side connected clustered LOD
 - integrated into the Vulkan scene mesh path
 - component controlled through `Rekall.VirtualGeometry`
 - inspectable through budget and virtual-geometry diagnostics
 - applied by command to dense renderables
+- whole-renderable caps apportioned across material surfaces
+- stable source-geometry caching before material color materialization
 - useful for imported/generated high-triangle scenes, including detailed planet scenes
 
 It does:
 
 - estimate source triangle pressure
-- group source geometry
-- select an appropriate reduced payload
+- preserve geometric connectivity across split render vertices without fusing coincident duplicate components
+- select an appropriate reduced payload from pixel error, cluster size, distance, and triangle cap
 - preserve inspectable source/reduced counts
 - reduce submitted vertices/indices
-- report selected LOD level
+- report selected LOD level and whether the authored cap was satisfied
 
 It does not yet do:
 

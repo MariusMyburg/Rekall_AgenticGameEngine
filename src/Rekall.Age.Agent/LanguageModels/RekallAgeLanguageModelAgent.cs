@@ -68,6 +68,8 @@ public sealed record RekallAgeLanguageModelAgentResult(
     RekallAgeLanguageModelUsage Usage,
     IReadOnlyList<RekallAgeLanguageModelMessage> Transcript)
 {
+    public string? ResponseId { get; init; }
+
     public IReadOnlyList<RekallAgeLanguageModelToolExecution> ToolExecutions { get; init; } =
         Array.Empty<RekallAgeLanguageModelToolExecution>();
 }
@@ -117,6 +119,7 @@ public sealed class RekallAgeLanguageModelAgent(
 {
     private const int MaximumEncodedGatewayArgumentsCharacters = 1_000_000;
     private const int MaxEncodedStructuredArgumentCharacters = 1_000_000;
+    private const int MaximumStreamProgressCharacters = 4_096;
 
     public async ValueTask<RekallAgeLanguageModelAgentResult> RunAsync(
         RekallAgeLanguageModelAgentRequest request,
@@ -161,10 +164,15 @@ public sealed class RekallAgeLanguageModelAgent(
         }
         var promptTokens = 0;
         var completionTokens = 0;
+        var cachedInputTokens = 0;
+        var reasoningTokens = 0;
+        var hasCachedInputTokens = false;
+        var hasReasoningTokens = false;
         long totalDuration = 0;
         var toolCallCount = 0;
         var toolExecutions = new List<RekallAgeLanguageModelToolExecution>();
         var finalContent = string.Empty;
+        string? responseId = null;
         var completionAuditPending = false;
         var runtimeCheckpointPrompted = false;
         var runtimeRepairReserveActivated = false;
@@ -188,20 +196,26 @@ public sealed class RekallAgeLanguageModelAgent(
             {
                 try
                 {
-                    var responseTask = modelClient.ChatAsync(
-                        new RekallAgeLanguageModelRequest(
-                            request.Model,
-                            BuildContext(transcript, toolExecutions, maxContextMessages),
-                            toolExecutor.Tools)
-                        {
-                            Think = actionRecoveryPending ? ReduceReasoningForAction(request.Think) : request.Think,
-                            Temperature = request.Temperature,
-                            ContextWindowTokens = contextWindowTokens,
-                            MaxOutputTokens = actionRecoveryPending
-                                ? ReduceOutputTokensForAction(maxOutputTokens)
-                                : maxOutputTokens
-                        },
-                        turnCancellation.Token).AsTask();
+                    var modelRequest = new RekallAgeLanguageModelRequest(
+                        request.Model,
+                        BuildContext(transcript, toolExecutions, maxContextMessages),
+                        toolExecutor.Tools)
+                    {
+                        Think = actionRecoveryPending ? ReduceReasoningForAction(request.Think) : request.Think,
+                        Temperature = request.Temperature,
+                        ContextWindowTokens = contextWindowTokens,
+                        MaxOutputTokens = actionRecoveryPending
+                            ? ReduceOutputTokensForAction(maxOutputTokens)
+                            : maxOutputTokens
+                    };
+                    var responseTask = modelClient is IRekallAgeStreamingLanguageModelClient streamingClient
+                        ? ConsumeStreamAsync(
+                            streamingClient,
+                            modelRequest,
+                            request.Progress,
+                            turn,
+                            turnCancellation.Token)
+                        : modelClient.ChatAsync(modelRequest, turnCancellation.Token).AsTask();
                     try
                     {
                         response = maxTurnDuration is { } duration
@@ -209,6 +223,12 @@ public sealed class RekallAgeLanguageModelAgent(
                             : await responseTask.WaitAsync(cancellationToken);
                     }
                     catch (TimeoutException) when (maxTurnDuration is not null)
+                    {
+                        turnCancellation.Cancel();
+                        ObserveAbandonedTask(responseTask);
+                        throw;
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
                         turnCancellation.Cancel();
                         ObserveAbandonedTask(responseTask);
@@ -230,12 +250,26 @@ public sealed class RekallAgeLanguageModelAgent(
             }
             promptTokens += response.Usage.PromptTokens;
             completionTokens += response.Usage.CompletionTokens;
+            if (response.Usage.CachedInputTokens is { } responseCachedInputTokens)
+            {
+                cachedInputTokens += responseCachedInputTokens;
+                hasCachedInputTokens = true;
+            }
+            if (response.Usage.ReasoningTokens is { } responseReasoningTokens)
+            {
+                reasoningTokens += responseReasoningTokens;
+                hasReasoningTokens = true;
+            }
             totalDuration = checked(totalDuration + response.Usage.TotalDurationNanoseconds);
             finalContent = response.Content;
+            responseId = response.ResponseId;
             transcript.Add(new RekallAgeLanguageModelMessage(
                 "assistant",
                 response.Content,
-                ToolCalls: response.ToolCalls));
+                ToolCalls: response.ToolCalls)
+            {
+                OpaqueProviderState = response.OpaqueProviderState
+            });
 
             if (response.ToolCalls.Count == 0 && IsOutputLimitFinishReason(response.FinishReason))
             {
@@ -423,7 +457,10 @@ public sealed class RekallAgeLanguageModelAgent(
                     "tool.completed",
                     $"{executedToolName} {(succeeded ? "completed" : "failed")}.",
                     execution));
-                transcript.Add(new RekallAgeLanguageModelMessage("tool", outputText, executedToolName));
+                transcript.Add(new RekallAgeLanguageModelMessage("tool", outputText, executedToolName)
+                {
+                    ToolCallId = call.Id
+                });
                 if (!succeeded
                     && executedToolName.Equals("rekall.runtime.inspect_scene", StringComparison.Ordinal)
                     && HasRuntimeCheckpointCoverage(effectiveCall.Arguments))
@@ -566,11 +603,138 @@ public sealed class RekallAgeLanguageModelAgent(
             content,
             turns,
             toolCallCount,
-            new RekallAgeLanguageModelUsage(promptTokens, completionTokens, totalDuration),
+            new RekallAgeLanguageModelUsage(promptTokens, completionTokens, totalDuration)
+            {
+                CachedInputTokens = hasCachedInputTokens ? cachedInputTokens : null,
+                ReasoningTokens = hasReasoningTokens ? reasoningTokens : null
+            },
             transcript.ToArray())
         {
+            ResponseId = responseId,
             ToolExecutions = toolExecutions.ToArray()
         };
+    }
+
+    private async Task<RekallAgeLanguageModelResponse> ConsumeStreamAsync(
+        IRekallAgeStreamingLanguageModelClient streamingClient,
+        RekallAgeLanguageModelRequest request,
+        IProgress<RekallAgeLanguageModelAgentProgress>? progress,
+        int turn,
+        CancellationToken cancellationToken)
+    {
+        RekallAgeLanguageModelResponse? completedResponse = null;
+        await foreach (var streamEvent in streamingClient.StreamChatAsync(request, cancellationToken)
+            .WithCancellation(cancellationToken)
+            .ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (streamEvent is null)
+            {
+                throw InvalidStream("The provider stream emitted a null event.");
+            }
+            if (streamEvent.Text is null)
+            {
+                throw InvalidStream("The provider stream event omitted its required text value.");
+            }
+            if (completedResponse is not null)
+            {
+                throw InvalidStream("The provider stream emitted data after its Completed event.");
+            }
+
+            if (streamEvent.Kind == RekallAgeLanguageModelStreamEventKind.Completed)
+            {
+                var response = streamEvent.Response
+                    ?? throw InvalidStream("The provider stream Completed event omitted its final response.");
+                ValidateCompletedStreamResponse(response);
+                completedResponse = response;
+                progress?.Report(new RekallAgeLanguageModelAgentProgress(
+                    turn,
+                    "model.completed",
+                    "Provider stream completed."));
+                continue;
+            }
+
+            var phase = streamEvent.Kind switch
+            {
+                RekallAgeLanguageModelStreamEventKind.TextDelta => "model.text_delta",
+                RekallAgeLanguageModelStreamEventKind.ThinkingDelta => "model.thinking_delta",
+                RekallAgeLanguageModelStreamEventKind.ToolCallDelta => "model.tool_call_delta",
+                RekallAgeLanguageModelStreamEventKind.Usage => "model.usage",
+                _ => throw InvalidStream("The provider stream emitted an unknown event kind.")
+            };
+            progress?.Report(new RekallAgeLanguageModelAgentProgress(
+                turn,
+                phase,
+                BoundStreamProgress(streamEvent.Text)));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return completedResponse
+            ?? throw InvalidStream("The provider stream ended without a Completed response.");
+    }
+
+    private void ValidateCompletedStreamResponse(RekallAgeLanguageModelResponse response)
+    {
+        if (string.IsNullOrWhiteSpace(response.ProviderId))
+        {
+            throw InvalidStream("The provider stream response omitted its required provider identity.");
+        }
+        if (string.IsNullOrWhiteSpace(response.Model))
+        {
+            throw InvalidStream("The provider stream response omitted its required model identity.");
+        }
+        if (response.Content is null)
+        {
+            throw InvalidStream("The provider stream response omitted its required content value.");
+        }
+        if (response.Thinking is null)
+        {
+            throw InvalidStream("The provider stream response omitted its required thinking value.");
+        }
+        if (response.ToolCalls is null)
+        {
+            throw InvalidStream("The provider stream response omitted its required tool-call collection.");
+        }
+        if (response.FinishReason is null)
+        {
+            throw InvalidStream("The provider stream response omitted its required finish reason.");
+        }
+        if (response.Usage is null)
+        {
+            throw InvalidStream("The provider stream response omitted its required usage value.");
+        }
+
+        for (var index = 0; index < response.ToolCalls.Count; index++)
+        {
+            var call = response.ToolCalls[index];
+            if (call is null)
+            {
+                throw InvalidStream($"The provider stream response tool call at index {index} was null.");
+            }
+            if (string.IsNullOrWhiteSpace(call.Name))
+            {
+                throw InvalidStream($"The provider stream response tool call at index {index} omitted its name.");
+            }
+            if (call.Arguments is null)
+            {
+                throw InvalidStream($"The provider stream response tool call at index {index} omitted its arguments.");
+            }
+        }
+    }
+
+    private RekallAgeLanguageModelProviderException InvalidStream(string message) => new(
+        "REKALL_LANGUAGE_MODEL_STREAM_INVALID",
+        modelClient.ProviderId,
+        message);
+
+    private static string BoundStreamProgress(string? text)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length <= MaximumStreamProgressCharacters)
+        {
+            return text ?? string.Empty;
+        }
+
+        return text[..(MaximumStreamProgressCharacters - 1)] + "…";
     }
 
     private static bool ShouldPromptFirstRuntimeCheckpoint(

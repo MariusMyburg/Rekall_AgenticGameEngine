@@ -8,6 +8,68 @@ namespace Rekall.Age.Tests.Modeling;
 public sealed class MeshSmoothSubdivisionTests
 {
     [Fact]
+    public async Task EdgeCreasesKeepHardSurfaceCornersAndPropagateAcrossSubdivision()
+    {
+        var source = await new RekallAgeMeshPrimitiveFactory().CreateAsync("box", "creased-box", "Creased Box", CancellationToken.None);
+        var creased = new RekallAgeMeshOperationExecutor().Execute(source,
+            new("set_edge_crease", RekallAgeGeometryDomain.Edge, source.Topology.EdgeIds,
+                new JsonObject { ["weight"] = 1.0, ["attribute"] = "crease.edge" })).Mesh;
+
+        var crease = Assert.Single(creased.Attributes, item => item.Name == "crease.edge");
+        Assert.Equal(RekallAgeGeometryDomain.Edge, crease.Domain);
+        Assert.All(crease.Values, value => Assert.Equal(1.0, value.GetDouble()));
+
+        var result = new RekallAgeMeshOperationExecutor().Execute(creased,
+            new("subdivide_smooth", RekallAgeGeometryDomain.Face, creased.Topology.FaceIds,
+                new JsonObject { ["creaseAttribute"] = "crease.edge" }));
+
+        Assert.Equal(source.Topology.Positions[0], result.Mesh.Topology.Positions[0]);
+        var propagated = Assert.Single(result.Mesh.Attributes, item => item.Name == "crease.edge");
+        Assert.Equal(48, propagated.Values.Count);
+        Assert.Equal(24, propagated.Values.Count(value => value.GetDouble() == 1.0));
+        Assert.Equal(24, propagated.Values.Count(value => value.GetDouble() == 0.0));
+    }
+
+    [Fact]
+    public async Task SmoothSubdivisionModifierSupportsBoundedMultipleLevels()
+    {
+        var source = await new RekallAgeMeshPrimitiveFactory().CreateAsync("box", "level-box", "Level Box", CancellationToken.None);
+        var stack = RekallAgeModifierStackAsset.Create("levels", "Levels", "source", new string('a', 64),
+            [new("smooth", "rekall.modifier.subdivide_smooth", 1, true, new JsonObject { ["levels"] = 2 })]);
+
+        var report = await new RekallAgeModifierStackEvaluator().EvaluateAsync(stack, source,
+            RekallAgeModelingEvaluationBudget.Default, CancellationToken.None);
+
+        Assert.True(report.Succeeded, string.Join(",", report.Diagnostics.Select(item => item.Code)));
+        Assert.Equal(96, report.Mesh!.Topology.FaceIds.Count);
+    }
+
+    [Fact]
+    public async Task ModelingGraphAuthorsCreasesBeforeMultipleSmoothLevels()
+    {
+        var graph = RekallAgeModelingGraphAsset.Create("creased-graph", "Creased Graph",
+            [
+                new("box", "rekall.modeling.primitive.box", 1, new JsonObject()),
+                new("crease", "rekall.modeling.edge_crease", 1, new JsonObject { ["weight"] = 1.0 }),
+                new("smooth", "rekall.modeling.subdivide_smooth", 1, new JsonObject { ["levels"] = 2 }),
+                new("output", "rekall.modeling.output.mesh", 1, new JsonObject())
+            ],
+            [
+                new("box-crease", "box", "geometry", "crease", "geometry"),
+                new("crease-smooth", "crease", "geometry", "smooth", "geometry"),
+                new("smooth-output", "smooth", "geometry", "output", "input")
+            ], [new("mesh", "output", "geometry")]);
+
+        var report = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(graph, ["mesh"],
+            RekallAgeModelingEvaluationBudget.Default, new(0, 0, "test", "desktop"), CancellationToken.None);
+
+        Assert.True(report.Succeeded, string.Join(",", report.Diagnostics.Select(item => item.Code)));
+        Assert.Equal(96, report.Outputs["mesh"].Topology.FaceIds.Count);
+        Assert.Contains(RekallAgeModelingNodeCatalog.CreateDefault().Descriptors,
+            item => item.TypeId == "rekall.modeling.edge_crease" && item.Parameters.Any(parameter => parameter.ParameterId == "weight"));
+    }
+
+    [Fact]
     public async Task ProceduralAndModifierSmoothSubdivisionHandleAClosedBox()
     {
         var graph = RekallAgeModelingGraphAsset.Create("smooth-box", "Smooth Box",

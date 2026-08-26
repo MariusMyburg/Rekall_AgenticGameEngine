@@ -1,5 +1,6 @@
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Rendering;
+using Rekall.Age.Core.Transactions;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime;
 
@@ -12,7 +13,14 @@ public sealed record InspectScenePerformanceBudgetRequest(
     int Width = 1920,
     int Height = 1080,
     string Profile = "desktop60",
-    bool DebugOverlay = false);
+    bool DebugOverlay = false)
+{
+    public string? QualityPreset { get; init; }
+
+    public RekallAgeRenderQualityOverrides? QualityOverrides { get; init; }
+
+    public bool IncludeGpuTimings { get; init; }
+}
 
 public sealed record InspectScenePerformanceBudgetResult(
     string SceneName,
@@ -44,7 +52,23 @@ public sealed record InspectScenePerformanceBudgetResult(
     RekallAgeScenePerformanceBudgetLimits Limits,
     IReadOnlyList<string> Blockers,
     IReadOnlyList<string> Warnings,
-    IReadOnlyList<string> Recommendations);
+    IReadOnlyList<string> Recommendations)
+{
+    public RekallAgeResolvedRenderFeaturePlan? QualityPlan { get; init; }
+
+    public RekallAgePointLightSelectionReport? Lighting { get; init; }
+
+    public RekallAgeGpuFrameTimingReport GpuTimings { get; init; } =
+        RekallAgeGpuFrameTimingReport.Unavailable(0);
+
+    public long ResourceBytes { get; init; }
+
+    public int RenderWorkloadDrawCount { get; init; }
+
+    public int RenderWorkloadDispatchCount { get; init; }
+
+    public IReadOnlyList<string> SuggestedCommands { get; init; } = Array.Empty<string>();
+}
 
 public sealed record RekallAgeScenePerformanceLayerBreakdown(
     string Layer,
@@ -84,6 +108,18 @@ public sealed record RekallAgeScenePerformanceBudgetLimits(
 public sealed class InspectScenePerformanceBudgetCommand
     : IRekallAgeCommand<InspectScenePerformanceBudgetRequest, InspectScenePerformanceBudgetResult>
 {
+    private readonly CaptureRuntimeViewportCommand _capture;
+
+    public InspectScenePerformanceBudgetCommand()
+        : this(new CaptureRuntimeViewportCommand())
+    {
+    }
+
+    internal InspectScenePerformanceBudgetCommand(CaptureRuntimeViewportCommand capture)
+    {
+        _capture = capture;
+    }
+
     public string Name => "rekall.render.performance.inspect_scene_budget";
 
     public RekallAgeCommandSchema Schema => new(
@@ -116,6 +152,13 @@ public sealed class InspectScenePerformanceBudgetCommand
             request.Width,
             request.Height,
             request.DebugOverlay);
+        frame = CaptureRuntimeViewportCommand.ApplyQualityPlan(
+            frame,
+            world,
+            request.QualityPreset,
+            request.QualityOverrides,
+            request.IncludeGpuTimings,
+            "vulkan");
         var renderFrame = frame.ForHeadsetOutput();
         var assets = await new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(
             request.ProjectRoot,
@@ -153,6 +196,22 @@ public sealed class InspectScenePerformanceBudgetCommand
             .Count();
         var renderTargetPixels = checked((long)Math.Max(1, request.Width) * Math.Max(1, request.Height) * Math.Max(1, eyeCount));
         var geometryBytes = EstimateGeometryBytes(batch.Vertices.Count, batch.Indices.Count);
+        var qualityGraph = renderFrame.ResolvedQualityPlan is { } qualityPlan
+            ? new RekallAgeHighFidelityRenderGraphBuilder().Build(renderFrame, qualityPlan)
+            : null;
+        var gpuMeasurement = request.IncludeGpuTimings
+            ? await CaptureGpuTimingAsync(request, context).ConfigureAwait(false)
+            : null;
+        var gpuTimings = gpuMeasurement?.GpuTimings
+            ?? RekallAgeGpuFrameTimingReport.Unavailable(world.FrameIndex);
+        var resourceBytes = gpuMeasurement?.ResourceBytes
+            ?? qualityGraph?.EstimatedBytes
+            ?? 0;
+        var workloadDrawCount = gpuMeasurement?.DrawCount ?? batch.Draws.Count;
+        var workloadDispatchCount = gpuMeasurement?.DispatchCount
+            ?? qualityGraph?.Passes.Count(pass =>
+                pass.Enabled && pass.Kind.Equals("compute", StringComparison.OrdinalIgnoreCase))
+            ?? 0;
         var blockers = BuildBlockers(profile, drawInvocations, triangles, batch.Vertices.Count, textureIds, renderTargetPixels);
         var warnings = BuildWarnings(profile, drawInvocations, triangles, batch.Vertices.Count, textureIds, renderTargetPixels, assets.Issues.Count);
         var result = new InspectScenePerformanceBudgetResult(
@@ -193,7 +252,19 @@ public sealed class InspectScenePerformanceBudgetCommand
                 eyeCount,
                 virtualGeometryRenderableCount,
                 virtualGeometrySourceTriangles,
-                virtualGeometrySelectedTriangles));
+                virtualGeometrySelectedTriangles))
+        {
+            QualityPlan = gpuMeasurement?.QualityPlan ?? renderFrame.ResolvedQualityPlan,
+            Lighting = new RekallAgePointLightSelectionReport(
+                batch.Frame.PointLightBudget,
+                batch.Frame.PointLights.Select(item => item.EntityId).ToArray(),
+                batch.Frame.DroppedPointLightEntityIds),
+            GpuTimings = gpuTimings,
+            ResourceBytes = resourceBytes,
+            RenderWorkloadDrawCount = workloadDrawCount,
+            RenderWorkloadDispatchCount = workloadDispatchCount,
+            SuggestedCommands = BuildSuggestedCommands(request)
+        };
 
         if (blockers.Count == 0)
         {
@@ -211,6 +282,73 @@ public sealed class InspectScenePerformanceBudgetCommand
                     string.Join(" ", blockers),
                     request.SceneName)
             ]);
+    }
+
+    private async ValueTask<CaptureRuntimeViewportResult?> CaptureGpuTimingAsync(
+        InspectScenePerformanceBudgetRequest request,
+        RekallAgeCommandContext context)
+    {
+        var outputDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "RekallAgeGpuBudget",
+            Guid.NewGuid().ToString("N"));
+        try
+        {
+            var captureRequest = new CaptureRuntimeViewportRequest(
+                request.ProjectRoot,
+                request.SceneName,
+                request.Frames,
+                outputDirectory,
+                request.Width,
+                request.Height,
+                request.DebugOverlay,
+                "vulkan")
+            {
+                QualityPreset = request.QualityPreset,
+                QualityOverrides = request.QualityOverrides,
+                IncludeGpuTimings = true
+            };
+            var timingContext = new RekallAgeCommandContext(
+                context.Actor,
+                RekallAgeTransaction.Begin("inspect scene GPU timing"),
+                context.CancellationToken);
+            var warmup = await _capture.ExecuteAsync(captureRequest, timingContext).ConfigureAwait(false);
+            if (!warmup.Ok || !warmup.Value.Captured)
+            {
+                return warmup.Value;
+            }
+
+            var measurement = await _capture.ExecuteAsync(captureRequest, timingContext).ConfigureAwait(false);
+            return measurement.Value;
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(outputDirectory))
+                {
+                    Directory.Delete(outputDirectory, recursive: true);
+                }
+            }
+            catch (IOException)
+            {
+                // Timing inspection is still useful if an external file scanner briefly retains the disposable capture.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Report the measurement rather than converting cleanup contention into a timing failure.
+            }
+        }
+    }
+
+    private static IReadOnlyList<string> BuildSuggestedCommands(InspectScenePerformanceBudgetRequest request)
+    {
+        var preset = string.IsNullOrWhiteSpace(request.QualityPreset) ? "High" : request.QualityPreset.Trim();
+        return
+        [
+            $"command execute rekall.render.capture_runtime_viewport --scene {request.SceneName} --qualityPreset {preset} --includeGpuTimings true",
+            $"command execute rekall.render.compare_quality_presets --scene {request.SceneName} --presets Performance,High --includeGpuTimings true"
+        ];
     }
 
     private static IReadOnlyList<RekallAgeCommandError> Validate(InspectScenePerformanceBudgetRequest request)

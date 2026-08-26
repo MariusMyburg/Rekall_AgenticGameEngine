@@ -26,7 +26,8 @@ internal static class EncounterSimulation
         var conduit = world.EntitiesWithComponent(AetherfallConstants.ConduitStateType)
             .FirstOrDefault(entity =>
                 !entity.ComponentBoolean(AetherfallConstants.ConduitStateType, "active")
-                && PlanarDistanceSquared(entity.Transform.Position3D, warden.Transform.Position3D) <= 4);
+                && PlanarDistanceSquared(entity.Transform.Position3D, warden.Transform.Position3D)
+                    <= AetherfallConstants.ConduitInteractionRadius * AetherfallConstants.ConduitInteractionRadius);
         if (conduit is null)
         {
             return world;

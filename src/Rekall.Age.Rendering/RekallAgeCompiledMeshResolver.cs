@@ -2,6 +2,7 @@ using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime.Abstractions;
+using System.Runtime.CompilerServices;
 
 namespace Rekall.Age.Rendering;
 
@@ -19,6 +20,7 @@ public sealed class RekallAgeCompiledMeshResolver
 {
     private readonly RekallAgeCompiledMeshAssetResolver _resolver = new();
     private readonly Rekall.Age.Runtime.RekallAgeCompiledModelAssetResolver _modelAssetResolver = new();
+    private readonly ConditionalWeakTable<RekallAgeCompiledMeshSnapshot, RekallAgeRuntimeViewportGeometryMesh> _geometryCache = new();
 
     public RekallAgeCompiledMeshResolution Resolve(
         string? projectRoot,
@@ -32,7 +34,7 @@ public sealed class RekallAgeCompiledMeshResolver
         var resolved = _resolver.Resolve(projectRoot, assetId, ReadString(reference, "expectedRevision"));
         return resolved.Snapshot is null
             ? new(null, resolved.IssueCode, resolved.IssueMessage)
-            : new(new(resolved.FileRevision!, resolved.Snapshot, ToGeometry(resolved.Snapshot)));
+            : new(new(resolved.FileRevision!, resolved.Snapshot, ResolveGeometry(resolved.Snapshot)));
     }
 
     /// <summary>
@@ -56,8 +58,11 @@ public sealed class RekallAgeCompiledMeshResolver
         var resolved = _modelAssetResolver.Resolve(projectRoot, assetId);
         return resolved.Snapshot is null
             ? new(null, resolved.IssueCode, resolved.IssueMessage)
-            : new(new(resolved.Revision!, resolved.Snapshot, ToGeometry(resolved.Snapshot)));
+            : new(new(resolved.Revision!, resolved.Snapshot, ResolveGeometry(resolved.Snapshot)));
     }
+
+    private RekallAgeRuntimeViewportGeometryMesh ResolveGeometry(RekallAgeCompiledMeshSnapshot snapshot) =>
+        _geometryCache.GetValue(snapshot, static value => ToGeometry(value));
 
     private static RekallAgeRuntimeViewportGeometryMesh ToGeometry(RekallAgeCompiledMeshSnapshot snapshot) =>
         new(
@@ -87,7 +92,13 @@ public sealed class RekallAgeCompiledMeshResolver
                 surface.MaterialAssetId,
                 surface.FirstIndex,
                 surface.IndexCount,
-                surface.SourceFaceIds)).ToArray());
+                surface.SourceFaceIds)).ToArray(),
+            snapshot.Vertices.All(vertex => vertex.JointIndices is { Count: 4 } && vertex.JointWeights is { Count: 4 })
+                ? snapshot.Vertices.Select(vertex => new RekallAgeRuntimeViewportSkinBinding(
+                    vertex.JointIndices![0], vertex.JointIndices[1], vertex.JointIndices[2], vertex.JointIndices[3],
+                    vertex.JointWeights![0], vertex.JointWeights[1], vertex.JointWeights[2], vertex.JointWeights[3])).ToArray()
+                : null,
+            snapshot.Vertices.All(vertex => vertex.JointIndices is { Count: 4 } && vertex.JointWeights is { Count: 4 }) ? 0 : null);
 
     private static string? ReadString(RekallAgeRuntimeComponent component, string name)
     {

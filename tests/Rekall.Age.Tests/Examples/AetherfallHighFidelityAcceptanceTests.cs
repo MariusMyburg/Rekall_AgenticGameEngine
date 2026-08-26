@@ -596,7 +596,7 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         var modelingGraph = JsonNode.Parse(File.ReadAllText(Path.Combine(
             projectRoot, "Modeling", "Graphs", "aetherfall.warden.graph.age.modeling-graph.json")))!.AsObject();
         var modelingNodes = modelingGraph["nodes"]!.AsArray();
-        Assert.True(modelingNodes.Count >= 85,
+        Assert.True(modelingNodes.Count >= 101,
             $"Expected the Warden graph to retain its detailed authored construction, found {modelingNodes.Count} nodes.");
         Assert.Contains(modelingNodes, node =>
             node?["typeId"]?.GetValue<string>() == "rekall.modeling.primitive.capsule");
@@ -604,10 +604,28 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             node?["nodeId"]?.GetValue<string>() == "armor-smooth-join");
         Assert.Contains(modelingNodes, node =>
             node?["nodeId"]?.GetValue<string>() == "cloth-bevel");
-        Assert.Equal(2, authoredSurfaces.Count);
+        foreach (var nodeId in new[]
+        {
+            "thigh-guards", "bracers", "gauntlets", "eye-slit-x", "aether-material"
+        })
+        {
+            Assert.Contains(modelingNodes, node => node?["nodeId"]?.GetValue<string>() == nodeId);
+        }
+        Assert.Equal(3, authoredSurfaces.Count);
         Assert.Equal(
-            ["aetherfall.warden-steel.material", "aetherfall.warden-cloth.material"],
+            [
+                "aetherfall.warden-steel.material",
+                "aetherfall.warden-cloth.material",
+                "aetherfall.warden-aether.material"
+            ],
             authoredSurfaces.Select(surface => surface!["materialAssetId"]!.GetValue<string>()).ToArray());
+
+        var aetherMaterialGraph = JsonNode.Parse(File.ReadAllText(Path.Combine(
+            projectRoot, "Materials", "Graphs", "aetherfall.warden-aether.material.age.material-graph.json")))!.AsObject();
+        var emissiveNode = aetherMaterialGraph["nodes"]!.AsArray().Single(node =>
+            node?["typeId"]?.GetValue<string>() == "rekall.material.surface.emissive")!.AsObject();
+        Assert.Equal("#d18a42", emissiveNode["parameters"]!["color"]!.GetValue<string>());
+        Assert.Equal(3.2, emissiveNode["parameters"]!["strength"]!.GetValue<double>());
     }
 
     private static JsonObject LoadMainScene() => JsonNode.Parse(File.ReadAllText(Path.Combine(

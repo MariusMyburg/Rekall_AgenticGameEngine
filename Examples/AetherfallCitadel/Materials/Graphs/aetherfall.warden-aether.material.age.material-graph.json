@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "assetId": "aetherfall.warden-aether.material",
+  "name": "Warden Restrained Aether",
+  "revision": 1,
+  "nodes": [
+    {
+      "nodeId": "emissive",
+      "typeId": "rekall.material.surface.emissive",
+      "typeVersion": 1,
+      "parameters": {
+        "strength": 3.2,
+        "color": "#d18a42"
+      }
+    },
+    {
+      "nodeId": "output",
+      "typeId": "rekall.material.output",
+      "typeVersion": 1,
+      "parameters": {}
+    }
+  ],
+  "links": [
+    {
+      "linkId": "emissive-output",
+      "fromNodeId": "emissive",
+      "fromPortId": "surface",
+      "toNodeId": "output",
+      "toPortId": "surface"
+    }
+  ],
+  "output": {
+    "name": "surface",
+    "nodeId": "output",
+    "portId": "surface"
+  },
+  "exposedParameters": []
+}

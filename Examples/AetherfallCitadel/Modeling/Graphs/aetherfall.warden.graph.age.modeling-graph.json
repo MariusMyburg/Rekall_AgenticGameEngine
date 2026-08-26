@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.warden.graph",
   "name": "Aetherfall Warden Silhouette",
-  "revision": 8,
+  "revision": 10,
   "nodes": [
     {
       "nodeId": "torso",
@@ -1351,6 +1351,177 @@
           0.0
         ]
       }
+    },
+    {
+      "nodeId": "thigh-guard",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": {
+        "segments": 24,
+        "capTop": true,
+        "capBottom": true,
+        "depth": 0.82,
+        "radiusBottom": 0.28,
+        "radiusTop": 0.36
+      }
+    },
+    {
+      "nodeId": "thigh-guard-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "rotation": [
+          0,
+          0,
+          -3
+        ],
+        "scale": [
+          0.86,
+          1.0,
+          0.72
+        ],
+        "translation": [
+          -0.42,
+          0.16,
+          -0.03
+        ]
+      }
+    },
+    {
+      "nodeId": "thigh-guards",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "mergeDistance": 0,
+        "bisect": false,
+        "axis": "x",
+        "origin": 0
+      }
+    },
+    {
+      "nodeId": "bracer",
+      "typeId": "rekall.modeling.primitive.frustum",
+      "typeVersion": 1,
+      "parameters": {
+        "segments": 20,
+        "capTop": true,
+        "capBottom": true,
+        "depth": 0.66,
+        "radiusBottom": 0.29,
+        "radiusTop": 0.23
+      }
+    },
+    {
+      "nodeId": "bracer-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "rotation": [
+          5,
+          7,
+          16
+        ],
+        "scale": [
+          0.9,
+          1.0,
+          0.78
+        ],
+        "translation": [
+          -1.22,
+          1.38,
+          -0.04
+        ]
+      }
+    },
+    {
+      "nodeId": "bracers",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "mergeDistance": 0,
+        "bisect": false,
+        "axis": "x",
+        "origin": 0
+      }
+    },
+    {
+      "nodeId": "gauntlet",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.29,
+        "rings": 14,
+        "segments": 24
+      }
+    },
+    {
+      "nodeId": "gauntlet-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "rotation": [
+          4,
+          5,
+          14
+        ],
+        "scale": [
+          0.78,
+          0.86,
+          0.7
+        ],
+        "translation": [
+          -1.34,
+          1.08,
+          -0.02
+        ]
+      }
+    },
+    {
+      "nodeId": "gauntlets",
+      "typeId": "rekall.modeling.mirror",
+      "typeVersion": 1,
+      "parameters": {
+        "mergeDistance": 0,
+        "bisect": false,
+        "axis": "x",
+        "origin": 0
+      }
+    },
+    {
+      "nodeId": "eye-slit",
+      "typeId": "rekall.modeling.primitive.box",
+      "typeVersion": 1,
+      "parameters": {
+        "sizeZ": 0.04,
+        "sizeX": 0.48,
+        "sizeY": 0.07
+      }
+    },
+    {
+      "nodeId": "eye-slit-x",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "translation": [
+          0,
+          3.3,
+          -0.535
+        ],
+        "rotation": [
+          -7,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "nodeId": "aether-material",
+      "typeId": "rekall.modeling.material.assign",
+      "typeVersion": 1,
+      "parameters": {
+        "slotName": "Restrained Aether",
+        "materialAssetId": "aetherfall.warden-aether.material"
+      }
     }
   ],
   "links": [
@@ -1968,6 +2139,90 @@
       "fromNodeId": "cuirass-shape",
       "fromPortId": "geometry",
       "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "thigh-x",
+      "fromNodeId": "thigh-guard",
+      "fromPortId": "geometry",
+      "toNodeId": "thigh-guard-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "thigh-mirror",
+      "fromNodeId": "thigh-guard-x",
+      "fromPortId": "geometry",
+      "toNodeId": "thigh-guards",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "thigh-smooth",
+      "fromNodeId": "thigh-guards",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "bracer-x",
+      "fromNodeId": "bracer",
+      "fromPortId": "geometry",
+      "toNodeId": "bracer-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "bracer-mirror",
+      "fromNodeId": "bracer-x",
+      "fromPortId": "geometry",
+      "toNodeId": "bracers",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "bracer-smooth",
+      "fromNodeId": "bracers",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "gauntlet-x",
+      "fromNodeId": "gauntlet",
+      "fromPortId": "geometry",
+      "toNodeId": "gauntlet-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "gauntlet-mirror",
+      "fromNodeId": "gauntlet-x",
+      "fromPortId": "geometry",
+      "toNodeId": "gauntlets",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "gauntlet-smooth",
+      "fromNodeId": "gauntlets",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "eye-slit-x",
+      "fromNodeId": "eye-slit",
+      "fromPortId": "geometry",
+      "toNodeId": "eye-slit-x",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "eye-slit-material",
+      "fromNodeId": "eye-slit-x",
+      "fromPortId": "geometry",
+      "toNodeId": "aether-material",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "j-eye",
+      "fromNodeId": "aether-material",
+      "fromPortId": "geometry",
+      "toNodeId": "join",
       "toPortId": "geometry"
     }
   ],

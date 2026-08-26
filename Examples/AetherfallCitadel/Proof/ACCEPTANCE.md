@@ -522,6 +522,34 @@ the new background is an explicit fallback, not a claim that sky assets render.
   Character anatomy, clothing, animation, architectural density, materials,
   and composition also remain visibly below the requested final fidelity.
 
+## Warden limb-detail and facial-focal checkpoint
+
+- The ordinary AGE modeling graph now authors the Warden with 101 typed nodes:
+  paired thigh guards, tapered bracers, anatomically separated gauntlet forms,
+  and a
+  separate face-slit surface join the existing curve-revolved cuirass,
+  pauldrons, mantle, cloth, blade, bevel, weighted-normal, and UV chain. The
+  graph remains valid with zero unreachable nodes and evaluates its `mesh`
+  output to 10,978 points, 26,750 edges, 13,416 faces, and 48,532 corners.
+- A restrained emissive material graph is assigned only to the facial slit.
+  The rebuilt live-linked Model Asset contains 48,532 compiled vertices and
+  21,700 triangles across a stable steel, cloth, then aether surface order.
+  The stronger acceptance contract requires all new authored nodes and all
+  three ordered surfaces; it caught and drove repair of the initial variadic
+  join-link ordering instead of accepting an unstable material-slot change.
+- The fresh native High Vulkan frame is
+  `Proof/Captures/WardenDetailPass/vulkan-scene-1280x720-20260826074140056.png`.
+  It is informative with 11,828 distinct colors, 16.9% dominant-color share,
+  mean luminance 0.101, 65 renderables, 301 render-work draws, four dispatches,
+  and zero observations or asset fallbacks. Original-image review confirms the
+  new limb armor and facial focal surface resolve in the gameplay camera.
+- This is a verified intermediate character-authoring improvement, not final
+  visual acceptance. The rigid stance, distant composition, coarse environment
+  props, and limited material breakup still read as prototype-grade and remain
+  the highest-priority visible gaps. High `desktop60` passes at 97 scene draws,
+  193,762 triangles, 833,624 vertices, nine textures, and 4.767552 ms measured
+  GPU time. Gameplay remains 2/4/4/5 and both validators report zero issues.
+
 ## Topology-safe virtual geometry checkpoint
 
 - AGE's CPU virtual-geometry path no longer retains every Nth triangle. It now

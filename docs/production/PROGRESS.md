@@ -4,10 +4,25 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 09:28 Africa/Johannesburg
+Last verified: 2026-08-26 09:47 Africa/Johannesburg
 
 Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
 commit `01f48ff`)
+
+The current character-authoring checkpoint expands the live Warden from 89 to
+101 generic modeling nodes through the normal graph, bake, and Model Asset
+pipeline. Paired thigh guards, tapered bracers, gauntlet forms, and a separately
+materialed facial slit now join the existing curve-revolved cuirass, layered
+armor, cloth, bevel, split-normal, UV, mantle, and weapon work. The graph
+evaluates cleanly to 10,978 points and 13,416 faces; the compiled asset contains
+48,532 vertices and 21,700 triangles across stable steel/cloth/aether surfaces.
+A fresh native High frame confirms the additions resolve in the gameplay view,
+but the honest visual verdict remains prototype-grade because stance,
+composition, environmental prop fidelity, and material breakup are still weak.
+High `desktop60` passes at 97 draws, 193,762 triangles, 833,624 vertices, nine
+textures, and 4.767552 ms. Gameplay remains 2/4/4/5 and validation is clean.
+This checkpoint deliberately advances visible functionality without claiming
+the requested final Diablo/Alan Wake-class result.
 
 The current Aetherfall engine-driven milestone replaces unsafe triangle-stride
 virtual geometry with topology-checked connected clustering. Material surfaces

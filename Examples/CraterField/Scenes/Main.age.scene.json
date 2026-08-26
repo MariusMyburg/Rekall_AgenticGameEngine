@@ -14,6 +14,210 @@
   ],
   "entities": [
     {
+      "id": "ent_e321757af38345afb53398e9763d182e",
+      "name": "Cool Rim Light",
+      "tags": [
+        "lighting"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PointLight",
+          "properties": {
+            "color": "#6ea8ff",
+            "intensity": 7,
+            "range": 16,
+            "castShadows": false
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -6,
+            "y": 4,
+            "z": -6
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_2f874a81bef7411c9355bc3bda4ac65a",
+      "name": "East Wall",
+      "tags": [
+        "destructible",
+        "wall"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Destructible",
+          "properties": {
+            "triggered": false,
+            "chunkMeshAssetIds": [
+              "wall-chunk-0",
+              "wall-chunk-1",
+              "wall-chunk-2",
+              "wall-chunk-3",
+              "wall-chunk-4",
+              "wall-chunk-5"
+            ],
+            "explosionImpulse": 4.0
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a8478",
+            "metallicFactor": 0.05,
+            "roughnessFactor": 0.85
+          }
+        },
+        {
+          "type": "Rekall.MeshAssetReference",
+          "properties": {
+            "assetId": "wall-body"
+          }
+        },
+        {
+          "type": "Rekall.MeshCollider",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 5,
+            "y": 0,
+            "z": 0,
+            "yaw": 90
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e9d91652ee1848cb9a0bdb8c0cf62384",
+      "name": "North Wall",
+      "tags": [
+        "destructible",
+        "wall"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Destructible",
+          "properties": {
+            "triggered": false,
+            "chunkMeshAssetIds": [
+              "wall-chunk-0",
+              "wall-chunk-1",
+              "wall-chunk-2",
+              "wall-chunk-3",
+              "wall-chunk-4",
+              "wall-chunk-5"
+            ],
+            "explosionImpulse": 4.0
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a8478",
+            "metallicFactor": 0.05,
+            "roughnessFactor": 0.85
+          }
+        },
+        {
+          "type": "Rekall.MeshAssetReference",
+          "properties": {
+            "assetId": "wall-body"
+          }
+        },
+        {
+          "type": "Rekall.MeshCollider",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "z": -5,
+            "yaw": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_1d5094634f8a487cbf4ed75c41821095",
+      "name": "Quality Settings",
+      "tags": [
+        "quality",
+        "rendering"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Environment3D",
+          "properties": {
+            "ambientEnergy": 1.4,
+            "ambientSkyColor": "#7fa0c2",
+            "ambientGroundColor": "#3a3226",
+            "backgroundColor": "#0d1218",
+            "exposure": -0.3,
+            "toneMapper": "agx",
+            "whitePoint": 9.0,
+            "backgroundPolicy": "skybox"
+          }
+        },
+        {
+          "type": "Rekall.RenderQualityProfile",
+          "properties": {
+            "preset": "High",
+            "automaticScaling": false,
+            "targetFramesPerSecond": 60
+          }
+        },
+        {
+          "type": "Rekall.ShadowSettings",
+          "properties": {
+            "cascadeCount": 3,
+            "atlasResolution": 2048,
+            "maximumDistance": 80,
+            "splitPolicy": "practical",
+            "bias": 0.0015,
+            "normalBias": 0.018,
+            "filter": "pcf",
+            "stabilization": true
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
       "id": "ent_934ef2331d804c86b54eed5878ff8673",
       "name": "Sky Camera",
       "tags": [
@@ -34,6 +238,69 @@
             "z": 18,
             "pitch": 41.6335393365702,
             "yaw": 180
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_039f92db3895423b9279c50177976e0d",
+      "name": "South Wall",
+      "tags": [
+        "destructible",
+        "wall"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Destructible",
+          "properties": {
+            "triggered": false,
+            "chunkMeshAssetIds": [
+              "wall-chunk-0",
+              "wall-chunk-1",
+              "wall-chunk-2",
+              "wall-chunk-3",
+              "wall-chunk-4",
+              "wall-chunk-5"
+            ],
+            "explosionImpulse": 4.0
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a8478",
+            "metallicFactor": 0.05,
+            "roughnessFactor": 0.85
+          }
+        },
+        {
+          "type": "Rekall.MeshAssetReference",
+          "properties": {
+            "assetId": "wall-body"
+          }
+        },
+        {
+          "type": "Rekall.MeshCollider",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "z": 5,
+            "yaw": 0
           }
         }
       ],
@@ -85,7 +352,8 @@
         {
           "type": "Rekall.DirectionalLight",
           "properties": {
-            "intensity": 3.2
+            "intensity": 4.2,
+            "color": "#fff2d8"
           }
         },
         {
@@ -128,11 +396,107 @@
         },
         {
           "type": "Rekall.MeshRenderer",
-          "properties": {}
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
         },
         {
           "type": "Rekall.Transform3D",
           "properties": {}
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_13f541405ef942098eedee4477c3027a",
+      "name": "Warm Fill Light",
+      "tags": [
+        "lighting"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PointLight",
+          "properties": {
+            "color": "#ffb066",
+            "intensity": 10,
+            "range": 18,
+            "castShadows": false
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 6,
+            "y": 4,
+            "z": 6
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_b0a9b1b408854e4d86a557440b6f49a8",
+      "name": "West Wall",
+      "tags": [
+        "destructible",
+        "wall"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Destructible",
+          "properties": {
+            "triggered": false,
+            "chunkMeshAssetIds": [
+              "wall-chunk-0",
+              "wall-chunk-1",
+              "wall-chunk-2",
+              "wall-chunk-3",
+              "wall-chunk-4",
+              "wall-chunk-5"
+            ],
+            "explosionImpulse": 4.0
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a8478",
+            "metallicFactor": 0.05,
+            "roughnessFactor": 0.85
+          }
+        },
+        {
+          "type": "Rekall.MeshAssetReference",
+          "properties": {
+            "assetId": "wall-body"
+          }
+        },
+        {
+          "type": "Rekall.MeshCollider",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -5,
+            "y": 0,
+            "z": 0,
+            "yaw": 90
+          }
         }
       ],
       "parentId": null,

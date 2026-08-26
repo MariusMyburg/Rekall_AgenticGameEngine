@@ -102,6 +102,10 @@ public sealed class CraterFieldRulesSystem : IRekallAgeRuntimeModuleSystem
         return ValueTask.FromResult(world);
     }
 
+    // Grenades knock over any un-detonated wall whose center lies within this planar distance
+    // of the blast -- roughly a wall's half-width plus a few units of shockwave reach.
+    private const double WallBlastRadius = 3.5;
+
     private static RekallAgeRuntimeWorld TickFuses(RekallAgeRuntimeWorld world, double seconds, int frameSeed)
     {
         var expired = new List<string>();
@@ -142,9 +146,34 @@ public sealed class CraterFieldRulesSystem : IRekallAgeRuntimeModuleSystem
                 .WithTag("detonated");
 
             updated = updated.UpdateEntity(entityId, _ => detonated);
+            updated = TriggerNearbyWalls(updated, detonated.Transform.Position3D);
         }
 
         return updated;
+    }
+
+    private static RekallAgeRuntimeWorld TriggerNearbyWalls(RekallAgeRuntimeWorld world, RekallAgeRuntimeVector3 blastOrigin)
+    {
+        foreach (var wall in world.Entities.Where(entity =>
+            entity.HasTag("wall")
+            && !entity.HasTag("detonated")
+            && entity.FindComponent("Rekall.Destructible") is not null))
+        {
+            var position = wall.Transform.Position3D;
+            var dx = position.X - blastOrigin.X;
+            var dz = position.Z - blastOrigin.Z;
+            if (Math.Sqrt(dx * dx + dz * dz) > WallBlastRadius)
+            {
+                continue;
+            }
+
+            var wallId = wall.Id;
+            world = world.UpdateEntity(wallId, entity => entity
+                .WithComponentBoolean("Rekall.Destructible", "triggered", true)
+                .WithTag("detonated"));
+        }
+
+        return world;
     }
 
     private static RekallAgeRuntimeWorld TickSpawners(RekallAgeRuntimeWorld world, double seconds, int frameSeed)

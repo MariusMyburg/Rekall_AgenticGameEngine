@@ -30,6 +30,31 @@ public sealed class CraterFieldAcceptanceTests
             components,
             component => ReadString(component, "type") == "Rekall.Camera3D" && ReadBoolean(component, "active"));
         Assert.Contains(components, component => ReadString(component, "type") == "Rekall.DirectionalLight");
+        Assert.Contains(components, component => ReadString(component, "type") == "Rekall.ShadowSettings");
+        Assert.True(
+            components.Count(component => ReadString(component, "type") == "Rekall.PointLight") >= 2,
+            "Expected at least two accent point lights.");
+        Assert.All(entities, entity =>
+        {
+            var meshRenderer = entity!["components"]!.AsArray()
+                .SingleOrDefault(component => ReadString(component, "type") == "Rekall.MeshRenderer");
+            if (meshRenderer is not null)
+            {
+                Assert.True(ReadBoolean(meshRenderer, "castShadows"), $"{ReadString(entity, "name")} should cast shadows.");
+            }
+        });
+
+        var wallNames = new[] { "North Wall", "South Wall", "East Wall", "West Wall" };
+        foreach (var wallName in wallNames)
+        {
+            var wall = entities.Single(entity => ReadString(entity, "name") == wallName)!;
+            var wallComponents = wall["components"]!.AsArray();
+            Assert.Contains(wallComponents, component => ReadString(component, "type") == "Rekall.Destructible");
+            var destructible = wallComponents.Single(component => ReadString(component, "type") == "Rekall.Destructible")!;
+            Assert.False(ReadBoolean(destructible, "triggered"), $"{wallName} should start intact.");
+            var chunkIds = destructible["properties"]!["chunkMeshAssetIds"]!.AsArray();
+            Assert.Equal(6, chunkIds.Count);
+        }
 
         var terrain = entities.Single(entity => ReadString(entity, "name") == "Terrain")!;
         Assert.NotNull(terrain["id"]);
@@ -50,11 +75,18 @@ public sealed class CraterFieldAcceptanceTests
 
         Assert.True(File.Exists(Path.Combine(meshesDirectory, "grenade-body.age.mesh.json")));
         Assert.True(File.Exists(Path.Combine(meshesDirectory, "terrain-ground.age.mesh.json")));
+        Assert.True(File.Exists(Path.Combine(meshesDirectory, "wall-body.age.mesh.json")));
         for (var index = 0; index < 5; index++)
         {
             Assert.True(
                 File.Exists(Path.Combine(meshesDirectory, $"grenade-chunk-{index}.age.mesh.json")),
                 $"Missing grenade-chunk-{index} mesh asset.");
+        }
+        for (var index = 0; index < 6; index++)
+        {
+            Assert.True(
+                File.Exists(Path.Combine(meshesDirectory, $"wall-chunk-{index}.age.mesh.json")),
+                $"Missing wall-chunk-{index} mesh asset.");
         }
     }
 
@@ -109,6 +141,43 @@ public sealed class CraterFieldAcceptanceTests
         var terrainMesh = JsonNode.Parse(await File.ReadAllTextAsync(terrainMeshPath))!.AsObject();
         var positions = terrainMesh["topology"]!["positions"]!.AsArray();
         Assert.Contains(positions, position => position!["y"]!.GetValue<double>() < 0);
+    }
+
+    [Fact]
+    public async Task AGrenadeDetonatingNearAWallShattersItIntoScatteredChunks()
+    {
+        var projectRoot = await CreateScenarioProjectAsync();
+
+        // Long enough for several grenades to spawn and detonate; the first spawn's
+        // deterministic position has reliably landed inside a wall's blast radius in manual
+        // verification runs, so this exercises the same-frame grenade-then-wall trigger chain.
+        var world = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(
+            projectRoot,
+            "Main",
+            900,
+            CancellationToken.None);
+
+        // Wall-chunk entities are named after their source wall's stable entity id (a
+        // "ent_..." GUID), not its display name, so distinguish them from grenade chunks
+        // (named "grenade-...") by that prefix instead.
+        var wallChunkEntities = world.Entities.Where(entity =>
+            entity.Name.Contains("-chunk-", StringComparison.Ordinal)
+            && !entity.Name.StartsWith("grenade-", StringComparison.Ordinal)).ToArray();
+        Assert.NotEmpty(wallChunkEntities);
+        Assert.All(wallChunkEntities, chunk =>
+        {
+            var rigidbody = chunk.Components.Single(component => component.Type == "Rekall.Rigidbody3D");
+            var vx = rigidbody.Properties["linearVelocityX"]!.GetValue<double>();
+            var vy = rigidbody.Properties["linearVelocityY"]!.GetValue<double>();
+            var vz = rigidbody.Properties["linearVelocityZ"]!.GetValue<double>();
+            Assert.True(Math.Sqrt(vx * vx + vy * vy + vz * vz) > 0);
+        });
+
+        var remainingWallNames = world.Entities
+            .Where(entity => entity.Name is "North Wall" or "South Wall" or "East Wall" or "West Wall")
+            .Select(entity => entity.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.True(remainingWallNames.Count < 4, "Expected at least one wall to have been destroyed and removed.");
     }
 
     private static bool ReadBoolean(JsonNode? component, string propertyName) =>

@@ -51,6 +51,49 @@ public sealed class MeshFractureTests
         Assert.Throws<ArgumentOutOfRangeException>(() => RekallAgeMeshFracture.Fracture(source, 65, seed: 1));
     }
 
+    [Fact]
+    public async Task FractureOfAThinElongatedSlabStaysWithinTheSourceBounds()
+    {
+        // A wall-shaped source (much wider/taller than it is thick) reproduces a real failure:
+        // the CSG slab used to carve each chunk was sized off the source's single largest axis
+        // span, so for a thin slab the cutting box was wildly oversized relative to the source's
+        // thin dimension, and the CSG intersection leaked slab-boundary vertices far outside the
+        // source's own bounds instead of clipping cleanly to it.
+        var source = await Primitive("rekall.modeling.primitive.box", sizeX: 4, sizeY: 2.4, sizeZ: 0.4);
+        var (sourceMin, sourceMax) = Bounds(source.Topology.Positions);
+        const double epsilon = 0.01;
+
+        var chunks = RekallAgeMeshFracture.Fracture(source, 6, seed: 31);
+
+        Assert.Equal(6, chunks.Count);
+        foreach (var chunk in chunks)
+        {
+            Assert.All(chunk.Topology.Positions, position =>
+            {
+                Assert.InRange(position.X, sourceMin.X - epsilon, sourceMax.X + epsilon);
+                Assert.InRange(position.Y, sourceMin.Y - epsilon, sourceMax.Y + epsilon);
+                Assert.InRange(position.Z, sourceMin.Z - epsilon, sourceMax.Z + epsilon);
+            });
+        }
+
+        var sourceVolume = MeshVolume(source);
+        var chunkVolumeSum = chunks.Sum(MeshVolume);
+        Assert.InRange(chunkVolumeSum, sourceVolume * 0.9, sourceVolume * 1.1);
+    }
+
+    private static (RekallAgeGeometryVector3 Min, RekallAgeGeometryVector3 Max) Bounds(
+        IReadOnlyList<RekallAgeGeometryVector3> positions)
+    {
+        var min = positions[0];
+        var max = positions[0];
+        foreach (var position in positions)
+        {
+            min = new(Math.Min(min.X, position.X), Math.Min(min.Y, position.Y), Math.Min(min.Z, position.Z));
+            max = new(Math.Max(max.X, position.X), Math.Max(max.Y, position.Y), Math.Max(max.Z, position.Z));
+        }
+        return (min, max);
+    }
+
     private static double MeshVolume(RekallAgeMeshAsset mesh)
     {
         var compiled = new RekallAgeMeshCompiler().Compile(mesh);
@@ -68,9 +111,17 @@ public sealed class MeshFractureTests
         return Math.Abs(volume);
     }
 
-    private static async ValueTask<RekallAgeMeshAsset> Primitive(string typeId)
+    private static async ValueTask<RekallAgeMeshAsset> Primitive(
+        string typeId,
+        double? sizeX = null,
+        double? sizeY = null,
+        double? sizeZ = null)
     {
-        var graph = RekallAgeModelingGraphAsset.Create("source", "Source", [new("source", typeId, 1, new())], [], [new("mesh", "source", "geometry")]);
+        var parameters = new System.Text.Json.Nodes.JsonObject();
+        if (sizeX.HasValue) parameters["sizeX"] = sizeX.Value;
+        if (sizeY.HasValue) parameters["sizeY"] = sizeY.Value;
+        if (sizeZ.HasValue) parameters["sizeZ"] = sizeZ.Value;
+        var graph = RekallAgeModelingGraphAsset.Create("source", "Source", [new("source", typeId, 1, parameters)], [], [new("mesh", "source", "geometry")]);
         var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, new(0, 0, "tests", "desktop"), default);
         return result.Outputs["mesh"];
     }

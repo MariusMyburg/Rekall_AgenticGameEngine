@@ -13,6 +13,54 @@ namespace Rekall.Age.Tests.Examples;
 public sealed class AetherfallHighFidelityAcceptanceTests
 {
     [Theory]
+    [InlineData("aetherfall.warden.graph", "aetherfall-warden-dark-mesh", "aetherfall-warden-dark-model.age.model.json", 6, 32, "aetherfall.warden-steel.material")]
+    [InlineData("aetherfall.weathered-ruin.graph", "aetherfall-weathered-ruin-mesh", "aetherfall-weathered-ruin-model.age.model.json", 8, 24, "aetherfall.ruin-trim.material")]
+    public async Task WardenAndWeatheredRuinPublishEditableRevolvedForms(
+        string graphAssetId,
+        string meshAssetId,
+        string modelFileName,
+        int minimumProfileControlPoints,
+        int minimumSegments,
+        string materialAssetId)
+    {
+        var projectRoot = Path.Combine(FindRepositoryRoot(), "Examples", "AetherfallCitadel");
+        var graph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
+            projectRoot, graphAssetId, CancellationToken.None);
+        var revolve = Assert.Single(graph.Nodes, node => node.TypeId == "rekall.modeling.curve.revolve");
+        var sourceLink = Assert.Single(graph.Links, link =>
+            link.ToNodeId == revolve.NodeId && link.ToPortId == "curve");
+        var source = Assert.Single(graph.Nodes, node =>
+            node.NodeId == sourceLink.FromNodeId && node.TypeId == "rekall.modeling.curve.source");
+        var document = source.Parameters["document"]!.AsObject();
+        var splines = document["splines"]!.AsArray();
+        var controlPoints = Assert.Single(splines)!["controlPoints"]!.AsArray();
+
+        Assert.True(controlPoints.Count >= minimumProfileControlPoints,
+            $"Expected at least {minimumProfileControlPoints} authored profile changes, found {controlPoints.Count}.");
+        Assert.True(revolve.Parameters["segments"]!.GetValue<int>() >= minimumSegments);
+        Assert.Equal(materialAssetId, revolve.Parameters["materialAssetId"]!.GetValue<string>());
+
+        var baked = await new RekallAgeMeshAssetStore().LoadVersionedAsync(
+            projectRoot, meshAssetId, CancellationToken.None);
+        Assert.Contains(baked.Value.MaterialSlots, slot => slot.MaterialAssetId == materialAssetId);
+        Assert.Contains(baked.Value.Attributes, attribute =>
+            attribute.Name == "uv.generated"
+            && attribute.Domain == RekallAgeGeometryDomain.Corner
+            && attribute.Semantic == "texcoord-0");
+        var provenance = Assert.Single(baked.Value.Attributes, attribute => attribute.Name == "curve.source.span");
+        Assert.Contains(provenance.Values, value => !string.IsNullOrWhiteSpace(value.GetString()));
+        Assert.Contains(baked.Value.Attributes, attribute =>
+            attribute.Name == "normal.authored" && attribute.Domain == RekallAgeGeometryDomain.Corner);
+
+        var model = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(
+            projectRoot, "Assets", "Models", modelFileName)))!.AsObject();
+        Assert.Equal(baked.Revision, model["lastSuccessfulBuild"]!["sourceFileRevision"]!.GetValue<string>());
+        var compiledPath = model["lastSuccessfulBuild"]!["compiledMeshPath"]!.GetValue<string>();
+        Assert.True(File.Exists(Path.Combine(projectRoot, compiledPath)),
+            $"Compiled revolve consumer '{compiledPath}' must be retained with the project.");
+    }
+
+    [Theory]
     [InlineData("aetherfall.warden.graph", "aetherfall-warden-dark-mesh", "aetherfall-warden-dark-model.age.model.json", 55.0)]
     [InlineData("aetherfall.weathered-ruin.graph", "aetherfall-weathered-ruin-mesh", "aetherfall-weathered-ruin-model.age.model.json", 35.0)]
     public async Task WardenAndWeatheredRuinPublishSplitNormalPolicy(

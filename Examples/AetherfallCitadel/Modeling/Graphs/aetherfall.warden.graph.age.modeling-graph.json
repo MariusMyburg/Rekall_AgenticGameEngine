@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.warden.graph",
   "name": "Aetherfall Warden Silhouette",
-  "revision": 6,
+  "revision": 8,
   "nodes": [
     {
       "nodeId": "torso",
@@ -1093,6 +1093,264 @@
         "angleDegrees": 55.0,
         "sharpAttribute": "normal.sharp"
       }
+    },
+    {
+      "nodeId": "cuirass-profile",
+      "typeId": "rekall.modeling.curve.source",
+      "typeVersion": 1,
+      "parameters": {
+        "document": {
+          "assetId": "aetherfall.warden.cuirass-profile",
+          "name": "Warden Layered Cuirass Profile",
+          "revision": 1,
+          "schemaVersion": 1,
+          "splines": [
+            {
+              "splineId": 1,
+              "controlPoints": [
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 0.5,
+                    "x": 0.68
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 1,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 0.5,
+                    "x": 0.68
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 0.5,
+                    "x": 0.68
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 0.62,
+                    "x": 0.84
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 2,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 0.62,
+                    "x": 0.84
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 0.62,
+                    "x": 0.84
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 0.76,
+                    "x": 0.78
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 3,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 0.76,
+                    "x": 0.78
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 0.76,
+                    "x": 0.78
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 0.92,
+                    "x": 0.7
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 4,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 0.92,
+                    "x": 0.7
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 0.92,
+                    "x": 0.7
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 1.22,
+                    "x": 0.72
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 5,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 1.22,
+                    "x": 0.72
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 1.22,
+                    "x": 0.72
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 1.58,
+                    "x": 0.86
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 6,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 1.58,
+                    "x": 0.86
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 1.58,
+                    "x": 0.86
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 1.92,
+                    "x": 0.94
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 7,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 1.92,
+                    "x": 0.94
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 1.92,
+                    "x": 0.94
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 2.18,
+                    "x": 0.88
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 8,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 2.18,
+                    "x": 0.88
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 2.18,
+                    "x": 0.88
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 2.44,
+                    "x": 0.72
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 9,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 2.44,
+                    "x": 0.72
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 2.44,
+                    "x": 0.72
+                  }
+                },
+                {
+                  "handleOut": {
+                    "z": 0.0,
+                    "y": 2.62,
+                    "x": 0.57
+                  },
+                  "tiltRadians": 0.0,
+                  "controlPointId": 10,
+                  "radius": 1.0,
+                  "position": {
+                    "z": 0.0,
+                    "y": 2.62,
+                    "x": 0.57
+                  },
+                  "handleIn": {
+                    "z": 0.0,
+                    "y": 2.62,
+                    "x": 0.57
+                  }
+                }
+              ],
+              "cyclic": false,
+              "kind": "Poly"
+            }
+          ]
+        },
+        "resolution": 1
+      }
+    },
+    {
+      "nodeId": "cuirass-revolve",
+      "typeId": "rekall.modeling.curve.revolve",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "y",
+        "materialAssetId": "aetherfall.warden-steel.material",
+        "angleDegrees": 360.0,
+        "segments": 40,
+        "weldDistance": 1E-06,
+        "slotName": "Layered Cuirass"
+      }
+    },
+    {
+      "nodeId": "cuirass-shape",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "scale": [
+          1.0,
+          1.0,
+          0.78
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "translation": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
     }
   ],
   "links": [
@@ -1689,6 +1947,27 @@
       "fromNodeId": "auto-smooth",
       "fromPortId": "geometry",
       "toNodeId": "normals",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cuirass-profile-revolve",
+      "fromNodeId": "cuirass-profile",
+      "fromPortId": "curve",
+      "toNodeId": "cuirass-revolve",
+      "toPortId": "curve"
+    },
+    {
+      "linkId": "cuirass-revolve-shape",
+      "fromNodeId": "cuirass-revolve",
+      "fromPortId": "geometry",
+      "toNodeId": "cuirass-shape",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "cuirass-armor-smooth",
+      "fromNodeId": "cuirass-shape",
+      "fromPortId": "geometry",
+      "toNodeId": "armor-smooth-join",
       "toPortId": "geometry"
     }
   ],

@@ -175,7 +175,7 @@ assets, xUnit, native Vulkan capture.
 - Produces: a shaped Warden armor form and a reusable citadel architectural
   dressing form in the existing published models.
 
-- [ ] **Step 1: Write failing consumer assertions**
+- [x] **Step 1: Write failing consumer assertions**
 
   Require both real graphs to contain at least one revolve node fed by a curve
   source. Require the Warden profile to contain at least six authored radial/
@@ -184,11 +184,11 @@ assets, xUnit, native Vulkan capture.
   compiled outputs contain the expected material, UV, normal, and varied-normal
   evidence and that live-linked source revisions are current.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
   Run the two consumer cases. Expected: no revolve nodes in either graph.
 
-- [ ] **Step 3: Patch the Warden through AGE commands**
+- [x] **Step 3: Patch the Warden through AGE commands**
 
   Add an editable vertical armor profile describing waist pinch, rib flare,
   breastplate projection, gorget narrowing, and layered lower rim. Revolve it
@@ -196,7 +196,7 @@ assets, xUnit, native Vulkan capture.
   existing body, join it before the final weather/normal/UV chain, bake the
   Warden mesh, and rebuild `aetherfall-warden-dark-model`.
 
-- [ ] **Step 4: Patch the ruin through AGE commands**
+- [x] **Step 4: Patch the ruin through AGE commands**
 
   Add a stepped capital/brazier profile with plinth, neck, bowl lip, and crown
   changes. Revolve it around Y with at least 24 segments, assign ruin trim,
@@ -204,7 +204,7 @@ assets, xUnit, native Vulkan capture.
   normal/UV chain, bake the mesh, and rebuild
   `aetherfall-weathered-ruin-model` so all existing instances consume it.
 
-- [ ] **Step 5: Run consumer GREEN and commit**
+- [x] **Step 5: Run consumer GREEN and commit**
 
   Require both cases green and retain the current compiled products in source
   control rather than leaving Model Assets pointed at ignored local files.

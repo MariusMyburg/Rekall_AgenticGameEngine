@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall.weathered-ruin.graph",
   "name": "Weathered Ruin Wall Module",
-  "revision": 8,
+  "revision": 11,
   "nodes": [
     {
       "nodeId": "wall",
@@ -518,6 +518,359 @@
         "angleDegrees": 35.0,
         "sharpAttribute": "normal.sharp"
       }
+    },
+    {
+      "nodeId": "capital-profile",
+      "typeId": "rekall.modeling.curve.source",
+      "typeVersion": 1,
+      "parameters": {
+        "document": {
+          "name": "Weathered Ruin Crown Capital Profile",
+          "revision": 2,
+          "splines": [
+            {
+              "kind": "Poly",
+              "controlPoints": [
+                {
+                  "radius": 1.0,
+                  "handleOut": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "position": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "tiltRadians": 0.0,
+                  "handleIn": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "controlPointId": 1
+                },
+                {
+                  "radius": 1.0,
+                  "handleOut": {
+                    "x": 0.5,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "position": {
+                    "x": 0.5,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "tiltRadians": 0.0,
+                  "handleIn": {
+                    "x": 0.5,
+                    "y": 0.0,
+                    "z": 0.0
+                  },
+                  "controlPointId": 2
+                },
+                {
+                  "radius": 1.0,
+                  "handleOut": {
+                    "x": 0.62,
+                    "y": 0.08,
+                    "z": 0.0
+                  },
+                  "position": {
+                    "x": 0.62,
+                    "y": 0.08,
+                    "z": 0.0
+                  },
+                  "tiltRadians": 0.0,
+                  "handleIn": {
+                    "x": 0.62,
+                    "y": 0.08,
+                    "z": 0.0
+                  },
+                  "controlPointId": 3
+                },
+                {
+                  "radius": 1.0,
+                  "handleOut": {
+                    "x": 0.58,
+                    "y": 0.18,
+                    "z": 0.0
+                  },
+                  "position": {
+                    "x": 0.58,
+                    "y": 0.18,
+                    "z": 0.0
+                  },
+                  "tiltRadians": 0.0,
+                  "handleIn": {
+                    "x": 0.58,
+                    "y": 0.18,
+                    "z": 0.0
+                  },
+                  "controlPointId": 4
+                },
+                {
+                  "radius": 1.0,
+                  "handleOut": {
+                    "x": 0.36,
+                    "y": 0.28,
+                    "z": 0.0
+                  },
+                  "position": {
+                    "x": 0.36,
+                    "y": 0.28,
+                    "z": 0.0
+                  },
+                  "tiltRadians": 0.0,
+                  "handleIn": {
+                    "x": 0.36,
+                    "y": 0.28,
+                    "z": 0.0
+                  },
+                  "controlPointId": 5
+                },
+                {
+                  "radius": 1.0,
+                  "handleOut": {
+                    "x": 0.31,
+                    "y": 0.55,
+                    "z": 0.0
+                  },
+                  "position": {
+                    "x": 0.31,
+                    "y": 0.55,
+                    "z": 0.0
+                  },
+                  "tiltRadians": 0.0,
+                  "handleIn": {
+                    "x": 0.31,
+                    "y": 0.55,
+                    "z": 0.0
+                  },
+                  "controlPointId": 6
+                },
+                {
+                  "radius": 1.0,
+                  "handleOut": {
+                    "x": 0.38,
+                    "y": 0.7,
+                    "z": 0.0
+                  },
+                  "position": {
+                    "x": 0.38,
+                    "y": 0.7,
+                    "z": 0.0
+                  },
+                  "tiltRadians": 0.0,
+                  "handleIn": {
+                    "x": 0.38,
+                    "y": 0.7,
+                    "z": 0.0
+                  },
+                  "controlPointId": 7
+                },
+                {
+                  "radius": 1.0,
+                  "handleOut": {
+                    "x": 0.56,
+                    "y": 0.82,
+                    "z": 0.0
+                  },
+                  "position": {
+                    "x": 0.56,
+                    "y": 0.82,
+                    "z": 0.0
+                  },
+                  "tiltRadians": 0.0,
+                  "handleIn": {
+                    "x": 0.56,
+                    "y": 0.82,
+                    "z": 0.0
+                  },
+                  "controlPointId": 8
+                },
+                {
+                  "radius": 1.0,
+                  "handleOut": {
+                    "x": 0.74,
+                    "y": 0.92,
+                    "z": 0.0
+                  },
+                  "position": {
+                    "x": 0.74,
+                    "y": 0.92,
+                    "z": 0.0
+                  },
+                  "tiltRadians": 0.0,
+                  "handleIn": {
+                    "x": 0.74,
+                    "y": 0.92,
+                    "z": 0.0
+                  },
+                  "controlPointId": 9
+                },
+                {
+                  "radius": 1.0,
+                  "handleOut": {
+                    "x": 0.78,
+                    "y": 1.02,
+                    "z": 0.0
+                  },
+                  "position": {
+                    "x": 0.78,
+                    "y": 1.02,
+                    "z": 0.0
+                  },
+                  "tiltRadians": 0.0,
+                  "handleIn": {
+                    "x": 0.78,
+                    "y": 1.02,
+                    "z": 0.0
+                  },
+                  "controlPointId": 10
+                },
+                {
+                  "radius": 1.0,
+                  "handleOut": {
+                    "x": 0.54,
+                    "y": 1.14,
+                    "z": 0.0
+                  },
+                  "position": {
+                    "x": 0.54,
+                    "y": 1.14,
+                    "z": 0.0
+                  },
+                  "tiltRadians": 0.0,
+                  "handleIn": {
+                    "x": 0.54,
+                    "y": 1.14,
+                    "z": 0.0
+                  },
+                  "controlPointId": 11
+                },
+                {
+                  "radius": 1.0,
+                  "handleOut": {
+                    "x": 0.32,
+                    "y": 1.3,
+                    "z": 0.0
+                  },
+                  "position": {
+                    "x": 0.32,
+                    "y": 1.3,
+                    "z": 0.0
+                  },
+                  "tiltRadians": 0.0,
+                  "handleIn": {
+                    "x": 0.32,
+                    "y": 1.3,
+                    "z": 0.0
+                  },
+                  "controlPointId": 12
+                },
+                {
+                  "radius": 1.0,
+                  "handleOut": {
+                    "x": 0.18,
+                    "y": 1.48,
+                    "z": 0.0
+                  },
+                  "position": {
+                    "x": 0.18,
+                    "y": 1.48,
+                    "z": 0.0
+                  },
+                  "tiltRadians": 0.0,
+                  "handleIn": {
+                    "x": 0.18,
+                    "y": 1.48,
+                    "z": 0.0
+                  },
+                  "controlPointId": 13
+                },
+                {
+                  "radius": 1.0,
+                  "handleOut": {
+                    "x": 0.0,
+                    "y": 1.48,
+                    "z": 0.0
+                  },
+                  "position": {
+                    "x": 0.0,
+                    "y": 1.48,
+                    "z": 0.0
+                  },
+                  "tiltRadians": 0.0,
+                  "handleIn": {
+                    "x": 0.0,
+                    "y": 1.48,
+                    "z": 0.0
+                  },
+                  "controlPointId": 14
+                }
+              ],
+              "splineId": 1,
+              "cyclic": false
+            }
+          ],
+          "assetId": "aetherfall.ruin.crown-capital-profile",
+          "schemaVersion": 1
+        },
+        "resolution": 1
+      }
+    },
+    {
+      "nodeId": "capital-revolve",
+      "typeId": "rekall.modeling.curve.revolve",
+      "typeVersion": 1,
+      "parameters": {
+        "axis": "y",
+        "materialAssetId": "aetherfall.ruin-trim.material",
+        "angleDegrees": 360.0,
+        "segments": 32,
+        "weldDistance": 1E-06,
+        "slotName": "Carved Crown Capital"
+      }
+    },
+    {
+      "nodeId": "capital-left",
+      "typeId": "rekall.modeling.transform",
+      "typeVersion": 1,
+      "parameters": {
+        "scale": [
+          1.0,
+          1.0,
+          0.88
+        ],
+        "rotation": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "translation": [
+          -3.6,
+          4.75,
+          -0.25
+        ]
+      }
+    },
+    {
+      "nodeId": "capital-pair",
+      "typeId": "rekall.modeling.array",
+      "typeVersion": 1,
+      "parameters": {
+        "instanceMode": false,
+        "relativeOffset": false,
+        "count": 2,
+        "offset": [
+          7.2,
+          0.0,
+          0.0
+        ]
+      }
     }
   ],
   "links": [
@@ -820,6 +1173,34 @@
       "fromNodeId": "auto-smooth",
       "fromPortId": "geometry",
       "toNodeId": "normals",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "capital-profile-revolve",
+      "fromNodeId": "capital-profile",
+      "fromPortId": "curve",
+      "toNodeId": "capital-revolve",
+      "toPortId": "curve"
+    },
+    {
+      "linkId": "capital-revolve-left",
+      "fromNodeId": "capital-revolve",
+      "fromPortId": "geometry",
+      "toNodeId": "capital-left",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "capital-left-pair",
+      "fromNodeId": "capital-left",
+      "fromPortId": "geometry",
+      "toNodeId": "capital-pair",
+      "toPortId": "geometry"
+    },
+    {
+      "linkId": "capital-pair-trim",
+      "fromNodeId": "capital-pair",
+      "fromPortId": "geometry",
+      "toNodeId": "trim-join",
       "toPortId": "geometry"
     }
   ],

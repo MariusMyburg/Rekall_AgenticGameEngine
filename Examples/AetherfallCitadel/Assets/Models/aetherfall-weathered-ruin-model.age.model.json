@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "assetId": "aetherfall-weathered-ruin-model",
   "displayName": "Weathered Ruin Wall",
-  "revision": 9,
+  "revision": 10,
   "source": {
     "kind": "Mesh",
     "assetId": "aetherfall-weathered-ruin-mesh",
@@ -10,12 +10,12 @@
   },
   "buildState": 0,
   "lastSuccessfulBuild": {
-    "sourceFileRevision": "21246abc9d51232a626bf82f082cf090fdc3c2e66276822c220f3b477ec2f749",
-    "sourceLogicalRevision": 10,
-    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-weathered-ruin-model/a11ce23245189e23cf220eaea0131bc6c1d4e957ba58177b56adb0532d53965a.age.compiled-mesh.json",
-    "compiledContentHash": "a11ce23245189e23cf220eaea0131bc6c1d4e957ba58177b56adb0532d53965a",
+    "sourceFileRevision": "438c762ee096cf5bea24e46e94ad064539856e4043afc578fd8306424e3b1f90",
+    "sourceLogicalRevision": 11,
+    "compiledMeshPath": "Assets/Models/Compiled/aetherfall-weathered-ruin-model/b3db8689e1c53a68078c5af56b5575f9ee766c166fbd176c278c51156d5332fa.age.compiled-mesh.json",
+    "compiledContentHash": "b3db8689e1c53a68078c5af56b5575f9ee766c166fbd176c278c51156d5332fa",
     "compilerVersion": "rekall-age-model-compiler-v1",
-    "builtAtUtc": "2026-08-26T03:58:16.9829221+00:00",
+    "builtAtUtc": "2026-08-26T04:27:03.4085049+00:00",
     "diagnostics": []
   },
   "frozen": false

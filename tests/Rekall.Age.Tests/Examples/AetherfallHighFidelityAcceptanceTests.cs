@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.World;
 using Rekall.Age.Runtime;
@@ -378,6 +379,9 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         Assert.Contains("Warden Deformable Mantle", targetPaths);
 
         var runeblade = Assert.Single(attachments, entity => entity.Name == "Warden Runeblade");
+        var bladeAttachment = Assert.Single(
+            runeblade.Components, component => component.Type == "Rekall.RigAttachment");
+        Assert.Equal("forearm_r", bladeAttachment.Properties["jointId"]!.GetValue<string>());
         var modelReference = Assert.Single(runeblade.Components, component => component.Type == "Rekall.ModelAssetReference");
         Assert.Equal("aetherfall-warden-runeblade-model", modelReference.Properties["assetId"]!.GetValue<string>());
         var bladeGraph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
@@ -399,6 +403,9 @@ public sealed class AetherfallHighFidelityAcceptanceTests
             authoredBladeTransform.Properties["roll"]!.GetValue<double>(),
             animatedBlade.Transform.Rotation3D.Z);
         var authoredPauldron = Assert.Single(attachments, entity => entity.Name == "Warden Articulated Pauldron");
+        var pauldronAttachment = Assert.Single(
+            authoredPauldron.Components, component => component.Type == "Rekall.RigAttachment");
+        Assert.Equal("upper_arm_l", pauldronAttachment.Properties["jointId"]!.GetValue<string>());
         var pauldronGraph = await new RekallAgeModelingGraphAssetStore().LoadAsync(
             projectRoot, "aetherfall.warden-pauldron.graph", CancellationToken.None);
         Assert.Contains(pauldronGraph.Nodes, node => node.NodeId == "lower-lamella");
@@ -424,6 +431,29 @@ public sealed class AetherfallHighFidelityAcceptanceTests
 
         var beforeFrame = new RekallAgeRuntimeRenderFrameBuilder().Build(animated.World, 640, 360, false);
         var beforeBlade = Assert.Single(beforeFrame.Renderables, item => item.EntityName == "Warden Runeblade");
+        var beforePauldron = Assert.Single(beforeFrame.Renderables, item => item.EntityName == "Warden Articulated Pauldron");
+        var jointMovedWorld = animated.World with
+        {
+            Entities = animated.World.Entities.Select(entity => entity.Name == "AetherWarden"
+                ? entity with
+                {
+                    Components = entity.Components.Select(component => component.Type == "Rekall.RigPose"
+                        ? component with { Properties = AttachmentPose(component.Properties) }
+                        : component).ToArray()
+                }
+                : entity).ToArray()
+        };
+        var jointMovedFrame = new RekallAgeRuntimeRenderFrameBuilder().Build(jointMovedWorld, 640, 360, false);
+        var jointMovedBlade = Assert.Single(jointMovedFrame.Renderables, item => item.EntityName == "Warden Runeblade");
+        var jointMovedPauldron = Assert.Single(jointMovedFrame.Renderables, item => item.EntityName == "Warden Articulated Pauldron");
+        Assert.True(RenderTransformDelta(beforeBlade, jointMovedBlade) > 0.01);
+        Assert.True(RenderTransformDelta(beforePauldron, jointMovedPauldron) > 0.01);
+        Assert.Equal(
+            Assert.Single(animated.World.Entities, entity => entity.Name == "Warden Runeblade").Transform,
+            Assert.Single(jointMovedWorld.Entities, entity => entity.Name == "Warden Runeblade").Transform);
+        Assert.Equal(
+            Assert.Single(animated.World.Entities, entity => entity.Name == "Warden Articulated Pauldron").Transform,
+            Assert.Single(jointMovedWorld.Entities, entity => entity.Name == "Warden Articulated Pauldron").Transform);
         var movedWorld = animated.World with
         {
             Entities = animated.World.Entities.Select(entity => entity.Name == "AetherWarden"
@@ -444,6 +474,41 @@ public sealed class AetherfallHighFidelityAcceptanceTests
 
         Assert.Equal(2.5, afterBlade.X - beforeBlade.X, precision: 4);
         Assert.DoesNotContain(afterFrame.Observations, item => item.Target == "Warden Runeblade");
+
+        static JsonObject AttachmentPose(JsonObject source)
+        {
+            var properties = source.DeepClone().AsObject();
+            var deltas = properties["jointDeltas"]!.AsArray();
+            for (var index = deltas.Count - 1; index >= 0; index--)
+            {
+                var jointId = deltas[index]?["jointId"]?.GetValue<string>();
+                if (jointId is "forearm_r" or "upper_arm_l")
+                    deltas.RemoveAt(index);
+            }
+            deltas.Add(Pose("forearm_r", System.Numerics.Matrix4x4.CreateRotationZ(-0.65f)));
+            deltas.Add(Pose("upper_arm_l", System.Numerics.Matrix4x4.CreateRotationZ(0.45f)));
+            return properties;
+        }
+
+        static JsonObject Pose(string jointId, System.Numerics.Matrix4x4 matrix) => new()
+        {
+            ["jointId"] = jointId,
+            ["matrix"] = new JsonArray(
+                matrix.M11, matrix.M12, matrix.M13, matrix.M14,
+                matrix.M21, matrix.M22, matrix.M23, matrix.M24,
+                matrix.M31, matrix.M32, matrix.M33, matrix.M34,
+                matrix.M41, matrix.M42, matrix.M43, matrix.M44)
+        };
+
+        static double RenderTransformDelta(
+            RekallAgeRuntimeViewportRenderable before,
+            RekallAgeRuntimeViewportRenderable after) =>
+            Math.Abs(before.X - after.X)
+            + Math.Abs(before.Y - after.Y)
+            + Math.Abs(before.Z - after.Z)
+            + Math.Abs(before.RotationX - after.RotationX)
+            + Math.Abs(before.RotationY - after.RotationY)
+            + Math.Abs(before.RotationZ - after.RotationZ);
     }
 
     [Theory]

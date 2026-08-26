@@ -107,21 +107,21 @@ Run the three relevant test classes and confirm existing hierarchy, component-ca
 - Consumes: Task 2 `Rekall.RigAttachment` and the Warden's `upper_arm_l` / `forearm_r` named joints.
 - Produces: joint-local pauldron and runeblade entities whose rendered world transforms follow the actual Warden pose.
 
-- [ ] **Step 1: Write failing Aetherfall acceptance**
+- [x] **Step 1: Write failing Aetherfall acceptance**
 
 Require the pauldron attachment joint to equal `upper_arm_l` and the runeblade joint to equal `forearm_r`. Build two frames from worlds that differ only in those named rig deltas; assert both rendered equipment transforms change while the equipment runtime local transforms remain unchanged.
 
-- [ ] **Step 2: Run the focused acceptance and verify RED**
+- [x] **Step 2: Run the focused acceptance and verify RED**
 
 Run: `dotnet test tests/Rekall.Age.Tests/Rekall.Age.Tests.csproj -c Release --no-restore --filter FullyQualifiedName~WardenUsesModelBackedParentedArticulationThatFollowsGameplayRoot`
 
 Expected: missing `Rekall.RigAttachment` components.
 
-- [ ] **Step 3: Rebase the authored equipment transforms**
+- [x] **Step 3: Rebase the authored equipment transforms**
 
 Add `Rekall.RigAttachment` to the two entities. Rebase the pauldron from Warden-root position `(-0.84, 2.52, 0.02)` to upper-arm-local `(-0.12, 0.37, 0.02)`. Rebase the blade from `(1.24, 1.92, 0.18)` to forearm-local `(0.17, 0.37, 0.18)`. Preserve their authored rotation, scale, material, model reference, tags, and root parent ID.
 
-- [ ] **Step 4: Run Aetherfall acceptance and inspect a native frame**
+- [x] **Step 4: Run Aetherfall acceptance and inspect a native frame**
 
 Run combined Aetherfall gameplay/high-fidelity acceptance. Capture a High Vulkan frame; reject and correct double transforms, detached equipment, exploded placement, or attachment observations rather than weakening assertions.
 

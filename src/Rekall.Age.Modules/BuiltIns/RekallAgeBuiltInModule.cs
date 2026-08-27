@@ -51,6 +51,8 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeBallSocketJointComponent>();
         builder.RegisterComponent<RekallAgeHingeJointComponent>();
         builder.RegisterComponent<RekallAgeDistanceJointComponent>();
+        builder.RegisterComponent<RekallAgeWeldJointComponent>();
+        builder.RegisterComponent<RekallAgeFixedJointComponent>();
         builder.RegisterComponent<RekallAgeRigidbody2DComponent>();
         builder.RegisterComponent<RekallAgeRigidbody3DComponent>();
         builder.RegisterComponent<RekallAgeTriggerComponent>();
@@ -1170,18 +1172,89 @@ public sealed class RekallAgeHingeJointComponent : RekallAgeComponent
 
     [RekallAgeProperty(Minimum = 0, Description = "Maximum torque the motor may apply to reach MotorTargetVelocity. 0 (the default) disables the motor entirely, leaving the hinge a passive pin+axis constraint - set this above 0 to drive a wheel, door, or turntable continuously without fighting the hinge's own constraint solving the way externally overwriting a body's angular velocity every frame does.")]
     public double MotorMaximumTorque { get; init; }
+
+    [RekallAgeProperty(Description = "Optional lower bound, in authored degrees, on relative rotation around Axis from the bodies' bind-time relative orientation. Ignored unless AngleLimitMaximum is also greater than AngleLimitMinimum.")]
+    public double AngleLimitMinimum { get; init; }
+
+    [RekallAgeProperty(Description = "Optional upper bound, in authored degrees, on relative rotation around Axis from the bodies' bind-time relative orientation. Ignored unless greater than AngleLimitMinimum - a door, turret, or ragdoll joint that should only swing within a range, rather than spin freely.")]
+    public double AngleLimitMaximum { get; init; }
 }
 
-[RekallAgeComponent("Distance Joint", Description = "Keeps this dynamic body's center and another dynamic body's center at an authored target distance apart, like a rigid rod or taut rope. Both entities must have a rigid body and collider. ConnectedEntityId must reference a different, existing, dynamic entity.")]
+[RekallAgeComponent("Distance Joint", Description = "Keeps this dynamic body's center and another dynamic body's center at an authored target distance apart, like a rigid rod or taut rope. Both entities must have a rigid body and collider. ConnectedEntityId must reference a different, existing, dynamic entity. When DistanceLimitMinimum/DistanceLimitMaximum are both authored (Maximum greater than Minimum), the joint instead allows any distance within that range, like a leash or slack chain, and TargetDistance is ignored.")]
 public sealed class RekallAgeDistanceJointComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Description = "Entity ID of the other dynamic body this joint connects to.")]
     public string ConnectedEntityId { get; init; } = string.Empty;
 
-    [RekallAgeProperty(Minimum = 0, Description = "Target distance in world units between the two entities' centers.")]
+    [RekallAgeProperty(Minimum = 0, Description = "Target distance in world units between the two entities' centers. Ignored when DistanceLimitMinimum/DistanceLimitMaximum author a valid range instead.")]
     public double TargetDistance { get; init; } = 1;
 
-    [RekallAgeProperty(Minimum = 0.0001, Description = "BEPU joint-spring frequency. Lower frequencies allow more stretch before correction; higher frequencies hold the target distance more rigidly.")]
+    [RekallAgeProperty(Minimum = 0.0001, Description = "BEPU joint-spring frequency. Lower frequencies allow more stretch before correction; higher frequencies hold the target distance (or, in range mode, the limit itself) more rigidly.")]
+    public double SpringFrequency { get; init; } = 30;
+
+    [RekallAgeProperty(Minimum = 0, Description = "BEPU damping ratio: 0 is undamped, 1 is critically damped, values above 1 are overdamped.")]
+    public double DampingRatio { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0, Description = "Optional lower bound, in world units, on distance between the two entities' centers. Ignored unless DistanceLimitMaximum is also greater than this value.")]
+    public double DistanceLimitMinimum { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Description = "Optional upper bound, in world units, on distance between the two entities' centers. Ignored unless greater than DistanceLimitMinimum - when authored, switches this joint from a fixed TargetDistance to a free-within-range leash.")]
+    public double DistanceLimitMaximum { get; init; }
+}
+
+[RekallAgeComponent("Weld Joint", Description = "Rigidly locks this dynamic body's position and orientation relative to another dynamic body, as if welded together - the two move as one rigid assembly. Both entities must have a rigid body and collider. ConnectedEntityId must reference a different, existing, dynamic entity.")]
+public sealed class RekallAgeWeldJointComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Description = "Entity ID of the other dynamic body this joint connects to.")]
+    public string ConnectedEntityId { get; init; } = string.Empty;
+
+    [RekallAgeProperty(Description = "This entity's local-space offset from the connected entity's center, held fixed by the weld.")]
+    public double LocalOffsetX { get; init; }
+
+    [RekallAgeProperty(Description = "This entity's local-space offset from the connected entity's center, held fixed by the weld.")]
+    public double LocalOffsetY { get; init; }
+
+    [RekallAgeProperty(Description = "This entity's local-space offset from the connected entity's center, held fixed by the weld.")]
+    public double LocalOffsetZ { get; init; }
+
+    [RekallAgeProperty(Description = "Fixed relative orientation held by the weld, authored as degrees around X, applied X then Y then Z.")]
+    public double LocalOrientationX { get; init; }
+
+    [RekallAgeProperty(Description = "Fixed relative orientation held by the weld, authored as degrees around Y, applied X then Y then Z.")]
+    public double LocalOrientationY { get; init; }
+
+    [RekallAgeProperty(Description = "Fixed relative orientation held by the weld, authored as degrees around Z, applied X then Y then Z.")]
+    public double LocalOrientationZ { get; init; }
+
+    [RekallAgeProperty(Minimum = 0.0001, Description = "BEPU joint-spring frequency. Lower frequencies allow more give before correction; higher frequencies hold the weld more rigidly.")]
+    public double SpringFrequency { get; init; } = 30;
+
+    [RekallAgeProperty(Minimum = 0, Description = "BEPU damping ratio: 0 is undamped, 1 is critically damped, values above 1 are overdamped.")]
+    public double DampingRatio { get; init; } = 1;
+}
+
+[RekallAgeComponent("Fixed Joint", Description = "Pins one local anchor point on this dynamic body to a fixed point in world space - not to another entity. Use this for a chain anchored to the world, a swinging sign bolted to a static wall position, or any joint that needs a truly immovable end rather than a second dynamic body. Requires a rigid body and collider on the same entity.")]
+public sealed class RekallAgeFixedJointComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Description = "World-space X the anchor point is pinned to.")]
+    public double AnchorX { get; init; }
+
+    [RekallAgeProperty(Description = "World-space Y the anchor point is pinned to.")]
+    public double AnchorY { get; init; }
+
+    [RekallAgeProperty(Description = "World-space Z the anchor point is pinned to.")]
+    public double AnchorZ { get; init; }
+
+    [RekallAgeProperty(Description = "Anchor point X, in this entity's own local space.")]
+    public double LocalOffsetX { get; init; }
+
+    [RekallAgeProperty(Description = "Anchor point Y, in this entity's own local space.")]
+    public double LocalOffsetY { get; init; }
+
+    [RekallAgeProperty(Description = "Anchor point Z, in this entity's own local space.")]
+    public double LocalOffsetZ { get; init; }
+
+    [RekallAgeProperty(Minimum = 0.0001, Description = "BEPU joint-spring frequency. Lower frequencies allow more stretch before correction; higher frequencies hold the anchor point more rigidly.")]
     public double SpringFrequency { get; init; } = 30;
 
     [RekallAgeProperty(Minimum = 0, Description = "BEPU damping ratio: 0 is undamped, 1 is critically damped, values above 1 are overdamped.")]

@@ -397,6 +397,110 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneAcceptsAHingeJointAngleLimit()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var wheel = RekallAgeEntityDocument.Create("Wheel", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.SphereCollider3D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.HingeJoint",
+                new JsonObject
+                {
+                    ["connectedEntityId"] = "chassis",
+                    ["angleLimitMinimum"] = -10,
+                    ["angleLimitMaximum"] = 10
+                }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["physics"])
+            .AddEntity(wheel);
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        Assert.DoesNotContain(report.Issues, issue =>
+            issue.Code == "REKALL_COMPONENT_PROPERTY_UNKNOWN" || issue.Code == "REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN");
+    }
+
+    [Fact]
+    public async Task ValidateSceneAcceptsADistanceJointRange()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var rope = RekallAgeEntityDocument.Create("Rope", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.SphereCollider3D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.DistanceJoint",
+                new JsonObject
+                {
+                    ["connectedEntityId"] = "anchor",
+                    ["distanceLimitMinimum"] = 1,
+                    ["distanceLimitMaximum"] = 3
+                }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["physics"])
+            .AddEntity(rope);
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        Assert.DoesNotContain(report.Issues, issue =>
+            issue.Code == "REKALL_COMPONENT_PROPERTY_UNKNOWN" || issue.Code == "REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN");
+    }
+
+    [Fact]
+    public async Task ValidateSceneAcceptsAWeldJoint()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var panel = RekallAgeEntityDocument.Create("Panel", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.BoxCollider3D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.WeldJoint",
+                new JsonObject
+                {
+                    ["connectedEntityId"] = "frame",
+                    ["localOffsetX"] = 0.5,
+                    ["localOrientationY"] = 90
+                }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["physics"])
+            .AddEntity(panel);
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        Assert.DoesNotContain(report.Issues, issue =>
+            issue.Code == "REKALL_COMPONENT_PROPERTY_UNKNOWN" || issue.Code == "REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN");
+    }
+
+    [Fact]
+    public async Task ValidateSceneAcceptsAFixedJoint()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var sign = RekallAgeEntityDocument.Create("Sign", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.BoxCollider3D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.FixedJoint",
+                new JsonObject
+                {
+                    ["anchorX"] = 0,
+                    ["anchorY"] = 4,
+                    ["anchorZ"] = 0
+                }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["physics"])
+            .AddEntity(sign);
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        Assert.DoesNotContain(report.Issues, issue =>
+            issue.Code == "REKALL_COMPONENT_PROPERTY_UNKNOWN" || issue.Code == "REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN");
+    }
+
+    [Fact]
     public async Task ValidateSceneAcceptsAnAuthoredCollisionFilter()
     {
         var root = TestPaths.CreateTempDirectory();

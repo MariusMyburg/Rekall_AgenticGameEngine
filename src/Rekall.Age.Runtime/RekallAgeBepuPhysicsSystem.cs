@@ -20,8 +20,10 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
     {
         "Rekall.BallSocketJoint",
         "Rekall.HingeJoint",
-        "Rekall.DistanceJoint"
+        "Rekall.DistanceJoint",
+        "Rekall.WeldJoint"
     };
+    private const string FixedJointComponentType = "Rekall.FixedJoint";
     private PersistentPhysicsWorld? _physicsWorld;
     private readonly RekallAgeCompiledMeshAssetResolver _meshResolver = new();
     private readonly RekallAgeCompiledModelAssetResolver _modelAssetResolver = new();
@@ -966,7 +968,42 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                     if (component.Type == "Rekall.HingeJoint")
                     {
                         SyncHingeMotor(key + ":motor", component, bodyA.Handle, bodyB.Handle, desired);
+                        SyncHingeAngleLimit(key + ":limit", component, bodyA.Handle, bodyB.Handle, desired);
                     }
+                }
+
+                foreach (var component in entity.Components.Where(item => item.Type == FixedJointComponentType))
+                {
+                    var key = $"{entity.Id}:{component.Type}";
+                    if (!_dynamicBodies.TryGetValue(entity.Id, out var body))
+                    {
+                        observations.Add(JointUnresolvedObservation(frameIndex, entity, "FixedJoint requires a rigid body and collider on the same entity"));
+                        continue;
+                    }
+
+                    var signature = $"{component.Type}|{component.Properties.ToJsonString()}|{body.Handle.Value}";
+                    desired.Add(key);
+                    if (_joints.TryGetValue(key, out var existing) && existing.Signature.Equals(signature, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    if (_joints.TryGetValue(key, out var stale))
+                    {
+                        Simulation.Solver.Remove(stale.Handle);
+                    }
+
+                    var description = new OneBodyLinearServo
+                    {
+                        LocalOffset = ReadAnchor(component, "localOffsetX", "localOffsetY", "localOffsetZ"),
+                        Target = ReadAnchor(component, "anchorX", "anchorY", "anchorZ"),
+                        SpringSettings = new SpringSettings(
+                            Math.Max(0.0001f, ReadSingle(component, "springFrequency", 30)),
+                            Math.Max(0, ReadSingle(component, "dampingRatio", 1))),
+                        ServoSettings = ServoSettings.Default
+                    };
+                    var handle = Simulation.Solver.Add(body.Handle, in description);
+                    _joints[key] = new PersistentJoint(handle, body.Handle, body.Handle, signature);
                 }
             }
 
@@ -1024,6 +1061,57 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
             _joints[motorKey] = new PersistentJoint(handle, handleA, handleB, string.Empty);
         }
 
+        /// <summary>
+        /// A HingeJoint's optional angle range, via a BEPU TwistLimit constraint solved alongside the
+        /// Hinge. TwistLimit measures relative rotation around each basis's local Z axis, so both bases
+        /// are built from the same authored hinge axis (Z aligned to it) the same way Hinge's own
+        /// LocalHingeAxisA/B already reuse one axis vector for both bodies - meaning, like the Hinge
+        /// itself, this is only geometrically exact when the two bodies start out reasonably co-oriented.
+        /// Unlike the motor, the limit's own signature already changes whenever its authored bounds
+        /// change (SyncJoints only calls this when the primary joint's own diff already fired, but the
+        /// limit has its own add/remove lifecycle here since it can be enabled/disabled independently).
+        /// </summary>
+        private void SyncHingeAngleLimit(
+            string limitKey,
+            RekallAgeRuntimeComponent component,
+            BodyHandle handleA,
+            BodyHandle handleB,
+            HashSet<string> desired)
+        {
+            var minimumDegrees = ReadSingle(component, "angleLimitMinimum", 0);
+            var maximumDegrees = ReadSingle(component, "angleLimitMaximum", 0);
+            if (maximumDegrees <= minimumDegrees)
+            {
+                return;
+            }
+
+            desired.Add(limitKey);
+            var signature = $"{minimumDegrees}|{maximumDegrees}|{handleA.Value}|{handleB.Value}";
+            if (_joints.TryGetValue(limitKey, out var existing) && existing.Signature.Equals(signature, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (_joints.TryGetValue(limitKey, out var stale))
+            {
+                Simulation.Solver.Remove(stale.Handle);
+            }
+
+            QuaternionEx.GetQuaternionBetweenNormalizedVectors(Vector3.UnitZ, ReadAxis(component), out var basis);
+            var description = new TwistLimit
+            {
+                LocalBasisA = basis,
+                LocalBasisB = basis,
+                MinimumAngle = minimumDegrees * (MathF.PI / 180),
+                MaximumAngle = maximumDegrees * (MathF.PI / 180),
+                SpringSettings = new SpringSettings(
+                    Math.Max(0.0001f, ReadSingle(component, "springFrequency", 30)),
+                    Math.Max(0, ReadSingle(component, "dampingRatio", 1)))
+            };
+            var handle = Simulation.Solver.Add(handleA, handleB, in description);
+            _joints[limitKey] = new PersistentJoint(handle, handleA, handleB, signature);
+        }
+
         private ConstraintHandle AddJointConstraint(RekallAgeRuntimeComponent component, BodyHandle handleA, BodyHandle handleB)
         {
             var springSettings = new SpringSettings(
@@ -1054,14 +1142,39 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                     };
                     return Simulation.Solver.Add(handleA, handleB, in description);
                 }
-                default:
+                case "Rekall.WeldJoint":
                 {
-                    var description = new CenterDistanceConstraint
+                    var description = new Weld
                     {
-                        TargetDistance = Math.Max(0, ReadSingle(component, "targetDistance", 1)),
+                        LocalOffset = ReadAnchor(component, "localOffsetX", "localOffsetY", "localOffsetZ"),
+                        LocalOrientation = ReadEulerOrientation(component, "localOrientationX", "localOrientationY", "localOrientationZ"),
                         SpringSettings = springSettings
                     };
                     return Simulation.Solver.Add(handleA, handleB, in description);
+                }
+                default:
+                {
+                    var limitMinimum = ReadSingle(component, "distanceLimitMinimum", 0);
+                    var limitMaximum = ReadSingle(component, "distanceLimitMaximum", 0);
+                    if (limitMaximum > limitMinimum)
+                    {
+                        var description = new CenterDistanceLimit
+                        {
+                            MinimumDistance = Math.Max(0, limitMinimum),
+                            MaximumDistance = limitMaximum,
+                            SpringSettings = springSettings
+                        };
+                        return Simulation.Solver.Add(handleA, handleB, in description);
+                    }
+                    else
+                    {
+                        var description = new CenterDistanceConstraint
+                        {
+                            TargetDistance = Math.Max(0, ReadSingle(component, "targetDistance", 1)),
+                            SpringSettings = springSettings
+                        };
+                        return Simulation.Solver.Add(handleA, handleB, in description);
+                    }
                 }
             }
         }
@@ -1081,6 +1194,20 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                 ReadSingle(component, "axisY", 1),
                 ReadSingle(component, "axisZ", 0));
             return axis.LengthSquared() > 0.0001f ? Vector3.Normalize(axis) : Vector3.UnitY;
+        }
+
+        /// <summary>Same authored-degrees, X-then-Y-then-Z composition convention already used for a
+        /// body's own authored Transform3D.Rotation3D (see ToAuthoredOrientation), applied here to a
+        /// joint's fixed local orientation instead of a body's world pose.</summary>
+        private static Quaternion ReadEulerOrientation(RekallAgeRuntimeComponent component, string xName, string yName, string zName)
+        {
+            var radiansX = ReadSingle(component, xName, 0) * (MathF.PI / 180);
+            var radiansY = ReadSingle(component, yName, 0) * (MathF.PI / 180);
+            var radiansZ = ReadSingle(component, zName, 0) * (MathF.PI / 180);
+            return Quaternion.Normalize(Quaternion.CreateFromRotationMatrix(
+                Matrix4x4.CreateRotationX(radiansX)
+                * Matrix4x4.CreateRotationY(radiansY)
+                * Matrix4x4.CreateRotationZ(radiansZ)));
         }
 
         private static RekallAgeRuntimeObservation JointUnresolvedObservation(int frameIndex, RekallAgeRuntimeEntity entity, string reason)

@@ -47,6 +47,8 @@ public static class RekallAgeBuiltInComponentTypeCatalog
         "Rekall.BallSocketJoint",
         "Rekall.HingeJoint",
         "Rekall.DistanceJoint",
+        "Rekall.WeldJoint",
+        "Rekall.FixedJoint",
         "Rekall.Rigidbody2D",
         "Rekall.Rigidbody3D",
         "Rekall.Trigger",

@@ -228,6 +228,276 @@ public sealed class PhysicsJointsTests
     }
 
     [Fact]
+    public async Task WeldJointLocksBothRelativePositionAndOrientation()
+    {
+        // Body A starts pre-rotated 30 degrees around Y and slightly separated from Body B, which
+        // starts unrotated. The weld's authored LocalOffset/LocalOrientation are both identity (B
+        // should end up coincident with, and oriented like, A). Since both bodies have equal mass and
+        // moment of inertia, a symmetric two-body correction settles them toward each other rather than
+        // one pinning the other exactly at its original value - so this asserts what Weld actually
+        // promises (position AND orientation converge to match) rather than predicting one exact
+        // final angle.
+        var bodyA = RekallAgeEntityDocument.Create("Body A", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["x"] = 0, ["y"] = 3, ["z"] = 0, ["yaw"] = 30 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Rigidbody3D",
+                new JsonObject { ["mass"] = 1 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.BoxCollider3D",
+                new JsonObject { ["width"] = 0.4, ["height"] = 0.4, ["depth"] = 0.4 }));
+        var bodyB = RekallAgeEntityDocument.Create("Body B", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["x"] = 0.3, ["y"] = 3, ["z"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Rigidbody3D",
+                new JsonObject { ["mass"] = 1 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.BoxCollider3D",
+                new JsonObject { ["width"] = 0.4, ["height"] = 0.4, ["depth"] = 0.4 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.WeldJoint",
+                new JsonObject { ["connectedEntityId"] = bodyA.Id }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Physics Settings", ["settings"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsWorld3D",
+                    new JsonObject { ["GravityY"] = 0 })))
+            .AddEntity(bodyA)
+            .AddEntity(bodyB);
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, frames: 90, CancellationToken.None);
+
+        var a = result.World.Entities.Single(entity => entity.Name == "Body A");
+        var b = result.World.Entities.Single(entity => entity.Name == "Body B");
+        var positionA = a.Transform.Position3D;
+        var positionB = b.Transform.Position3D;
+        var distance = Vector3.Distance(
+            new Vector3((float)positionA.X, (float)positionA.Y, (float)positionA.Z),
+            new Vector3((float)positionB.X, (float)positionB.Y, (float)positionB.Z));
+
+        Assert.True(distance < 0.2, $"Expected the weld to pull the two bodies to a coincident position, actual distance {distance}.");
+        Assert.InRange(
+            Math.Abs(Normalize180(a.Transform.Rotation3D.Y - b.Transform.Rotation3D.Y)),
+            0,
+            10);
+    }
+
+    [Fact]
+    public async Task FixedJointPinsABodyToAWorldSpaceAnchorInsteadOfAnotherEntity()
+    {
+        var body = RekallAgeEntityDocument.Create("Body", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["x"] = 3, ["y"] = 5, ["z"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Rigidbody3D",
+                new JsonObject { ["mass"] = 1 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.SphereCollider3D",
+                new JsonObject { ["radius"] = 0.2 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.FixedJoint",
+                new JsonObject { ["anchorX"] = 0, ["anchorY"] = 5, ["anchorZ"] = 0 }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Physics Settings", ["settings"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsWorld3D",
+                    new JsonObject { ["GravityY"] = -9.81 })))
+            .AddEntity(body);
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, frames: 120, CancellationToken.None);
+
+        var position = result.World.Entities.Single(entity => entity.Name == "Body").Transform.Position3D;
+        var distanceFromAnchor = Vector3.Distance(
+            new Vector3((float)position.X, (float)position.Y, (float)position.Z),
+            new Vector3(0, 5, 0));
+        Assert.True(
+            distanceFromAnchor < 0.5,
+            $"Expected the fixed joint to hold the body near its world anchor despite gravity and its starting offset, actual distance {distanceFromAnchor}.");
+    }
+
+    [Fact]
+    public async Task HingeJointAngleLimitStopsRotationWithinAuthoredBounds()
+    {
+        // Same setup as HingeJointConstrainsRelativeRotationToOneAxisWhilePinningPosition, but with a
+        // tight [-10, 10] degree limit and enough spin (45 deg/s over one second) that an unlimited
+        // hinge would rotate roughly 45 degrees - the limit must visibly cap that.
+        var bodyA = RekallAgeEntityDocument.Create("Body A", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["x"] = 0, ["y"] = 3, ["z"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Rigidbody3D",
+                new JsonObject { ["mass"] = 1 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.SphereCollider3D",
+                new JsonObject { ["radius"] = 0.2 }));
+        var bodyB = RekallAgeEntityDocument.Create("Body B", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["x"] = 1, ["y"] = 3, ["z"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Rigidbody3D",
+                new JsonObject { ["mass"] = 1, ["angularVelocityY"] = 45 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.SphereCollider3D",
+                new JsonObject { ["radius"] = 0.2 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.HingeJoint",
+                new JsonObject
+                {
+                    ["connectedEntityId"] = bodyA.Id,
+                    ["axisX"] = 0,
+                    ["axisY"] = 1,
+                    ["axisZ"] = 0,
+                    ["angleLimitMinimum"] = -10,
+                    ["angleLimitMaximum"] = 10
+                }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Physics Settings", ["settings"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsWorld3D",
+                    new JsonObject { ["GravityY"] = 0 })))
+            .AddEntity(bodyA)
+            .AddEntity(bodyB);
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, frames: 60, CancellationToken.None);
+
+        var rotationY = result.World.Entities.Single(entity => entity.Name == "Body B").Transform.Rotation3D.Y;
+        Assert.True(
+            Math.Abs(Normalize180(rotationY)) < 20,
+            $"Expected the [-10, 10] degree angle limit to cap Body B's rotation well short of the ~45 degrees an unlimited hinge would reach, actual {rotationY}.");
+    }
+
+    [Fact]
+    public async Task DistanceJointRangeAllowsMovementWithinLimitsButCapsBeyondThem()
+    {
+        var bodyA = RekallAgeEntityDocument.Create("Body A", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["x"] = 0, ["y"] = 3, ["z"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Rigidbody3D",
+                new JsonObject { ["mass"] = 1 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.SphereCollider3D",
+                new JsonObject { ["radius"] = 0.2 }));
+        var bodyB = RekallAgeEntityDocument.Create("Body B", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["x"] = 1.5, ["y"] = 3, ["z"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Rigidbody3D",
+                new JsonObject { ["mass"] = 1, ["linearVelocityX"] = 20 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.SphereCollider3D",
+                new JsonObject { ["radius"] = 0.2 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.DistanceJoint",
+                new JsonObject
+                {
+                    ["connectedEntityId"] = bodyA.Id,
+                    ["distanceLimitMinimum"] = 1,
+                    ["distanceLimitMaximum"] = 2
+                }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Physics Settings", ["settings"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsWorld3D",
+                    new JsonObject { ["GravityY"] = 0 })))
+            .AddEntity(bodyA)
+            .AddEntity(bodyB);
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, frames: 120, CancellationToken.None);
+
+        var a = result.World.Entities.Single(entity => entity.Name == "Body A").Transform.Position3D;
+        var b = result.World.Entities.Single(entity => entity.Name == "Body B").Transform.Position3D;
+        var distance = Vector3.Distance(new Vector3((float)a.X, (float)a.Y, (float)a.Z), new Vector3((float)b.X, (float)b.Y, (float)b.Z));
+
+        // A fast outward launch (20 units/s) would separate the bodies to ~40 units apart within two
+        // seconds if nothing constrained them; the range limit must keep them within the authored
+        // [1, 2] bounds throughout instead of a single fixed TargetDistance or unbounded separation.
+        Assert.InRange(distance, 0.9, 2.3);
+    }
+
+    private static double Normalize180(double degrees)
+    {
+        var wrapped = degrees % 360;
+        if (wrapped > 180)
+        {
+            wrapped -= 360;
+        }
+        else if (wrapped < -180)
+        {
+            wrapped += 360;
+        }
+
+        return wrapped;
+    }
+
+    [Fact]
+    public async Task DistanceJointWorksBetweenTwoRigidbody2DEntitiesTheSameAsIn3D()
+    {
+        // Joint components aren't 2D/3D-specific - there's one shared set (BallSocketJoint,
+        // HingeJoint, DistanceJoint, WeldJoint, FixedJoint). BEPU itself has no 2D concept at all
+        // (confirmed: its own shipped XML docs contain zero mentions of "2D" or "planar" anywhere);
+        // this engine's own 2D support is a planar projection of ordinary 3D BEPU bodies, so a joint
+        // between two Rigidbody2D entities should work identically to the 3D case above.
+        var bodyA = RekallAgeEntityDocument.Create("Body A", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform2D",
+                new JsonObject { ["x"] = 0, ["y"] = 3 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Rigidbody2D",
+                new JsonObject { ["mass"] = 1 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.CircleCollider2D",
+                new JsonObject { ["radius"] = 0.2 }));
+        var bodyB = RekallAgeEntityDocument.Create("Body B", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform2D",
+                new JsonObject { ["x"] = 0.5, ["y"] = 3 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Rigidbody2D",
+                new JsonObject { ["mass"] = 1 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.CircleCollider2D",
+                new JsonObject { ["radius"] = 0.2 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.DistanceJoint",
+                new JsonObject { ["connectedEntityId"] = bodyA.Id, ["targetDistance"] = 2 }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics2d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Physics Settings", ["settings"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsWorld3D",
+                    new JsonObject { ["GravityY"] = 0 })))
+            .AddEntity(bodyA)
+            .AddEntity(bodyB);
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, frames: 150, CancellationToken.None);
+
+        var a = result.World.Entities.Single(entity => entity.Name == "Body A").Transform.Position2D;
+        var b = result.World.Entities.Single(entity => entity.Name == "Body B").Transform.Position2D;
+        var distance = Vector2.Distance(new Vector2((float)a.X, (float)a.Y), new Vector2((float)b.X, (float)b.Y));
+
+        Assert.InRange(distance, 1.5, 2.5);
+        Assert.DoesNotContain(result.World.Observations, observation => observation.Code == "runtime.physics.joint_unresolved");
+    }
+
+    [Fact]
     public async Task JointWithMissingConnectedEntityIsSkippedWithAnObservationInsteadOfCrashing()
     {
         var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])

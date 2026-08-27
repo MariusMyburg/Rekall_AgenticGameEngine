@@ -13,6 +13,19 @@ namespace Rekall.Age.Modeling;
 /// </summary>
 public static class RekallAgeMeshFracture
 {
+    /// <summary>
+    /// Bounded number of deterministic reseed attempts before giving up. CSG.Sharp's BSP
+    /// construction can throw (observed as a NullReferenceException from Node.Invert, but the
+    /// exact failure mode is a third-party implementation detail we don't control the source of)
+    /// when a seed pair's perpendicular-bisector cutting plane is numerically degenerate against
+    /// the source mesh's specific geometry - found while authoring a real example game, where
+    /// some seeds on an otherwise perfectly valid sphere crashed and others didn't. Retrying with
+    /// a different, but deterministically-derived, seed keeps the function pure (the same input
+    /// seed always retries through the same sequence and lands on the same result) while turning
+    /// an occasional unhandled crash into a successful, still-reproducible fracture.
+    /// </summary>
+    private const int MaximumReseedAttempts = 8;
+
     public static IReadOnlyList<RekallAgeMeshAsset> Fracture(RekallAgeMeshAsset source, int chunkCount, long seed)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -22,8 +35,33 @@ public static class RekallAgeMeshFracture
         if (!validation.IsValid || validation.Summary.BoundaryEdgeCount != 0 || validation.Summary.NonManifoldEdgeCount != 0 || validation.Summary.FaceCount == 0)
             throw new ArgumentException("Fracture source must be a non-empty, closed manifold mesh.", nameof(source));
 
+        for (var attempt = 0; attempt < MaximumReseedAttempts; attempt++)
+        {
+            try
+            {
+                return FractureOnce(source, chunkCount, DeriveAttemptSeed(seed, attempt));
+            }
+            catch (Exception error) when (error is NullReferenceException or InvalidOperationException or IndexOutOfRangeException)
+            {
+                // A degenerate cutting plane for this particular seed; try the next deterministic
+                // reseed rather than surfacing a raw third-party crash.
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"Could not fracture mesh '{source.AssetId}' into {chunkCount} chunks after {MaximumReseedAttempts} deterministic reseed attempts starting from seed {seed}. " +
+            "The source geometry may be producing degenerate cutting planes for every attempted seed point set; try a different seed or chunk count.");
+    }
+
+    /// <summary>Combines the caller's seed with a retry attempt index into one deterministic
+    /// 32-bit seed, so a given (seed, attempt) pair always produces the same result.</summary>
+    private static int DeriveAttemptSeed(long seed, int attempt) =>
+        unchecked((int)((ulong)seed * 0x9E3779B97F4A7C15UL + (ulong)attempt * 0xBF58476D1CE4E5B9UL));
+
+    private static IReadOnlyList<RekallAgeMeshAsset> FractureOnce(RekallAgeMeshAsset source, int chunkCount, int effectiveSeed)
+    {
         var (min, max) = ComputeBounds(source.Topology.Positions);
-        var random = new Random(unchecked((int)seed));
+        var random = new Random(effectiveSeed);
         var seeds = Enumerable.Range(0, chunkCount)
             .Select(_ => new RekallAgeGeometryVector3(
                 Lerp(min.X, max.X, random.NextDouble()),

@@ -43,6 +43,28 @@ public sealed class MeshFractureTests
     }
 
     [Fact]
+    public async Task FractureOfASphereSucceedsForASeedThatDegeneratesTheUnfixedCsgKernel()
+    {
+        // Reproduces a real crash found while authoring an example game: fracturing this exact
+        // sphere (radius 0.5, 10 segments, 7 rings) with seed 2 or seed 7 threw an unhandled
+        // NullReferenceException from inside CSG.Sharp's Node.Invert(), called from CSG.Intersect,
+        // for a random seed-pair whose perpendicular-bisector slab produces a numerically
+        // degenerate cut against this mesh's geometry. Seeds 1, 3, and 42 succeeded on the
+        // identical source, so this is seed-specific, not a general sphere-fracture failure.
+        var source = await Sphere(radius: 0.5, segments: 10, rings: 7);
+
+        var chunks = RekallAgeMeshFracture.Fracture(source, 5, seed: 2);
+
+        Assert.Equal(5, chunks.Count);
+        var validator = new RekallAgeMeshValidator();
+        foreach (var chunk in chunks)
+        {
+            var validation = validator.Validate(chunk);
+            Assert.True(validation.IsValid, string.Join(", ", validation.Diagnostics.Select(item => item.Message)));
+        }
+    }
+
+    [Fact]
     public async Task RejectsAnOutOfRangeChunkCount()
     {
         var source = await Primitive("rekall.modeling.primitive.box");
@@ -109,6 +131,19 @@ public sealed class MeshFractureTests
                      + p0.Z * (p1.X * p2.Y - p2.X * p1.Y)) / 6.0;
         }
         return Math.Abs(volume);
+    }
+
+    private static async ValueTask<RekallAgeMeshAsset> Sphere(double radius, int segments, int rings)
+    {
+        var parameters = new System.Text.Json.Nodes.JsonObject
+        {
+            ["radius"] = radius,
+            ["segments"] = segments,
+            ["rings"] = rings
+        };
+        var graph = RekallAgeModelingGraphAsset.Create("source", "Source", [new("source", "rekall.modeling.primitive.sphere", 1, parameters)], [], [new("mesh", "source", "geometry")]);
+        var result = await new RekallAgeModelingGraphEvaluator().EvaluateAsync(graph, ["mesh"], RekallAgeModelingEvaluationBudget.Default, new(0, 0, "tests", "desktop"), default);
+        return result.Outputs["mesh"];
     }
 
     private static async ValueTask<RekallAgeMeshAsset> Primitive(

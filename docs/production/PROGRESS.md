@@ -6492,6 +6492,54 @@ lag-distance clamp, and collision avoidance pulling the camera in / leaving
 it alone when nothing is in the way / staying off when disabled) plus the
 full `Runtime`/`Validation`/`Modules` regression selection all passed.
 
+## 2026-08-27 Swept-sphere collision probe and real AlphaCutoff mask mode
+
+Two follow-ups closing gaps this session had itself just flagged as honest
+simplifications.
+
+The camera collision-avoidance probe (previous checkpoint) upgraded from a
+single ray to a genuine swept sphere: each candidate obstruction is
+approximated as a bounding sphere around its collider (the same
+approximation `RekallAgeTriggerEventSystem` already uses for trigger-volume
+overlap, not a new kind of imprecision), reducing the sweep to an ordinary
+ray-vs-sphere test against `probeRadius + boundingRadius`. A new
+`CollisionProbeRadius` property controls the sweep thickness (0 degrades to
+the old thin-ray behavior). Verified with a new test proving an off-axis
+obstruction a thin ray would miss is now correctly caught, and a companion
+test proving `CollisionProbeRadius = 0` correctly misses that same
+obstruction again - the radius genuinely controls sensitivity rather than
+the sweep just always catching everything nearby.
+
+`AlphaCutoff`'s "mask" mode (the honest gap recorded in the RainGlass
+checkpoint) turned out to need real investigation before implementing:
+tracing the full pipeline found the headless-capture path's entire C# side
+(mesh builder through the draw-plan/push-constants builder) was *already*
+fully wired end to end - `AlphaMode`/`AlphaCutoff` already flowed all the
+way to `RekallAgeVulkanSceneGpuDrawPushConstants`'s `AlphaMask`/
+`AlphaCutoff` fields - only the shader itself (`rekall_scene.frag`) never
+declared or acted on them. The live Windows Player, by contrast, has its
+own entirely separate inline shader/uniform-struct implementation
+(`Program.cs`) that needed the same treatment from scratch. Added real
+`discard`-based alpha-tested cutout to both: the capture-path shader reads
+already-existing spare uniform slots (`shadowFactors.z`/`.w`, alongside
+`.x`/`.y` already used for cast/receive shadows), and the live player
+reuses its own equivalent spare slots (`ShadowFactors.y`/`.z`) - in both
+cases without growing the shared Draw-uniform struct at all, since every
+custom shader (including the example games' own) already reads a shorter
+prefix of that same buffer than either default shader declares, exactly
+like the existing `ShadowFactors` field before this change.
+
+Verified: new `BuildDrawPushConstantsEncodesAlphaModeAndCutoff`/
+`BuildDrawPushConstantsClampsAlphaCutoffToTheValidZeroToOneRange` unit
+tests; a real visual proof via CLI capture (three cubes - a "mask" cube at
+alpha 0.2 rendered completely invisible, a "mask" cube at alpha 0.9
+rendered fully solid, and an "opaque" control at the same low alpha 0.2
+rendered as a dim blended rectangle rather than vanishing, proving mask
+mode genuinely discards while ordinary alpha just blends); both default
+shaders confirmed compiling and rendering correctly (a live player run over
+2000+ frames, and a real headless capture through an existing example
+project); and the full `Rendering` test selection (741/741) passed.
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

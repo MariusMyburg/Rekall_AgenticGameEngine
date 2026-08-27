@@ -6455,6 +6455,43 @@ normally authored with a collider, a one-line scene fix.
 
 Verified: 6/6 in the full `RuntimeTriggerEventSystemTests` selection.
 
+## 2026-08-27 Spring-arm-style camera lag and collision avoidance
+
+Answered a direct capability question: does AGE support something like
+Unreal's SpringArmComponent (attach a camera to an entity, offset, delayed/
+lagged follow motion, arm-length collision avoidance)? `Rekall.CameraTarget3D`
+already had the "attach + offset + look-at" half; verified by reading its
+own update loop that it had zero lag/smoothing (an instant snap to
+`target + offset` every frame) and zero collision probing.
+
+Added both missing halves, kept off by default so every scene authored
+before this existed keeps its exact prior instant-snap behavior unchanged:
+
+- `PositionLagEnabled`/`PositionLagSpeed`/`MaximumPositionLagDistance` and
+  `RotationLagEnabled`/`RotationLagSpeed` add real exponential-decay
+  smoothing (framerate-independent: a continuous decay rate, not a fixed
+  per-frame step) toward the instant target position/look-at rotation,
+  with shortest-path angle interpolation for rotation so decaying across
+  the 359-to-1-degree wrap steps the short way. Look-at rotation is aimed
+  from the actual (possibly lagged) camera position, not the unlagged
+  instant one, so a trailing camera looks toward the target from where it
+  actually is.
+- `CollisionAvoidanceEnabled`/`CollisionMinimumDistance` probe a single ray
+  from the target out to the desired camera position via the same generic,
+  physics-independent `Raycast3D` the pointer/picking system already uses
+  (no new physics dependency), and pull the camera in short of the nearest
+  obstruction (excluding the target and camera entities themselves) instead
+  of letting it clip through geometry. Explicitly a single ray, not a true
+  swept sphere/capsule the way a real spring arm's own collision channel
+  is - documented as a known simplification, not silently passed off as
+  the genuine article.
+
+Verified: 8 new tests (partial-progress position/rotation lag, the
+disabled-by-default regression proving unchanged prior behavior, the max-
+lag-distance clamp, and collision avoidance pulling the camera in / leaving
+it alone when nothing is in the way / staying off when disabled) plus the
+full `Runtime`/`Validation`/`Modules` regression selection all passed.
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

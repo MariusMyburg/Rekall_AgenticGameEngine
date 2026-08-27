@@ -3186,9 +3186,15 @@ behavior.
   cameras, viewports/layers/stereo/OpenXR, primitives and authored/imported GLB
   meshes, PBR texture inputs, directional/point lighting, generic animation,
   skeletal skinning, morph targets, LOD/virtual geometry, Vulkan capture and a
-  windowed player are verified. Breadth still lacks a generic spot-light
-  contract and mature shadow/contact/render-feature coverage expected of a
-  finished general-purpose 3D engine.
+  windowed player are verified. `Rekall.Material` now authors real alpha
+  blending (`AlphaMode`/`AlphaCutoff`, threaded to the already-existing
+  alpha-blend-capable transparent scene pipeline that only fixed-purpose
+  atmosphere/cloud/halo effects could reach before); ordinary custom-shaded
+  translucent surfaces (glass, water) are authorable through the generic
+  component system for the first time, proven by `Examples/RainGlass`.
+  Breadth still lacks a generic spot-light contract and mature
+  shadow/contact/render-feature coverage expected of a finished
+  general-purpose 3D engine.
 - Expand adversarial security tests around authored JSON, migration races,
   diagnostic stores, and full-trust module inputs.
 - Production consumers still execute C# modules in-process until the active
@@ -6349,6 +6355,56 @@ proven by a dedicated 2D/3D interop test.
 Verified: new `PhysicsJointsTests`/`ProjectValidatorTests` selection passed
 50/50; the broader `Runtime|Validation|Modules` regression selection passed
 729/729.
+
+## 2026-08-27 RainGlass: authored alpha blending, raindrops-on-glass proof
+
+Answered a direct question: can the engine support a realistic raindrops-
+on-glass effect, or does it need to be made more powerful? Investigated by
+attempting the real acceptance-benchmark-queue item 3 brief directly
+(acting as the LLM client myself, this session's established practice, no
+Ollama model in the loop this time) rather than reasoning about it in the
+abstract.
+
+Found one real, narrowly-scoped gap, not a fundamental limitation:
+`RekallAgeRuntimeViewportRenderable.AlphaMode`/`AlphaCutoff` already
+existed, and the real Vulkan renderer already had two alpha-blend-capable
+scene pipelines (opaque and transparent) that already switched per-draw on
+it - all built to serve the fixed-purpose atmosphere/cloud/halo systems.
+Nothing in the authoring layer ever set `AlphaMode` away from its "opaque"
+default, so an ordinary `Rekall.Material` had no way to produce a
+translucent surface through the generic component system. Fixed by
+exposing `AlphaMode`/`AlphaCutoff` on `Rekall.Material` and threading them
+through `RekallAgeRuntimeRenderFrameBuilder`.
+
+With that one fix, `Examples/RainGlass` proves the full effect: a real CC
+BY 2.0 landscape photo searched and imported via
+`rekall.asset.search_remote_images`/`import_remote` with full provenance,
+a full-window background plane, and a second "glass" plane with a custom
+shader pair (`rainglass.vert`/`.frag`) rendering animated per-column rain
+streaks with a cheap UV-offset refraction approximation, alpha-blended
+over the background. `RainGlassSystem` (a runtime module) writes world-
+elapsed seconds into the glass entity's own `Rekall.Material.roughnessFactor`
+every frame - the same authored-per-frame-property pattern Ridgebreaker
+used to drive a wheel motor, repurposing an existing numeric material slot
+as "time" since AGE has no dedicated engine-time uniform reaching shaders
+directly.
+
+Verified: both shader stages compile clean; project validation passes with
+zero issues; two captured frames 1.5 simulated seconds apart show the rain
+streaks at visibly different phases (real animation); the
+`RuntimeFrameBuilderProjectsAnAuthoredBlendAlphaModeForMeshRenderables`
+regression plus the full `Rendering` test selection passed 736/736.
+
+This closes the "can the engine do this" question for this class of
+effect: shader authoring, texture sampling, UV-space distortion, and CPU-
+driven per-frame shader parameters were already fully capable; alpha
+blending needed one fix and now works the same way. Not yet attempted
+through Studio's own GUI (this proof used the CLI/MCP surface directly,
+matching how Ridgebreaker was authored this session) - a Studio-driven
+repeat of this exact brief remains open per the original acceptance-
+benchmark-queue wording, and BaseColor's own alpha channel (an 8-digit hex
+color, independent of a custom shader's output alpha) is not yet wired to
+AlphaCutoff's "mask" mode, since nothing needed it for this proof.
 
 ## Update rule
 

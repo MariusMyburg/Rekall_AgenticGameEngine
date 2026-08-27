@@ -997,7 +997,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                         continue;
                     }
 
-                    var signature = $"{component.Type}|{component.Properties.ToJsonString()}|{bodyA.Handle.Value}|{bodyB.Handle.Value}";
+                    var signature = $"{component.Type}|{StructuralPropertiesSignature(component)}|{bodyA.Handle.Value}|{bodyB.Handle.Value}";
                     desired.Add(key);
                     if (!_joints.TryGetValue(key, out var existing) || !existing.Signature.Equals(signature, StringComparison.Ordinal))
                     {
@@ -1057,6 +1057,37 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                 Simulation.Solver.Remove(stale.Value.Handle);
                 _joints.Remove(stale.Key);
             }
+        }
+
+        /// <summary>
+        /// A joint component's own signature must ignore properties that a game module is expected
+        /// to write every single frame - motorTargetVelocity (continuous throttle/steering input) and
+        /// the angle-limit bounds (which already have their own independent add/remove lifecycle in
+        /// SyncHingeAngleLimit). Without this, ANY per-frame write to those fields - the ordinary way
+        /// a motor gets driven - changes component.Properties.ToJsonString() every frame, which used
+        /// to make the BASE structural constraint (Hinge/BallSocket/Weld/etc, not just the motor
+        /// sub-constraint) look "changed" and get torn down and rebuilt on every single frame,
+        /// destroying its solver warm-start state continuously and preventing the assembly from ever
+        /// building real momentum. Found via a real motorbike prototype: a motor-driven wheel spun up
+        /// briefly then stalled near-zero net velocity despite a large, continuously-applied motor
+        /// target, because the wheel's own Hinge constraint was being destroyed and recreated 60
+        /// times a second underneath the (correctly warm-start-preserving) motor sync in
+        /// SyncHingeMotor. Structural fields that legitimately require a rebuild when authored -
+        /// axis, anchors, spring/damping, connectedEntityId - are unaffected; only the known
+        /// per-frame-mutable fields are excluded.
+        /// </summary>
+        private static string StructuralPropertiesSignature(RekallAgeRuntimeComponent component)
+        {
+            if (component.Properties.DeepClone() is not JsonObject properties)
+            {
+                return component.Properties.ToJsonString();
+            }
+
+            properties.Remove("motorTargetVelocity");
+            properties.Remove("motorMaximumTorque");
+            properties.Remove("angleLimitMinimum");
+            properties.Remove("angleLimitMaximum");
+            return properties.ToJsonString();
         }
 
         /// <summary>

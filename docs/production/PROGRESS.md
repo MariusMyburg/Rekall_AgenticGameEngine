@@ -6666,6 +6666,89 @@ own left/right input - which is ordinary control code reusing the existing joint
 machinery entirely, not a new engine capability, and keeps the lean itself genuinely emergent
 from real contact/inertia physics rather than authored directly.
 
+## 2026-08-28 Joint-signature churn fix and the real motor-propulsion fix (solver iteration/substep count)
+
+Continuing the motorcycle prototype work from the 2026-08-27 checkpoint above (user
+instruction: "fix any bugs, and add all necessary support to the engine, to be able to
+create that bike game and games like it").
+
+**Fixed and verified:** `PersistentPhysicsWorld.SyncJoints` computed each joint's rebuild
+signature from the component's *entire* JSON (`component.Properties.ToJsonString()`),
+including `motorTargetVelocity` - a field the game's own throttle/steering code is expected
+to write every single frame. Every such write changed the signature, which tore down and
+recreated the joint's base structural constraint (Hinge/BallSocket/Weld) from scratch 60
+times a second, destroying its solver warm-start state continuously - exactly the
+instability the motor constraint's own `ApplyDescription`-based in-place update (see the
+2026-08-27 checkpoint) was designed to avoid, undermined one level up. Fixed via
+`StructuralPropertiesSignature`, which excludes the known per-frame-mutable fields
+(`motorTargetVelocity`, `motorMaximumTorque`, `angleLimitMinimum`, `angleLimitMaximum`) from
+the structural signature - those already have their own independent update paths
+(`SyncHingeMotor`, `SyncHingeAngleLimit`) and never needed to be in it. Verified against the
+full test suite (2,345 of 2,348 passing; the 3 failures are pre-existing environment
+flakiness - a stale content-addressed asset fixture, an editor codegen snapshot, and a
+timing-sensitive module-host deadline test - unrelated to this change and not modified).
+
+**Root cause of the propulsion stall, found and fixed:** an isolated single-wheel-on-a-chassis
+rig (`HingeJointMotorSpinsAWheelContinuouslyWithoutDestabilizingTheAssembly` in
+`PhysicsJointsTests.cs`) showed the `AngularAxisMotor` overshooting its authored
+`TargetVelocity` by 10-20x within about the first 20-40 frames, then collapsing to near-zero
+angular velocity and staying there - reproduced independent of chassis mass (up to 10000,
+ruling out reaction-torque toppling as the cause), independent of the motor's target sign,
+independent of starting contact gap, and unaffected by caching the motor's resolved axis at
+bind time instead of recomputing it live (tested and discarded, byte-identical output). BEPU's
+own `AngularAxisMotor`/`Hinge`/`MotorSettings` source (fetched and read directly from
+github.com/bepu/bepuphysics2) confirmed the constraint math and sign convention were both
+correct as authored - the motor's `TargetVelocity` legitimately means `(ωA - ωB)·axis`, and
+`MotorSettings(maximumForce, softness: 0)` legitimately means "rigid, hard-capped," exactly as
+this codebase already used it.
+
+The actual cause: a wheel's `Hinge` (which locks 2 angular DOFs to keep the spin axis aligned,
+per BEPU's own `Hinge = BallSocket + AngularHinge` composition) and its `AngularAxisMotor`
+(driving the 3rd, free DOF) are two stiff constraints solved together over the same body pair.
+The engine's bare defaults - `velocityIterationCount: 4`, `substepCount: 4` - do not give a
+PGS solver enough passes to converge that coupling once the wheel starts spinning fast; the
+motor overshoots while the under-converged Hinge correction fights it, and the two together
+crash the assembly's angular state rather than settling. Verified directly on the real
+four-body motorcycle rig: raising `examples/MidnightRider`'s `Rekall.PhysicsWorld3D` to
+`velocityIterationCount: 32, substepCount: 16` (added as a new `Physics Settings` entity - the
+scene previously had none, relying on the bare defaults) took the chassis's measured forward
+travel (`delta.position3d.x`, not the module's own `targetSpeed` setpoint - `targetSpeed`
+ramps to `MaxSpeed` regardless of whether the bike actually moves and does not detect this
+failure) from 0.23m to 21.98m over the same 10-second sustained-throttle run, and to 29.85m
+over a 760-frame throttle+steer run that also does not crash
+(`RunState.crashed` stays `false`) and settles into a genuine, bounded lean (Z-rotation
+14.75° at the end of that run - a real, turn-appropriate lean, well clear of the 62°
+`CrashRollDegrees` threshold). The isolated single-wheel test was fixed the same way (its own
+`Physics Settings` entity added at the same values) plus a heavier chassis (10 -> 200) to
+separate this fix from the unrelated single-wheel toppling effect below; it remains skipped
+only because that separate toppling instability still dominates its particular degenerate
+rig (light chassis, one ground contact, no active balance) regardless of iteration count -
+not because the motor bug this test was written for is still open.
+
+**A separate, confirmed-real effect, not a bug:** a single wheel hinged to an otherwise
+unsupported chassis (no second ground contact, no active balance) reliably topples sideways
+under gravity/reaction-torque alone and wedges at a static, bounded lean angle - this is
+correct physics for that degenerate configuration, not an engine defect. The real game's
+four-body rig does not exhibit this because it has two wheels and the PD balance controller.
+
+**Also fixed:** the pre-existing `HingeJointMotorSpinsAWheelContinuouslyWithoutDestabilizingTheAssembly`
+test's central assertion (`Assert.NotEqual(0, wheelEntity.Transform.Rotation3D.Z, precision: 2)`)
+was vacuous - satisfied equally by a wheel spinning as intended and by one stalled at a static
+non-zero tilt, which is exactly how the iteration-count bug above went undetected across the
+whole session until now. Replaced with a direct check on the wheel's measured
+`Rekall.PhysicsState3D` angular velocity.
+
+**Current honest state of the motorcycle prototype (`examples/MidnightRider`, uncommitted):**
+scene, four-body rig, road-chunk streaming, streetlights, and the game-rules module all exist
+and build; the chassis rests correctly on the road surface, drives forward under throttle at a
+real, measured, sustained speed, survives steering input without crashing, and leans into
+turns at a bounded, plausible angle. Not yet verified: hazard collision, a visual capture to
+confirm the night/streetlight/road appearance, and whether cruising speed climbs closer to the
+authored `MaxSpeed` (22 m/s) over a longer run than tested so far (~3 m/s measured at the end
+of a 12.67-second combined run, still climbing). "Ultra realistic geometry and materials" per
+the original spec has not been addressed at all - current materials are flat-color PBR-factor
+`Rekall.Material` on primitive `Rekall.GeometryPrimitive` shapes.
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

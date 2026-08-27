@@ -44,7 +44,8 @@ public sealed class RekallAgeTriggerEventSystem : IRekallAgeRuntimeWorldSystem
             var current = colliders
                 .Where(body => !body.Entity.Id.Equals(entity.Id, StringComparison.Ordinal)
                                && MatchesFilters(body.Entity, trigger)
-                               && Overlaps(triggerBody, body))
+                               && Overlaps(triggerBody, body)
+                               && RekallAgeCollisionFilter.Allows(entity, body.Entity))
                 .Select(body => body.Entity.Id)
                 .ToHashSet(StringComparer.Ordinal);
             var previous = ReadPreviousOccupants(entity);

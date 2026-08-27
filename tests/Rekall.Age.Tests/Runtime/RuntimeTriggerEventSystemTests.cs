@@ -37,6 +37,31 @@ public sealed class RuntimeTriggerEventSystemTests
     }
 
     [Fact]
+    public async Task TriggerSystemDoesNotEmitEnterForNonAcceptingLayers()
+    {
+        var zone = CreateTrigger(
+            "zone",
+            "Zone",
+            x: 0,
+            [
+                new JsonObject { ["event"] = "trigger.enter", ["handler"] = "enteredZone" }
+            ]);
+        zone = zone with
+        {
+            Components = [.. zone.Components, new RekallAgeRuntimeComponent(
+                "Rekall.CollisionFilter",
+                new JsonObject { ["layer"] = "zoneOnly", ["collidesWith"] = new JsonArray("nothing") })]
+        };
+        var world = CreateWorld(zone, CreateActor("actor", "Actor", x: 0.5));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, 1, CancellationToken.None);
+
+        Assert.DoesNotContain(result.World.Subsystems.Events.Events, runtimeEvent =>
+            runtimeEvent.Type == "trigger.enter");
+    }
+
+    [Fact]
     public async Task TriggerSystemEmitsEnterForA2DCollider()
     {
         var world = CreateWorld(

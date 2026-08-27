@@ -158,6 +158,7 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new FractureMeshCommand());
         registry.Register(new SearchMeshOperationTypesCommand());
         registry.Register(new InspectMeshOperationTypeCommand());
+        registry.Register(new ListFractureAlgorithmsCommand());
         registry.Register(new SearchModelingNodeTypesCommand());
         registry.Register(new InspectModelingNodeTypeCommand());
         registry.Register(new CreateModelingGraphCommand());

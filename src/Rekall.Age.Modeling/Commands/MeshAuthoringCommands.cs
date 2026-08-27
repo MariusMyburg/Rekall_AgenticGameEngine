@@ -558,7 +558,6 @@ public sealed record PreviewMeshOperationResult(RekallAgeMeshOperationEvidence? 
 
 public sealed class PreviewMeshOperationCommand : IRekallAgeCommand<PreviewMeshOperationRequest, PreviewMeshOperationResult>
 {
-    private readonly RekallAgeMeshEditService _service = new();
     public string Name => "rekall.mesh.operation.preview";
     public RekallAgeCommandSchema Schema => new(
         Name,
@@ -576,7 +575,7 @@ public sealed class PreviewMeshOperationCommand : IRekallAgeCommand<PreviewMeshO
             request.Operation,
             persist: false,
             context,
-            _service);
+            MeshOperationPluginWiring.BuildEditService(request.ProjectRoot));
 }
 
 public sealed record ApplyMeshOperationRequest(
@@ -589,7 +588,6 @@ public sealed record ApplyMeshOperationResult(RekallAgeMeshOperationEvidence? Ev
 
 public sealed class ApplyMeshOperationCommand : IRekallAgeCommand<ApplyMeshOperationRequest, ApplyMeshOperationResult>
 {
-    private readonly RekallAgeMeshEditService _service = new();
     public string Name => "rekall.mesh.operation.apply";
     public RekallAgeCommandSchema Schema => new(
         Name,
@@ -608,7 +606,7 @@ public sealed class ApplyMeshOperationCommand : IRekallAgeCommand<ApplyMeshOpera
             request.Operation,
             persist: true,
             context,
-            _service);
+            MeshOperationPluginWiring.BuildEditService(request.ProjectRoot));
         return result.Ok
             ? RekallAgeCommandResult<ApplyMeshOperationResult>.Success(new(result.Value.Evidence), result.Summary)
             : RekallAgeCommandResult<ApplyMeshOperationResult>.Failure(new(result.Value.Evidence), result.Summary, result.Errors);
@@ -636,7 +634,6 @@ public sealed record BatchMeshOperationsResult(
 
 public sealed class BatchMeshOperationsCommand : IRekallAgeCommand<BatchMeshOperationsRequest, BatchMeshOperationsResult>
 {
-    private readonly RekallAgeMeshEditService _service = new();
     public string Name => "rekall.mesh.operation.batch";
     public RekallAgeCommandSchema Schema => new(
         Name,
@@ -650,9 +647,10 @@ public sealed class BatchMeshOperationsCommand : IRekallAgeCommand<BatchMeshOper
     {
         try
         {
+            var service = MeshOperationPluginWiring.BuildEditService(request.ProjectRoot);
             var execution = request.Apply
-                ? await _service.ApplyBatchAsync(request.ProjectRoot, request.AssetId, request.ExpectedRevision, request.Operations, context.Transaction, context.CancellationToken)
-                : await _service.PreviewBatchAsync(request.ProjectRoot, request.AssetId, request.ExpectedRevision, request.Operations, context.Transaction, context.CancellationToken);
+                ? await service.ApplyBatchAsync(request.ProjectRoot, request.AssetId, request.ExpectedRevision, request.Operations, context.Transaction, context.CancellationToken)
+                : await service.PreviewBatchAsync(request.ProjectRoot, request.AssetId, request.ExpectedRevision, request.Operations, context.Transaction, context.CancellationToken);
             var stepEvidence = execution.Steps
                 .Take(MeshCommandEvidence.MaximumEvidenceItems)
                 .Select((step, index) => MeshCommandEvidence.Operation(
@@ -783,7 +781,8 @@ public sealed record FractureMeshRequest(
     string SourceAssetId,
     string ChunkAssetIdPrefix,
     int ChunkCount,
-    long Seed = 0);
+    long Seed = 0,
+    string? AlgorithmId = null);
 
 public sealed record FractureMeshResult(IReadOnlyList<RekallAgeMeshAssetSummary> Chunks);
 
@@ -821,7 +820,9 @@ public sealed class FractureMeshCommand : IRekallAgeCommand<FractureMeshRequest,
         IReadOnlyList<RekallAgeMeshAsset> chunks;
         try
         {
-            chunks = RekallAgeMeshFracture.Fracture(source, request.ChunkCount, request.Seed);
+            var plugins = new RekallAgeProjectMeshPluginLoader().Load(request.ProjectRoot);
+            var fractureExecutor = new RekallAgeMeshFractureExecutor(plugins.FractureAlgorithms);
+            chunks = fractureExecutor.Fracture(source, request.ChunkCount, request.Seed, request.AlgorithmId);
         }
         catch (Exception error) when (error is ArgumentException or ArgumentOutOfRangeException or InvalidOperationException)
         {
@@ -856,6 +857,15 @@ public sealed class FractureMeshCommand : IRekallAgeCommand<FractureMeshRequest,
 
     private static RekallAgeCommandResult<FractureMeshResult> Failure(string code, string message, string target) =>
         RekallAgeCommandResult<FractureMeshResult>.Failure(new([]), message, [new(code, message, target)]);
+}
+
+internal static class MeshOperationPluginWiring
+{
+    public static RekallAgeMeshEditService BuildEditService(string projectRoot)
+    {
+        var plugins = new RekallAgeProjectMeshPluginLoader().Load(projectRoot);
+        return new RekallAgeMeshEditService(executor: new RekallAgeMeshOperationExecutor(plugins.Operations));
+    }
 }
 
 internal static class MeshOperationCommandRunner

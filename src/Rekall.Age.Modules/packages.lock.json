@@ -5,6 +5,9 @@
       "rekall.age.core": {
         "type": "Project"
       },
+      "rekall.age.modeling.contracts": {
+        "type": "Project"
+      },
       "rekall.age.rendering.abstractions": {
         "type": "Project",
         "dependencies": {

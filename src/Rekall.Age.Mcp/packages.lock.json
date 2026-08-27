@@ -27,10 +27,14 @@
       "rekall.age.core": {
         "type": "Project"
       },
+      "rekall.age.modeling.contracts": {
+        "type": "Project"
+      },
       "rekall.age.modules": {
         "type": "Project",
         "dependencies": {
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )",
           "Rekall.Age.Runtime.Abstractions": "[0.1.0-preview.1, )"
         }
       },

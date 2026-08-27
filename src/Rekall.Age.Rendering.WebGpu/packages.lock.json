@@ -134,6 +134,7 @@
         "dependencies": {
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
           "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
           "SamuelRe.CSG.Sharp": "[1.0.0, )"
         }
       },
@@ -144,6 +145,7 @@
         "type": "Project",
         "dependencies": {
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )",
           "Rekall.Age.Runtime.Abstractions": "[0.1.0-preview.1, )"
         }
       },

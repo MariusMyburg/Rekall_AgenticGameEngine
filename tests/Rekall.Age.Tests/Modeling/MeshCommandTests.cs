@@ -1,10 +1,13 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Rekall.Age.Build.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Mcp;
+using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Commands;
 using Rekall.Age.Modeling.Contracts;
+using Rekall.Age.Modules.Commands;
 using Rekall.Age.Workflows;
 
 namespace Rekall.Age.Tests.Modeling;
@@ -30,11 +33,12 @@ public sealed class MeshCommandTests
         Assert.Contains("rekall.mesh.operation_types.search", names);
         Assert.Contains("rekall.mesh.operation_types.inspect", names);
         Assert.Contains("rekall.mesh.fracture", names);
+        Assert.Contains("rekall.mesh.fracture_algorithms.list", names);
 
         var tools = RekallAgeMcpCatalog.FromRegistry(registry).Tools
             .Where(tool => tool.Name.StartsWith("rekall.mesh.", StringComparison.Ordinal))
             .ToArray();
-        Assert.Equal(13, tools.Length);
+        Assert.Equal(14, tools.Length);
         Assert.All(tools, tool => Assert.Equal("modeling", tool.Category));
         Assert.True(tools.Single(tool => tool.Name == "rekall.mesh.inspect").Recommended);
         Assert.True(tools.Single(tool => tool.Name == "rekall.mesh.inspect_compiled").Recommended);
@@ -225,6 +229,130 @@ public sealed class MeshCommandTests
         var reloaded = await new InspectMeshAssetCommand().ExecuteAsync(new(root, "crate-chunk-0"), Context("inspect-chunk"));
         Assert.True(reloaded.Ok);
     }
+
+    [Fact]
+    public async Task SearchMeshOperationTypesIncludesAProjectRegisteredPluginOperation()
+    {
+        var root = await BuildScratchModuleProjectAsync("TestMeshPlugins", TestMeshOperationPluginModuleSource);
+        var registry = RekallAgeDefaultCommandRegistry.Create();
+
+        var result = await registry.ExecuteJsonAsync(
+            "rekall.mesh.operation_types.search",
+            JsonSerializer.Serialize(new { projectRoot = root, query = "testmeshplugins" }),
+            Context("search"));
+
+        Assert.True(result.Ok, result.Summary);
+        var found = Assert.IsType<SearchMeshOperationTypesResult>(result.Value);
+        Assert.Contains(found.OperationTypes, item => item.OperationId == "testmeshplugins.fake_operation");
+    }
+
+    [Fact]
+    public async Task FractureMeshDispatchesToARegisteredPluginAlgorithmByAlgorithmId()
+    {
+        var root = await BuildScratchModuleProjectAsync("TestMeshPlugins", TestFractureAlgorithmPluginModuleSource);
+        var box = await BoxPrimitive();
+        await new CreateMeshAssetCommand().ExecuteAsync(new(root, "crate", "Crate", box.Topology, box.Attributes, box.MaterialSlots), Context("create-source"));
+        var registry = RekallAgeDefaultCommandRegistry.Create();
+
+        var result = await registry.ExecuteJsonAsync(
+            "rekall.mesh.fracture",
+            JsonSerializer.Serialize(new { projectRoot = root, sourceAssetId = "crate", chunkAssetIdPrefix = "crate-chunk", chunkCount = 1, algorithmId = "testmeshplugins.fake_algorithm" }),
+            Context("fracture-plugin"));
+
+        Assert.True(result.Ok, result.Summary);
+        var fractured = Assert.IsType<FractureMeshResult>(result.Value);
+        Assert.Single(fractured.Chunks);
+    }
+
+    [Fact]
+    public async Task ListFractureAlgorithmsIncludesTheBuiltInAndAProjectRegisteredAlgorithm()
+    {
+        var root = await BuildScratchModuleProjectAsync("TestMeshPlugins", TestFractureAlgorithmPluginModuleSource);
+        var registry = RekallAgeDefaultCommandRegistry.Create();
+
+        var result = await registry.ExecuteJsonAsync(
+            "rekall.mesh.fracture_algorithms.list",
+            JsonSerializer.Serialize(new { projectRoot = root }),
+            Context("list-algorithms"));
+
+        Assert.True(result.Ok, result.Summary);
+        var listed = Assert.IsType<ListFractureAlgorithmsResult>(result.Value);
+        Assert.Contains(listed.Algorithms, item => item.AlgorithmId == RekallAgeMeshFractureExecutor.BuiltInVoronoiAlgorithmId);
+        Assert.Contains(listed.Algorithms, item => item.AlgorithmId == "testmeshplugins.fake_algorithm");
+    }
+
+    private static async Task<string> BuildScratchModuleProjectAsync(string moduleId, string moduleSource)
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = Context("scaffold");
+        var scaffold = await new ScaffoldModuleCommand().ExecuteAsync(
+            new ScaffoldModuleRequest(root, moduleId, moduleId, moduleId, "PluginState"),
+            context);
+        Assert.True(scaffold.Ok, scaffold.Summary);
+        var write = await new WriteModuleSourceCommand().ExecuteAsync(
+            new WriteModuleSourceRequest(root, moduleId, $"{moduleId}Module.cs", moduleSource),
+            context);
+        Assert.True(write.Ok, write.Summary);
+        var build = await new BuildModulesCommand().ExecuteAsync(new BuildModulesRequest(root), context);
+        Assert.True(build.Ok, build.Summary);
+        return root;
+    }
+
+    // Registers only the mesh operation plugin -- same module/namespace shape as
+    // ProjectMeshPluginLoaderTests.TestModuleSource, with the fracture algorithm omitted.
+    private const string TestMeshOperationPluginModuleSource = """
+        using Rekall.Age.Modeling;
+        using Rekall.Age.Modeling.Contracts;
+        using Rekall.Age.Modules;
+
+        namespace Game.Modules.TestMeshPlugins;
+
+        [RekallAgeModule("TestMeshPlugins", "Test Mesh Plugins")]
+        public sealed class TestMeshPluginsModule : RekallAgeModule
+        {
+            public override void Configure(RekallAgeModuleBuilder builder)
+            {
+                builder.RegisterMeshOperation<FakeOperation>();
+            }
+        }
+
+        public sealed class FakeOperation : IRekallAgeMeshOperationPlugin
+        {
+            public string OperationId => "testmeshplugins.fake_operation";
+            public RekallAgeMeshOperationDescriptor Descriptor => new(
+                OperationId, "A fake test operation.", RekallAgeGeometryDomain.Face,
+                RekallAgeMeshChangeKind.None, []);
+            public RekallAgeMeshOperationResult Execute(RekallAgeMeshAsset source, RekallAgeMeshOperationRequest request) =>
+                throw new System.NotSupportedException();
+        }
+        """;
+
+    // Registers only the fracture algorithm plugin. FakeAlgorithm returns exactly one chunk
+    // (the source mesh itself, renamed) regardless of chunkCount/seed -- enough to prove
+    // dispatch without needing real CSG fracture math in a test plugin.
+    private const string TestFractureAlgorithmPluginModuleSource = """
+        using Rekall.Age.Modeling;
+        using Rekall.Age.Modeling.Contracts;
+        using Rekall.Age.Modules;
+
+        namespace Game.Modules.TestMeshPlugins;
+
+        [RekallAgeModule("TestMeshPlugins", "Test Mesh Plugins")]
+        public sealed class TestMeshPluginsModule : RekallAgeModule
+        {
+            public override void Configure(RekallAgeModuleBuilder builder)
+            {
+                builder.RegisterFractureAlgorithm<FakeAlgorithm>();
+            }
+        }
+
+        public sealed class FakeAlgorithm : IRekallAgeFractureAlgorithmPlugin
+        {
+            public string AlgorithmId => "testmeshplugins.fake_algorithm";
+            public System.Collections.Generic.IReadOnlyList<RekallAgeMeshAsset> Fracture(RekallAgeMeshAsset source, int chunkCount, long seed) =>
+                [source with { AssetId = source.AssetId + "-single-chunk" }];
+        }
+        """;
 
     private static async ValueTask<RekallAgeMeshAsset> BoxPrimitive()
     {

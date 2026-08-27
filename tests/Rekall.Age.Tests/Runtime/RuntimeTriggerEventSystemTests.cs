@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Rekall.Age.Modules;
 using Rekall.Age.Runtime;
 using Rekall.Age.Runtime.Abstractions;
 
@@ -34,6 +35,57 @@ public sealed class RuntimeTriggerEventSystemTests
             .Components.Single(component => component.Type == "Rekall.TriggerState");
         Assert.Contains(state.Properties["occupants"]!.AsArray(), item =>
             item!.GetValue<string>() == "actor");
+    }
+
+    [Fact]
+    public async Task TriggerSystemFiresForACameraEntityGivenAnAttachedCollider()
+    {
+        // Proves the "camera enters a volume" pattern a project author asked about needs zero new
+        // engine capability: Rekall.Trigger already detects occupancy purely from a collider
+        // component (no physics rigidbody required on either side - see CreateColliderBody in
+        // RekallAgeTriggerEventSystem), and Rekall.Camera3D is an ordinary entity that can carry
+        // any collider like anything else. The only thing actually missing before this test is
+        // written is that a camera is not normally authored with one; attaching a small collider is
+        // the whole "fix", not new engine code.
+        var camera = new RekallAgeRuntimeEntity(
+            "camera",
+            "Main Camera",
+            [],
+            null,
+            null,
+            true,
+            false,
+            RekallAgeRuntimeTransform.Identity with
+            {
+                Position3D = new RekallAgeRuntimeVector3(0.5, 0, 0)
+            },
+            [
+                new RekallAgeRuntimeComponent("Rekall.Camera3D", new JsonObject { ["active"] = true }),
+                new RekallAgeRuntimeComponent("Rekall.SphereCollider3D", new JsonObject { ["radius"] = 0.1 })
+            ]);
+        var world = CreateWorld(
+            CreateTrigger(
+                "rainZone",
+                "Rain Zone",
+                x: 0,
+                [
+                    new JsonObject { ["event"] = "trigger.enter", ["handler"] = "cameraEnteredRainZone" },
+                    new JsonObject { ["event"] = "trigger.exit", ["handler"] = "cameraExitedRainZone" }
+                ]),
+            camera);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, 1, CancellationToken.None);
+
+        // This is exactly the same world.EventsOfType(...) read RidgebreakerSystem already uses for
+        // trigger.enter (its fuel-pickup handling) - proving the whole "volume + arbitrary
+        // project-authored C# reaction" round trip already works end to end with the camera as the
+        // occupant, through entirely existing, generic mechanisms.
+        var enter = Assert.Single(
+            result.World.EventsOfType("trigger.enter"),
+            item => item.Handler == "cameraEnteredRainZone");
+        Assert.Equal("camera", enter.Payload["otherEntityId"]!.GetValue<string>());
+        Assert.Equal("Main Camera", enter.Payload["otherEntityName"]!.GetValue<string>());
     }
 
     [Fact]

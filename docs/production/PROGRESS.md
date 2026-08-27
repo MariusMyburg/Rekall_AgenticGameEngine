@@ -6281,6 +6281,36 @@ over.
   original `CollidableProperty<T>` unmanaged-type constraint that motivated
   the handle-keyed dictionary pattern `SyncHingeMotor` also follows)
 
+## 2026-08-27 Testable Windows input bridge
+
+A real "holding Up does nothing" bug reached a live Ridgebreaker session
+this session, and every prior test that session had run only exercised the
+semantic-action injection path (`runtime inspect` with `semanticActions`),
+never the physical-key capture path a real Windows player uses -- so this
+class of bug had no headless coverage at all. `RekallAgeWindowsInputBridge`
+extracts `Program.cs`'s inline `_pressedKeys`/`_pressedButtons` bookkeeping
+into its own class, mirroring the pattern `Rekall.Age.Player.Web`'s
+`RekallAgeWebInputBridge` already established: `RecordKey`/
+`RecordMouseButton`/`RecordMouseDelta`/`RecordMouseWheel` accumulate raw
+device facts, `ConsumeRuntimeInput` turns them into a
+`RekallAgeRuntimeInputState` with identical idle-fast-path and edge-clearing
+behavior to the code it replaced. `Program.cs` now only builds Veldrid-shaped
+facts and delegates to it; linked into `Rekall.Age.Tests` the same way
+`RekallAgeWebInputBridge.cs` already is, since the Windows Player csproj
+itself can't be referenced by the cross-platform test project.
+
+New tests cover held/pressed/released edges and an end-to-end reproduction:
+a held physical "Up" key, through an authored `Rekall.InputActionMap`
+`positiveKey`, reaching a declared action via the real
+`RekallAgeInputActionSystem` -- the exact scenario that broke live with zero
+prior coverage. This is now a same-process unit test instead of something
+only a human at a keyboard could verify.
+
+Verified: new bridge/end-to-end tests plus the existing input/runtime
+regression selection passed 52/52; manually confirmed unchanged behavior in
+a live relaunch (Up arrow still drives Ridgebreaker's vehicle) both before
+and after the extraction.
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

@@ -31,7 +31,7 @@
           "type": "Rekall.Transform3D",
           "properties": {
             "x": 0, "y": 1.5, "z": 6,
-            "pitch": -90, "yaw": 0, "roll": 0,
+            "pitch": 90, "yaw": 0, "roll": 0,
             "scaleX": 24, "scaleY": 1, "scaleZ": 14
           }
         }
@@ -63,14 +63,14 @@
           "properties": {
             "baseColorTexture": "asset_little-redfish-lake-sunrise_58618c91",
             "alphaMode": "blend",
-            "roughnessFactor": 0
+            "emissiveStrength": 0
           }
         },
         {
           "type": "Rekall.Transform3D",
           "properties": {
             "x": 0, "y": 1.5, "z": -2,
-            "pitch": -90, "yaw": 0, "roll": 0,
+            "pitch": 90, "yaw": 0, "roll": 0,
             "scaleX": 10, "scaleY": 1, "scaleZ": 5.6
           }
         }

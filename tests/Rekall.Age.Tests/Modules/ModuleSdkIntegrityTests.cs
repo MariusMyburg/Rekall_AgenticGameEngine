@@ -18,7 +18,7 @@ public sealed class ModuleSdkIntegrityTests
 
         Assert.Equal(1, manifest["schemaVersion"]!.GetValue<int>());
         var files = manifest["files"]!.AsArray();
-        Assert.Equal(5, files.Count);
+        Assert.Equal(6, files.Count);
         Assert.All(files, item =>
         {
             var file = item!.AsObject();

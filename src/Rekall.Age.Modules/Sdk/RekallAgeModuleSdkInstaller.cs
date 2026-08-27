@@ -34,7 +34,8 @@ public sealed class RekallAgeModuleSdkInstaller
         "Rekall.Age.Core.dll",
         "Rekall.Age.World.dll",
         "Rekall.Age.Runtime.Abstractions.dll",
-        "Rekall.Age.Modules.dll"
+        "Rekall.Age.Modules.dll",
+        "Rekall.Age.Modeling.Contracts.dll"
     ];
 
     public async ValueTask<RekallAgeModuleSdkInstallation> InstallAsync(
@@ -145,6 +146,7 @@ public sealed class RekallAgeModuleSdkInstaller
                 <Reference Include="Rekall.Age.World" HintPath="$(MSBuildThisFileDirectory)Rekall.Age.World.dll" Private="false" />
                 <Reference Include="Rekall.Age.Runtime.Abstractions" HintPath="$(MSBuildThisFileDirectory)Rekall.Age.Runtime.Abstractions.dll" Private="false" />
                 <Reference Include="Rekall.Age.Modules" HintPath="$(MSBuildThisFileDirectory)Rekall.Age.Modules.dll" Private="false" />
+                <Reference Include="Rekall.Age.Modeling.Contracts" HintPath="$(MSBuildThisFileDirectory)Rekall.Age.Modeling.Contracts.dll" Private="false" />
               </ItemGroup>
             </Project>
 

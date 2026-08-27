@@ -24,6 +24,10 @@ public static class RekallAgeCollisionFilter
 
     public readonly record struct Rule(string Layer, IReadOnlySet<string>? CollidesWith)
     {
+        /// <summary>The "no filter" rule: collides with every layer. Used as the fallback for
+        /// any collidable that never had a <see cref="Rule"/> explicitly recorded for it.</summary>
+        public static Rule Default { get; } = new(DefaultLayer, null);
+
         public static Rule From(RekallAgeRuntimeEntity entity)
         {
             var component = entity.FindComponent(ComponentType);

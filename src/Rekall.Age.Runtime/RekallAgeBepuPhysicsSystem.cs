@@ -824,6 +824,12 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
     {
         private readonly BufferPool _pool = new();
         private readonly CollidableProperty<PhysicsMaterial> _materials;
+        // RekallAgeCollisionFilter.Rule holds reference-type fields (string/IReadOnlySet<string>),
+        // so it cannot live in BEPU's CollidableProperty<T> (requires an unmanaged T). Plain
+        // handle-keyed dictionaries instead; entries are removed in RemoveDynamic/RemoveStatic so a
+        // recycled BEPU handle never resolves to a stale entity's rule.
+        private readonly Dictionary<BodyHandle, RekallAgeCollisionFilter.Rule> _dynamicFilters = new();
+        private readonly Dictionary<StaticHandle, RekallAgeCollisionFilter.Rule> _staticFilters = new();
         private readonly Dictionary<string, PersistentDynamicBody> _dynamicBodies = new(StringComparer.Ordinal);
         private readonly Dictionary<string, PersistentStaticBody> _staticBodies = new(StringComparer.Ordinal);
         private readonly Dictionary<string, BodyOutputSnapshot> _lastOutputs = new(StringComparer.Ordinal);
@@ -835,7 +841,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
             _materials = new CollidableProperty<PhysicsMaterial>(_pool);
             Simulation = Simulation.Create(
                 _pool,
-                new RekallAgeBepuNarrowPhaseCallbacks(_materials),
+                new RekallAgeBepuNarrowPhaseCallbacks(_materials, LookupFilter),
                 new RekallAgeBepuPoseIntegratorCallbacks(configuration.Gravity),
                 new SolveDescription(configuration.VelocityIterationCount, configuration.SubstepCount));
         }
@@ -955,6 +961,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
 
             var handle = Simulation.Bodies.Add(created.Description);
             _materials.Allocate(handle) = item.Material;
+            _dynamicFilters[handle] = RekallAgeCollisionFilter.Rule.From(item.Entity);
             _dynamicBodies[item.Entity.Id] = new PersistentDynamicBody(
                 handle,
                 created.Description.Collidable.Shape,
@@ -974,6 +981,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                 CreatePose(item, Vector3.Zero),
                 shape.Shape));
             _materials.Allocate(handle) = item.Material;
+            _staticFilters[handle] = RekallAgeCollisionFilter.Rule.From(item.Entity);
             _staticBodies[item.Entity.Id] = new PersistentStaticBody(
                 handle,
                 shape.Shape,
@@ -984,6 +992,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
         {
             Simulation.Bodies.Remove(body.Handle);
             Simulation.Shapes.RemoveAndDispose(body.Shape, _pool);
+            _dynamicFilters.Remove(body.Handle);
             _dynamicBodies.Remove(id);
             _lastOutputs.Remove(id);
         }
@@ -992,7 +1001,15 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
         {
             Simulation.Statics.Remove(body.Handle);
             Simulation.Shapes.RemoveAndDispose(body.Shape, _pool);
+            _staticFilters.Remove(body.Handle);
             _staticBodies.Remove(id);
+        }
+
+        private RekallAgeCollisionFilter.Rule LookupFilter(CollidableReference collidable)
+        {
+            return collidable.Mobility == CollidableMobility.Static
+                ? _staticFilters.GetValueOrDefault(collidable.StaticHandle, RekallAgeCollisionFilter.Rule.Default)
+                : _dynamicFilters.GetValueOrDefault(collidable.BodyHandle, RekallAgeCollisionFilter.Rule.Default);
         }
 
         private static RigidPose CreatePose(PhysicsEntity item, Vector3 centerOffset)
@@ -1107,7 +1124,8 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
     }
 
     private struct RekallAgeBepuNarrowPhaseCallbacks(
-        CollidableProperty<PhysicsMaterial> materials) : INarrowPhaseCallbacks
+        CollidableProperty<PhysicsMaterial> materials,
+        Func<CollidableReference, RekallAgeCollisionFilter.Rule> lookupFilter) : INarrowPhaseCallbacks
     {
         private Simulation? _simulation;
 
@@ -1123,7 +1141,9 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
             CollidableReference b,
             ref float speculativeMargin)
         {
-            return true;
+            var left = lookupFilter(a);
+            var right = lookupFilter(b);
+            return left.Accepts(right.Layer) && right.Accepts(left.Layer);
         }
 
         public bool ConfigureContactManifold<TManifold>(

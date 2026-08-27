@@ -309,6 +309,46 @@ public sealed class SceneRuntimeFoundationTests
     }
 
     [Fact]
+    public async Task BepuPhysicsIgnoresCollisionsBetweenNonAcceptingLayers()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Ground", ["level"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["x"] = 0, ["y"] = -0.5, ["z"] = 0 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.BoxCollider3D",
+                    new JsonObject { ["width"] = 20, ["height"] = 1, ["depth"] = 20 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.CollisionFilter",
+                    new JsonObject { ["layer"] = "terrain" })))
+            .AddEntity(RekallAgeEntityDocument.Create("Falling Box", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["x"] = 0, ["y"] = 3, ["z"] = 0 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Rigidbody3D",
+                    new JsonObject { ["mass"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.BoxCollider3D",
+                    new JsonObject { ["width"] = 1, ["height"] = 1, ["depth"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.CollisionFilter",
+                    new JsonObject
+                    {
+                        ["layer"] = "ghost",
+                        ["collidesWith"] = new JsonArray("nothing")
+                    })));
+        var initial = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(initial, frames: 180, CancellationToken.None);
+
+        var body = result.World.Entities.Single(entity => entity.Name == "Falling Box");
+        Assert.True(body.Transform.Position3D.Y < -5, $"Expected the box to fall through the non-accepting ground, actual Y={body.Transform.Position3D.Y}.");
+    }
+
+    [Fact]
     public async Task BepuPhysicsDynamicBoxesCollideAndSettleIntoAStack()
     {
         var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])

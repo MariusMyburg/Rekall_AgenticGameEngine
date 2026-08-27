@@ -299,19 +299,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private int _frameIndex;
     private double _lastPlayableTickSeconds;
     private Rekall.Age.Runtime.Abstractions.RekallAgeRuntimeWorld _runtimeWorld;
-    private double _pendingMouseWheelDelta;
-    private double _pendingMouseDeltaX;
-    private double _pendingMouseDeltaY;
     private Vector2 _lastMousePosition;
     private Vector2 _previousMousePosition;
     private bool _hasMousePosition;
     private bool _mouseCaptured;
-    private readonly HashSet<string> _pressedKeys = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _pressedKeysThisFrame = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _releasedKeysThisFrame = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _pressedButtons = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _pressedButtonsThisFrame = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _releasedButtonsThisFrame = new(StringComparer.OrdinalIgnoreCase);
+    private readonly RekallAgeWindowsInputBridge _inputBridge = new();
     private readonly uint[] _drawUniformDynamicOffsets = new uint[1];
     private int _lastFpsFrame;
     private double _lastFpsTime;
@@ -1082,8 +1074,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var mouseDelta = _mouseCaptured
             ? _window.MouseDelta
             : _lastMousePosition - _previousMousePosition;
-        _pendingMouseDeltaX += mouseDelta.X;
-        _pendingMouseDeltaY += mouseDelta.Y;
+        _inputBridge.RecordMouseDelta(mouseDelta.X, mouseDelta.Y);
 
         if (!_window.Focused && _mouseCaptured)
         {
@@ -1093,43 +1084,23 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         foreach (var keyEvent in snapshot.KeyEvents)
         {
             var key = keyEvent.Key.ToString();
-            if (keyEvent.Down)
+            if (keyEvent.Down && key.Equals("Escape", StringComparison.OrdinalIgnoreCase))
             {
-                if (key.Equals("Escape", StringComparison.OrdinalIgnoreCase))
-                {
-                    SetMouseCapture(false);
-                }
+                SetMouseCapture(false);
+            }
 
-                if (_pressedKeys.Add(key))
-                {
-                    _pressedKeysThisFrame.Add(key);
-                }
-            }
-            else if (_pressedKeys.Remove(key))
-            {
-                _releasedKeysThisFrame.Add(key);
-            }
+            _inputBridge.RecordKey(key, keyEvent.Down);
         }
 
         foreach (var mouseEvent in snapshot.MouseEvents)
         {
             var button = mouseEvent.MouseButton.ToString();
-            if (mouseEvent.Down)
+            if (mouseEvent.Down && !_mouseCaptured)
             {
-                if (!_mouseCaptured)
-                {
-                    SetMouseCapture(true);
-                }
+                SetMouseCapture(true);
+            }
 
-                if (_pressedButtons.Add(button))
-                {
-                    _pressedButtonsThisFrame.Add(button);
-                }
-            }
-            else if (_pressedButtons.Remove(button))
-            {
-                _releasedButtonsThisFrame.Add(button);
-            }
+            _inputBridge.RecordMouseButton(button, mouseEvent.Down);
         }
 
         if (Math.Abs(snapshot.WheelDelta) <= 0.000001f)
@@ -1137,7 +1108,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             return;
         }
 
-        _pendingMouseWheelDelta += snapshot.WheelDelta;
+        _inputBridge.RecordMouseWheel(snapshot.WheelDelta);
         _cachedStaticGeometry = null;
     }
 
@@ -1174,8 +1145,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         Sdl2Native.SDL_SetRelativeMouseMode(captured);
         _window.CursorVisible = !captured;
         _mouseCaptured = captured;
-        _pendingMouseDeltaX = 0;
-        _pendingMouseDeltaY = 0;
+        _inputBridge.ResetPendingMouseDelta();
         _previousMousePosition = _lastMousePosition;
         PlayerLog.Write(captured
             ? "Runtime mouse capture enabled; press Escape to release."
@@ -2189,65 +2159,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private RekallAgeRuntimeInputState ConsumeRuntimeInput()
     {
         var controllers = _controllerInput.Poll();
-        var wheelDelta = _pendingMouseWheelDelta;
-        var mouseDeltaX = _pendingMouseDeltaX;
-        var mouseDeltaY = _pendingMouseDeltaY;
-        if (wheelDelta == 0
-            && mouseDeltaX == 0
-            && mouseDeltaY == 0
-            && _pressedKeys.Count == 0
-            && _pressedButtons.Count == 0
-            && _pressedKeysThisFrame.Count == 0
-            && _releasedKeysThisFrame.Count == 0
-            && _pressedButtonsThisFrame.Count == 0
-            && _releasedButtonsThisFrame.Count == 0)
-        {
-            var pointerInput = new RekallAgeRuntimeInputState(
-                MouseX: _lastMousePosition.X,
-                MouseY: _lastMousePosition.Y,
-                PressedKeys: SnapshotSetOrNull(_pressedKeys),
-                PressedButtons: SnapshotSetOrNull(_pressedButtons),
-                ViewportWidth: Math.Max(1, _window.Width),
-                ViewportHeight: Math.Max(1, _window.Height),
-                Controllers: controllers);
-            var idleInput = _simulateXrInput
-                ? RekallAgeXrInputSimulator.CreateFrame(pointerInput, _clock.Elapsed)
-                : pointerInput;
-            PublishRuntimeInput(idleInput);
-            return idleInput;
-        }
-
-        var pressedKeysThisFrame = SnapshotSetOrNull(_pressedKeysThisFrame);
-        var releasedKeysThisFrame = SnapshotSetOrNull(_releasedKeysThisFrame);
-        var pressedButtonsThisFrame = SnapshotSetOrNull(_pressedButtonsThisFrame);
-        var releasedButtonsThisFrame = SnapshotSetOrNull(_releasedButtonsThisFrame);
-        var pressedKeys = SnapshotSetOrNull(_pressedKeys);
-        var pressedButtons = SnapshotSetOrNull(_pressedButtons);
-        _pendingMouseWheelDelta = 0;
-        _pressedKeysThisFrame.Clear();
-        _releasedKeysThisFrame.Clear();
-        _pressedButtonsThisFrame.Clear();
-        _releasedButtonsThisFrame.Clear();
-        _pendingMouseDeltaX = 0;
-        _pendingMouseDeltaY = 0;
-        var input = new RekallAgeRuntimeInputState(
-            MouseX: _lastMousePosition.X,
-            MouseY: _lastMousePosition.Y,
-            MouseDeltaX: mouseDeltaX,
-            MouseDeltaY: mouseDeltaY,
-            MouseWheelDelta: wheelDelta,
-            PressedKeys: pressedKeys,
-            PressedKeysThisFrame: pressedKeysThisFrame,
-            ReleasedKeysThisFrame: releasedKeysThisFrame,
-            PressedButtons: pressedButtons,
-            PressedButtonsThisFrame: pressedButtonsThisFrame,
-            ReleasedButtonsThisFrame: releasedButtonsThisFrame,
-            ViewportWidth: Math.Max(1, _window.Width),
-            ViewportHeight: Math.Max(1, _window.Height),
-            Controllers: controllers);
+        var captured = _inputBridge.ConsumeRuntimeInput(
+            _lastMousePosition.X,
+            _lastMousePosition.Y,
+            Math.Max(1, _window.Width),
+            Math.Max(1, _window.Height),
+            controllers);
         var inputFrame = _simulateXrInput
-            ? RekallAgeXrInputSimulator.CreateFrame(input, _clock.Elapsed)
-            : input;
+            ? RekallAgeXrInputSimulator.CreateFrame(captured, _clock.Elapsed)
+            : captured;
         PublishRuntimeInput(inputFrame);
         return inputFrame;
     }
@@ -2303,19 +2223,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
     private bool IsPressed(string key)
     {
-        return _pressedKeys.Contains(key);
+        return _inputBridge.IsPressed(key);
     }
 
     private bool IsPressedThisFrame(string key)
     {
-        return _pressedKeysThisFrame.Contains(key);
-    }
-
-    private static IReadOnlySet<string>? SnapshotSetOrNull(HashSet<string> source)
-    {
-        return source.Count == 0
-            ? null
-            : source.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return _inputBridge.IsPressedThisFrame(key);
     }
 
     private RenderPacket GetRenderPacket(

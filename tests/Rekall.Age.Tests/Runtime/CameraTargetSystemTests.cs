@@ -345,4 +345,99 @@ public sealed class CameraTargetSystemTests
         var updatedCamera = result.World.Entities.Single(entity => entity.Id == "camera");
         Assert.Equal(-10, updatedCamera.Transform.Position3D.Z, precision: 3);
     }
+
+    [Fact]
+    public async Task CollisionAvoidanceSweepsASphereRatherThanAThinRay()
+    {
+        // A small sphere obstruction sits 0.2 units off to the side of the dead-straight target-to-
+        // camera line (which runs along X=0, Y=0 for all Z) rather than directly on it. Its own
+        // bounding radius (0.1) alone is too small to reach the line - a thin ray straight down the
+        // line would miss it entirely - but with the default CollisionProbeRadius (0.15) added, the
+        // combined 0.25 reach exceeds the 0.2 perpendicular offset, so a genuine sphere sweep must
+        // still catch it. This is the exact scenario a single-ray probe (the prior implementation)
+        // could not have detected.
+        var target = CreateStationaryEntity("target", "Target", x: 0);
+        var obstruction = new RekallAgeRuntimeEntity(
+            "obstruction",
+            "Obstruction",
+            [],
+            null,
+            null,
+            true,
+            false,
+            RekallAgeRuntimeTransform.Identity with
+            {
+                Position3D = new RekallAgeRuntimeVector3(0.2, 0, -5)
+            },
+            [new RekallAgeRuntimeComponent(
+                "Rekall.SphereCollider3D",
+                new JsonObject { ["radius"] = 0.1 })]);
+        var camera = CreateCamera(
+            startX: 0,
+            new JsonObject
+            {
+                ["targetName"] = "Target",
+                ["offsetX"] = 0,
+                ["offsetY"] = 0,
+                ["offsetZ"] = -10,
+                ["lookAt"] = false,
+                ["collisionAvoidanceEnabled"] = true,
+                ["collisionMinimumDistance"] = 0.5
+                // collisionProbeRadius intentionally omitted - exercises the default (0.15).
+            });
+        var world = CreateWorld(camera, target, obstruction);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, 1, CancellationToken.None);
+
+        var updatedCamera = result.World.Entities.Single(entity => entity.Id == "camera");
+        var finalZ = updatedCamera.Transform.Position3D.Z;
+        Assert.True(finalZ > -10 && finalZ < 0);
+    }
+
+    [Fact]
+    public async Task CollisionProbeRadiusZeroDegradesToAThinRayMissingTheOffAxisObstruction()
+    {
+        // Same off-axis obstruction as the positive sweep test above, but with CollisionProbeRadius
+        // explicitly set to 0: the combined reach (0 + the obstruction's own 0.1 bounding radius)
+        // no longer reaches the 0.2 perpendicular offset, so this must NOT be detected - proving the
+        // probe radius genuinely controls sweep thickness rather than always catching everything
+        // nearby regardless of the authored radius.
+        var target = CreateStationaryEntity("target", "Target", x: 0);
+        var obstruction = new RekallAgeRuntimeEntity(
+            "obstruction",
+            "Obstruction",
+            [],
+            null,
+            null,
+            true,
+            false,
+            RekallAgeRuntimeTransform.Identity with
+            {
+                Position3D = new RekallAgeRuntimeVector3(0.2, 0, -5)
+            },
+            [new RekallAgeRuntimeComponent(
+                "Rekall.SphereCollider3D",
+                new JsonObject { ["radius"] = 0.1 })]);
+        var camera = CreateCamera(
+            startX: 0,
+            new JsonObject
+            {
+                ["targetName"] = "Target",
+                ["offsetX"] = 0,
+                ["offsetY"] = 0,
+                ["offsetZ"] = -10,
+                ["lookAt"] = false,
+                ["collisionAvoidanceEnabled"] = true,
+                ["collisionMinimumDistance"] = 0.5,
+                ["collisionProbeRadius"] = 0
+            });
+        var world = CreateWorld(camera, target, obstruction);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, 1, CancellationToken.None);
+
+        var updatedCamera = result.World.Entities.Single(entity => entity.Id == "camera");
+        Assert.Equal(-10, updatedCamera.Transform.Position3D.Z, precision: 3);
+    }
 }

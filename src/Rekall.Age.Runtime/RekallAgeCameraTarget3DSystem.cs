@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
-using Rekall.Age.Modules;
 using Rekall.Age.Runtime.Abstractions;
 
 namespace Rekall.Age.Runtime;
@@ -68,11 +67,11 @@ public sealed class RekallAgeCameraTarget3DSystem : IRekallAgeRuntimeWorldSystem
                 deltaSeconds)
             : instantPosition;
 
-        // Real spring-arm collision avoidance: probe from the target out toward the (possibly
-        // lagged) desired camera position with a single ray - not a true swept sphere/capsule,
-        // since world.Raycast3D is itself a point ray, an honest, simpler approximation of what a
-        // full arm-radius sweep would do - and if something is in the way, pull the camera in to
-        // just short of the hit point instead of letting it clip through geometry.
+        // Real spring-arm collision avoidance: sweep a sphere from the target out toward the
+        // (possibly lagged) desired camera position, approximating obstructions as bounding spheres
+        // around their colliders (see ApplyCollisionAvoidance's own doc comment) - and if something
+        // is in the way, pull the camera in to just short of the hit point instead of letting it
+        // clip through geometry.
         if (ReadBoolean(cameraTarget.Properties, "collisionAvoidanceEnabled", false))
         {
             cameraPosition = ApplyCollisionAvoidance(
@@ -81,7 +80,8 @@ public sealed class RekallAgeCameraTarget3DSystem : IRekallAgeRuntimeWorldSystem
                 target,
                 targetPosition,
                 cameraPosition,
-                Math.Max(0, ReadNumber(cameraTarget.Properties, "collisionMinimumDistance", 0.1)));
+                Math.Max(0, ReadNumber(cameraTarget.Properties, "collisionMinimumDistance", 0.1)),
+                Math.Max(0, ReadNumber(cameraTarget.Properties, "collisionProbeRadius", 0.15)));
         }
 
         var currentRotation = entity.Transform.Rotation3D;
@@ -328,13 +328,17 @@ public sealed class RekallAgeCameraTarget3DSystem : IRekallAgeRuntimeWorldSystem
     }
 
     /// <summary>
-    /// Probes a single ray from the target's position toward the desired camera position (via the
-    /// already-generic, physics-independent <see cref="RekallAgeRuntimeModuleSdk.Raycast3D"/> the
-    /// pointer/picking system already uses - not a new physics dependency). If the nearest hit
+    /// Sweeps a sphere of <paramref name="probeRadius"/> from the target's position toward the
+    /// desired camera position - not a single ray - so a thin obstruction near the edge of where
+    /// the camera would sit is still caught, the same way a real spring arm's own collision channel
+    /// (which sweeps its actual camera-mount radius, not an infinitely thin line) behaves. Each
+    /// candidate obstruction is approximated as a bounding sphere around its collider (the same
+    /// approximation <see cref="RekallAgeTriggerEventSystem"/> already uses for trigger-volume
+    /// overlap, not a new kind of imprecision this feature introduces) so the sweep reduces to an
+    /// ordinary ray-vs-sphere test against (probeRadius + that bounding radius). If the nearest hit
     /// (excluding the target and camera entities themselves, so neither ever obstructs its own arm)
     /// is closer than the desired distance, pulls the camera in along the same line to
-    /// <paramref name="minimumDistance"/> short of that hit, the same way a real spring arm's
-    /// collision probe prevents the camera clipping through geometry between it and its target.
+    /// <paramref name="minimumDistance"/> short of that hit.
     /// </summary>
     private static RekallAgeRuntimeVector3 ApplyCollisionAvoidance(
         RekallAgeRuntimeWorld world,
@@ -342,7 +346,8 @@ public sealed class RekallAgeCameraTarget3DSystem : IRekallAgeRuntimeWorldSystem
         RekallAgeRuntimeEntity target,
         RekallAgeRuntimeVector3 targetPosition,
         RekallAgeRuntimeVector3 desiredPosition,
-        double minimumDistance)
+        double minimumDistance,
+        double probeRadius)
     {
         var toCamera = Subtract(desiredPosition, targetPosition);
         var desiredDistance = Length(toCamera);
@@ -352,11 +357,37 @@ public sealed class RekallAgeCameraTarget3DSystem : IRekallAgeRuntimeWorldSystem
         }
 
         var direction = Scale(toCamera, 1.0 / desiredDistance);
-        var hit = world.Raycast3D(targetPosition, direction, desiredDistance)
-            .FirstOrDefault(candidate =>
-                !candidate.Entity.Id.Equals(target.Id, StringComparison.Ordinal)
-                && !candidate.Entity.Id.Equals(cameraEntity.Id, StringComparison.Ordinal));
-        if (hit is null)
+        double? nearestHitDistance = null;
+        foreach (var entity in world.Entities)
+        {
+            if (!entity.Visible
+                || entity.Id.Equals(target.Id, StringComparison.Ordinal)
+                || entity.Id.Equals(cameraEntity.Id, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var collider = entity.Components.FirstOrDefault(Is3DCollider);
+            if (collider is null)
+            {
+                continue;
+            }
+
+            var sphereCenter = entity.Transform.Position3D;
+            var sphereRadius = probeRadius + EstimateColliderBoundingRadius(collider);
+            var entryDistance = RaySphereEntryDistance(targetPosition, direction, sphereCenter, sphereRadius);
+            if (entryDistance is not { } distance || distance > desiredDistance)
+            {
+                continue;
+            }
+
+            if (nearestHitDistance is null || distance < nearestHitDistance)
+            {
+                nearestHitDistance = distance;
+            }
+        }
+
+        if (nearestHitDistance is not { } hitDistance)
         {
             return desiredPosition;
         }
@@ -364,8 +395,67 @@ public sealed class RekallAgeCameraTarget3DSystem : IRekallAgeRuntimeWorldSystem
         // Math.Min/Max rather than Math.Clamp deliberately: minimumDistance could theoretically be
         // authored larger than desiredDistance itself, which would make Math.Clamp's min > max and
         // throw - this stays well-defined (falls back toward minimumDistance) in that case instead.
-        var clampedDistance = Math.Max(minimumDistance, Math.Min(desiredDistance, hit.Distance - minimumDistance));
+        var clampedDistance = Math.Max(minimumDistance, Math.Min(desiredDistance, hitDistance - minimumDistance));
         return Add(targetPosition, Scale(direction, clampedDistance));
+    }
+
+    /// <summary>Ray-vs-sphere intersection: returns the distance along the ray (from
+    /// <paramref name="origin"/>, in the already-normalized <paramref name="direction"/>) to the
+    /// nearest entry point on the sphere, or null if the ray never enters it. If the origin already
+    /// starts inside the sphere, returns 0 (the whole arm is already touching the obstruction).</summary>
+    private static double? RaySphereEntryDistance(
+        RekallAgeRuntimeVector3 origin,
+        RekallAgeRuntimeVector3 direction,
+        RekallAgeRuntimeVector3 sphereCenter,
+        double sphereRadius)
+    {
+        var toCenter = Subtract(origin, sphereCenter);
+        var b = Dot(toCenter, direction);
+        var c = Dot(toCenter, toCenter) - sphereRadius * sphereRadius;
+        var discriminant = b * b - c;
+        if (discriminant < 0)
+        {
+            return null;
+        }
+
+        var entry = -b - Math.Sqrt(discriminant);
+        return Math.Max(0, entry);
+    }
+
+    private static double Dot(RekallAgeRuntimeVector3 a, RekallAgeRuntimeVector3 b)
+    {
+        return a.X * b.X + a.Y * b.Y + a.Z * b.Z;
+    }
+
+    private static bool Is3DCollider(RekallAgeRuntimeComponent component)
+    {
+        return component.Type is
+            "Rekall.BoxCollider3D" or
+            "Rekall.SphereCollider3D" or
+            "Rekall.CapsuleCollider3D" or
+            "Rekall.MeshCollider";
+    }
+
+    /// <summary>Same collider-to-bounding-sphere-radius approximation
+    /// <see cref="RekallAgeTriggerEventSystem"/> already uses for trigger-volume overlap.</summary>
+    private static double EstimateColliderBoundingRadius(RekallAgeRuntimeComponent collider)
+    {
+        return collider.Type switch
+        {
+            "Rekall.SphereCollider3D" => Math.Max(0.0001, ReadNumber(collider.Properties, "radius", 0.5)),
+            "Rekall.CapsuleCollider3D" => Math.Max(0.0001, ReadNumber(collider.Properties, "radius", 0.5))
+                + Math.Max(0.0001, ReadNumber(collider.Properties, "length", 1)) * 0.5,
+            "Rekall.BoxCollider3D" => EstimateBoxBoundingRadius(collider),
+            _ => 1
+        };
+    }
+
+    private static double EstimateBoxBoundingRadius(RekallAgeRuntimeComponent collider)
+    {
+        var width = Math.Max(0.0001, ReadNumber(collider.Properties, "width", 1));
+        var height = Math.Max(0.0001, ReadNumber(collider.Properties, "height", 1));
+        var depth = Math.Max(0.0001, ReadNumber(collider.Properties, "depth", 1));
+        return Math.Sqrt(width * width + height * height + depth * depth) * 0.5;
     }
 
     private static string? ReadString(JsonObject properties, string name)

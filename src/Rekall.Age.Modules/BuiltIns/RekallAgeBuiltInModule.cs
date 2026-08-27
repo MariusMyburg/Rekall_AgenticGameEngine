@@ -354,7 +354,7 @@ public sealed class RekallAgeCameraZoomInputComponent : RekallAgeComponent
 
 [RekallAgeComponent(
     "Camera Target 3D",
-    Description = "Attaches this entity (typically a camera) to a target entity with an authored offset and optional look-at, similar to Unreal's SpringArmComponent. FollowPosition alone snaps instantly every frame; enable PositionLagEnabled/RotationLagEnabled for the smoothed, trailing-behind motion an actual spring arm has, tuned by PositionLagSpeed/RotationLagSpeed and optionally bounded by MaximumPositionLagDistance. Enable CollisionAvoidanceEnabled for the other classic spring-arm feature: a probe ray from the target out to the desired camera position pulls the camera in to CollisionMinimumDistance short of anything in the way, so it does not clip through geometry - a single ray, not a true swept sphere/capsule.")]
+    Description = "Attaches this entity (typically a camera) to a target entity with an authored offset and optional look-at, similar to Unreal's SpringArmComponent. FollowPosition alone snaps instantly every frame; enable PositionLagEnabled/RotationLagEnabled for the smoothed, trailing-behind motion an actual spring arm has, tuned by PositionLagSpeed/RotationLagSpeed and optionally bounded by MaximumPositionLagDistance. Enable CollisionAvoidanceEnabled for the other classic spring-arm feature: a sphere of CollisionProbeRadius sweeps from the target out to the desired camera position and pulls the camera in to CollisionMinimumDistance short of anything in the way, so it does not clip through geometry.")]
 public sealed class RekallAgeCameraTarget3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty]
@@ -426,11 +426,14 @@ public sealed class RekallAgeCameraTarget3DComponent : RekallAgeComponent
     [RekallAgeProperty(Minimum = 0.0001, Description = "Exponential-decay catch-up rate in 1/seconds for rotation lag, same semantics as PositionLagSpeed. Ignored unless RotationLagEnabled is true.")]
     public double RotationLagSpeed { get; init; } = 10;
 
-    [RekallAgeProperty(Description = "When true, probes a single ray from the target's position out toward the desired camera position every frame and pulls the camera in if something (other than the target or camera entities themselves) is in the way, so it never clips through geometry. This is a single ray, not a true swept sphere/capsule the way a real spring arm's own collision channel is - a thin obstruction near the ray's edge may not be detected. Off by default.")]
+    [RekallAgeProperty(Description = "When true, sweeps a sphere (radius CollisionProbeRadius) from the target's position out toward the desired camera position every frame and pulls the camera in if something (other than the target or camera entities themselves) is in the way, so it never clips through geometry - the same purpose a real spring arm's own collision channel serves. Obstructions are approximated as bounding spheres around their colliders (matching how Rekall.Trigger already approximates collider overlap), so it is not pixel-exact against a box or mesh's true corners. Off by default.")]
     public bool CollisionAvoidanceEnabled { get; init; }
 
     [RekallAgeProperty(Minimum = 0, Description = "How close, in world units, the camera is allowed to sit in front of whatever the collision probe hit. Also the minimum possible distance from the target when an obstruction is found extremely close. Ignored unless CollisionAvoidanceEnabled is true.")]
     public double CollisionMinimumDistance { get; init; } = 0.1;
+
+    [RekallAgeProperty(Minimum = 0, Description = "Radius of the sphere swept along the arm for collision avoidance, in world units - roughly how large the camera itself is treated as being for clipping purposes. 0 degrades to a thin ray. Ignored unless CollisionAvoidanceEnabled is true.")]
+    public double CollisionProbeRadius { get; init; } = 0.15;
 
     [RekallAgeProperty]
     public bool Active { get; init; } = true;

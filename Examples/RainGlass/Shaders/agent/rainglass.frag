@@ -50,7 +50,10 @@ void main()
     float column = floor(fragUv.x * columnCount);
     float columnSeed = hash(column);
     float speed = 0.35 + columnSeed * 0.9;
-    float phase = fract(fragUv.y + time * speed + columnSeed * 3.7);
+    // Subtracting time (not adding) makes the streak's phase-zero point move toward larger UV.y as
+    // time increases - i.e. toward the bottom of the corrected, right-side-up image - so droplets
+    // actually fall instead of rising.
+    float phase = fract(fragUv.y - time * speed + columnSeed * 3.7);
 
     // A short bright droplet band trailing into a fading tail, repeated per column via the phase
     // wrap above so each column's streak falls continuously and independently of its neighbors.

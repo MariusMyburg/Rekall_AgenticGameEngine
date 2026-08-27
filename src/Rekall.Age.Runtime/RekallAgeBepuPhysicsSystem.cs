@@ -16,6 +16,12 @@ namespace Rekall.Age.Runtime;
 public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, IDisposable
 {
     private const float DefaultGravityY = -9.81f;
+    private static readonly HashSet<string> JointComponentTypes = new(StringComparer.Ordinal)
+    {
+        "Rekall.BallSocketJoint",
+        "Rekall.HingeJoint",
+        "Rekall.DistanceJoint"
+    };
     private PersistentPhysicsWorld? _physicsWorld;
     private readonly RekallAgeCompiledMeshAssetResolver _meshResolver = new();
     private readonly RekallAgeCompiledModelAssetResolver _modelAssetResolver = new();
@@ -57,6 +63,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
 
         _physicsWorld.Reconcile(dynamicBodies, staticBodies);
         _physicsWorld.SynchronizeAuthoredChanges(dynamicBodies);
+        _physicsWorld.SyncJoints(world.Entities, observations, context.FrameIndex);
         var preStepBodies = _physicsWorld.CapturePreStepBodies(dynamicBodies);
         _physicsWorld.Simulation.Timestep((float)context.DeltaTime.TotalSeconds);
 
@@ -834,6 +841,10 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
         private readonly Dictionary<string, PersistentDynamicBody> _dynamicBodies = new(StringComparer.Ordinal);
         private readonly Dictionary<string, PersistentStaticBody> _staticBodies = new(StringComparer.Ordinal);
         private readonly Dictionary<string, BodyOutputSnapshot> _lastOutputs = new(StringComparer.Ordinal);
+        // Keyed by "{sourceEntityId}:{componentType}" since an entity could in principle carry more
+        // than one joint component type. Persisted (not rebuilt every frame) so BEPU's solver
+        // warm-start state survives across frames, the same way bodies persist via Reconcile.
+        private readonly Dictionary<string, PersistentJoint> _joints = new(StringComparer.Ordinal);
 
         public PersistentPhysicsWorld(string sceneId, PhysicsWorldConfiguration configuration)
         {
@@ -915,6 +926,127 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
             }
         }
 
+        public void SyncJoints(
+            IReadOnlyList<RekallAgeRuntimeEntity> entities,
+            List<RekallAgeRuntimeObservation> observations,
+            int frameIndex)
+        {
+            var desired = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var entity in entities)
+            {
+                foreach (var component in entity.Components.Where(item => JointComponentTypes.Contains(item.Type)))
+                {
+                    var key = $"{entity.Id}:{component.Type}";
+                    var connectedEntityId = ReadString(component, "connectedEntityId", string.Empty);
+                    if (string.IsNullOrEmpty(connectedEntityId) || connectedEntityId.Equals(entity.Id, StringComparison.Ordinal))
+                    {
+                        observations.Add(JointUnresolvedObservation(frameIndex, entity, "self-referential or missing connectedEntityId"));
+                        continue;
+                    }
+
+                    if (!_dynamicBodies.TryGetValue(entity.Id, out var bodyA) || !_dynamicBodies.TryGetValue(connectedEntityId, out var bodyB))
+                    {
+                        observations.Add(JointUnresolvedObservation(frameIndex, entity, $"connected entity '{connectedEntityId}' is not a dynamic body"));
+                        continue;
+                    }
+
+                    var signature = $"{component.Type}|{component.Properties.ToJsonString()}|{bodyA.Handle.Value}|{bodyB.Handle.Value}";
+                    desired.Add(key);
+                    if (_joints.TryGetValue(key, out var existing) && existing.Signature.Equals(signature, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    if (_joints.TryGetValue(key, out var stale))
+                    {
+                        Simulation.Solver.Remove(stale.Handle);
+                    }
+
+                    var handle = AddJointConstraint(component, bodyA.Handle, bodyB.Handle);
+                    _joints[key] = new PersistentJoint(handle, bodyA.Handle, bodyB.Handle, signature);
+                }
+            }
+
+            foreach (var stale in _joints.Where(pair => !desired.Contains(pair.Key)).ToArray())
+            {
+                Simulation.Solver.Remove(stale.Value.Handle);
+                _joints.Remove(stale.Key);
+            }
+        }
+
+        private ConstraintHandle AddJointConstraint(RekallAgeRuntimeComponent component, BodyHandle handleA, BodyHandle handleB)
+        {
+            var springSettings = new SpringSettings(
+                Math.Max(0.0001f, ReadSingle(component, "springFrequency", 30)),
+                Math.Max(0, ReadSingle(component, "dampingRatio", 1)));
+            switch (component.Type)
+            {
+                case "Rekall.BallSocketJoint":
+                {
+                    var description = new BallSocket
+                    {
+                        LocalOffsetA = ReadAnchor(component, "anchorAX", "anchorAY", "anchorAZ"),
+                        LocalOffsetB = ReadAnchor(component, "anchorBX", "anchorBY", "anchorBZ"),
+                        SpringSettings = springSettings
+                    };
+                    return Simulation.Solver.Add(handleA, handleB, in description);
+                }
+                case "Rekall.HingeJoint":
+                {
+                    var axis = ReadAxis(component);
+                    var description = new Hinge
+                    {
+                        LocalOffsetA = ReadAnchor(component, "anchorAX", "anchorAY", "anchorAZ"),
+                        LocalHingeAxisA = axis,
+                        LocalOffsetB = ReadAnchor(component, "anchorBX", "anchorBY", "anchorBZ"),
+                        LocalHingeAxisB = axis,
+                        SpringSettings = springSettings
+                    };
+                    return Simulation.Solver.Add(handleA, handleB, in description);
+                }
+                default:
+                {
+                    var description = new CenterDistanceConstraint
+                    {
+                        TargetDistance = Math.Max(0, ReadSingle(component, "targetDistance", 1)),
+                        SpringSettings = springSettings
+                    };
+                    return Simulation.Solver.Add(handleA, handleB, in description);
+                }
+            }
+        }
+
+        private static Vector3 ReadAnchor(RekallAgeRuntimeComponent component, string xName, string yName, string zName)
+        {
+            return new Vector3(
+                ReadSingle(component, xName, 0),
+                ReadSingle(component, yName, 0),
+                ReadSingle(component, zName, 0));
+        }
+
+        private static Vector3 ReadAxis(RekallAgeRuntimeComponent component)
+        {
+            var axis = new Vector3(
+                ReadSingle(component, "axisX", 0),
+                ReadSingle(component, "axisY", 1),
+                ReadSingle(component, "axisZ", 0));
+            return axis.LengthSquared() > 0.0001f ? Vector3.Normalize(axis) : Vector3.UnitY;
+        }
+
+        private static RekallAgeRuntimeObservation JointUnresolvedObservation(int frameIndex, RekallAgeRuntimeEntity entity, string reason)
+        {
+            return new RekallAgeRuntimeObservation(
+                frameIndex,
+                "runtime.physics.joint_unresolved",
+                "warning",
+                "physics",
+                entity.Id,
+                entity.Name,
+                "runtime.physics.bepu",
+                $"Joint on entity '{entity.Name}' could not be resolved: {reason}.",
+                [entity.Id]);
+        }
+
         public Dictionary<string, DynamicBodyState> CapturePreStepBodies(
             IReadOnlyList<PhysicsEntity> dynamicBodies)
         {
@@ -991,6 +1123,15 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
 
         private void RemoveDynamic(string id, PersistentDynamicBody body)
         {
+            // BEPU requires constraints referencing a body to be removed before the body itself;
+            // SyncJoints runs after Reconcile each frame, so any joint attached to this body must
+            // be torn down here rather than left for SyncJoints to discover next.
+            foreach (var stale in _joints.Where(pair => pair.Value.HandleA.Equals(body.Handle) || pair.Value.HandleB.Equals(body.Handle)).ToArray())
+            {
+                Simulation.Solver.Remove(stale.Value.Handle);
+                _joints.Remove(stale.Key);
+            }
+
             Simulation.Bodies.Remove(body.Handle);
             Simulation.Shapes.RemoveAndDispose(body.Shape, _pool);
             _dynamicFilters.Remove(body.Handle);
@@ -1066,6 +1207,12 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
     private readonly record struct PersistentStaticBody(
         StaticHandle Handle,
         TypedIndex Shape,
+        string Signature);
+
+    private readonly record struct PersistentJoint(
+        ConstraintHandle Handle,
+        BodyHandle HandleA,
+        BodyHandle HandleB,
         string Signature);
 
     private readonly record struct PhysicsWorldConfiguration(

@@ -48,6 +48,9 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgePhysicsWorld3DComponent>();
         builder.RegisterComponent<RekallAgePhysicsMaterial3DComponent>();
         builder.RegisterComponent<RekallAgePhysicsMaterial2DComponent>();
+        builder.RegisterComponent<RekallAgeBallSocketJointComponent>();
+        builder.RegisterComponent<RekallAgeHingeJointComponent>();
+        builder.RegisterComponent<RekallAgeDistanceJointComponent>();
         builder.RegisterComponent<RekallAgeRigidbody2DComponent>();
         builder.RegisterComponent<RekallAgeRigidbody3DComponent>();
         builder.RegisterComponent<RekallAgeTriggerComponent>();
@@ -1089,6 +1092,93 @@ public sealed class RekallAgePhysicsMaterial2DComponent : RekallAgeComponent
     public double SpringFrequency { get; init; } = 30;
 
     [RekallAgeProperty(Minimum = 0, Description = "BEPU damping ratio used for non-bouncy and resting contacts: 0 is undamped, 1 is critically damped, and values above 1 are overdamped.")]
+    public double DampingRatio { get; init; } = 1;
+}
+
+[RekallAgeComponent("Ball Socket Joint", Description = "Pins one local anchor point on this dynamic body to one local anchor point on another dynamic body, free to rotate. Both entities must have a rigid body and collider. ConnectedEntityId must reference a different, existing, dynamic entity.")]
+public sealed class RekallAgeBallSocketJointComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Description = "Entity ID of the other dynamic body this joint connects to.")]
+    public string ConnectedEntityId { get; init; } = string.Empty;
+
+    [RekallAgeProperty(Description = "Anchor point X, in this entity's own local space.")]
+    public double AnchorAX { get; init; }
+
+    [RekallAgeProperty(Description = "Anchor point Y, in this entity's own local space.")]
+    public double AnchorAY { get; init; }
+
+    [RekallAgeProperty(Description = "Anchor point Z, in this entity's own local space.")]
+    public double AnchorAZ { get; init; }
+
+    [RekallAgeProperty(Description = "Anchor point X, in the connected entity's own local space.")]
+    public double AnchorBX { get; init; }
+
+    [RekallAgeProperty(Description = "Anchor point Y, in the connected entity's own local space.")]
+    public double AnchorBY { get; init; }
+
+    [RekallAgeProperty(Description = "Anchor point Z, in the connected entity's own local space.")]
+    public double AnchorBZ { get; init; }
+
+    [RekallAgeProperty(Minimum = 0.0001, Description = "BEPU joint-spring frequency. Lower frequencies allow more stretch before correction; higher frequencies hold the anchor points together more rigidly.")]
+    public double SpringFrequency { get; init; } = 30;
+
+    [RekallAgeProperty(Minimum = 0, Description = "BEPU damping ratio: 0 is undamped, 1 is critically damped, values above 1 are overdamped.")]
+    public double DampingRatio { get; init; } = 1;
+}
+
+[RekallAgeComponent("Hinge Joint", Description = "Pins one local anchor point on this dynamic body to one local anchor point on another dynamic body, and constrains relative rotation to one shared axis. The authored axis is interpreted identically in both entities' local spaces, which is only geometrically correct when the two bodies start out reasonably co-oriented. Both entities must have a rigid body and collider. ConnectedEntityId must reference a different, existing, dynamic entity.")]
+public sealed class RekallAgeHingeJointComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Description = "Entity ID of the other dynamic body this joint connects to.")]
+    public string ConnectedEntityId { get; init; } = string.Empty;
+
+    [RekallAgeProperty(Description = "Anchor point X, in this entity's own local space.")]
+    public double AnchorAX { get; init; }
+
+    [RekallAgeProperty(Description = "Anchor point Y, in this entity's own local space.")]
+    public double AnchorAY { get; init; }
+
+    [RekallAgeProperty(Description = "Anchor point Z, in this entity's own local space.")]
+    public double AnchorAZ { get; init; }
+
+    [RekallAgeProperty(Description = "Anchor point X, in the connected entity's own local space.")]
+    public double AnchorBX { get; init; }
+
+    [RekallAgeProperty(Description = "Anchor point Y, in the connected entity's own local space.")]
+    public double AnchorBY { get; init; }
+
+    [RekallAgeProperty(Description = "Anchor point Z, in the connected entity's own local space.")]
+    public double AnchorBZ { get; init; }
+
+    [RekallAgeProperty(Description = "Hinge rotation axis X, interpreted identically in both entities' local spaces.")]
+    public double AxisX { get; init; }
+
+    [RekallAgeProperty(Description = "Hinge rotation axis Y, interpreted identically in both entities' local spaces.")]
+    public double AxisY { get; init; } = 1;
+
+    [RekallAgeProperty(Description = "Hinge rotation axis Z, interpreted identically in both entities' local spaces.")]
+    public double AxisZ { get; init; }
+
+    [RekallAgeProperty(Minimum = 0.0001, Description = "BEPU joint-spring frequency for the pinned anchor point.")]
+    public double SpringFrequency { get; init; } = 30;
+
+    [RekallAgeProperty(Minimum = 0, Description = "BEPU damping ratio: 0 is undamped, 1 is critically damped, values above 1 are overdamped.")]
+    public double DampingRatio { get; init; } = 1;
+}
+
+[RekallAgeComponent("Distance Joint", Description = "Keeps this dynamic body's center and another dynamic body's center at an authored target distance apart, like a rigid rod or taut rope. Both entities must have a rigid body and collider. ConnectedEntityId must reference a different, existing, dynamic entity.")]
+public sealed class RekallAgeDistanceJointComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Description = "Entity ID of the other dynamic body this joint connects to.")]
+    public string ConnectedEntityId { get; init; } = string.Empty;
+
+    [RekallAgeProperty(Minimum = 0, Description = "Target distance in world units between the two entities' centers.")]
+    public double TargetDistance { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0.0001, Description = "BEPU joint-spring frequency. Lower frequencies allow more stretch before correction; higher frequencies hold the target distance more rigidly.")]
+    public double SpringFrequency { get; init; } = 30;
+
+    [RekallAgeProperty(Minimum = 0, Description = "BEPU damping ratio: 0 is undamped, 1 is critically damped, values above 1 are overdamped.")]
     public double DampingRatio { get; init; } = 1;
 }
 

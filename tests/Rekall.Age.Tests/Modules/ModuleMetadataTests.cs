@@ -219,6 +219,26 @@ public sealed class ModuleMetadataTests
     }
 
     [Fact]
+    public async Task PhysicsJointsAreDiscoverableAsAPhysicsConcept()
+    {
+        var command = new SearchComponentSchemasCommand(typeof(RekallAgeBuiltInModule).Assembly);
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("search physics joints"),
+            CancellationToken.None);
+
+        var result = await command.ExecuteAsync(
+            new SearchComponentSchemasRequest("joint constraint connected body hinge", Limit: 24),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        var types = result.Value.Components.Select(component => component.TypeName).ToHashSet(StringComparer.Ordinal);
+        Assert.Contains("Rekall.BallSocketJoint", types);
+        Assert.Contains("Rekall.HingeJoint", types);
+        Assert.Contains("Rekall.DistanceJoint", types);
+    }
+
+    [Fact]
     public async Task ComponentSchemaSearchRejectsMissingQueryWithStructuredError()
     {
         var command = new SearchComponentSchemasCommand(typeof(RekallAgeBuiltInModule).Assembly);

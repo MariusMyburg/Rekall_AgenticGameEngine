@@ -5607,21 +5607,25 @@ dive timer rather than player-fired bullets) at frame 220, where one enemy
 has visibly broken formation mid-dive; vulkan and software compositions
 agree.
 
-Real, distinct CLI/MCP finding, not yet fixed: `rekall.play.capture_frame`
-and `rekall.workflow.capture_playable_package_frame` both hardcode an
-`{deltaSeconds, primaryAction, verticalAxis}` input shape tied to the
-`ClockworkCanopy` reference platformer's controls, not a generic shape
-driven by a project's own declared `Rekall.InputActionMap` actions (the
-way `rekall.runtime.inspect_scene`'s `PressedKeys`/`SemanticActions` shape
-is). A client authoring any game whose inputs aren't literally "vertical
-axis + one action button" -- Galaga's `fire`/`player.move`, Pong's
-`paddle.move`/`reset` -- cannot drive real gameplay through either
-capture/run/audit workflow tool at all. This blocked getting a
-projectile-in-flight visual capture for Galaga specifically. Not fixed in
-this session: redesigning those two tools' input contract to accept the
-same generic shape `runtime inspect` already uses is a larger, standalone
-change, not a small patch, and deserves its own dedicated pass rather than
-being folded in here.
+2026-08-27 update: the finding above is now fixed and verified as of the
+current tree. `rekall.play.capture_frame` and
+`rekall.workflow.capture_playable_package_frame` both accept an `inputFrames`
+field using the same generic `RekallAgeRuntimeInputFrame`
+`semanticActions`/`pressedKeys`/`pressedKeysThisFrame`/`releasedKeysThisFrame`
+shape `rekall.runtime.inspect_scene` uses; the old
+`{deltaSeconds, primaryAction, verticalAxis}` `inputs` field remains only as
+an explicitly documented legacy compatibility fallback used when
+`inputFrames` is not supplied. Both schemas document this explicitly.
+`CapturePlayableFrameProjectsSemanticActionsAndInputEdgesIntoThePlayableModule`
+proves a non-platformer `capture.move` semantic action drives the playable
+module directly; `RegistryDeserializesGenericInputFramesForDirectCaptureRequest`
+and `RegistryDeserializesGenericInputFramesForPackageCaptureRequest` prove a
+`fire`-style action (Galaga's own shape) deserializes and round-trips through
+both commands' real command-registry JSON path, including through the unsafe-
+output retry suggestion. The one caller that still constructs the legacy
+shape (`RunAgentAuthoringGauntletCommand`) does so only for its synthetic
+bootstrap-blueprint self-test scene when the project has no authored
+entities yet; it passes `null` for real authored games.
 
 Not yet done for Galaga: package/relocate/audit workflow; a direct
 projectile-vs-enemy visual capture (blocked by the finding above); native

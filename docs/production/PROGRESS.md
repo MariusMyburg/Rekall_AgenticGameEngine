@@ -3167,9 +3167,13 @@ behavior.
   3D-named component, and authored 2D angular velocity
   (`Rekall.Rigidbody2D.AngularVelocityZ`) is now schema-discoverable and
   passes validation (the runtime already applied it correctly; it was only
-  ever blocked by an incomplete schema). Remaining breadth includes generic
-  joints/constraints, exact contact manifold/impulse facts, deformables, and
-  measured large-world broadphase performance.
+  ever blocked by an incomplete schema). Generic physics joints now exist for
+  a first increment of three constraint types (`Rekall.BallSocketJoint`,
+  `Rekall.HingeJoint`, `Rekall.DistanceJoint`, connecting two dynamic bodies
+  by entity ID reference); connecting to a fixed/static anchor, angle/distance
+  limits and motors, and `Weld` remain deferred. Remaining breadth includes
+  exact contact manifold/impulse facts, deformables, and measured large-world
+  broadphase performance.
 - 3D rendering is substantial and hardware-backed: perspective/orthographic
   cameras, viewports/layers/stereo/OpenXR, primitives and authored/imported GLB
   meshes, PBR texture inputs, directional/point lighting, generic animation,
@@ -6175,6 +6179,47 @@ Verified: full `CollisionFilterTests`/`ModuleMetadataTests`/
 
 - `docs/superpowers/specs/2026-08-27-collision-layers-design.md`
 - `docs/superpowers/plans/2026-08-27-collision-layers.md`
+
+## 2026-08-27 Generic physics joints/constraints
+
+Third and last of this session's physics-breadth sub-projects (after
+collision layers/masks and the 2D material/angular-control work above). Three
+new components map directly onto real BEPU v2.4.0 constraint structs:
+`Rekall.BallSocketJoint` (`BallSocket`), `Rekall.HingeJoint` (`Hinge`), and
+`Rekall.DistanceJoint` (`CenterDistanceConstraint`). Each references a second
+dynamic entity by `ConnectedEntityId`, the same cross-entity-reference pattern
+`Rekall.CameraTarget3D.TargetEntityId` already established, applied to
+physics for the first time.
+
+Joints persist across frames the same way dynamic bodies already do
+(`PersistentPhysicsWorld.Reconcile`'s signature diffing), via a new
+`SyncJoints` step keyed by `"{sourceEntityId}:{componentType}"`, so BEPU's
+solver warm-start state survives rather than being rebuilt every frame. A
+joint's signature includes both resolved `BodyHandle` values, so a body
+recreated mid-session (a shape/config change) correctly tears down and
+rebuilds any joint attached to it instead of referencing a stale handle;
+`RemoveDynamic` also proactively removes any joint attached to a body being
+removed, since BEPU requires constraints removed before their body — this
+can't wait for the next `SyncJoints` pass. A joint referencing a missing,
+non-dynamic, or self entity id is skipped with a
+`runtime.physics.joint_unresolved` observation, never a crash.
+
+Scope for this increment, explicitly deferred rather than silently missing:
+connecting to a fixed/static world anchor (needs a synthetic kinematic body,
+since BEPU constraints only connect `BodyHandle`s, not `StaticHandle`s),
+angle/distance limits and motors, `Weld`, and Studio joint-authoring UI
+(components are already editable through Studio's generic JSON component
+editor).
+
+Verified: targeted physics/schema/validation regression green (89/89).
+
+This closes the physics-breadth work item begun earlier this session. All
+three sub-projects (collision layers/masks, 2D material/angular parity,
+generic joints) are shipped, tested, and documented.
+
+- `docs/superpowers/specs/2026-08-27-collision-layers-design.md`
+- `docs/superpowers/plans/2026-08-27-collision-layers.md`
+- `docs/superpowers/specs/2026-08-27-physics-joints-design.md`
 
 ## Update rule
 

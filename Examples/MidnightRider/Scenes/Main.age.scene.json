@@ -1,0 +1,458 @@
+{
+  "schemaVersion": 1,
+  "id": "scene_77ab98922b4443f4a348277d8240452e",
+  "name": "Main",
+  "capabilities": [
+    "modules",
+    "physics3d",
+    "rendering3d",
+    "world"
+  ],
+  "entities": [
+    {
+      "id": "ent_physics_settings_midnightrider",
+      "name": "Physics Settings",
+      "tags": [
+        "settings"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PhysicsWorld3D",
+          "properties": {
+            "velocityIterationCount": 32,
+            "substepCount": 16
+          }
+        }
+      ]
+    },
+    {
+      "id": "ent_6c4c8a0c31814eb4a2288239ca20b926",
+      "name": "Camera",
+      "tags": [
+        "camera"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.CameraTarget3D",
+          "properties": {
+            "targetEntityId": "ent_74e5f98a089b426eab17409691d51d6b",
+            "offsetX": -6,
+            "offsetY": 2.6,
+            "offsetZ": 0,
+            "followPosition": true,
+            "lookAt": true,
+            "positionLagEnabled": true,
+            "positionLagSpeed": 6,
+            "rotationLagEnabled": true,
+            "rotationLagSpeed": 5,
+            "collisionAvoidanceEnabled": false,
+            "collisionMinimumDistance": 0.6
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -6,
+            "y": 2.5,
+            "z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_74e5f98a089b426eab17409691d51d6b",
+      "name": "Chassis",
+      "tags": [
+        "actor"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.MidnightRiderRules.RunState",
+          "properties": {
+            "enabled": true,
+            "chassisId": "ent_74e5f98a089b426eab17409691d51d6b",
+            "forkId": "ent_26e9544e6e2a4e88a7bdedc7c1904a3c",
+            "rearWheelId": "ent_3eb072628c304074a0acf8609bc0f3bc",
+            "seed": 7,
+            "nextSpawnX": 0
+          }
+        },
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 1.3,
+            "height": 0.35,
+            "depth": 0.3
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube",
+            "color": "#c22b3a"
+          }
+        },
+        {
+          "type": "Rekall.InputActionMap",
+          "properties": {
+            "actions": [
+              {
+                "name": "throttle",
+                "key": "Up",
+                "positiveKey": "Up",
+                "negativeKey": "Down"
+              },
+              {
+                "name": "steer",
+                "key": "Right",
+                "positiveKey": "Right",
+                "negativeKey": "Left"
+              }
+            ]
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#c22b3a",
+            "metallicFactor": 0.7,
+            "roughnessFactor": 0.28
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true,
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 0.3,
+            "restitution": 0
+          }
+        },
+        {
+          "type": "Rekall.Rigidbody3D",
+          "properties": {
+            "mass": 180,
+            "linearDrag": 0.12,
+            "angularDrag": 0.6
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 5,
+            "y": 0.85,
+            "z": 0,
+            "scaleX": 1.3,
+            "scaleY": 0.35,
+            "scaleZ": 0.3
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e5ed1db4f26c40ceb3937c1fced8afd3",
+      "name": "Environment",
+      "tags": [
+        "settings"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Environment3D",
+          "properties": {
+            "ambientEnergy": 0.15,
+            "ambientSkyColor": "#1a2438",
+            "ambientGroundColor": "#0a0c14",
+            "backgroundColor": "#04050a",
+            "exposure": 0.2,
+            "toneMapper": "agx",
+            "whitePoint": 8
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_26e9544e6e2a4e88a7bdedc7c1904a3c",
+      "name": "Fork",
+      "tags": [
+        "actor"
+      ],
+      "components": [
+        {
+          "type": "Rekall.HingeJoint",
+          "properties": {
+            "connectedEntityId": "ent_74e5f98a089b426eab17409691d51d6b",
+            "anchorAX": 0,
+            "anchorAY": 0,
+            "anchorAZ": 0,
+            "anchorBX": 0.55,
+            "anchorBY": -0.15,
+            "anchorBZ": 0,
+            "axisX": 0,
+            "axisY": 1,
+            "axisZ": 0,
+            "springFrequency": 45,
+            "dampingRatio": 3,
+            "motorTargetVelocity": 0,
+            "motorMaximumTorque": 60,
+            "angleLimitMinimum": -30,
+            "angleLimitMaximum": 30
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 0.3,
+            "restitution": 0
+          }
+        },
+        {
+          "type": "Rekall.Rigidbody3D",
+          "properties": {
+            "mass": 4
+          }
+        },
+        {
+          "type": "Rekall.SphereCollider3D",
+          "properties": {
+            "radius": 0.08
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 5.55,
+            "y": 0.7,
+            "z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_df57d5ef9e05489ab8e00e1a36242210",
+      "name": "Front Wheel",
+      "tags": [
+        "actor"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CapsuleCollider3D",
+          "properties": {
+            "radius": 0.32,
+            "length": 0.15
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cylinder",
+            "color": "#15151a"
+          }
+        },
+        {
+          "type": "Rekall.HingeJoint",
+          "properties": {
+            "connectedEntityId": "ent_26e9544e6e2a4e88a7bdedc7c1904a3c",
+            "anchorAX": 0,
+            "anchorAY": 0,
+            "anchorAZ": 0,
+            "anchorBX": 0,
+            "anchorBY": -0.38,
+            "anchorBZ": 0,
+            "axisX": 0,
+            "axisY": 0,
+            "axisZ": 1,
+            "springFrequency": 45,
+            "dampingRatio": 3,
+            "motorTargetVelocity": 0,
+            "motorMaximumTorque": 0
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#15151a",
+            "metallicFactor": 0.1,
+            "roughnessFactor": 0.75
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true,
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.6,
+            "restitution": 0.02
+          }
+        },
+        {
+          "type": "Rekall.Rigidbody3D",
+          "properties": {
+            "mass": 3
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 5.55,
+            "y": 0.32,
+            "z": 0,
+            "pitch": 90
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_11dbe472f21045fe9e922d2e51fd5fca",
+      "name": "Moonlight",
+      "tags": [
+        "lighting"
+      ],
+      "components": [
+        {
+          "type": "Rekall.DirectionalLight",
+          "properties": {
+            "intensity": 0.35,
+            "color": "#a9c3ff"
+          }
+        },
+        {
+          "type": "Rekall.ShadowSettings",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "pitch": 55,
+            "yaw": 35
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_3eb072628c304074a0acf8609bc0f3bc",
+      "name": "Rear Wheel",
+      "tags": [
+        "actor"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CapsuleCollider3D",
+          "properties": {
+            "radius": 0.32,
+            "length": 0.15
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cylinder",
+            "color": "#15151a"
+          }
+        },
+        {
+          "type": "Rekall.HingeJoint",
+          "properties": {
+            "connectedEntityId": "ent_74e5f98a089b426eab17409691d51d6b",
+            "anchorAX": 0,
+            "anchorAY": 0,
+            "anchorAZ": 0,
+            "anchorBX": -0.55,
+            "anchorBY": -0.15,
+            "anchorBZ": 0,
+            "axisX": 0,
+            "axisY": 0,
+            "axisZ": 1,
+            "springFrequency": 45,
+            "dampingRatio": 3,
+            "motorTargetVelocity": 0,
+            "motorMaximumTorque": 400
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#15151a",
+            "metallicFactor": 0.1,
+            "roughnessFactor": 0.75
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true,
+            "castShadows": true,
+            "receiveShadows": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.6,
+            "restitution": 0.02
+          }
+        },
+        {
+          "type": "Rekall.Rigidbody3D",
+          "properties": {
+            "mass": 3
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 4.45,
+            "y": 0.32,
+            "z": 0,
+            "pitch": 90
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

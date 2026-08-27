@@ -6757,7 +6757,21 @@ procedural trees "when the bike game is fully working and looking great").
   frame. Confirmed by re-enabling/disabling it side by side against otherwise-identical
   captures. Disabling it (rather than tagging rails for exclusion, since no such filter exists
   yet) restored a normal third-person chase framing; a real capture (`render viewport capture`,
-  vulkan backend) now shows the intended dark road/streetlight/motorcycle composition.
+  vulkan backend) now shows a recognizable dark road/streetlight/motorcycle composition. Two
+  thin bright lines running along both road edges are visible in every such capture and were
+  initially assumed to be the (invisible, unrendered) guard rails; re-captured with the rails'
+  `AddEntity` calls commented out and the lines are unchanged - they are not the rails, cause
+  still unidentified (road material at a grazing view angle is the likely suspect, not
+  confirmed).
+
+**A concrete, load-based explanation for why the wheel is at its friction limit by design, not
+by accident:** the rear wheel's `motorMaximumTorque` (400 N·m) over its 0.32m radius delivers
+up to ~1250 N of thrust; combined wheel/road friction (`CombineMaterials` averages the two
+`PhysicsMaterial3D.friction` values - confirmed by reading that code directly, it is a plain
+average, not min/max/product) is ~1.45, and the rear wheel's share of the ~1863 N chassis
+weight puts available grip in the same 1200-1300 N range. The authored rig is built right at
+its own traction ceiling - not a coincidence, and not evidence of a bug in the friction
+combination itself.
 
 **A real, unresolved gap: the drive wheel slips heavily and does not reach cruising speed.**
 Measured directly: at 5 seconds into a sustained-throttle run, the chassis is moving at 2.4
@@ -6774,9 +6788,18 @@ gripping. Two things were tried and both made this worse or did nothing:
   already a full convergence plateau for this rig, not a partial fix; more iterations is not
   the remaining lever.
 
-Root cause not yet found. This directly explains why cruising speed stays well under the
-authored `MaxSpeed` (22 m/s) - measured ~2.4-3 m/s sustained, essentially flat across 5-30
-second runs, not climbing toward the target.
+A third thing was tried, specifically to test whether the rig is simply over-torqued past its
+own traction limit (see the load calculation above): `motorMaximumTorque` was dropped from 400
+to 180 N·m. If the wheel were breaking traction on excess torque, reducing torque should raise
+chassis speed while lowering wheel angular speed. It did neither - at 180 N·m, both chassis
+speed and wheel angular speed collapsed to near-zero (0.018 m/s, 1.55 deg/s at 5 seconds,
+compared to 2.4 m/s / 2747 deg/s at 400 N·m). This rules out "too much torque" as the fix;
+400 N·m is not simply excessive, it is closer to necessary, even though it sits at the
+traction ceiling above. Root cause of the residual slip is not yet found.
+
+This directly explains why cruising speed stays well under the authored `MaxSpeed` (22 m/s) -
+measured ~2.4-3 m/s sustained, essentially flat across 5-30 second runs, not climbing toward
+the target.
 
 **A real, unresolved gap: emergent yaw/roll drift, confirmed independent of the balance
 controller.** A zero-balance-gain control run (`BalanceProportionalGain`/`BalanceDerivativeGain`
@@ -6784,24 +6807,44 @@ both set to 0, throttle-only, no steering input) still drifted laterally by seve
 within 20 seconds - ruling out the PD roll controller's own steady-state as the cause. A yaw-
 rate damping term was added to the steering command (`PreviousYaw` tracking, `YawDampingGain`)
 as a hypothesis fix; tested at a real gain and it did not reliably reduce the drift over a full
-30-second run (results were inconsistent run-to-run at the level of individual test variations,
-suggesting the underlying dynamics may be genuinely sensitive/chaotic at this iteration count,
-not just under-damped). Left wired but disabled (`YawDampingGain = 0`) rather than shipped as a
-working fix it isn't. Raising the balance gains substantially (2.4/0.35 -> 8/1.2) also did not
+30-second run. Left wired but disabled (`YawDampingGain = 0`) rather than shipped as a working
+fix it isn't. Raising the balance gains substantially (2.4/0.35 -> 8/1.2) also did not
 measurably change the drift trajectory in the first ~12 seconds, suggesting the steering-to-
 lean coupling itself may be too weak at these still-low cruising speeds to correct roll at all
 - tying this gap back to the unresolved slip/speed gap above rather than being independent of
 it.
 
+One measurement here does not yet have an explanation and is recorded rather than smoothed
+over: an early 30-second (1800-frame) throttle-only run at what was believed to be this exact
+configuration measured 50.69m traveled with no crash; the same 1800-frame input, re-run later
+against the tree with friction/iterations/gains verified back at their original values (the
+only diff being the disabled, mathematically-inert `YawDampingGain = 0` wiring), reproducibly
+measures 27.97m with a crash - reproducible on repeated re-runs of the identical input against
+the identical current tree, i.e. not a one-off. Something concrete changed between those two
+measurements that was not identified before this checkpoint; treat 27.97m/crashed as the
+current, verified, reproducible number, and treat the earlier 50.69m/clean measurement as
+unreliable rather than as a "best case" to cite.
+
 **Honest status: the motorcycle prototype is not "fully working" and not ready for a final
 visual pass.** It reliably drives, turns, leans into turns at a bounded angle, and does not
-crash or fall through the world during normal short play (verified: 28-30m over a 12.67-second
-combined throttle+steer run, repeatedly, no crash). It does not reach anywhere near its
-authored cruising speed, and an unattended long run can end in a real crash (correctly
-detected, not silently broken, but still a crash) from the unresolved drift above. Per the
-user's own stated condition, procedural-tree work should not begin until this is resolved -
-recorded here rather than acted on, since the remaining root causes (wheel slip; drift/steering
-coupling at low speed) were not found before this checkpoint.
+crash or fall through the world during normal short play (verified, reproducibly: 28-30m over
+a 12.67-second combined throttle+steer run, repeatedly, no crash). It does not reach anywhere
+near its authored cruising speed (~2.4-3 m/s against 22 m/s), and a longer unattended run
+reproducibly ends in a real crash (correctly detected, not silently broken, but still a crash)
+at ~28m/~15s from the unresolved drift above. Per the user's own stated condition, procedural-
+tree work should not begin until this is resolved - recorded here rather than acted on, since
+the remaining root causes (wheel slip at the traction ceiling; drift/steering coupling at low
+speed) were not found before this checkpoint.
+
+**Recommended next step, concrete rather than more parameter guessing:** the load calculation
+above shows the rig sits right at its own traction ceiling by construction, and reducing torque
+made things strictly worse (both speed and wheel spin collapsed), which rules out "excess
+torque causing slip" as the mechanism. The remaining slip is not explained by torque, friction
+coefficient (averaging, confirmed, not a bug), or solver iteration count (32/16 is a confirmed
+convergence plateau - 64/32 gave byte-identical results). The next productive angle is likely
+the contact/friction solve itself under this specific combination of a moving rigid body,
+substep count, and a motor constraint sharing the same body - not another authored-value
+adjustment.
 
 ## Update rule
 

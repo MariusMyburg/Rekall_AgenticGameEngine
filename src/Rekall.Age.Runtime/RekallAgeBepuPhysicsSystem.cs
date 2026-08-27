@@ -66,6 +66,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
         _physicsWorld.Reconcile(dynamicBodies, staticBodies);
         _physicsWorld.SynchronizeAuthoredChanges(dynamicBodies);
         _physicsWorld.SyncJoints(world.Entities, observations, context.FrameIndex);
+        _physicsWorld.ApplyDrag(dynamicBodies, (float)context.DeltaTime.TotalSeconds);
         var preStepBodies = _physicsWorld.CapturePreStepBodies(dynamicBodies);
         _physicsWorld.Simulation.Timestep((float)context.DeltaTime.TotalSeconds);
 
@@ -925,6 +926,50 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                 body.Velocity = CreateVelocity(item);
                 body.Awake = true;
                 Simulation.Bodies.UpdateBounds(persistent.Handle);
+            }
+        }
+
+        /// <summary>
+        /// A simple, framerate-stable linear/angular drag approximation, applied directly to
+        /// each body's own velocity before Timestep runs - the same direct-access pattern
+        /// SynchronizeAuthoredChanges already uses, rather than a BEPU pose-integrator callback
+        /// (which operates on wide SIMD batches with no per-body authored data available). Real
+        /// gravity/contacts/joints still solve on top of the decayed velocity this leaves behind.
+        /// </summary>
+        public void ApplyDrag(IReadOnlyList<PhysicsEntity> dynamicBodies, float deltaSeconds)
+        {
+            if (deltaSeconds <= 0)
+            {
+                return;
+            }
+
+            foreach (var item in dynamicBodies)
+            {
+                if (item.Rigidbody is null || !_dynamicBodies.TryGetValue(item.Entity.Id, out var persistent))
+                {
+                    continue;
+                }
+
+                var linearDrag = ReadSingle(item.Rigidbody, "linearDrag", 0);
+                var angularDrag = ReadSingle(item.Rigidbody, "angularDrag", 0);
+                if (linearDrag <= 0 && angularDrag <= 0)
+                {
+                    continue;
+                }
+
+                var body = Simulation.Bodies[persistent.Handle];
+                var velocity = body.Velocity;
+                if (linearDrag > 0)
+                {
+                    velocity.Linear /= 1 + (linearDrag * deltaSeconds);
+                }
+
+                if (angularDrag > 0)
+                {
+                    velocity.Angular /= 1 + (angularDrag * deltaSeconds);
+                }
+
+                body.Velocity = velocity;
             }
         }
 

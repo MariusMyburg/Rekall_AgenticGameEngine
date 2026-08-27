@@ -1345,6 +1345,12 @@ public sealed class RekallAgeRigidbody3DComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public double AngularVelocityZ { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Description = "Linear drag coefficient: each frame, linear velocity is scaled by 1/(1 + LinearDrag * deltaSeconds) - a simple, framerate-stable air-resistance approximation applied on top of BEPU's own gravity/contact/joint solving, not a replacement for it. 0 (the default) disables drag entirely, matching prior behavior.")]
+    public double LinearDrag { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Description = "Angular drag coefficient: each frame, angular velocity is scaled by 1/(1 + AngularDrag * deltaSeconds), the same framerate-stable approximation LinearDrag uses. 0 (the default) disables it entirely, matching prior behavior.")]
+    public double AngularDrag { get; init; }
 }
 
 [RekallAgeComponent("Sprite Renderer", Description = "Projects a texture or sprite asset as visible 2D runtime content.")]

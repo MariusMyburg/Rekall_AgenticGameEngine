@@ -265,6 +265,19 @@ public sealed record RekallAgeMeshAsset(
             selectionSets ?? []);
 }
 
+public interface IRekallAgeMeshOperationPlugin
+{
+    string OperationId { get; }
+    RekallAgeMeshOperationDescriptor Descriptor { get; }
+    RekallAgeMeshOperationResult Execute(RekallAgeMeshAsset source, RekallAgeMeshOperationRequest request);
+}
+
+public interface IRekallAgeFractureAlgorithmPlugin
+{
+    string AlgorithmId { get; }
+    IReadOnlyList<RekallAgeMeshAsset> Fracture(RekallAgeMeshAsset source, int chunkCount, long seed);
+}
+
 public static class RekallAgeModelingJson
 {
     public static JsonSerializerOptions Options { get; } = CreateOptions();

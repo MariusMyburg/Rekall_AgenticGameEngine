@@ -3246,22 +3246,28 @@ behavior.
   operations can now also be registered from project code without engine
   changes. Not yet done: further destruction fidelity (partial/progressive
   damage, debris despawn/pooling policy) beyond this first proof.
-- BACKLOG (research, not started): investigate the feasibility of procedural
-  tree generation - trees "grown" from authored parameters (branching rules,
-  age/height, species-like presets) rather than hand-modeled, spanning a
-  quality range from low-poly stylized up to highly detailed/realistic
-  depending on parameters. Should build on the modeling capability already
-  in the engine (procedural mesh generation, the mesh-operation/fracture
-  plugin system's `IRekallAgeMeshOperationPlugin` pattern is a plausible
-  home for this rather than a new bespoke subsystem) and fits the "Advanced
-  world-modelling track" already in the stable priority order's acceptance
-  queue (item 6) rather than being a wholly separate initiative. Open
-  questions a feasibility pass should answer: L-system/space-colonization
-  vs. simpler recursive-branching generation trade-offs, how LOD/detail
-  level maps to the existing `Rekall.LodGroup`/`Rekall.VirtualGeometry`
-  contracts, bark/leaf material and billboard-foliage authoring, and
-  whether this belongs in the engine as a built-in generator or as a
-  project-registered plugin following the destruction system's precedent.
+- BACKLOG (research complete, implementation not started): procedural tree
+  generation feasibility - see
+  `docs/superpowers/specs/2026-08-27-procedural-tree-generation-feasibility.md`.
+  Verdict: highly feasible, and the hard geometric core (a tube tapering
+  organically along a curving branch path) already works today with zero
+  engine changes - confirmed by reading `CreateProfileSweep`'s actual sweep
+  math, not assumed: `rekall.modeling.curve.profile_sweep` already multiplies
+  its profile by each curve control point's own authored `Radius`, so a curve
+  with decreasing per-point radius already sweeps into an organically
+  tapering trunk/branch. The rest of the toolkit a generator would compose
+  (curve join/resample/fillet, join/merge_by_distance for junction welds,
+  array/scatter for leaf placement, deform.bend/taper/noise for organic
+  variation, LodGroup for the low-poly/detailed quality dial) already exists
+  too. The only genuinely new work is the branching-skeleton algorithm itself
+  (recursive or L-system logic deciding branch angles/lengths/radii per
+  generation) - pure algorithm work, not an engine gap, recommended as a
+  project-registered plugin following the destruction system's
+  `IRekallAgeMeshOperationPlugin` precedent rather than a new built-in
+  subsystem. Fits the "Advanced world-modelling track" already in the stable
+  priority order's acceptance queue (item 6). Next step when picked up:
+  actually implement the branching generator against this already-confirmed
+  foundation.
 - Expand Studio asset/module workflows and run broader installed game-creation
   benchmarks beyond the fixed gauntlet. Deterministic WPF automation,
   schema-guided editing, transactional undo/redo, embedded Ollama authoring,

@@ -145,18 +145,21 @@ public sealed class PhysicsJointsTests
         Assert.True(distance < 0.5, $"Expected the hinge joint to keep the anchor points close together, actual distance {distance}.");
     }
 
-    [Fact(Skip = "This isolated single-wheel rig (light chassis, one ground contact, no active " +
-        "balance) is inherently unstable under gravity/reaction-torque alone regardless of solver " +
-        "iteration count or chassis mass (verified up to mass 10000 and 32 velocity iterations / 16 " +
-        "substeps) - a real vehicle needs a second ground contact or an active balance controller, " +
-        "neither of which this narrow rig has. The real bug this test was written to catch - " +
-        "insufficient solver iteration/substep count starving a coupled motor+hinge assembly of the " +
-        "torque it needs - is fixed and verified on the real four-body motorcycle rig in " +
-        "examples/MidnightRider (see docs/production/PROGRESS.md, 2026-08-28 checkpoint): raising " +
-        "velocityIterationCount/substepCount there took forward travel from 0.23m to 30m over the " +
-        "same 10-second throttle run. Left skipped rather than deleted because the isolated-rig " +
-        "instability itself is real and worth a future test once this rig has proper wide-stance " +
-        "support to isolate it from the motor concern.")]
+    [Fact(Skip = "This isolated single-wheel rig fails to sustain spin regardless of solver " +
+        "iteration count or chassis mass - verified up to mass 10000 (which cannot physically " +
+        "topple; reaction-torque toppling is NOT the explanation there) and 32 velocity " +
+        "iterations / 16 substeps, so something specific to this narrow, one-ground-contact, " +
+        "no-active-balance rig remains unexplained, not merely 'a light chassis tips over.' " +
+        "The real bug this test was written to catch - insufficient solver iteration/substep " +
+        "count starving a coupled motor+hinge assembly of the torque it needs - is fixed and " +
+        "verified on the real four-body motorcycle rig in examples/MidnightRider (see " +
+        "docs/production/PROGRESS.md, 2026-08-28 checkpoints): raising " +
+        "velocityIterationCount/substepCount there took forward travel from 0.23m to ~30m over " +
+        "a combined throttle+steer run. That same rig still has its own unresolved gaps though " +
+        "(measured heavy rear-wheel slip; cruising speed well under the authored max) - see the " +
+        "later 2026-08-28 checkpoint - so this isolated rig's residual failure and the real " +
+        "game's slip may well share a cause. Left skipped rather than deleted so the isolated " +
+        "repro survives for whoever investigates that next.")]
     public async Task HingeJointMotorSpinsAWheelContinuouslyWithoutDestabilizingTheAssembly()
     {
         // Found while authoring an example game: driving a wheel by overwriting its

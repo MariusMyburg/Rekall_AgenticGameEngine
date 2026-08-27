@@ -6719,17 +6719,13 @@ over a 760-frame throttle+steer run that also does not crash
 (`RunState.crashed` stays `false`) and settles into a genuine, bounded lean (Z-rotation
 14.75° at the end of that run - a real, turn-appropriate lean, well clear of the 62°
 `CrashRollDegrees` threshold). The isolated single-wheel test was fixed the same way (its own
-`Physics Settings` entity added at the same values) plus a heavier chassis (10 -> 200) to
-separate this fix from the unrelated single-wheel toppling effect below; it remains skipped
-only because that separate toppling instability still dominates its particular degenerate
-rig (light chassis, one ground contact, no active balance) regardless of iteration count -
-not because the motor bug this test was written for is still open.
-
-**A separate, confirmed-real effect, not a bug:** a single wheel hinged to an otherwise
-unsupported chassis (no second ground contact, no active balance) reliably topples sideways
-under gravity/reaction-torque alone and wedges at a static, bounded lean angle - this is
-correct physics for that degenerate configuration, not an engine defect. The real game's
-four-body rig does not exhibit this because it has two wheels and the PD balance controller.
+`Physics Settings` entity added at the same values) plus a heavier chassis (10 -> 200); it
+remains skipped because the wheel still fails to sustain spin even at mass 200, and even at
+mass 10000 (which cannot physically topple - reaction-torque toppling is not a complete
+explanation there, see the skip reason in the test itself and the later 2026-08-28 checkpoint
+below, where the real game's own rear wheel is measured slipping heavily). Not claiming this
+isolated rig's remaining failure is fully understood - only that the signature-churn and
+iteration-count fixes above are independently verified on the real four-body rig.
 
 **Also fixed:** the pre-existing `HingeJointMotorSpinsAWheelContinuouslyWithoutDestabilizingTheAssembly`
 test's central assertion (`Assert.NotEqual(0, wheelEntity.Transform.Rotation3D.Z, precision: 2)`)
@@ -6738,16 +6734,74 @@ non-zero tilt, which is exactly how the iteration-count bug above went undetecte
 whole session until now. Replaced with a direct check on the wheel's measured
 `Rekall.PhysicsState3D` angular velocity.
 
-**Current honest state of the motorcycle prototype (`examples/MidnightRider`, uncommitted):**
-scene, four-body rig, road-chunk streaming, streetlights, and the game-rules module all exist
-and build; the chassis rests correctly on the road surface, drives forward under throttle at a
-real, measured, sustained speed, survives steering input without crashing, and leans into
-turns at a bounded, plausible angle. Not yet verified: hazard collision, a visual capture to
-confirm the night/streetlight/road appearance, and whether cruising speed climbs closer to the
-authored `MaxSpeed` (22 m/s) over a longer run than tested so far (~3 m/s measured at the end
-of a 12.67-second combined run, still climbing). "Ultra realistic geometry and materials" per
-the original spec has not been addressed at all - current materials are flat-color PBR-factor
-`Rekall.Material` on primitive `Rekall.GeometryPrimitive` shapes.
+## 2026-08-28 (later) Guard rails, real wheel-slip finding, and an honest non-"fully working" status
+
+Continuing the same session (user instruction, given while going to sleep: keep debugging
+autonomously, "check the internet if needed," finish the bike game, and only then move on to
+procedural trees "when the bike game is fully working and looking great").
+
+**Committed and verified as real improvements:**
+
+- **Invisible guard rails** along both road edges (`SpawnChunk` in
+  `MidnightRiderRulesModule.cs`), tagged `road-chunk` so they stream in/out with the rest of
+  the road. Found necessary via a 60-real-second unattended throttle-only run: the chassis
+  drifts laterally under real, physically-emergent yaw/roll coupling (confirmed independent of
+  the balance controller - see below) and, without a rail, eventually runs off the finite-width
+  road and free-falls through the world forever. With rails, the same run now correctly ends in
+  the game's own `RunState.crashed = true` (the bike drifts into a rail, flips, and comes to
+  rest) instead of an unbounded fall - a real, verified fix for a genuine "falls out of the
+  world" defect, not merely a cosmetic addition.
+- **Camera collision-avoidance disabled** (`Rekall.CameraTarget3D.collisionAvoidanceEnabled`
+  on the Camera entity): the new guard rails' colliders were being swept by the camera's own
+  collision-avoidance probe, pulling the chase camera in almost on top of the chassis every
+  frame. Confirmed by re-enabling/disabling it side by side against otherwise-identical
+  captures. Disabling it (rather than tagging rails for exclusion, since no such filter exists
+  yet) restored a normal third-person chase framing; a real capture (`render viewport capture`,
+  vulkan backend) now shows the intended dark road/streetlight/motorcycle composition.
+
+**A real, unresolved gap: the drive wheel slips heavily and does not reach cruising speed.**
+Measured directly: at 5 seconds into a sustained-throttle run, the chassis is moving at 2.4
+m/s while the rear wheel's own measured angular speed is ~2747 deg/s (≈48 rad/s) - pure
+rolling at 2.4 m/s over a 0.32m-radius wheel would only need ~7.5 rad/s (≈430 deg/s). The
+wheel is spinning roughly 6x faster than the ground speed it's producing: it is slipping, not
+gripping. Two things were tried and both made this worse or did nothing:
+
+- Raising wheel and road friction from 1.6/1.3 to 3.5 did not reduce slip - it caused the
+  rear wheel to lock up almost entirely (measured chassis speed dropped to ~0.01 m/s).
+  Reverted.
+- Raising solver iteration/substep counts further, from the already-fixed 32/16 to 64/32,
+  produced byte-for-byte identical telemetry at every checkpoint tested - confirming 32/16 is
+  already a full convergence plateau for this rig, not a partial fix; more iterations is not
+  the remaining lever.
+
+Root cause not yet found. This directly explains why cruising speed stays well under the
+authored `MaxSpeed` (22 m/s) - measured ~2.4-3 m/s sustained, essentially flat across 5-30
+second runs, not climbing toward the target.
+
+**A real, unresolved gap: emergent yaw/roll drift, confirmed independent of the balance
+controller.** A zero-balance-gain control run (`BalanceProportionalGain`/`BalanceDerivativeGain`
+both set to 0, throttle-only, no steering input) still drifted laterally by several meters
+within 20 seconds - ruling out the PD roll controller's own steady-state as the cause. A yaw-
+rate damping term was added to the steering command (`PreviousYaw` tracking, `YawDampingGain`)
+as a hypothesis fix; tested at a real gain and it did not reliably reduce the drift over a full
+30-second run (results were inconsistent run-to-run at the level of individual test variations,
+suggesting the underlying dynamics may be genuinely sensitive/chaotic at this iteration count,
+not just under-damped). Left wired but disabled (`YawDampingGain = 0`) rather than shipped as a
+working fix it isn't. Raising the balance gains substantially (2.4/0.35 -> 8/1.2) also did not
+measurably change the drift trajectory in the first ~12 seconds, suggesting the steering-to-
+lean coupling itself may be too weak at these still-low cruising speeds to correct roll at all
+- tying this gap back to the unresolved slip/speed gap above rather than being independent of
+it.
+
+**Honest status: the motorcycle prototype is not "fully working" and not ready for a final
+visual pass.** It reliably drives, turns, leans into turns at a bounded angle, and does not
+crash or fall through the world during normal short play (verified: 28-30m over a 12.67-second
+combined throttle+steer run, repeatedly, no crash). It does not reach anywhere near its
+authored cruising speed, and an unattended long run can end in a real crash (correctly
+detected, not silently broken, but still a crash) from the unresolved drift above. Per the
+user's own stated condition, procedural-tree work should not begin until this is resolved -
+recorded here rather than acted on, since the remaining root causes (wheel slip; drift/steering
+coupling at low speed) were not found before this checkpoint.
 
 ## Update rule
 

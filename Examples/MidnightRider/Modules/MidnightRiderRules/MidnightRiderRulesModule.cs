@@ -31,6 +31,9 @@ public sealed class RunState : RekallAgeComponent
     public double PreviousRoll { get; init; }
 
     [RekallAgeProperty]
+    public double PreviousYaw { get; init; }
+
+    [RekallAgeProperty]
     public double DistanceTraveled { get; init; }
 
     [RekallAgeProperty]
@@ -75,6 +78,18 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
     private const double MaxForkMotorDegreesPerSecond = 160;
     private const double BalanceProportionalGain = 2.4;
     private const double BalanceDerivativeGain = 0.35;
+    // A real, physically-genuine emergent yaw drift shows up on a long unattended throttle-only
+    // run (confirmed via a zero-balance-gain control run that still drifted, ruling out the roll
+    // balance controller's own limit cycle as the cause) - the rear wheel's large spin angular
+    // momentum at speed couples with chassis pitch/roll into a slow yaw precession, plus real
+    // wheel slip (measured rear-wheel angular speed runs ~6x faster than v/r implies - see
+    // docs/production/PROGRESS.md's 2026-08-28 checkpoint). Left at 0 (disabled): tested with a
+    // meaningful gain and it did not reliably reduce the drift over a 30-second run, and
+    // increasing wheel/road friction to try to fix the underlying slip made propulsion worse
+    // (the wheel locked up instead of rolling) rather than better. This is a genuine open gap,
+    // not resolved by this term - the wiring (PreviousYaw tracking, yawRate below) is kept as
+    // the hook for whoever picks this up next, not as a working fix.
+    private const double YawDampingGain = 0;
     private const double CrashRollDegrees = 62;
     private const double CrashPitchDegrees = 70;
 
@@ -116,6 +131,7 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
         var crashed = run.Properties.ReadBoolean("crashed", false);
         var targetSpeed = run.Properties.ReadNumber("targetSpeed", 0);
         var previousRoll = run.Properties.ReadNumber("previousRoll", 0);
+        var previousYaw = run.Properties.ReadNumber("previousYaw", 0);
         var distanceTraveled = run.Properties.ReadNumber("distanceTraveled", 0);
         var nextSpawnX = run.Properties.ReadNumber("nextSpawnX", 0);
         var nextChunkIndex = (int)run.Properties.ReadNumber("nextChunkIndex", 0);
@@ -124,6 +140,7 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
 
         var roll = Normalize180(chassis.Transform.Rotation3D.Z);
         var pitch = Normalize180(chassis.Transform.Rotation3D.X);
+        var chassisYaw = chassis.Transform.Rotation3D.Y;
         var chassisX = chassis.Transform.Position3D.X;
 
         if (!crashed && (Math.Abs(roll) > CrashRollDegrees || Math.Abs(pitch) > CrashPitchDegrees))
@@ -158,12 +175,13 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
         var steerInput = running ? Math.Clamp(world.InputActionValue("steer"), -1, 1) : 0;
         var rollRate = seconds > 0 ? (roll - previousRoll) / seconds : 0;
         var balanceCorrection = (BalanceProportionalGain * roll) + (BalanceDerivativeGain * rollRate);
+        var yawRate = seconds > 0 ? Normalize180(chassisYaw - previousYaw) / seconds : 0;
+        var yawDamping = -YawDampingGain * yawRate;
         var targetSteerAngle = Math.Clamp(
-            (steerInput * MaxSteerAngleDegrees) + balanceCorrection,
+            (steerInput * MaxSteerAngleDegrees) + balanceCorrection + yawDamping,
             -MaxForkAngleDegrees,
             MaxForkAngleDegrees);
 
-        var chassisYaw = chassis.Transform.Rotation3D.Y;
         var forkYaw = fork.Transform.Rotation3D.Y;
         var currentSteerAngle = Normalize180(forkYaw - chassisYaw);
         var steerError = targetSteerAngle - currentSteerAngle;
@@ -199,6 +217,7 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
             .WithComponentBoolean(RunStateType, "crashed", crashed)
             .WithComponentNumber(RunStateType, "targetSpeed", targetSpeed)
             .WithComponentNumber(RunStateType, "previousRoll", roll)
+            .WithComponentNumber(RunStateType, "previousYaw", chassisYaw)
             .WithComponentNumber(RunStateType, "distanceTraveled", distanceTraveled)
             .WithComponentNumber(RunStateType, "nextSpawnX", nextSpawnX)
             .WithComponentNumber(RunStateType, "nextChunkIndex", nextChunkIndex));

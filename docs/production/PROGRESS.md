@@ -3167,13 +3167,21 @@ behavior.
   3D-named component, and authored 2D angular velocity
   (`Rekall.Rigidbody2D.AngularVelocityZ`) is now schema-discoverable and
   passes validation (the runtime already applied it correctly; it was only
-  ever blocked by an incomplete schema). Generic physics joints now exist for
-  a first increment of three constraint types (`Rekall.BallSocketJoint`,
-  `Rekall.HingeJoint`, `Rekall.DistanceJoint`, connecting two dynamic bodies
-  by entity ID reference); connecting to a fixed/static anchor, angle/distance
-  limits and motors, and `Weld` remain deferred. Remaining breadth includes
-  exact contact manifold/impulse facts, deformables, and measured large-world
-  broadphase performance.
+  ever blocked by an incomplete schema). Generic physics joints now cover
+  five constraint types: `Rekall.BallSocketJoint`, `Rekall.HingeJoint`
+  (optional continuous motor and optional angle limit), `Rekall.DistanceJoint`
+  (fixed target distance, or a min/max range instead), `Rekall.WeldJoint`
+  (rigid two-body lock), all connecting two dynamic bodies by entity ID
+  reference, and `Rekall.FixedJoint` connecting one dynamic body to a fixed
+  world-space anchor (a genuine BEPU one-body constraint - no synthetic
+  kinematic body needed, contrary to this file's own earlier speculation).
+  Joints are not 2D/3D-specific; the same components work on `Rigidbody2D`
+  entities exactly as they do on 3D ones, since BEPU itself has no 2D concept
+  at all - this engine's "2D" is a planar projection of ordinary 3D BEPU
+  bodies. Remaining breadth includes exact contact manifold/impulse facts,
+  deformables, measured large-world broadphase performance, and joint
+  authoring properties that stay X/Y/Z-shaped even for a 2D game (no
+  dedicated 2D-flavored joint API).
 - 3D rendering is substantial and hardware-backed: perspective/orthographic
   cameras, viewports/layers/stereo/OpenXR, primitives and authored/imported GLB
   meshes, PBR texture inputs, directional/point lighting, generic animation,
@@ -6310,6 +6318,37 @@ Verified: new bridge/end-to-end tests plus the existing input/runtime
 regression selection passed 52/52; manually confirmed unchanged behavior in
 a live relaunch (Up arrow still drives Ridgebreaker's vehicle) both before
 and after the extraction.
+
+## 2026-08-27 Fixed-anchor, angle/distance limits, and Weld joints
+
+Closed the three items the generic-physics-joints work explicitly deferred:
+connecting to a fixed/static world anchor, angle/distance limits and motors,
+and `Weld`.
+
+`Rekall.FixedJoint` pins a local point on one dynamic body to an authored
+world-space target via BEPU's `OneBodyLinearServo` - a genuine one-body
+constraint, confirmed by reflecting directly over `BepuPhysics.dll`'s actual
+constraint set rather than guessing. This contradicts the earlier physics-
+joints checkpoint's own speculation that a fixed anchor would need a
+synthetic kinematic body; it does not. `Rekall.HingeJoint` gained optional
+`AngleLimitMinimum`/`AngleLimitMaximum`, added as a `TwistLimit` constraint
+alongside the existing `Hinge` (same additive pattern the motor already
+established), aligned to the hinge's own axis. `Rekall.DistanceJoint` gained
+optional `DistanceLimitMinimum`/`Maximum`: when both are authored, the
+primary constraint switches from a fixed-distance `CenterDistanceConstraint`
+to BEPU's `CenterDistanceLimit` range constraint. `Rekall.WeldJoint` is new,
+rigidly locking two dynamic bodies' relative pose via BEPU's `Weld`.
+
+Also confirmed and documented: joints are not 2D/3D-specific. BEPU itself
+has no 2D concept anywhere (verified directly against its own shipped XML
+docs - zero mentions of "2D" or "planar"); this engine's 2D support is a
+planar projection of ordinary 3D BEPU bodies, so the same five joint
+components attach to `Rigidbody2D` entities exactly as they do to 3D ones,
+proven by a dedicated 2D/3D interop test.
+
+Verified: new `PhysicsJointsTests`/`ProjectValidatorTests` selection passed
+50/50; the broader `Runtime|Validation|Modules` regression selection passed
+729/729.
 
 ## Update rule
 

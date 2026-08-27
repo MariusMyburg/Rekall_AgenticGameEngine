@@ -220,4 +220,49 @@ public sealed class VulkanScenePreparedFrameTests
         Assert.Equal(3.4f, push.SurfaceWaterRoughness);
         Assert.True(System.Runtime.InteropServices.Marshal.SizeOf<RekallAgeVulkanSceneGpuDrawPushConstants>() > System.Runtime.InteropServices.Marshal.SizeOf<RekallAgeVulkanSceneGpuMatrix4x4>());
     }
+
+    [Theory]
+    [InlineData("mask", 0.35, 1, 0.35f)]
+    [InlineData("blend", 0.35, 0, 0.35f)]
+    [InlineData("opaque", 0.35, 0, 0.35f)]
+    [InlineData("MASK", 0.9, 1, 0.9f)]
+    public void BuildDrawPushConstantsEncodesAlphaModeAndCutoff(
+        string alphaMode,
+        double alphaCutoff,
+        float expectedAlphaMask,
+        float expectedAlphaCutoff)
+    {
+        // Only "mask" (case-insensitively) should ever set AlphaMask - the shader's discard logic
+        // gates entirely on this flag, so an authoring typo or a different mode string must not
+        // accidentally enable cutout behavior for an ordinary opaque/blend material.
+        var push = RekallAgeVulkanSceneUniformUploadBuilder.BuildDrawPushConstants(
+            System.Numerics.Matrix4x4.Identity,
+            System.Numerics.Vector4.Zero,
+            System.Numerics.Vector4.Zero,
+            alphaMode: alphaMode,
+            alphaCutoff: (float)alphaCutoff);
+
+        Assert.Equal(expectedAlphaMask, push.AlphaMask);
+        Assert.Equal(expectedAlphaCutoff, push.AlphaCutoff);
+    }
+
+    [Fact]
+    public void BuildDrawPushConstantsClampsAlphaCutoffToTheValidZeroToOneRange()
+    {
+        var tooLow = RekallAgeVulkanSceneUniformUploadBuilder.BuildDrawPushConstants(
+            System.Numerics.Matrix4x4.Identity,
+            System.Numerics.Vector4.Zero,
+            System.Numerics.Vector4.Zero,
+            alphaMode: "mask",
+            alphaCutoff: -2);
+        var tooHigh = RekallAgeVulkanSceneUniformUploadBuilder.BuildDrawPushConstants(
+            System.Numerics.Matrix4x4.Identity,
+            System.Numerics.Vector4.Zero,
+            System.Numerics.Vector4.Zero,
+            alphaMode: "mask",
+            alphaCutoff: 5);
+
+        Assert.Equal(0, tooLow.AlphaCutoff);
+        Assert.Equal(1, tooHigh.AlphaCutoff);
+    }
 }

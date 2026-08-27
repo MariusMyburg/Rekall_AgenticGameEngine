@@ -1841,7 +1841,18 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                         draw.CloudColor,
                         draw.CloudShadowFactors,
                         draw.SurfaceWaterFactors,
-                        new Vector4(draw.ReceiveShadows ? 1 : 0, 0, 0, 0)));
+                        // ShadowFactors.y/.z are spare slots (only .x, ReceiveShadows, was used) -
+                        // repurposed here for AlphaCutoff and the "is this a mask-mode draw" flag,
+                        // rather than growing this shared uniform struct: appending a whole new
+                        // field would still be safe (every custom shader already reads a shorter
+                        // prefix of this same buffer than the live player's own C# struct declares,
+                        // e.g. none of them know about ShadowFactors either), but reusing already-
+                        // spare bytes is simpler when they're sitting right there unused.
+                        new Vector4(
+                            draw.ReceiveShadows ? 1 : 0,
+                            draw.AlphaCutoff,
+                            draw.AlphaMode.Equals("mask", StringComparison.OrdinalIgnoreCase) ? 1 : 0,
+                            0)));
             }
         }
 
@@ -2340,7 +2351,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 draw.ShaderPipeline,
                 draw.EntityId,
                 draw.CastShadows,
-                draw.ReceiveShadows));
+                draw.ReceiveShadows,
+                draw.AlphaMode,
+                draw.AlphaCutoff));
         }
 
         var indices = cachedGeometry?.Indices;
@@ -2488,7 +2501,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 ShaderPipeline: null,
                 EntityId: representative.EmitterEntityId,
                 CastShadows: false,
-                ReceiveShadows: false));
+                ReceiveShadows: false,
+                AlphaMode: "blend",
+                AlphaCutoff: 0.5f));
         }
 
         return packet with
@@ -4540,6 +4555,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec3 mapped = vec3(1.0) - exp(-max(color, vec3(0.0)) * 1.15);
             vec3 lit = pow(mapped, vec3(1.0 / 2.2));
             float surfaceAlpha = hasAtmosphereData() ? fsin_Color.a : fsin_Color.a * textureColor.a;
+            // Draw.ShadowFactors.y/.z are repurposed as AlphaCutoff and an "is this a mask-mode
+            // draw" flag, rather than adding new fields to this shared uniform struct. A masked
+            // material discards below its cutoff instead of blending, the real alpha-tested cutout
+            // behavior (foliage, chain-link) as opposed to AlphaMode "blend"'s soft transparency.
+            if (Draw.ShadowFactors.z > 0.5 && surfaceAlpha < Draw.ShadowFactors.y)
+            {
+                discard;
+            }
+
             fsout_Color = vec4(lit, surfaceAlpha);
         }
         """;
@@ -4937,7 +4961,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         RekallAgeRuntimeViewportShaderPipeline? ShaderPipeline,
         string EntityId,
         bool CastShadows,
-        bool ReceiveShadows);
+        bool ReceiveShadows,
+        string AlphaMode,
+        float AlphaCutoff);
 
     private readonly record struct MaterialKey(
         string? BaseColorTextureId,

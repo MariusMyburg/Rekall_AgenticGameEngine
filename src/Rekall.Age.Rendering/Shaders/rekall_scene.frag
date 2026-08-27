@@ -841,6 +841,14 @@ void main()
         + additionalDirect;
     color = applySurfaceAerialPerspective(color, fragWorldPosition, light);
     float surfaceAlpha = hasAtmosphereData() ? fragColor.a : fragColor.a * textureColor.a;
+    // draw.shadowFactors.z/.w carry AlphaMask/AlphaCutoff (packed here alongside CastShadows/
+    // ReceiveShadows in .x/.y rather than adding new uniform fields). A masked material discards
+    // below its cutoff instead of blending - the real alpha-tested cutout behavior (foliage,
+    // chain-link) as opposed to AlphaMode "blend"'s soft transparency.
+    if (draw.shadowFactors.z > 0.5 && surfaceAlpha < draw.shadowFactors.w)
+    {
+        discard;
+    }
 #ifdef REKALL_HDR_SCENE_OUTPUT
     outColor = vec4(max(color, vec3(0.0)), surfaceAlpha);
 #else

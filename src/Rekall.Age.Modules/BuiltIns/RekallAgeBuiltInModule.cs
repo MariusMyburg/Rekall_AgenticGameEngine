@@ -949,6 +949,12 @@ public sealed class RekallAgeMaterialComponent : RekallAgeComponent
 
     [RekallAgeProperty(Minimum = 0)]
     public double EmissiveStrength { get; init; }
+
+    [RekallAgeProperty(AllowedValues = ["opaque", "blend"], Description = "\"opaque\" (the default) draws this surface fully solid. \"blend\" makes it translucent: the surface's fragment shader controls per-pixel opacity through its own output alpha (an unmodified built-in shader reads BaseColorTexture/BaseColor's own alpha channel), and the surface draws through the engine's real alpha-blended transparent render pass instead of the opaque one - use this for glass, water, or any custom shader that needs to see through to what is behind it.")]
+    public string AlphaMode { get; init; } = "opaque";
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1, Description = "Alpha threshold used only in a future \"mask\" alpha mode; currently unused by \"opaque\"/\"blend\". Reserved for cutout materials (foliage, chain-link) so authoring it now doesn't require a schema change later.")]
+    public double AlphaCutoff { get; init; } = 0.5;
 }
 
 [RekallAgeComponent("Procedural Material")]

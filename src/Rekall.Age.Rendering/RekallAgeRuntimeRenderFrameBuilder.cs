@@ -664,7 +664,11 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                     : "world",
                 VirtualGeometry: virtualGeometry,
                 Skin: ReadSkin(world.ProjectRoot, entity, mesh.EntityName, meshObservations),
-                Morph: ReadMorph(entity));
+                Morph: ReadMorph(entity))
+            {
+                AlphaMode = ReadString(materialComponent, "alphaMode") ?? "opaque",
+                AlphaCutoff = Math.Clamp(ReadNumber(materialComponent, "alphaCutoff", 0.5), 0, 1)
+            };
 
             if (grassComponent is not null)
             {

@@ -626,6 +626,33 @@ public sealed class ViewportContractTests
         Assert.Equal("#ff8800", renderable.EmissiveColor);
         Assert.Equal("asset_glow", renderable.EmissiveTextureAssetId);
         Assert.Equal(4, renderable.EmissiveStrength);
+        Assert.Equal("opaque", renderable.AlphaMode);
+    }
+
+    [Fact]
+    public void RuntimeFrameBuilderProjectsAnAuthoredBlendAlphaModeForMeshRenderables()
+    {
+        // AlphaMode/AlphaCutoff already existed on RekallAgeRuntimeViewportRenderable and the real
+        // render pipeline (both scene pipelines are alpha-blend-capable, and the batch builder already
+        // switches to the transparent pass when AlphaMode is "blend") - but nothing in the authoring
+        // layer ever set it away from its "opaque" default, so no ordinary Rekall.Material could ever
+        // produce a translucent surface (glass, water) through the generic component system. This is
+        // the fix: an authored alphaMode/alphaCutoff on Rekall.Material now reaches the renderable.
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Glass Pane", ["prop"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.GeometryPrimitive", new JsonObject { ["primitive"] = "plane" }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Material", new JsonObject
+                {
+                    ["alphaMode"] = "blend",
+                    ["alphaCutoff"] = 0.3
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var renderable = Assert.Single(frame.Renderables, item => item.Kind == "mesh");
+        Assert.Equal("blend", renderable.AlphaMode);
+        Assert.Equal(0.3, renderable.AlphaCutoff);
     }
 
     [Fact]

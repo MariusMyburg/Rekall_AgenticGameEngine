@@ -1041,7 +1041,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
             desired.Add(motorKey);
             var description = new AngularAxisMotor
             {
-                LocalAxisA = ReadAxis(component),
+                LocalAxisA = WorldAxisToLocal(ReadAxis(component), Simulation.Bodies[handleA].Pose.Orientation),
                 TargetVelocity = ReadSingle(component, "motorTargetVelocity", 0) * (MathF.PI / 180),
                 Settings = new MotorSettings(maximumTorque, 0)
             };
@@ -1064,9 +1064,10 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
         /// <summary>
         /// A HingeJoint's optional angle range, via a BEPU TwistLimit constraint solved alongside the
         /// Hinge. TwistLimit measures relative rotation around each basis's local Z axis, so both bases
-        /// are built from the same authored hinge axis (Z aligned to it) the same way Hinge's own
-        /// LocalHingeAxisA/B already reuse one axis vector for both bodies - meaning, like the Hinge
-        /// itself, this is only geometrically exact when the two bodies start out reasonably co-oriented.
+        /// are built from the same world-space authored hinge axis, converted into each body's own
+        /// local frame at bind time (see WorldAxisToLocal) the same way Hinge's own LocalHingeAxisA/B
+        /// now do - this is exact even when the two bodies do not share an orientation, unlike the
+        /// axis-reused-raw approach this replaced.
         /// Unlike the motor, the limit's own signature already changes whenever its authored bounds
         /// change (SyncJoints only calls this when the primary joint's own diff already fired, but the
         /// limit has its own add/remove lifecycle here since it can be enabled/disabled independently).
@@ -1097,11 +1098,15 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                 Simulation.Solver.Remove(stale.Handle);
             }
 
-            QuaternionEx.GetQuaternionBetweenNormalizedVectors(Vector3.UnitZ, ReadAxis(component), out var basis);
+            var worldAxis = ReadAxis(component);
+            QuaternionEx.GetQuaternionBetweenNormalizedVectors(
+                Vector3.UnitZ, WorldAxisToLocal(worldAxis, Simulation.Bodies[handleA].Pose.Orientation), out var basisA);
+            QuaternionEx.GetQuaternionBetweenNormalizedVectors(
+                Vector3.UnitZ, WorldAxisToLocal(worldAxis, Simulation.Bodies[handleB].Pose.Orientation), out var basisB);
             var description = new TwistLimit
             {
-                LocalBasisA = basis,
-                LocalBasisB = basis,
+                LocalBasisA = basisA,
+                LocalBasisB = basisB,
                 MinimumAngle = minimumDegrees * (MathF.PI / 180),
                 MaximumAngle = maximumDegrees * (MathF.PI / 180),
                 SpringSettings = new SpringSettings(
@@ -1135,9 +1140,9 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                     var description = new Hinge
                     {
                         LocalOffsetA = ReadAnchor(component, "anchorAX", "anchorAY", "anchorAZ"),
-                        LocalHingeAxisA = axis,
+                        LocalHingeAxisA = WorldAxisToLocal(axis, Simulation.Bodies[handleA].Pose.Orientation),
                         LocalOffsetB = ReadAnchor(component, "anchorBX", "anchorBY", "anchorBZ"),
-                        LocalHingeAxisB = axis,
+                        LocalHingeAxisB = WorldAxisToLocal(axis, Simulation.Bodies[handleB].Pose.Orientation),
                         SpringSettings = springSettings
                     };
                     return Simulation.Solver.Add(handleA, handleB, in description);
@@ -1194,6 +1199,22 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                 ReadSingle(component, "axisY", 1),
                 ReadSingle(component, "axisZ", 0));
             return axis.LengthSquared() > 0.0001f ? Vector3.Normalize(axis) : Vector3.UnitY;
+        }
+
+        /// <summary>
+        /// A HingeJoint's authored Axis is a single world-space direction, meant at the two
+        /// bodies' current (bind-time) orientations - not a value pre-computed by hand for each
+        /// body's own local frame. This converts it into one body's local frame so the hinge/
+        /// motor/angle-limit constraints stay geometrically correct even when the connected
+        /// bodies do NOT share an orientation (a wheel rotated to align a capsule collider's own
+        /// long axis with the spin axis, for example). For co-oriented bodies (the common case,
+        /// and the only case this authoring model originally supported) this reduces to exactly
+        /// the previous raw-shared-axis behavior, since Conjugate(orientation) then transforms
+        /// identically for both bodies - existing content is unaffected.
+        /// </summary>
+        private static Vector3 WorldAxisToLocal(Vector3 worldAxis, Quaternion bodyOrientation)
+        {
+            return Vector3.Transform(worldAxis, Quaternion.Conjugate(bodyOrientation));
         }
 
         /// <summary>Same authored-degrees, X-then-Y-then-Z composition convention already used for a

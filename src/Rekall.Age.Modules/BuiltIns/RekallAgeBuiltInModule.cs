@@ -1189,7 +1189,7 @@ public sealed class RekallAgeBallSocketJointComponent : RekallAgeComponent
     public double DampingRatio { get; init; } = 1;
 }
 
-[RekallAgeComponent("Hinge Joint", Description = "Pins one local anchor point on this dynamic body to one local anchor point on another dynamic body, and constrains relative rotation to one shared axis. The authored axis is interpreted identically in both entities' local spaces, which is only geometrically correct when the two bodies start out reasonably co-oriented. Both entities must have a rigid body and collider. ConnectedEntityId must reference a different, existing, dynamic entity.")]
+[RekallAgeComponent("Hinge Joint", Description = "Pins one local anchor point on this dynamic body to one local anchor point on another dynamic body, and constrains relative rotation to one shared axis. The authored axis is a world-space direction at bind time, converted into each body's own local frame automatically - the two bodies do not need to share an orientation (a wheel rotated to align its own collider shape with the spin axis works correctly). Both entities must have a rigid body and collider. ConnectedEntityId must reference a different, existing, dynamic entity.")]
 public sealed class RekallAgeHingeJointComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Description = "Entity ID of the other dynamic body this joint connects to.")]
@@ -1213,13 +1213,13 @@ public sealed class RekallAgeHingeJointComponent : RekallAgeComponent
     [RekallAgeProperty(Description = "Anchor point Z, in the connected entity's own local space.")]
     public double AnchorBZ { get; init; }
 
-    [RekallAgeProperty(Description = "Hinge rotation axis X, interpreted identically in both entities' local spaces.")]
+    [RekallAgeProperty(Description = "Hinge rotation axis X, a world-space direction at bind time - converted into each body's own local frame automatically, so the two bodies do not need to share an orientation.")]
     public double AxisX { get; init; }
 
-    [RekallAgeProperty(Description = "Hinge rotation axis Y, interpreted identically in both entities' local spaces.")]
+    [RekallAgeProperty(Description = "Hinge rotation axis Y, a world-space direction at bind time - converted into each body's own local frame automatically, so the two bodies do not need to share an orientation.")]
     public double AxisY { get; init; } = 1;
 
-    [RekallAgeProperty(Description = "Hinge rotation axis Z, interpreted identically in both entities' local spaces.")]
+    [RekallAgeProperty(Description = "Hinge rotation axis Z, a world-space direction at bind time - converted into each body's own local frame automatically, so the two bodies do not need to share an orientation.")]
     public double AxisZ { get; init; }
 
     [RekallAgeProperty(Minimum = 0.0001, Description = "BEPU joint-spring frequency for the pinned anchor point.")]

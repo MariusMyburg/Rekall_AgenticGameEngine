@@ -6613,6 +6613,59 @@ proves the capture path's `BuildFrameUniform` unpacks color/position/
 direction/range/priority/cone-cosines correctly and updates the uniform's
 verified byte size (1,280 -> 1,536 bytes for the 4 new 16-float slots).
 
+## 2026-08-27 HingeJoint axis is now a world-space direction, not a shared-local-frame value
+
+Found while prototyping a motorcycle example (an infinite-runner showcase requested this
+session, spec/implementation still in progress - this checkpoint is the one confirmed,
+tested, and shippable piece of that work so far).
+
+A motorcycle's front wheel needs a collider shape (a capsule, so its rolling-radius contact
+patch resists lean instead of a sphere's single-point contact) rotated 90 degrees from its
+hinge parent (the steering fork) so the capsule's own long axis lands on the wheel's spin
+axis. `RekallAgeHingeJointComponent`'s own doc string already flagged the risk this exposed:
+"the authored axis is interpreted identically in both entities' local spaces, which is only
+geometrically correct when the two bodies start out reasonably co-oriented." A wheel rotated
+90 degrees from its parent is exactly the case that isn't co-oriented, and the same raw axis
+value silently meant a completely different world direction for each body - the hinge, its
+motor, and its angle-limit constraint were all quietly wrong whenever a game needed this.
+
+Fixed by treating the authored Axis as a single world-space direction at bind time, converted
+into each connected body's own local frame via `WorldAxisToLocal` (transform by the
+conjugate of that body's own orientation) instead of reused raw. For co-oriented bodies
+(everything authored in the engine before this - Ridgebreaker's wheels included) this is
+mathematically identical to the old behavior, since `Conjugate(orientation)` then produces
+the same local value for both bodies when their orientations match; existing content and all
+11 pre-existing joint tests pass unchanged. Verified with a new test
+(`HingeJointAxisIsAWorldSpaceDirectionEvenWhenTheConnectedBodiesDoNotShareAnOrientation`)
+that reproduces the exact wheel-rotated-90-degrees case and confirms the motor now correctly
+drags the assembly along the ground instead of spinning uselessly around the wrong world axis.
+
+**A related, confirmed engine gap, not yet fixed:** `PersistentPhysicsWorld.AddDynamic` builds
+every dynamic body via `BodyDescription.CreateConvexDynamic`, which derives the inertia tensor
+purely from collider shape and mass - there is no authoring path to override it. A real wheel's
+gyroscopic behavior depends heavily on its actual moment of inertia (a thin ring at a given
+radius has roughly double a solid sphere's inertia at the same mass), so "author a wheel with
+realistic gyroscopic stability" is not currently possible independent of just picking a
+collider shape/size/mass combination that happens to produce the right tensor as a side effect.
+Recorded here as a real, evidence-backed gap - not yet needed to decide, since the motorcycle
+prototype's remaining balance work has not yet required it (see below).
+
+**Where the motorcycle prototype actually stands:** a rigid four-body assembly (chassis + fork
++ front wheel + rear wheel, real BEPU hinges/motors, capsule tires, the axis fix above, a
+correctly-scaled rear motor torque) drives forward and stays upright with no lean input at all
+- confirmed in a throwaway spike, not committed. Adding a steering input (driving the fork
+toward a target angle via the existing velocity motor, exactly how Ridgebreaker already drives
+its wheels) does tilt the chassis, but the assembly settles into a fixed lean angle rather than
+balancing dynamically - expected, since nothing in that spike modeled the continuous small
+corrective countersteering a real rider supplies many times per second to stay upright; a bare
+rigid-hinge assembly has no restoring roll torque of its own at rest, same as a real motorcycle
+without a kickstand or a balancing rider. The recommended next step (not yet built) is a
+rider-like PD balance controller in the game's own module code - nudging the fork's steering
+target by a term proportional to chassis roll angle and roll rate, layered under the player's
+own left/right input - which is ordinary control code reusing the existing joint/motor
+machinery entirely, not a new engine capability, and keeps the lean itself genuinely emergent
+from real contact/inertia physics rather than authored directly.
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

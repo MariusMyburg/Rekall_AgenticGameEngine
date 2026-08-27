@@ -228,6 +228,83 @@ public sealed class PhysicsJointsTests
     }
 
     [Fact]
+    public async Task HingeJointAxisIsAWorldSpaceDirectionEvenWhenTheConnectedBodiesDoNotShareAnOrientation()
+    {
+        // Found while modeling a wheel whose own collider needed a 90-degree local rotation
+        // (to align a capsule shape's own long axis with the wheel's spin axis) while its hinge
+        // parent (the chassis) stays unrotated. The authored axis (0,0,1) is meant as "spin
+        // around world Z" regardless of that rotation - previously the same raw axis value was
+        // used verbatim as both bodies' LOCAL axis, which is only correct when both bodies share
+        // an orientation. This wheel is deliberately pre-rotated 90 degrees around X relative to
+        // its chassis, so a broken (unconverted) axis would drive the wheel to spin around the
+        // wrong world axis entirely and the assembly would never translate.
+        var chassis = RekallAgeEntityDocument.Create("Chassis", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["x"] = 0, ["y"] = 1.0, ["z"] = 0 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Rigidbody3D",
+                new JsonObject { ["mass"] = 10 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.BoxCollider3D",
+                new JsonObject { ["width"] = 2, ["height"] = 0.6, ["depth"] = 1 }));
+        var wheel = RekallAgeEntityDocument.Create("Wheel", ["actor"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["x"] = 1, ["y"] = 0.5, ["z"] = 0, ["pitch"] = 90 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Rigidbody3D",
+                new JsonObject { ["mass"] = 2 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.CapsuleCollider3D",
+                new JsonObject { ["radius"] = 0.5, ["length"] = 0.2 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.HingeJoint",
+                new JsonObject
+                {
+                    ["connectedEntityId"] = chassis.Id,
+                    ["anchorAX"] = 0,
+                    ["anchorAY"] = 0,
+                    ["anchorAZ"] = 0,
+                    ["anchorBX"] = 1,
+                    ["anchorBY"] = -0.5,
+                    ["anchorBZ"] = 0,
+                    ["axisX"] = 0,
+                    ["axisY"] = 0,
+                    ["axisZ"] = 1,
+                    ["motorTargetVelocity"] = 360,
+                    ["motorMaximumTorque"] = 20
+                }));
+        var ground = RekallAgeEntityDocument.Create("Ground", ["level"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Transform3D",
+                new JsonObject { ["y"] = -0.5 }))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.BoxCollider3D",
+                new JsonObject { ["width"] = 20, ["height"] = 1, ["depth"] = 20 }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])
+            .AddEntity(ground)
+            .AddEntity(chassis)
+            .AddEntity(wheel);
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, frames: 240, CancellationToken.None);
+
+        var wheelEntity = result.World.Entities.Single(entity => entity.Name == "Wheel");
+        var chassisEntity = result.World.Entities.Single(entity => entity.Name == "Chassis");
+
+        // A correctly-resolved world-Z spin axis rolls the wheel and drags the chassis along
+        // with it (via the hinge anchor); a broken axis instead spins around some other world
+        // direction (most likely local Y, world "up" for the unrotated chassis's own frame) and
+        // the assembly barely translates from its starting X.
+        Assert.True(
+            Math.Abs(chassisEntity.Transform.Position3D.X) > 0.2,
+            $"Expected the chassis to be dragged along the ground by a correctly-axed wheel motor, actual X {chassisEntity.Transform.Position3D.X}.");
+        Assert.InRange(Math.Abs(chassisEntity.Transform.Rotation3D.Z), 0, 45);
+    }
+
+    [Fact]
     public async Task WeldJointLocksBothRelativePositionAndOrientation()
     {
         // Body A starts pre-rotated 30 degrees around Y and slightly separated from Body B, which

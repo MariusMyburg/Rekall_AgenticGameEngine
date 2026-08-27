@@ -371,6 +371,30 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneAcceptsAnAuthoredCollisionFilter()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var body = RekallAgeEntityDocument.Create("Body", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.BoxCollider3D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.CollisionFilter",
+                new JsonObject
+                {
+                    ["layer"] = "player",
+                    ["collidesWith"] = new JsonArray("enemy")
+                }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["physics"])
+            .AddEntity(body);
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        Assert.DoesNotContain(report.Issues, issue => issue.Code == "REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN");
+    }
+
+    [Fact]
     public async Task ValidateSceneRequiresDimensionMatchingTransformForPhysicsBodies()
     {
         var root = TestPaths.CreateTempDirectory();

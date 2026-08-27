@@ -3160,10 +3160,12 @@ behavior.
   projection with box/circle shapes and persisted linear velocity; 3D adds
   box/sphere/capsule and static or convex mesh shapes. Persistent 3D bodies now
   retain angular velocity, orientation, and sleep state, and native BEPU
-  contacts own friction/restitution response. Remaining breadth includes
-  generic joints/constraints, a dedicated 2D world/material contract, authored
-  angular control, collision layers/masks, exact contact manifold/impulse
-  facts, deformables, and measured large-world broadphase performance.
+  contacts own friction/restitution response. Collision layers/masks now exist
+  (`Rekall.CollisionFilter`, uniform across 2D/3D, physical response, and both
+  `collision.*`/`trigger.*` event systems). Remaining breadth includes generic
+  joints/constraints, a dedicated 2D world/material contract, authored 2D
+  angular control, exact contact manifold/impulse facts, deformables, and
+  measured large-world broadphase performance.
 - 3D rendering is substantial and hardware-backed: perspective/orthographic
   cameras, viewports/layers/stereo/OpenXR, primitives and authored/imported GLB
   meshes, PBR texture inputs, directional/point lighting, generic animation,
@@ -6122,6 +6124,53 @@ run the full solution test suite or broad multi-project filters during
 ordinary feature development — it is slow. Use narrowly targeted tests for
 the feature or fix currently being touched; reserve full-suite runs for an
 explicit user request or an explicit final delivery/acceptance gate.
+
+## 2026-08-27 Collision layers and masks
+
+Authored entities can now selectively ignore each other's collisions via a
+new generic `Rekall.CollisionFilter` component (`layer` string,
+`collidesWith` string array), following the same declarative
+`[RekallAgeComponent]`/`RegisterComponent<T>()` registration path every other
+built-in component uses. One shared, pure, unit-tested matching rule
+(`RekallAgeCollisionFilter.Allows`, symmetric-AND: each side must accept the
+other's layer) is consumed identically by all three independent runtime
+systems that do their own pair detection: `RekallAgeBepuPhysicsSystem`
+(physical response, filtered in BEPU's `AllowContactGeneration` narrow-phase
+callback), `RekallAgeCollisionEventSystem`, and `RekallAgeTriggerEventSystem`
+(`collision.*`/`trigger.*` event facts). An entity with no
+`Rekall.CollisionFilter`, or an absent/empty `collidesWith`, keeps colliding
+with everything — strictly additive, zero-authoring-change default, confirmed
+by the full existing physics/collision/trigger regression staying green
+throughout.
+
+One design deviation from the written spec: `RekallAgeCollisionFilter.Rule`
+holds reference-type fields (`string`, `IReadOnlySet<string>?`), so it cannot
+live in BEPU's `CollidableProperty<T>` (requires an unmanaged `T`) the way the
+spec assumed by analogy with the existing `CollidableProperty<PhysicsMaterial>`.
+Plain `Dictionary<BodyHandle, Rule>`/`Dictionary<StaticHandle, Rule>` are used
+instead, with entries removed on body/static removal so a BEPU handle recycled
+after removal never resolves to a stale entity's rule.
+
+While reaching for a clean regression signal on this work, an unrelated
+pre-existing bug surfaced and was fixed in the same commit: `Rekall.Destructible`
+(added to `RekallAgeBuiltInComponentTypeCatalog.Types` in an earlier session
+for the procedural-destruction work) was never registered as an actual
+`[RekallAgeComponent]` schema class, so
+`ReservedComponentTypeCatalogMatchesIndexedBuiltInSchemas` was failing
+independent of any change here. Added the real `RekallAgeDestructibleComponent`
+schema (`Triggered`, `ChunkMeshAssetIds`, `ExplosionImpulse`, `TerrainEntityId`,
+`CraterRadius`, `CraterDepth`), matching the exact property names
+`RekallAgeDestructionSystem` already reads at runtime — schema-only, no runtime
+behavior change, confirmed by the destruction/CraterField regression staying
+green.
+
+Verified: full `CollisionFilterTests`/`ModuleMetadataTests`/
+`RuntimeCollisionEventSystemTests`/`RuntimeTriggerEventSystemTests`/
+`SceneRuntimeFoundationTests`/`ProjectValidatorTests`/`DestructionSystemTests`/
+`CraterFieldAcceptanceTests` selection green (104/104).
+
+- `docs/superpowers/specs/2026-08-27-collision-layers-design.md`
+- `docs/superpowers/plans/2026-08-27-collision-layers.md`
 
 ## Update rule
 

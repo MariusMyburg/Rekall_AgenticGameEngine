@@ -83,7 +83,15 @@ public sealed class RekallAgeCollisionFilterComponent : RekallAgeComponent
 
 Registered with `builder.RegisterComponent<RekallAgeCollisionFilterComponent>();`
 next to `RegisterComponent<RekallAgeTriggerComponent>()` in the same file's
-`Configure`. The `CollidesWith` array's `[]`-suffixed .NET type name makes
+`Configure`. Separately, `RekallAgeBuiltInComponentTypeCatalog.Types` (in
+`src/Rekall.Age.World/RekallAgeBuiltInComponentTypeCatalog.cs`) is a distinct,
+hand-maintained `HashSet<string>` gating `IsUnknownReserved` — an authored
+component type starting with `Rekall.` that isn't in this set is rejected as
+an unrecognized reserved type before it ever reaches the schema/reflection
+path above. `"Rekall.CollisionFilter"` must be added there too (alphabetically
+after `"Rekall.Trigger"`), or authoring the component would be rejected.
+
+The `CollidesWith` array's `[]`-suffixed .NET type name makes
 `RekallAgeProjectValidator`'s existing `ExpectedStructuredShape` check treat it
 as a required native JSON array automatically (the same mechanism that already
 rejects a JSON-encoded string for `Rekall.InputActionMap.Actions`) — no new

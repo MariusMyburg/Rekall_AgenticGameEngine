@@ -57,6 +57,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeSphereCollider3DComponent>();
         builder.RegisterComponent<RekallAgeCapsuleCollider3DComponent>();
         builder.RegisterComponent<RekallAgeMeshColliderComponent>();
+        builder.RegisterComponent<RekallAgeDestructibleComponent>();
         builder.RegisterComponent<RekallAgePlanetRendererComponent>();
         builder.RegisterComponent<RekallAgeCloudLayerRendererComponent>();
         builder.RegisterComponent<RekallAgeAtmosphereRendererComponent>();
@@ -1228,6 +1229,28 @@ public sealed class RekallAgeMeshColliderComponent : RekallAgeComponent
 {
     [RekallAgeProperty]
     public bool Convex { get; init; }
+}
+
+[RekallAgeComponent("Destructible", Description = "Generic procedural destruction: setting Triggered removes this entity and replaces it with one dynamic rigid-body entity per pre-authored chunk mesh in ChunkMeshAssetIds, given an outward impulse from this entity's position. If TerrainEntityId references another entity with a mesh, a crater is stamped into that terrain's editable mesh asset. Set Triggered from any game module (a health check, a grenade timer, anything) - this component knows nothing about a specific game.")]
+public sealed class RekallAgeDestructibleComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Description = "Set true to detonate this entity on the current frame.")]
+    public bool Triggered { get; init; }
+
+    [RekallAgeProperty(Description = "Native JSON array of pre-authored chunk mesh asset IDs; one dynamic rigid-body entity is spawned per entry.")]
+    public string[] ChunkMeshAssetIds { get; init; } = [];
+
+    [RekallAgeProperty(Minimum = 0, Description = "Outward impulse magnitude applied to each spawned chunk.")]
+    public double ExplosionImpulse { get; init; } = 6;
+
+    [RekallAgeProperty(Description = "Optional entity ID of a terrain entity whose editable mesh receives a crater stamp when this entity detonates.")]
+    public string? TerrainEntityId { get; init; }
+
+    [RekallAgeProperty(Minimum = 0.0001, Description = "Crater stamp radius in world units, used only when TerrainEntityId is set.")]
+    public double CraterRadius { get; init; } = 2;
+
+    [RekallAgeProperty(Minimum = 0.0001, Description = "Crater stamp depth in world units, used only when TerrainEntityId is set.")]
+    public double CraterDepth { get; init; } = 1;
 }
 
 [RekallAgeComponent("Planet Renderer")]

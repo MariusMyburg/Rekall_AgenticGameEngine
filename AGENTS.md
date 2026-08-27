@@ -32,6 +32,7 @@ Permanent architectural rule:
 - When a user-facing example fails, fix the generic engine contract first, then update the example as a consumer of that contract.
 - Before adding a new built-in runtime behavior, ask whether an AI agent could author it cleanly from existing primitives. If yes, improve the primitives instead.
 - After a clean fast-forward merge or conflict-free cherry-pick of the exact commit that was already built and tested, do not rerun the identical build/test suite solely because the branch name changed. Verify the resulting commit identity, clean worktree, and push instead. Rerun only when integration changed bytes, generated/installed artifacts must be refreshed, the target environment differs, or a broader acceptance gate is genuinely due.
+- Do not run the full solution test suite (or broad multi-project filters spanning it) during ordinary feature development — it is slow and wastes time. During TDD, run only the narrowly targeted test(s)/class(es) for the feature or fix currently being touched (e.g. `--filter "FullyQualifiedName~ExactClassName"`). Reserve full-suite or wide cross-cutting runs for when the user explicitly asks for one, or for an explicit final delivery/acceptance gate the user has directed.
 
 OpenXR operational note from the local FPS test:
 

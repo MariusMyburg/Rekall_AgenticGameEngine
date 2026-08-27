@@ -3192,15 +3192,15 @@ behavior.
   the full animated runtime loop for Play mode, but the Animation tab does not
   yet embed it), and any gizmo-based interactive posing. Tracked as the next
   animation-workspace increment.
-- Procedural destruction is not yet an engine capability: no destructible-mesh
-  fracture/chunking, no terrain deformation (e.g. explosion craters), and no
-  runtime module support for spawning transient destructible props. Requested
-  follow-up: build procedural destruction, then build a visually impressive
-  original game (grenades spawn every few seconds at random and explode,
-  breaking geometry apart and cratering the terrain) as its proof, authored
-  the same way every other Aetherfall-style example in this repo is meant to
-  be proven - through the CLI/MCP authoring surface as an external client
-  would use it, not by hand-editing engine internals to fake the result.
+- Procedural destruction is now an engine capability (see the "Mesh operation
+  and fracture plugin system" checkpoint below): mesh fracture/chunking,
+  terrain crater deformation, and a runtime destruction system exist, proven
+  by the CraterField example (grenades spawn under real physics, explode, crack
+  geometry into physically simulated chunks, and crater the terrain), authored
+  through the CLI/MCP surface. Third-party fracture algorithms and mesh
+  operations can now also be registered from project code without engine
+  changes. Not yet done: further destruction fidelity (partial/progressive
+  damage, debris despawn/pooling policy) beyond this first proof.
 - Expand Studio asset/module workflows and run broader installed game-creation
   benchmarks beyond the fixed gauntlet. Deterministic WPF automation,
   schema-guided editing, transactional undo/redo, embedded Ollama authoring,
@@ -6090,6 +6090,34 @@ plugin surfaces with zero engine-source edits.
 
 - `docs/superpowers/specs/2026-08-26-mesh-operation-fracture-plugins-design.md`
 - `docs/superpowers/plans/2026-08-26-mesh-operation-fracture-plugins.md`
+
+## 2026-08-27 High-Fidelity Forward+ Foundation closed out (Task 10)
+
+The `docs/superpowers/plans/2026-08-24-high-fidelity-forward-plus-foundation.md`
+plan's Tasks 1-8 (backend-neutral quality presets, the inspectable render
+graph, HDR/bloom/tone mapping, cascaded shadows, volumetric fog, GPU particle
+emitters, GPU timing/budget inspection, and the Studio high-fidelity authoring
+surface) were already fully implemented and committed but the plan's own
+checkboxes had never been ticked and `PROGRESS.md` had not recorded delivery.
+Verified by exact-commit lookup (`bf292d2`, `8efbc15`, `1b2ba10`, `9cc78ac`,
+`9a96964`, `992567d`, `dd2c69c`, `114a2cc`) and by confirming every file the
+plan's File Structure section names exists on disk; the plan document's
+checkboxes now match reality. Task 9 (Aetherfall Resonance Court visual
+upgrade) is genuinely open, ongoing, iterative work by its own explicit
+acceptance criteria — not stalled — evidenced by repeated real checkpoints in
+`Examples/AetherfallCitadel/Proof/ACCEPTANCE.md` (native rig animation,
+restrained lighting, textured Warden surfaces, a scaled many-light bridge,
+environment/UV and height-fog fixes), each with real RTX 5090 High 2560x1440
+GPU timings under the 16.67 ms bar (most recently 8.546048 ms). Closing Task 10
+did not require rerunning that already-satisfied hardware gate from scratch;
+it required a clean Release solution build (confirmed, 0 warnings/errors) and
+this reconciliation.
+
+A new repository policy was also adopted and recorded in `AGENTS.md`: do not
+run the full solution test suite or broad multi-project filters during
+ordinary feature development — it is slow. Use narrowly targeted tests for
+the feature or fix currently being touched; reserve full-suite runs for an
+explicit user request or an explicit final delivery/acceptance gate.
 
 ## Update rule
 

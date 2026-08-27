@@ -210,6 +210,7 @@
           "Rekall.Age.Editor.Contracts": "[0.1.0-preview.1, )",
           "Rekall.Age.Modules": "[0.1.0-preview.1, )",
           "Rekall.Age.Project": "[0.1.0-preview.1, )",
+          "Rekall.Age.Rendering": "[0.1.0-preview.1, )",
           "Rekall.Age.Rendering.Abstractions": "[0.1.0-preview.1, )",
           "Rekall.Age.Runtime": "[0.1.0-preview.1, )",
           "Rekall.Age.Validation": "[0.1.0-preview.1, )",
@@ -242,6 +243,7 @@
         "dependencies": {
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
           "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
           "SamuelRe.CSG.Sharp": "[1.0.0, )"
         }
       },
@@ -252,6 +254,7 @@
         "type": "Project",
         "dependencies": {
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )",
           "Rekall.Age.Runtime.Abstractions": "[0.1.0-preview.1, )"
         }
       },

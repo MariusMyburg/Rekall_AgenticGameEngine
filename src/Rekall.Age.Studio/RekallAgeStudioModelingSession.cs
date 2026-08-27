@@ -9,10 +9,12 @@ namespace Rekall.Age.Studio;
 public sealed class RekallAgeStudioModelingSession
 {
     private readonly RekallAgeMeshAssetStore _store;
-    private readonly RekallAgeMeshEditService _edits;
-    private readonly RekallAgeMeshOperationExecutor _operations;
+    private readonly bool _usesDefaultOperations;
+    private RekallAgeMeshEditService _edits;
+    private RekallAgeMeshOperationExecutor _operations;
     private readonly RekallAgeTransactionLogStore _transactions;
     private readonly List<ulong> _selectionHistory = [];
+    private string? _pluginsLoadedForProjectRoot;
 
     public RekallAgeStudioModelingSession(
         RekallAgeMeshAssetStore? store = null,
@@ -21,6 +23,7 @@ public sealed class RekallAgeStudioModelingSession
         RekallAgeTransactionLogStore? transactions = null)
     {
         _store = store ?? new RekallAgeMeshAssetStore();
+        _usesDefaultOperations = operations is null && edits is null;
         _operations = operations ?? new RekallAgeMeshOperationExecutor();
         _edits = edits ?? new RekallAgeMeshEditService(_store, _operations);
         _transactions = transactions ?? new RekallAgeTransactionLogStore();
@@ -41,8 +44,17 @@ public sealed class RekallAgeStudioModelingSession
 
     public async ValueTask OpenAsync(string projectRoot, string assetId, CancellationToken cancellationToken)
     {
+        var fullRoot = Path.GetFullPath(projectRoot);
+        if (_usesDefaultOperations && !string.Equals(_pluginsLoadedForProjectRoot, fullRoot, StringComparison.Ordinal))
+        {
+            var plugins = new RekallAgeProjectMeshPluginLoader().Load(fullRoot);
+            _operations = new RekallAgeMeshOperationExecutor(plugins.Operations);
+            _edits = new RekallAgeMeshEditService(_store, _operations);
+            _pluginsLoadedForProjectRoot = fullRoot;
+        }
+
         var loaded = await _store.LoadVersionedAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
-        ProjectRoot = Path.GetFullPath(projectRoot); AssetId = assetId; FileRevision = loaded.Revision; Mesh = loaded.Value;
+        ProjectRoot = fullRoot; AssetId = assetId; FileRevision = loaded.Revision; Mesh = loaded.Value;
         Preview = null; _selectionHistory.Clear();
     }
 

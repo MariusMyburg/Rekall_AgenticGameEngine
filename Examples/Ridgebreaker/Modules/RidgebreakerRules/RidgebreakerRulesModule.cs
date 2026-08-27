@@ -52,14 +52,15 @@ public sealed class RunState : RekallAgeComponent
 }
 
 /// <summary>
-/// Ridgebreaker's whole gameplay loop: throttle-driven wheel spin (a live-authored angular
-/// velocity target, re-asserted every frame - the same technique the built-in physics reads
-/// for any Rigidbody3D), fuel drain, crystal-outcrop destruction on vehicle impact (reads
-/// last frame's collision.begin facts and flips the crystal's own Rekall.Destructible.Triggered
-/// flag; RekallAgeDestructionSystem does the actual fracture/replace), fuel-cell pickups (last
-/// frame's trigger.enter facts), a chase camera, and crash/out-of-fuel/finish outcome tracking.
+/// Ridgebreaker's whole gameplay loop: throttle drives each wheel's own Rekall.HingeJoint motor
+/// (MotorTargetVelocity authored live every frame - a real solved BEPU AngularAxisMotor
+/// constraint, not an external velocity override), fuel drain, crystal-outcrop destruction on
+/// vehicle impact (reads last frame's collision.begin facts and flips the crystal's own
+/// Rekall.Destructible.Triggered flag; RekallAgeDestructionSystem does the actual
+/// fracture/replace), fuel-cell pickups (last frame's trigger.enter facts), a chase camera, and
+/// crash/out-of-fuel/finish outcome tracking.
 ///
-/// Priority -10 (before RekallAgeBepuPhysicsSystem's 0) so a wheel spin set this frame is
+/// Priority -10 (before RekallAgeBepuPhysicsSystem's 0) so a motor target set this frame is
 /// consumed by physics this same frame; this means collision/trigger events read here are one
 /// frame old, which is imperceptible and matches how EmitBoundEvents-driven gameplay elsewhere
 /// in this engine's examples already reads events a frame late.
@@ -68,7 +69,7 @@ public sealed class RidgebreakerSystem : IRekallAgeRuntimeModuleSystem
 {
     private const string RunStateType = "Game.Modules.RidgebreakerRules.RunState";
     private const string DestructibleType = "Rekall.Destructible";
-    private const string Rigidbody3DType = "Rekall.Rigidbody3D";
+    private const string HingeJointType = "Rekall.HingeJoint";
 
     public string Id => nameof(RidgebreakerSystem);
 
@@ -157,24 +158,22 @@ public sealed class RidgebreakerSystem : IRekallAgeRuntimeModuleSystem
                 $"Out of fuel at distance {chassis.Transform.Position3D.X - startX:0.0}m. Coasting only.");
         }
 
-        // Wheel spin is re-authored every frame at the live throttle target. Forcing the CHASSIS's
-        // own linearVelocityX directly (an earlier attempt) is worse, not better: the chassis is
-        // the shared anchor for both wheel Hinge joints, and resetting its velocity externally
-        // every frame while the solver simultaneously tries to satisfy two active joint
-        // constraints on it caused outright numerical blow-up (positions diverging to thousands
-        // of units within seconds). Driving the wheels (each only jointed to the chassis, not to
-        // each other) is the more stable of the two, though sustained full-throttle for tens of
-        // seconds can still eventually build up a pitch resonance - documented as a known tuning
-        // follow-up rather than fully resolved in this pass.
-        var wheelSpeed = -throttle * throttleSpeed;
+        // Each wheel's own HingeJoint carries a real motor (MotorTargetVelocity/MotorMaximumTorque,
+        // a solved BEPU AngularAxisMotor constraint - see docs/superpowers/specs for the design).
+        // Earlier versions of this module drove the wheels by overwriting their own
+        // Rigidbody3D.angularVelocityZ directly every frame, which fights the Hinge joint's own
+        // constraint solving and reliably tumbled the vehicle after sustained throttle; a real
+        // motor constraint doesn't have that problem because the solver resolves it consistently
+        // alongside the hinge instead of having it externally overridden out from under the joint.
+        var motorTarget = -throttle * throttleSpeed;
         if (!string.IsNullOrEmpty(wheelRearId))
         {
-            world = world.UpdateEntity(wheelRearId, wheel => wheel.WithComponentNumber(Rigidbody3DType, "angularVelocityZ", wheelSpeed));
+            world = world.UpdateEntity(wheelRearId, wheel => wheel.WithComponentNumber(HingeJointType, "motorTargetVelocity", motorTarget));
         }
 
         if (!string.IsNullOrEmpty(wheelFrontId))
         {
-            world = world.UpdateEntity(wheelFrontId, wheel => wheel.WithComponentNumber(Rigidbody3DType, "angularVelocityZ", wheelSpeed));
+            world = world.UpdateEntity(wheelFrontId, wheel => wheel.WithComponentNumber(HingeJointType, "motorTargetVelocity", motorTarget));
         }
 
         // --- Side-view chase camera: tracks the chassis X/Y, keeps its authored Z/rotation

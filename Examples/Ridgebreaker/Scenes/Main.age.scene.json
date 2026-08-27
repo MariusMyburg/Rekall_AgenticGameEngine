@@ -38,7 +38,7 @@
       "locked": false
     },
     {
-      "id": "ent_f4cb82417d09426fb668d0043c12ad1c",
+      "id": "ent_8012ec7ae9b7457794bdbe9a53a1e012",
       "name": "Crystal Outcrop 1",
       "tags": [
         "crystal"
@@ -124,7 +124,7 @@
       "locked": false
     },
     {
-      "id": "ent_3d514d8a22fe4c0cbe1e528249979e83",
+      "id": "ent_31a6617bf03c4ecdb0d5217a8a647b27",
       "name": "Crystal Outcrop 2",
       "tags": [
         "crystal"
@@ -247,8 +247,10 @@
             "axisX": 0,
             "axisY": 0,
             "axisZ": 1,
-            "springFrequency": 150,
-            "dampingRatio": 10
+            "springFrequency": 45,
+            "dampingRatio": 3,
+            "motorTargetVelocity": 0,
+            "motorMaximumTorque": 9
           }
         },
         {
@@ -302,7 +304,7 @@
       "locked": false
     },
     {
-      "id": "ent_6e10d9d7a9f341448aff278e994f8e45",
+      "id": "ent_ee847cf533254cf6a292d241b7420f2f",
       "name": "Fuel Cell 1",
       "tags": [
         "fuel"
@@ -372,7 +374,7 @@
       "locked": false
     },
     {
-      "id": "ent_12da87bd81254bcea71f8122419e7b6a",
+      "id": "ent_6e3390a4b2b744ac85ad81414beff9c2",
       "name": "Fuel Cell 2",
       "tags": [
         "fuel"
@@ -442,7 +444,7 @@
       "locked": false
     },
     {
-      "id": "ent_55085ca6898a4ca68f28932e3a641007",
+      "id": "ent_77a4549ef89d4e358cf59be63f759fe4",
       "name": "Fuel Cell 3",
       "tags": [
         "fuel"
@@ -512,7 +514,7 @@
       "locked": false
     },
     {
-      "id": "ent_01d543f19b3147ea999ae2d176d27973",
+      "id": "ent_6be0476a1abb4bfd99c34b6ebc252942",
       "name": "Fuel Cell 4",
       "tags": [
         "fuel"
@@ -582,7 +584,7 @@
       "locked": false
     },
     {
-      "id": "ent_43ea09d9166d422fac74c0c07659752f",
+      "id": "ent_98885d982e764d6da3235dc20894d148",
       "name": "Guide Rail Left",
       "tags": [
         "rail",
@@ -618,7 +620,7 @@
       "locked": false
     },
     {
-      "id": "ent_9065d6f2a8824d3f9ade063dc7b4c7d1",
+      "id": "ent_59701a6070f2486d9201e24d4984522a",
       "name": "Guide Rail Right",
       "tags": [
         "rail",
@@ -691,8 +693,10 @@
             "axisX": 0,
             "axisY": 0,
             "axisZ": 1,
-            "springFrequency": 150,
-            "dampingRatio": 10
+            "springFrequency": 45,
+            "dampingRatio": 3,
+            "motorTargetVelocity": 0,
+            "motorMaximumTorque": 9
           }
         },
         {
@@ -766,7 +770,7 @@
             "outOfFuel": false,
             "crashed": false,
             "finished": false,
-            "throttleSpeed": 120.0
+            "throttleSpeed": 400.0
           }
         },
         {
@@ -871,7 +875,7 @@
       "locked": false
     },
     {
-      "id": "ent_9ffc8b87288f46db81795aa17d206396",
+      "id": "ent_988c83e67ec6479fac1de65a562cec74",
       "name": "Sun",
       "tags": [
         "lighting"
@@ -902,7 +906,7 @@
       "locked": false
     },
     {
-      "id": "ent_cedfc66e24b14c0b87cf159fc442b42b",
+      "id": "ent_3ca1589d9ccd41a2ba512adb81ed3564",
       "name": "Terrain Segment 1",
       "tags": [
         "terrain"
@@ -968,7 +972,7 @@
       "locked": false
     },
     {
-      "id": "ent_37903748cc4647a9a9f1148ed11046c2",
+      "id": "ent_a88f56ab19174552bc6eac09340d8841",
       "name": "Terrain Segment 10",
       "tags": [
         "terrain"
@@ -1034,7 +1038,7 @@
       "locked": false
     },
     {
-      "id": "ent_0832351135644f5990a4ef4e41bc3ef8",
+      "id": "ent_1bc82d220a644dbeba6a5cd780825d72",
       "name": "Terrain Segment 11",
       "tags": [
         "terrain"
@@ -1100,7 +1104,7 @@
       "locked": false
     },
     {
-      "id": "ent_44d403b7807842adb9464b96584987d1",
+      "id": "ent_a347e33b6fdc4d059960ddd6dc656567",
       "name": "Terrain Segment 12",
       "tags": [
         "terrain"
@@ -1166,7 +1170,7 @@
       "locked": false
     },
     {
-      "id": "ent_ba8e23d125e44ac6a37aba9f5182d1ff",
+      "id": "ent_8b03f30f9a55480ba333c3b8615a3f35",
       "name": "Terrain Segment 13",
       "tags": [
         "terrain"
@@ -1232,7 +1236,7 @@
       "locked": false
     },
     {
-      "id": "ent_118c8b5a0b0c4859a626b40cdad979cb",
+      "id": "ent_0344d733bca14a029038ed44740201cf",
       "name": "Terrain Segment 2",
       "tags": [
         "terrain"
@@ -1298,7 +1302,7 @@
       "locked": false
     },
     {
-      "id": "ent_e3b0ee643ac248e1a896ebb82d909cb6",
+      "id": "ent_a178b789b80f40169db98d1ba24d9500",
       "name": "Terrain Segment 3",
       "tags": [
         "terrain"
@@ -1364,7 +1368,7 @@
       "locked": false
     },
     {
-      "id": "ent_2c09f7f2be4d4928a13d890699fa20b2",
+      "id": "ent_229f99e5aa4a4dd995d49d3936184434",
       "name": "Terrain Segment 4",
       "tags": [
         "terrain"
@@ -1430,7 +1434,7 @@
       "locked": false
     },
     {
-      "id": "ent_f5f3535d4c5240ffac3593c54787dcdd",
+      "id": "ent_d52192aec8544cf883ecd7879be6c79c",
       "name": "Terrain Segment 5",
       "tags": [
         "terrain"
@@ -1496,7 +1500,7 @@
       "locked": false
     },
     {
-      "id": "ent_1ed47fef0e67463ba7438513be110d5d",
+      "id": "ent_87c84952978a46d58f6da4e786f1fdfc",
       "name": "Terrain Segment 6",
       "tags": [
         "terrain"
@@ -1562,7 +1566,7 @@
       "locked": false
     },
     {
-      "id": "ent_fa4ddb4c1b9b493b8a1a72c9523a1d41",
+      "id": "ent_b47815ba8c5a4b99ac03f13c94e30b2a",
       "name": "Terrain Segment 7",
       "tags": [
         "terrain"
@@ -1628,7 +1632,7 @@
       "locked": false
     },
     {
-      "id": "ent_7a94e98ce7ad4effb713b6e330c3ee41",
+      "id": "ent_257d91426a234ddda8f55f5941aa7647",
       "name": "Terrain Segment 8",
       "tags": [
         "terrain"
@@ -1694,7 +1698,7 @@
       "locked": false
     },
     {
-      "id": "ent_9a5cf5522eaf44389daeff3edf7a7cb1",
+      "id": "ent_09ef2bcba67e4a4d827986f46230705c",
       "name": "Terrain Segment 9",
       "tags": [
         "terrain"
@@ -1760,7 +1764,7 @@
       "locked": false
     },
     {
-      "id": "ent_4d2fd308b2f34f17bb2dfec9878a5b57",
+      "id": "ent_17ef1b5783fb450ab48caeb600b46283",
       "name": "World Environment",
       "tags": [
         "lighting"

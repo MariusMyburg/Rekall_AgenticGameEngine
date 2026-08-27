@@ -3188,6 +3188,27 @@ behavior.
   broker now exist with adversarial local proof, but are not yet a shipped
   product claim. Build receipts also remain unsigned; publisher signatures are
   a separate future security capability.
+- Third-party engine extensibility is uneven and undocumented as a whole.
+  Already fully available to project code, no new work needed: authoring new
+  *components* (`RekallAgeModuleBuilder.RegisterComponent<T>()`) and new
+  *gameplay runtime systems* (`RegisterRuntimeSystem<T>()`) — every example
+  game's own modules already use exactly these, and every built-in component
+  added this session (`Rekall.CollisionFilter`, `Rekall.PhysicsMaterial2D`,
+  the joint components, etc.) used the identical mechanism a third party has.
+  Genuinely new and shipped this session: pluggable mesh operations and
+  fracture algorithms as executable behavior, not just data
+  (`IRekallAgeMeshOperationPlugin`/`IRekallAgeFractureAlgorithmPlugin`, see
+  the "Mesh operation and fracture plugin system" checkpoint below).
+  Explicitly out of scope, with no design started: per-frame rendering
+  extensions (custom `Rekall.*Renderer`-style components with real
+  GPU/render-loop behavior — "different trust/performance envelope, needs its
+  own design", per that plugin spec's own out-of-scope note) and wiring the
+  sandboxed `RekallAgeRestrictedModuleHostClient` into any real execution
+  path (still in-process only). Never evaluated at all: whether the physics
+  backend/solver itself, or the renderer's core frame-graph, should be
+  swappable. No single document currently tracks this whole picture end to
+  end; this bullet is that tracking until/unless a dedicated roadmap is
+  requested.
 - Complete advanced animation breadth such as native glTF weight-channel
   animation, TANGENT/sparse/quantized morph accessors, broader complex
   transform fixtures, richer graph curves, and interruptible or hierarchical

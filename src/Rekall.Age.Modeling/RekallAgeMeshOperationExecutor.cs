@@ -262,8 +262,17 @@ public sealed partial class RekallAgeMeshOperationExecutor
              new("fill", RekallAgeGeometryValueType.Bool, false, JsonSerializer.SerializeToElement(false), "Cap the cut boundary (not yet supported).")])
     ];
     private readonly RekallAgeMeshValidator _validator = new();
+    private readonly IReadOnlyList<IRekallAgeMeshOperationPlugin> _plugins;
 
-    public IReadOnlyList<RekallAgeMeshOperationDescriptor> Descriptors => OperationDescriptors;
+    public RekallAgeMeshOperationExecutor(IReadOnlyList<IRekallAgeMeshOperationPlugin>? plugins = null)
+    {
+        _plugins = plugins ?? [];
+    }
+
+    public IReadOnlyList<RekallAgeMeshOperationDescriptor> Descriptors =>
+        _plugins.Count == 0
+            ? OperationDescriptors
+            : [.. OperationDescriptors, .. _plugins.Select(plugin => plugin.Descriptor)];
 
     public RekallAgeMeshOperationResult Execute(
         RekallAgeMeshAsset source,
@@ -317,7 +326,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
             "poke_faces" => SubdivideFaces(source, request),
             "dissolve_edges" => DissolveEdges(source, request),
             "bisect_plane" => BisectPlane(source, request),
-            _ => throw Failure("REKALL_MESH_OPERATION_UNKNOWN", $"Unknown mesh operation '{request.OperationId}'.")
+            _ => ExecutePlugin(source, request)
         };
         var outputValidation = _validator.Validate(result.Mesh);
         if (!outputValidation.IsValid)
@@ -328,6 +337,17 @@ public sealed partial class RekallAgeMeshOperationExecutor
         }
 
         return result with { Validation = outputValidation };
+    }
+
+    private RekallAgeMeshOperationResult ExecutePlugin(RekallAgeMeshAsset source, RekallAgeMeshOperationRequest request)
+    {
+        var plugin = _plugins.FirstOrDefault(item => item.OperationId == request.OperationId);
+        if (plugin is null)
+        {
+            throw Failure("REKALL_MESH_OPERATION_UNKNOWN", $"Unknown mesh operation '{request.OperationId}'.");
+        }
+
+        return plugin.Execute(source, request);
     }
 
     private RekallAgeMeshOperationResult Transform(

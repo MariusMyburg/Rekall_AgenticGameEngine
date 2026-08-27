@@ -3246,6 +3246,22 @@ behavior.
   operations can now also be registered from project code without engine
   changes. Not yet done: further destruction fidelity (partial/progressive
   damage, debris despawn/pooling policy) beyond this first proof.
+- BACKLOG (research, not started): investigate the feasibility of procedural
+  tree generation - trees "grown" from authored parameters (branching rules,
+  age/height, species-like presets) rather than hand-modeled, spanning a
+  quality range from low-poly stylized up to highly detailed/realistic
+  depending on parameters. Should build on the modeling capability already
+  in the engine (procedural mesh generation, the mesh-operation/fracture
+  plugin system's `IRekallAgeMeshOperationPlugin` pattern is a plausible
+  home for this rather than a new bespoke subsystem) and fits the "Advanced
+  world-modelling track" already in the stable priority order's acceptance
+  queue (item 6) rather than being a wholly separate initiative. Open
+  questions a feasibility pass should answer: L-system/space-colonization
+  vs. simpler recursive-branching generation trade-offs, how LOD/detail
+  level maps to the existing `Rekall.LodGroup`/`Rekall.VirtualGeometry`
+  contracts, bark/leaf material and billboard-foliage authoring, and
+  whether this belongs in the engine as a built-in generator or as a
+  project-registered plugin following the destruction system's precedent.
 - Expand Studio asset/module workflows and run broader installed game-creation
   benchmarks beyond the fixed gauntlet. Deterministic WPF automation,
   schema-guided editing, transactional undo/redo, embedded Ollama authoring,

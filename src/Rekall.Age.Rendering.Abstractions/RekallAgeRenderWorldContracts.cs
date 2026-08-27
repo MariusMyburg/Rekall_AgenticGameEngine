@@ -385,6 +385,10 @@ public sealed record RekallAgeRuntimeViewportRenderable(
 
     public int LightPriority { get; init; }
 
+    public double LightInnerConeAngle { get; init; } = 20;
+
+    public double LightOuterConeAngle { get; init; } = 30;
+
     public string AlphaMode { get; init; } = "opaque";
 
     public double AlphaCutoff { get; init; } = 0.5;

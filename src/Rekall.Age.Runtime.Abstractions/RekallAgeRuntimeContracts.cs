@@ -407,7 +407,9 @@ public sealed record RekallAgeRuntimeRenderLight(
     string? Color = null,
     string Layer = "default",
     double Range = 10,
-    int Priority = 0);
+    int Priority = 0,
+    double InnerConeAngle = 20,
+    double OuterConeAngle = 30);
 
 public sealed record RekallAgeRuntimeRenderUiLayer(
     string EntityId,

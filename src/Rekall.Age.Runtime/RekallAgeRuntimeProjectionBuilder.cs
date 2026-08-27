@@ -690,7 +690,9 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                                     ?? stellarColor,
                                 renderLayer,
                                 Math.Max(0.001, ReadNumber(component.Properties, "range", 10)),
-                                ReadInt32(component.Properties, "priority", 0)));
+                                ReadInt32(component.Properties, "priority", 0),
+                                ReadNumber(component.Properties, "innerConeAngle", 20),
+                                ReadNumber(component.Properties, "outerConeAngle", 30)));
                         }
 
                         break;
@@ -1017,6 +1019,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             "Rekall.HaloRenderer" or
             "Rekall.TextLabelRenderer" or
             "Rekall.PointLight" or
+            "Rekall.SpotLight" or
             "Rekall.DirectionalLight" or
             "Rekall.UiCanvas" or
             "Rekall.Button" or

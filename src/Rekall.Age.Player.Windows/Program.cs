@@ -2418,6 +2418,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 PointLight(batch.Frame, 1).Color, PointLight(batch.Frame, 1).Position, PointLight(batch.Frame, 1).Parameters,
                 PointLight(batch.Frame, 2).Color, PointLight(batch.Frame, 2).Position, PointLight(batch.Frame, 2).Parameters,
                 PointLight(batch.Frame, 3).Color, PointLight(batch.Frame, 3).Position, PointLight(batch.Frame, 3).Parameters,
+                SpotLight(batch.Frame, 0).Color, SpotLight(batch.Frame, 0).Position, SpotLight(batch.Frame, 0).Direction, SpotLight(batch.Frame, 0).Parameters,
+                SpotLight(batch.Frame, 1).Color, SpotLight(batch.Frame, 1).Position, SpotLight(batch.Frame, 1).Direction, SpotLight(batch.Frame, 1).Parameters,
+                SpotLight(batch.Frame, 2).Color, SpotLight(batch.Frame, 2).Position, SpotLight(batch.Frame, 2).Direction, SpotLight(batch.Frame, 2).Parameters,
+                SpotLight(batch.Frame, 3).Color, SpotLight(batch.Frame, 3).Position, SpotLight(batch.Frame, 3).Direction, SpotLight(batch.Frame, 3).Parameters,
                 EnvironmentAmbientSkyColor: batch.Frame.EnvironmentAmbientSkyColor,
                 EnvironmentAmbientGroundColor: batch.Frame.EnvironmentAmbientGroundColor),
             BuildStereoUniforms(batch),
@@ -2631,7 +2635,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                     batch.Frame.AdditionalLightParameters,
                     PointLight(batch.Frame, 1).Color, PointLight(batch.Frame, 1).Position, PointLight(batch.Frame, 1).Parameters,
                     PointLight(batch.Frame, 2).Color, PointLight(batch.Frame, 2).Position, PointLight(batch.Frame, 2).Parameters,
-                    PointLight(batch.Frame, 3).Color, PointLight(batch.Frame, 3).Position, PointLight(batch.Frame, 3).Parameters),
+                    PointLight(batch.Frame, 3).Color, PointLight(batch.Frame, 3).Position, PointLight(batch.Frame, 3).Parameters,
+                    SpotLight(batch.Frame, 0).Color, SpotLight(batch.Frame, 0).Position, SpotLight(batch.Frame, 0).Direction, SpotLight(batch.Frame, 0).Parameters,
+                    SpotLight(batch.Frame, 1).Color, SpotLight(batch.Frame, 1).Position, SpotLight(batch.Frame, 1).Direction, SpotLight(batch.Frame, 1).Parameters,
+                    SpotLight(batch.Frame, 2).Color, SpotLight(batch.Frame, 2).Position, SpotLight(batch.Frame, 2).Direction, SpotLight(batch.Frame, 2).Parameters,
+                    SpotLight(batch.Frame, 3).Color, SpotLight(batch.Frame, 3).Position, SpotLight(batch.Frame, 3).Direction, SpotLight(batch.Frame, 3).Parameters),
                 view.Viewport);
         }
 
@@ -2642,6 +2650,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         index >= 0 && index < frame.PointLights.Count
             ? frame.PointLights[index]
             : new(string.Empty, Vector4.Zero, Vector4.Zero, Vector4.Zero);
+
+    private static RekallAgeVulkanSpotLight SpotLight(RekallAgeVulkanSceneFrameUniform frame, int index) =>
+        index >= 0 && index < frame.SpotLights.Count
+            ? frame.SpotLights[index]
+            : new(string.Empty, Vector4.Zero, Vector4.Zero, Vector4.Zero, Vector4.Zero);
 
     private static PostProcessUniform BuildPostProcessUniform(
         RekallAgeRuntimeViewportPostProcessStack? stack,
@@ -3648,6 +3661,22 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec4 AdditionalLightColor4;
             vec4 AdditionalLightPosition4;
             vec4 AdditionalLightParameters4;
+            vec4 SpotLightColor;
+            vec4 SpotLightPosition;
+            vec4 SpotLightDirection;
+            vec4 SpotLightParameters;
+            vec4 SpotLightColor2;
+            vec4 SpotLightPosition2;
+            vec4 SpotLightDirection2;
+            vec4 SpotLightParameters2;
+            vec4 SpotLightColor3;
+            vec4 SpotLightPosition3;
+            vec4 SpotLightDirection3;
+            vec4 SpotLightParameters3;
+            vec4 SpotLightColor4;
+            vec4 SpotLightPosition4;
+            vec4 SpotLightDirection4;
+            vec4 SpotLightParameters4;
             mat4 ShadowViewProjection0;
             mat4 ShadowViewProjection1;
             mat4 ShadowViewProjection2;
@@ -3720,6 +3749,22 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec4 AdditionalLightColor4;
             vec4 AdditionalLightPosition4;
             vec4 AdditionalLightParameters4;
+            vec4 SpotLightColor;
+            vec4 SpotLightPosition;
+            vec4 SpotLightDirection;
+            vec4 SpotLightParameters;
+            vec4 SpotLightColor2;
+            vec4 SpotLightPosition2;
+            vec4 SpotLightDirection2;
+            vec4 SpotLightParameters2;
+            vec4 SpotLightColor3;
+            vec4 SpotLightPosition3;
+            vec4 SpotLightDirection3;
+            vec4 SpotLightParameters3;
+            vec4 SpotLightColor4;
+            vec4 SpotLightPosition4;
+            vec4 SpotLightDirection4;
+            vec4 SpotLightParameters4;
             mat4 ShadowViewProjection0;
             mat4 ShadowViewProjection1;
             mat4 ShadowViewProjection2;
@@ -4546,6 +4591,36 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 vec3 practicalDiffuse = (1.0 - practicalF) * (1.0 - metallic) * albedo / PI;
                 color += (practicalDiffuse + practicalSpecular) * practicalColors[practicalIndex].rgb * practicalNdotL * practicalAttenuation * 4.5;
             }
+            vec4 spotColors[4] = vec4[](Frame.SpotLightColor, Frame.SpotLightColor2, Frame.SpotLightColor3, Frame.SpotLightColor4);
+            vec4 spotPositions[4] = vec4[](Frame.SpotLightPosition, Frame.SpotLightPosition2, Frame.SpotLightPosition3, Frame.SpotLightPosition4);
+            vec4 spotDirections[4] = vec4[](Frame.SpotLightDirection, Frame.SpotLightDirection2, Frame.SpotLightDirection3, Frame.SpotLightDirection4);
+            vec4 spotParameters[4] = vec4[](Frame.SpotLightParameters, Frame.SpotLightParameters2, Frame.SpotLightParameters3, Frame.SpotLightParameters4);
+            for (int spotIndex = 0; spotIndex < 4; spotIndex++)
+            {
+                if (dot(spotColors[spotIndex].rgb, spotColors[spotIndex].rgb) <= 0.000001) continue;
+                vec3 spotOffset = spotPositions[spotIndex].xyz - fsin_WorldPosition;
+                float spotDistance = length(spotOffset);
+                vec3 spotLight = spotOffset / max(spotDistance, 0.0001);
+                float spotRange = max(spotParameters[spotIndex].x, 0.001);
+                float spotWindow = pow(clamp(1.0 - spotDistance / spotRange, 0.0, 1.0), 2.0);
+                float spotDistanceAttenuation = spotWindow / (1.0 + 0.045 * spotDistance * spotDistance);
+                vec3 spotForward = normalize(spotDirections[spotIndex].xyz);
+                float spotCos = dot(-spotLight, spotForward);
+                float spotInnerCos = spotParameters[spotIndex].z;
+                float spotOuterCos = spotParameters[spotIndex].w;
+                float spotConeAttenuation = clamp((spotCos - spotOuterCos) / max(spotInnerCos - spotOuterCos, 0.0001), 0.0, 1.0);
+                spotConeAttenuation *= spotConeAttenuation;
+                float spotAttenuation = spotDistanceAttenuation * spotConeAttenuation;
+                if (spotAttenuation <= 0.0001) continue;
+                vec3 spotHalf = normalize(view + spotLight);
+                float spotNdotL = max(dot(normal, spotLight), 0.0);
+                float spotD = distributionGgx(normal, spotHalf, roughness);
+                float spotG = geometrySchlickGgx(ndotv, roughness) * geometrySchlickGgx(spotNdotL, roughness);
+                vec3 spotF = fresnelSchlick(max(dot(spotHalf, view), 0.0), f0);
+                vec3 spotSpecular = spotD * spotG * spotF / max(4.0 * ndotv * spotNdotL, 0.0001);
+                vec3 spotDiffuse = (1.0 - spotF) * (1.0 - metallic) * albedo / PI;
+                color += (spotDiffuse + spotSpecular) * spotColors[spotIndex].rgb * spotNdotL * spotAttenuation * 4.5;
+            }
             color = applySurfaceAerialPerspective(color, fsin_WorldPosition, light);
             color = applyInteractiveFog(color, fsin_WorldPosition, light);
             // Exposure belongs in linear scene light. Applying it after this curve in the
@@ -4803,6 +4878,22 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         Vector4 AdditionalLightColor4,
         Vector4 AdditionalLightPosition4,
         Vector4 AdditionalLightParameters4,
+        Vector4 SpotLightColor = default,
+        Vector4 SpotLightPosition = default,
+        Vector4 SpotLightDirection = default,
+        Vector4 SpotLightParameters = default,
+        Vector4 SpotLightColor2 = default,
+        Vector4 SpotLightPosition2 = default,
+        Vector4 SpotLightDirection2 = default,
+        Vector4 SpotLightParameters2 = default,
+        Vector4 SpotLightColor3 = default,
+        Vector4 SpotLightPosition3 = default,
+        Vector4 SpotLightDirection3 = default,
+        Vector4 SpotLightParameters3 = default,
+        Vector4 SpotLightColor4 = default,
+        Vector4 SpotLightPosition4 = default,
+        Vector4 SpotLightDirection4 = default,
+        Vector4 SpotLightParameters4 = default,
         Matrix4x4 ShadowViewProjection0 = default,
         Matrix4x4 ShadowViewProjection1 = default,
         Matrix4x4 ShadowViewProjection2 = default,

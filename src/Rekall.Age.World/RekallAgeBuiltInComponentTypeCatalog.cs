@@ -28,6 +28,7 @@ public static class RekallAgeBuiltInComponentTypeCatalog
         "Rekall.XrController",
         "Rekall.DirectionalLight",
         "Rekall.PointLight",
+        "Rekall.SpotLight",
         "Rekall.MultiplayerSession",
         "Rekall.NetworkIdentity",
         "Rekall.NetworkTransform",

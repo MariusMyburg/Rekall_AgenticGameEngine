@@ -3192,9 +3192,12 @@ behavior.
   atmosphere/cloud/halo effects could reach before); ordinary custom-shaded
   translucent surfaces (glass, water) are authorable through the generic
   component system for the first time, proven by `Examples/RainGlass`.
-  Breadth still lacks a generic spot-light contract and mature
-  shadow/contact/render-feature coverage expected of a finished
-  general-purpose 3D engine.
+  `Rekall.SpotLight` now provides a generic cone-light contract (direction
+  from the entity's own `Rekall.Transform3D`, inner/outer cone falloff,
+  same 4-light budget/priority ordering as point lights, in both the
+  headless capture and live-player shader implementations). Breadth still
+  lacks mature shadow/contact/render-feature coverage expected of a
+  finished general-purpose 3D engine.
 - Expand adversarial security tests around authored JSON, migration races,
   diagnostic stores, and full-trust module inputs.
 - Production consumers still execute C# modules in-process until the active
@@ -6545,6 +6548,70 @@ mode genuinely discards while ordinary alpha just blends); both default
 shaders confirmed compiling and rendering correctly (a live player run over
 2000+ frames, and a real headless capture through an existing example
 project); and the full `Rendering` test selection (741/741) passed.
+
+## 2026-08-27 Generic spot light contract
+
+Fourth item from the same session's backlog: a `Rekall.SpotLight` component,
+parallel to the existing `Rekall.PointLight`/`Rekall.DirectionalLight` pair.
+Intensity/color/range/priority/shadow-schema properties mirror
+`RekallAgePointLightComponent` exactly (including the same dead
+`CastShadows`/`ShadowPriority` schema fields point lights already carry but
+don't yet act on); `InnerConeAngle`/`OuterConeAngle` (degrees) are new. The
+cone's facing direction is not authored on the component at all - it comes
+from the entity's own `Rekall.Transform3D` rotation via the exact same
+`DirectionFromEuler` helper the camera and `Rekall.DirectionalLight` already
+use, so no new authoring convention was introduced.
+
+Investigation before implementing found the existing point-light uniform
+pipeline is already a 16-slot flat-field struct in the headless capture path
+(`RekallAgeVulkanSceneGpuFrameUniform`) but only a 4-slot one in the live
+Windows Player's own separate inline shader - the same dual-implementation
+divergence discovered during the AlphaCutoff work. Rather than retrofit cone
+data onto that already-large, already-inconsistent point-light array, spot
+lights got their own deliberately small, fixed 4-slot array in both
+implementations (matching the live player's existing 4-light point budget),
+threaded through the full authoring-to-GPU pipeline: `RekallAgeSpotLightComponent`
+-> generic `IsLight` projection into `RekallAgeRuntimeRenderLight` (cone
+angles read the same generic way range/priority already are) ->
+`RekallAgeRuntimeViewportRenderable.LightInnerConeAngle`/`LightOuterConeAngle`
+-> `RekallAgeVulkanSceneBatchBuilder.ResolveSpotLights`/`ToSceneSpotLight`
+(same priority/intensity/stable-id ordering as point lights; inner angle
+clamped to never exceed outer) -> `RekallAgeVulkanSpotLight` records on the
+shared frame uniform -> both `BuildFrameUniform` (capture path) and
+`Program.cs`'s own `FrameUniform`/`SpotLight()` helper (live path) -> cone
+attenuation (`smoothstep`-style falloff between cos(inner) and cos(outer),
+squared, multiplied into the existing distance-attenuation term) added to
+both shaders' lighting loops (`rekall_scene.frag` and the live player's
+inline `SceneFragmentShader`). The two paths signal "how many spot lights
+are active" differently, matching how they already diverge for point
+lights: the capture path packs a real count into the spare
+`spotLightDirection.w` slot and loops `spotIndex < spotCount`; the live
+player has no count field at all and just loops all 4 slots, using each
+slot's own zero-color check to skip unused ones (the same technique its
+existing 4-slot point-light loop already uses).
+
+Confirmed empirically, not just by field-count arithmetic, that the ~20
+new `vec4`s inserted into `rekall_scene.frag`'s std140 uniform block still
+line up byte-for-byte with the flat `float` sequence `BuildFrameUniform`
+packs on the C# side: a real Vulkan headless capture (RTX 5090, not the
+software fallback) of a spot light dropped straight down onto a floor
+renders a clean, correctly warm-tinted, correctly falling-off circle of
+light centered under the fixture - the exact shape a working cone
+attenuation produces, and not what a slipped uniform offset would produce
+(that fails as global lighting corruption/darkness, not a clean localized
+cone).
+
+Verified with new tests at every layer: `ViewportContractTests` proves an
+authored `Rekall.SpotLight` + `Rekall.Transform3D` projects cone angles all
+the way into a runtime renderable; `VulkanSceneBatchBuilderTests` proves
+direction comes from rotation (a 180-degree yaw flips the default +Z
+forward to -Z), cone angles convert to cosines correctly, the 4-light budget
+and priority/intensity/stable-id ordering match the point-light pattern, and
+an authored inner-angle-greater-than-outer mistake is clamped rather than
+producing an inverted (never-lit) cone; `VulkanScenePreparedFrameTests`
+proves the capture path's `BuildFrameUniform` unpacks color/position/
+direction/range/priority/cone-cosines correctly and updates the uniform's
+verified byte size (1,280 -> 1,536 bytes for the 4 new 16-float slots).
 
 ## Update rule
 

@@ -66,6 +66,22 @@ layout(set = 0, binding = 0) uniform FrameUniform
     vec4 additionalLightColor16;
     vec4 additionalLightPosition16;
     vec4 additionalLightParameters16;
+    vec4 spotLightColor;
+    vec4 spotLightPosition;
+    vec4 spotLightDirection;
+    vec4 spotLightParameters;
+    vec4 spotLightColor2;
+    vec4 spotLightPosition2;
+    vec4 spotLightDirection2;
+    vec4 spotLightParameters2;
+    vec4 spotLightColor3;
+    vec4 spotLightPosition3;
+    vec4 spotLightDirection3;
+    vec4 spotLightParameters3;
+    vec4 spotLightColor4;
+    vec4 spotLightPosition4;
+    vec4 spotLightDirection4;
+    vec4 spotLightParameters4;
     vec4 environmentParameters;
     vec4 environmentAmbientSkyColor;
     vec4 environmentAmbientGroundColor;
@@ -833,6 +849,45 @@ void main()
             * additionalTransmittance
             * additionalNdotl
             * practicalAttenuation
+            * 4.5;
+    }
+    vec4 spotColors[4] = vec4[](frame.spotLightColor, frame.spotLightColor2, frame.spotLightColor3, frame.spotLightColor4);
+    vec4 spotPositions[4] = vec4[](frame.spotLightPosition, frame.spotLightPosition2, frame.spotLightPosition3, frame.spotLightPosition4);
+    vec4 spotDirections[4] = vec4[](frame.spotLightDirection, frame.spotLightDirection2, frame.spotLightDirection3, frame.spotLightDirection4);
+    vec4 spotParameters[4] = vec4[](frame.spotLightParameters, frame.spotLightParameters2, frame.spotLightParameters3, frame.spotLightParameters4);
+    int spotCount = clamp(int(frame.spotLightDirection.w + 0.5), 0, 4);
+    for (int spotIndex = 0; spotIndex < spotCount; spotIndex++)
+    {
+        if (dot(spotColors[spotIndex].rgb, spotColors[spotIndex].rgb) <= 0.000001) continue;
+        vec3 spotOffset = spotPositions[spotIndex].xyz - fragWorldPosition;
+        float spotDistance = length(spotOffset);
+        vec3 spotLight = spotOffset / max(spotDistance, 0.0001);
+        float spotRange = max(spotParameters[spotIndex].x, 0.001);
+        float spotWindow = pow(clamp(1.0 - spotDistance / spotRange, 0.0, 1.0), 2.0);
+        float spotDistanceAttenuation = spotWindow / (1.0 + 0.045 * spotDistance * spotDistance);
+        vec3 spotForward = normalize(spotDirections[spotIndex].xyz);
+        float spotCos = dot(-spotLight, spotForward);
+        float spotInnerCos = spotParameters[spotIndex].z;
+        float spotOuterCos = spotParameters[spotIndex].w;
+        float spotConeAttenuation = clamp((spotCos - spotOuterCos) / max(spotInnerCos - spotOuterCos, 0.0001), 0.0, 1.0);
+        spotConeAttenuation *= spotConeAttenuation;
+        float spotAttenuation = spotDistanceAttenuation * spotConeAttenuation;
+        if (spotAttenuation <= 0.0001) continue;
+        vec3 spotHalfVector = normalize(view + spotLight);
+        float spotNdotl = max(dot(normal, spotLight), 0.0);
+        float spotD = distributionGgx(normal, spotHalfVector, roughness);
+        float spotG = geometrySchlickGgx(ndotv, roughness) * geometrySchlickGgx(spotNdotl, roughness);
+        vec3 spotF = fresnelSchlick(max(dot(spotHalfVector, view), 0.0), f0);
+        vec3 spotSpecular = spotD * spotG * spotF / max(4.0 * ndotv * spotNdotl, 0.0001);
+        spotSpecular *= mix(1.0, surfaceWaterSpecularStrength(), waterCoverage);
+        vec3 spotDiffuse = (1.0 - spotF) * (1.0 - metallic) * albedo / PI;
+        spotDiffuse *= mix(1.0, 0.42, waterCoverage);
+        vec3 spotTransmittance = surfaceAtmosphereTransmittance(fragWorldPosition, spotLight);
+        additionalDirect += (spotDiffuse + spotSpecular)
+            * spotColors[spotIndex].rgb
+            * spotTransmittance
+            * spotNdotl
+            * spotAttenuation
             * 4.5;
     }
     vec3 color = emissive

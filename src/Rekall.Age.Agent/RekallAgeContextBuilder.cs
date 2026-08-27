@@ -200,7 +200,8 @@ public sealed class RekallAgeContextBuilder
             or "Rekall.TextLabelRenderer"
             or "Rekall.RenderLight"
             or "Rekall.DirectionalLight"
-            or "Rekall.PointLight";
+            or "Rekall.PointLight"
+            or "Rekall.SpotLight";
     }
 
     private static bool ReadBoolean(JsonObject properties, string name, bool fallback)

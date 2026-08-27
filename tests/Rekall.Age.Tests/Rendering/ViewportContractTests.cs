@@ -457,6 +457,32 @@ public sealed class ViewportContractTests
     }
 
     [Fact]
+    public void RuntimeFrameBuilderProjectsSpotLightConeAnglesFromAuthoredComponent()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", ["camera"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Camera3D", new JsonObject { ["active"] = true })))
+            .AddEntity(RekallAgeEntityDocument.Create("Flashlight", ["lighting"])
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D", new JsonObject { ["x"] = 1, ["y"] = 2, ["z"] = 3 }))
+                .AddComponent(RekallAgeComponentDocument.Create("Rekall.SpotLight", new JsonObject
+                {
+                    ["intensity"] = 2,
+                    ["range"] = 15,
+                    ["innerConeAngle"] = 12,
+                    ["outerConeAngle"] = 24
+                })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var spot = Assert.Single(frame.Renderables, item => item.Kind == "light" && item.EntityName == "Flashlight");
+        Assert.Equal("SpotLight", spot.Variant);
+        Assert.Equal(15, spot.LightRange);
+        Assert.Equal(12, spot.LightInnerConeAngle);
+        Assert.Equal(24, spot.LightOuterConeAngle);
+    }
+
+    [Fact]
     public void RuntimeFrameBuilderIncludesActiveCameraTransformForHardwareRendering()
     {
         var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"])

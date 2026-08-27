@@ -468,6 +468,74 @@ public sealed class VulkanSceneBatchBuilderTests
     }
 
     [Fact]
+    public void BuildResolvesASpotLightWithDirectionFromRotationAndConeAnglesFromDegrees()
+    {
+        var frame = CreateFrame(
+            new RekallAgeRuntimeViewportRenderable(
+                "flashlight", "Flashlight", "light", null, 1, 2, 3, 1,
+                Variant: "SpotLight", Intensity: 5, MaterialColor: "#ffffff",
+                RotationX: 0, RotationY: 180, RotationZ: 0)
+            {
+                LightRange = 25,
+                LightPriority = 7,
+                LightInnerConeAngle = 10,
+                LightOuterConeAngle = 20
+            });
+
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, []);
+
+        Assert.Single(batch.Frame.SpotLights);
+        var spot = batch.Frame.SpotLights[0];
+        Assert.Equal("flashlight", spot.EntityId);
+        Assert.Equal(new Vector4(1, 2, 3, 1), spot.Position);
+        Assert.Equal(25, spot.Parameters.X);
+        Assert.Equal(7, spot.Parameters.Y);
+        Assert.Equal(MathF.Cos(10 * MathF.PI / 180f), spot.Parameters.Z, 5);
+        Assert.Equal(MathF.Cos(20 * MathF.PI / 180f), spot.Parameters.W, 5);
+        // A 180-degree yaw about Y should flip the default +Z forward direction to -Z.
+        Assert.Equal(-1, spot.Direction.Z, 3);
+    }
+
+    [Fact]
+    public void BuildKeepsAtMostFourSpotLightsByPriorityIntensityAndStableId()
+    {
+        var lights = new[]
+        {
+            new RekallAgeRuntimeViewportRenderable("z-low", "Low", "light", null, 0, 1, 0, 1, Variant: "SpotLight", Intensity: 20, MaterialColor: "#ffffff") { LightPriority = 1 },
+            new RekallAgeRuntimeViewportRenderable("b-priority", "B", "light", null, 0, 2, 0, 2, Variant: "SpotLight", Intensity: 4, MaterialColor: "#ffffff") { LightPriority = 8 },
+            new RekallAgeRuntimeViewportRenderable("a-priority", "A", "light", null, 0, 3, 0, 3, Variant: "SpotLight", Intensity: 4, MaterialColor: "#ffffff") { LightPriority = 8 },
+            new RekallAgeRuntimeViewportRenderable("c-priority", "C", "light", null, 0, 4, 0, 4, Variant: "SpotLight", Intensity: 2, MaterialColor: "#ffffff") { LightPriority = 8 },
+            new RekallAgeRuntimeViewportRenderable("d-middle", "D", "light", null, 0, 5, 0, 5, Variant: "SpotLight", Intensity: 9, MaterialColor: "#ffffff") { LightPriority = 4 },
+            new RekallAgeRuntimeViewportRenderable("e-dropped", "E", "light", null, 0, 6, 0, 6, Variant: "SpotLight", Intensity: 1, MaterialColor: "#ffffff") { LightPriority = 0 }
+        };
+        var frame = CreateFrame(lights);
+
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, []);
+
+        Assert.Equal(4, batch.Frame.SpotLightBudget);
+        Assert.Equal(["a-priority", "b-priority", "c-priority", "d-middle"], batch.Frame.SpotLights.Select(item => item.EntityId));
+        Assert.Equal(["z-low", "e-dropped"], batch.Frame.DroppedSpotLightEntityIds);
+    }
+
+    [Fact]
+    public void BuildClampsAnInvertedConeSoInnerNeverExceedsOuter()
+    {
+        var frame = CreateFrame(
+            new RekallAgeRuntimeViewportRenderable(
+                "confused", "Confused", "light", null, 0, 0, 0, 1,
+                Variant: "SpotLight", Intensity: 5, MaterialColor: "#ffffff")
+            {
+                LightInnerConeAngle = 45,
+                LightOuterConeAngle = 10
+            });
+
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, []);
+
+        var spot = batch.Frame.SpotLights[0];
+        Assert.Equal(spot.Parameters.W, spot.Parameters.Z, 5);
+    }
+
+    [Fact]
     public void DefaultBatchKeepsDirectionalKeyAndFirstPointPractical()
     {
         var frame = CreateFrame(

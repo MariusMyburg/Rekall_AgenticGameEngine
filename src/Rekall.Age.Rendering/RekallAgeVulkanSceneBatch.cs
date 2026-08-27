@@ -145,12 +145,25 @@ public sealed record RekallAgeVulkanSceneFrameUniform(
     public int PointLightBudget { get; init; } = 4;
 
     public IReadOnlyList<string> DroppedPointLightEntityIds { get; init; } = [];
+
+    public IReadOnlyList<RekallAgeVulkanSpotLight> SpotLights { get; init; } = [];
+
+    public int SpotLightBudget { get; init; } = 4;
+
+    public IReadOnlyList<string> DroppedSpotLightEntityIds { get; init; } = [];
 }
 
 public sealed record RekallAgeVulkanPointLight(
     string EntityId,
     Vector4 Color,
     Vector4 Position,
+    Vector4 Parameters);
+
+public sealed record RekallAgeVulkanSpotLight(
+    string EntityId,
+    Vector4 Color,
+    Vector4 Position,
+    Vector4 Direction,
     Vector4 Parameters);
 
 public sealed record RekallAgePointLightSelectionReport(

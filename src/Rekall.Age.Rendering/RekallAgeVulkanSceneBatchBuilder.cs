@@ -238,6 +238,9 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         {
             additionalLight = SceneLight.Disabled;
         }
+        const int spotLightBudget = 4;
+        var spotLightCandidates = ResolveSpotLights(renderables, int.MaxValue);
+        var spotLights = spotLightCandidates.Take(spotLightBudget).ToArray();
         var environment = frame.Environment;
         var environmentParameters = environment is null
             ? new Vector4(1, 0, 11.2f, 0)
@@ -268,6 +271,21 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
                 item.EntityId ?? string.Empty, item.Color, item.Position, new Vector4(item.Range, item.Priority, 0, 0))).ToArray(),
             DroppedPointLightEntityIds = pointLightCandidates
                 .Skip(pointLightBudget)
+                .Select(item => item.EntityId ?? string.Empty)
+                .ToArray(),
+            SpotLightBudget = spotLightBudget,
+            SpotLights = spotLights.Select(item => new RekallAgeVulkanSpotLight(
+                item.EntityId ?? string.Empty,
+                item.Color,
+                item.Position,
+                new Vector4(item.Direction, 0),
+                new Vector4(
+                    item.Range,
+                    item.Priority,
+                    MathF.Cos(item.InnerConeAngle * MathF.PI / 180f),
+                    MathF.Cos(item.OuterConeAngle * MathF.PI / 180f)))).ToArray(),
+            DroppedSpotLightEntityIds = spotLightCandidates
+                .Skip(spotLightBudget)
                 .Select(item => item.EntityId ?? string.Empty)
                 .ToArray()
         };
@@ -597,7 +615,7 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
     private static Vector4 ResolveLightColor(RekallAgeRuntimeViewportRenderable light)
     {
         var color = ParseColor(light.MaterialColor);
-        var intensity = (float)Math.Clamp(light.Intensity, 0.05, IsPointLight(light) ? 16.0 : 4.0);
+        var intensity = (float)Math.Clamp(light.Intensity, 0.05, IsPointLight(light) || IsSpotLight(light) ? 16.0 : 4.0);
         return new Vector4(color.X * intensity, color.Y * intensity, color.Z * intensity, 1);
     }
 
@@ -617,6 +635,47 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
     private static bool IsPointLight(RekallAgeRuntimeViewportRenderable renderable)
     {
         return renderable.Variant?.Contains("point", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool IsSpotLight(RekallAgeRuntimeViewportRenderable renderable)
+    {
+        return renderable.Variant?.Contains("spot", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static IReadOnlyList<SceneSpotLight> ResolveSpotLights(
+        IEnumerable<RekallAgeRuntimeViewportRenderable> renderables,
+        int maximumCount)
+    {
+        return renderables
+            .Where(renderable => renderable.Kind.Equals("light", StringComparison.Ordinal)
+                && renderable.Intensity > 0.0001
+                && IsSpotLight(renderable))
+            .OrderByDescending(renderable => renderable.LightPriority)
+            .ThenByDescending(renderable => renderable.Intensity)
+            .ThenBy(renderable => renderable.EntityId, StringComparer.Ordinal)
+            .Take(maximumCount)
+            .Select(ToSceneSpotLight)
+            .ToArray();
+    }
+
+    private static SceneSpotLight ToSceneSpotLight(RekallAgeRuntimeViewportRenderable light)
+    {
+        var inner = (float)Math.Clamp(light.LightInnerConeAngle, 0, 89);
+        var outer = (float)Math.Clamp(light.LightOuterConeAngle, 0.001, 89);
+        if (inner > outer)
+        {
+            inner = outer;
+        }
+
+        return new SceneSpotLight(
+            light.EntityId,
+            DirectionFromEuler(light.RotationX, light.RotationY, light.RotationZ),
+            new Vector4((float)light.X, (float)light.Y, (float)light.Z, 1),
+            ResolveLightColor(light),
+            (float)Math.Clamp(light.LightRange, 0.001, 1_000_000),
+            light.LightPriority,
+            inner,
+            outer);
     }
 
     private static Vector3 DirectionFromEuler(double degreesX, double degreesY, double degreesZ)
@@ -690,6 +749,16 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
     {
         public static SceneLight Disabled { get; } = new(null, Vector3.Zero, Vector4.Zero, Vector4.Zero);
     }
+
+    private readonly record struct SceneSpotLight(
+        string? EntityId,
+        Vector3 Direction,
+        Vector4 Position,
+        Vector4 Color,
+        float Range,
+        int Priority,
+        float InnerConeAngle,
+        float OuterConeAngle);
 
     private readonly record struct CameraPose(Vector3 Eye, Vector3 Forward, Vector3 Right, Vector3 Up);
 }

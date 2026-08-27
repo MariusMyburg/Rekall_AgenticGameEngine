@@ -165,6 +165,10 @@ public sealed class VulkanScenePreparedFrameTests
                 new("three", new(1, 0, 4, 1), new(7, 8, 9, 1), new(9, 2, 0, 0)),
                 new("four", new(2, 2, 2, 1), new(10, 11, 12, 1), new(10, 1, 0, 0)),
                 new("five", new(5, 4, 3, 1), new(13, 14, 15, 1), new(11, 0, 0, 0))
+            ],
+            SpotLights =
+            [
+                new("torch", new(6, 5, 4, 1), new(16, 17, 18, 1), new(0, 1, 0, 0), new(20, 3, 0.9f, 0.8f))
             ]
         };
 
@@ -193,9 +197,18 @@ public sealed class VulkanScenePreparedFrameTests
         Assert.Equal(6, uniform.AdditionalLight2PositionZ);
         Assert.Equal(9, uniform.AdditionalLight3Range);
         Assert.Equal(12, uniform.AdditionalLight4PositionZ);
+        Assert.Equal(6, uniform.SpotLight1R);
+        Assert.Equal(18, uniform.SpotLight1PositionZ);
+        Assert.Equal(1, uniform.SpotLight1DirectionY);
+        Assert.Equal(20, uniform.SpotLight1Range);
+        Assert.Equal(3, uniform.SpotLight1Priority);
+        Assert.Equal(0.9f, uniform.SpotLight1InnerCos);
+        Assert.Equal(0.8f, uniform.SpotLight1OuterCos);
+        Assert.Equal(0, uniform.SpotLight2R);
+        Assert.Equal(0, uniform.SpotLight2Range);
         var uniformBytes = System.Runtime.InteropServices.MemoryMarshal.AsBytes(
             System.Runtime.InteropServices.MemoryMarshal.CreateReadOnlySpan(in uniform, 1));
-        Assert.Equal(1_280, uniformBytes.Length);
+        Assert.Equal(1_536, uniformBytes.Length);
         Assert.Equal(5, System.BitConverter.ToSingle(uniformBytes.Slice(656, sizeof(float))));
         Assert.Equal(0.55f, uniform.EnvironmentAmbientEnergy);
         Assert.Equal(-0.35f, uniform.EnvironmentExposure);

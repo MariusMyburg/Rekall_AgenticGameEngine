@@ -32,6 +32,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeXrControllerComponent>();
         builder.RegisterComponent<RekallAgeDirectionalLightComponent>();
         builder.RegisterComponent<RekallAgePointLightComponent>();
+        builder.RegisterComponent<RekallAgeSpotLightComponent>();
         builder.RegisterComponent<RekallAgeMultiplayerSessionComponent>();
         builder.RegisterComponent<RekallAgeNetworkIdentityComponent>();
         builder.RegisterComponent<RekallAgeNetworkTransformComponent>();
@@ -756,6 +757,34 @@ public sealed class RekallAgePointLightComponent : RekallAgeComponent
 
     [RekallAgeProperty(Minimum = 0.001)]
     public double Range { get; init; } = 10;
+
+    [RekallAgeProperty]
+    public int Priority { get; init; }
+
+    [RekallAgeProperty]
+    public bool CastShadows { get; init; }
+
+    [RekallAgeProperty]
+    public int ShadowPriority { get; init; }
+}
+
+[RekallAgeComponent("Spot Light", Description = "Emits a cone-shaped light. Put its position and facing direction on a separate Rekall.Transform3D component on the same entity (the cone points along the transform's forward axis, the same convention Rekall.DirectionalLight uses); this component configures intensity, color, range, and cone angles only.")]
+public sealed class RekallAgeSpotLightComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 0)]
+    public double Intensity { get; init; } = 1;
+
+    [RekallAgeProperty(Kind = "color")]
+    public string Color { get; init; } = "#ffffff";
+
+    [RekallAgeProperty(Minimum = 0.001)]
+    public double Range { get; init; } = 10;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 89)]
+    public double InnerConeAngle { get; init; } = 20;
+
+    [RekallAgeProperty(Minimum = 0.001, Maximum = 89)]
+    public double OuterConeAngle { get; init; } = 30;
 
     [RekallAgeProperty]
     public int Priority { get; init; }

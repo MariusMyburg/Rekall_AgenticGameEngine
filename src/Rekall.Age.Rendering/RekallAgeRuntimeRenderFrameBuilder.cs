@@ -808,7 +808,9 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 Layer: light.Layer)
             {
                 LightRange = light.Range,
-                LightPriority = light.Priority
+                LightPriority = light.Priority,
+                LightInnerConeAngle = light.InnerConeAngle,
+                LightOuterConeAngle = light.OuterConeAngle
             };
         }
 

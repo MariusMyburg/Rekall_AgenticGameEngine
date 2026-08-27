@@ -352,7 +352,9 @@ public sealed class RekallAgeCameraZoomInputComponent : RekallAgeComponent
     public bool InvertWheel { get; init; }
 }
 
-[RekallAgeComponent("Camera Target 3D")]
+[RekallAgeComponent(
+    "Camera Target 3D",
+    Description = "Attaches this entity (typically a camera) to a target entity with an authored offset and optional look-at, similar to Unreal's SpringArmComponent. FollowPosition alone snaps instantly every frame; enable PositionLagEnabled/RotationLagEnabled for the smoothed, trailing-behind motion an actual spring arm has, tuned by PositionLagSpeed/RotationLagSpeed and optionally bounded by MaximumPositionLagDistance. Enable CollisionAvoidanceEnabled for the other classic spring-arm feature: a probe ray from the target out to the desired camera position pulls the camera in to CollisionMinimumDistance short of anything in the way, so it does not clip through geometry - a single ray, not a true swept sphere/capsule.")]
 public sealed class RekallAgeCameraTarget3DComponent : RekallAgeComponent
 {
     [RekallAgeProperty]
@@ -408,6 +410,27 @@ public sealed class RekallAgeCameraTarget3DComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public bool LookAt { get; init; } = true;
+
+    [RekallAgeProperty(Description = "When true, the camera's position smoothly trails the instant target+offset position instead of snapping to it every frame - the actual spring-arm \"delayed motion\" behavior. Off by default so existing scenes authored before this property existed keep their exact prior instant-follow behavior.")]
+    public bool PositionLagEnabled { get; init; }
+
+    [RekallAgeProperty(Minimum = 0.0001, Description = "Exponential-decay catch-up rate in 1/seconds for position lag: higher values catch up to the target faster (snappier), lower values trail further behind (looser). Matches Unreal's SpringArmComponent CameraLagSpeed in spirit. Ignored unless PositionLagEnabled is true.")]
+    public double PositionLagSpeed { get; init; } = 10;
+
+    [RekallAgeProperty(Minimum = 0, Description = "Caps how far the smoothed camera position may lag behind the instant target+offset position, in world units. 0 (the default) means unbounded lag distance. Prevents the camera falling arbitrarily far behind during a sudden fast target movement.")]
+    public double MaximumPositionLagDistance { get; init; }
+
+    [RekallAgeProperty(Description = "Same idea as PositionLagEnabled but for the look-at rotation: when true, rotation smoothly trails the instant look-at orientation using shortest-path angle interpolation on each axis, instead of snapping. Off by default for the same backward-compatibility reason as PositionLagEnabled. Ignored when LookAt is false.")]
+    public bool RotationLagEnabled { get; init; }
+
+    [RekallAgeProperty(Minimum = 0.0001, Description = "Exponential-decay catch-up rate in 1/seconds for rotation lag, same semantics as PositionLagSpeed. Ignored unless RotationLagEnabled is true.")]
+    public double RotationLagSpeed { get; init; } = 10;
+
+    [RekallAgeProperty(Description = "When true, probes a single ray from the target's position out toward the desired camera position every frame and pulls the camera in if something (other than the target or camera entities themselves) is in the way, so it never clips through geometry. This is a single ray, not a true swept sphere/capsule the way a real spring arm's own collision channel is - a thin obstruction near the ray's edge may not be detected. Off by default.")]
+    public bool CollisionAvoidanceEnabled { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Description = "How close, in world units, the camera is allowed to sit in front of whatever the collision probe hit. Also the minimum possible distance from the target when an obstruction is found extremely close. Ignored unless CollisionAvoidanceEnabled is true.")]
+    public double CollisionMinimumDistance { get; init; } = 0.1;
 
     [RekallAgeProperty]
     public bool Active { get; init; } = true;

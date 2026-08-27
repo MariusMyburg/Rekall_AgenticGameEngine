@@ -576,6 +576,7 @@ public sealed class ModuleHostWindowsIsolationTests
             "Rekall.Age.ModuleHost.deps.json",
             "Rekall.Age.ModuleHost.runtimeconfig.json",
             "Rekall.Age.Modules.dll",
+            "Rekall.Age.Modeling.Contracts.dll",
             "Rekall.Age.Core.dll",
             "Rekall.Age.Rendering.Abstractions.dll",
             "Rekall.Age.Runtime.Abstractions.dll",

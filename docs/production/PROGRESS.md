@@ -6242,6 +6242,45 @@ generic joints) are shipped, tested, and documented.
 - `docs/superpowers/plans/2026-08-27-collision-layers.md`
 - `docs/superpowers/specs/2026-08-27-physics-joints-design.md`
 
+## 2026-08-27 Engine fixes from authoring Ridgebreaker
+
+Two real engine issues found while authoring `Examples/Ridgebreaker` (a
+physics vehicle-climber built as an external CLI/MCP client would) were
+fixed, not just worked around in the example:
+
+- `RekallAgeMeshFracture.Fracture` threw an unhandled `NullReferenceException`
+  from inside the third-party CSG.Sharp library for certain seeds on an
+  otherwise valid closed mesh (a degenerate cutting plane for that specific
+  seed pair). We don't control CSG.Sharp's source, so `Fracture` now retries
+  up to 8 times with a deterministic reseed (a pure function of the caller's
+  seed and attempt index) before surfacing a clear `InvalidOperationException`
+  instead of letting the crash escape.
+- `Rekall.HingeJoint` gained a real continuous motor
+  (`MotorTargetVelocity`/`MotorMaximumTorque`, a solved BEPU
+  `AngularAxisMotor` constraint, updated in place via `Solver.ApplyDescription`
+  so a live-authored target never tears down solver warm-start state). This
+  is the actual fix for a root cause, not a patch: driving a wheel by
+  overwriting its own `Rigidbody3D.angularVelocityZ` every frame — the only
+  way to do continuous driving before this — fights a Hinge joint's own
+  constraint solving and reliably destabilizes the assembly after sustained
+  use. Verified stable over 600 frames of continuous full motor torque on a
+  properly grounded single-wheel rig; a free-floating (no gravity, no ground)
+  version of the identical test does destabilize, which is correct physics
+  (a motor's reaction torque needs something to resist it), not an engine
+  bug — matches how a real vehicle's chassis rolls under hard acceleration.
+
+Applying the motor fix to Ridgebreaker's actual two-wheeled vehicle improved
+but did not fully resolve its own long-duration full-throttle stability
+(roughly 3x the distance, roughly 2x the time before tipping, versus the
+pre-fix vehicle). The remaining instability is a game-tuning problem specific
+to that vehicle's wheelbase/mass/torque balance under cumulative two-wheel
+reaction torque, not a further engine gap — recorded here rather than papered
+over.
+
+- `docs/superpowers/plans/2026-08-27-collision-layers.md` (records the
+  original `CollidableProperty<T>` unmanaged-type constraint that motivated
+  the handle-keyed dictionary pattern `SyncHingeMotor` also follows)
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

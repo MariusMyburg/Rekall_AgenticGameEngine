@@ -952,18 +952,21 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
 
                     var signature = $"{component.Type}|{component.Properties.ToJsonString()}|{bodyA.Handle.Value}|{bodyB.Handle.Value}";
                     desired.Add(key);
-                    if (_joints.TryGetValue(key, out var existing) && existing.Signature.Equals(signature, StringComparison.Ordinal))
+                    if (!_joints.TryGetValue(key, out var existing) || !existing.Signature.Equals(signature, StringComparison.Ordinal))
                     {
-                        continue;
+                        if (_joints.TryGetValue(key, out var stale))
+                        {
+                            Simulation.Solver.Remove(stale.Handle);
+                        }
+
+                        var handle = AddJointConstraint(component, bodyA.Handle, bodyB.Handle);
+                        _joints[key] = new PersistentJoint(handle, bodyA.Handle, bodyB.Handle, signature);
                     }
 
-                    if (_joints.TryGetValue(key, out var stale))
+                    if (component.Type == "Rekall.HingeJoint")
                     {
-                        Simulation.Solver.Remove(stale.Handle);
+                        SyncHingeMotor(key + ":motor", component, bodyA.Handle, bodyB.Handle, desired);
                     }
-
-                    var handle = AddJointConstraint(component, bodyA.Handle, bodyB.Handle);
-                    _joints[key] = new PersistentJoint(handle, bodyA.Handle, bodyB.Handle, signature);
                 }
             }
 
@@ -972,6 +975,53 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                 Simulation.Solver.Remove(stale.Value.Handle);
                 _joints.Remove(stale.Key);
             }
+        }
+
+        /// <summary>
+        /// A HingeJoint's optional continuous motor: a real BEPU AngularAxisMotor constraint,
+        /// solved by the solver every frame alongside the hinge, rather than an external velocity
+        /// override. Found necessary while authoring a real example game: repeatedly overwriting
+        /// a wheel body's own angular velocity every frame to "drive" it fights the Hinge
+        /// constraint's own solving and reliably destabilizes the assembly after sustained use.
+        /// An existing motor constraint's target/torque is updated in place via
+        /// Solver.ApplyDescription so its solver warm-start state is never torn down just because
+        /// the authored target changed - only a full add/remove is needed when the motor is first
+        /// enabled or fully disabled (MotorMaximumTorque back to 0).
+        /// </summary>
+        private void SyncHingeMotor(
+            string motorKey,
+            RekallAgeRuntimeComponent component,
+            BodyHandle handleA,
+            BodyHandle handleB,
+            HashSet<string> desired)
+        {
+            var maximumTorque = ReadSingle(component, "motorMaximumTorque", 0);
+            if (maximumTorque <= 0)
+            {
+                return;
+            }
+
+            desired.Add(motorKey);
+            var description = new AngularAxisMotor
+            {
+                LocalAxisA = ReadAxis(component),
+                TargetVelocity = ReadSingle(component, "motorTargetVelocity", 0) * (MathF.PI / 180),
+                Settings = new MotorSettings(maximumTorque, 0)
+            };
+            if (_joints.TryGetValue(motorKey, out var existing)
+                && existing.HandleA.Equals(handleA) && existing.HandleB.Equals(handleB))
+            {
+                Simulation.Solver.ApplyDescription(existing.Handle, in description);
+                return;
+            }
+
+            if (_joints.TryGetValue(motorKey, out var stale))
+            {
+                Simulation.Solver.Remove(stale.Handle);
+            }
+
+            var handle = Simulation.Solver.Add(handleA, handleB, in description);
+            _joints[motorKey] = new PersistentJoint(handle, handleA, handleB, string.Empty);
         }
 
         private ConstraintHandle AddJointConstraint(RekallAgeRuntimeComponent component, BodyHandle handleA, BodyHandle handleB)

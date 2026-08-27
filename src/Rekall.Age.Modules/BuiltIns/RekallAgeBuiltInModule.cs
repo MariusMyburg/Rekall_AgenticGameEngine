@@ -1164,6 +1164,12 @@ public sealed class RekallAgeHingeJointComponent : RekallAgeComponent
 
     [RekallAgeProperty(Minimum = 0, Description = "BEPU damping ratio: 0 is undamped, 1 is critically damped, values above 1 are overdamped.")]
     public double DampingRatio { get; init; } = 1;
+
+    [RekallAgeProperty(Description = "Optional continuous motor: target relative angular velocity around Axis, in authored degrees per second, driven by the solver every frame (not an external velocity override). Ignored when MotorMaximumTorque is 0.")]
+    public double MotorTargetVelocity { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Description = "Maximum torque the motor may apply to reach MotorTargetVelocity. 0 (the default) disables the motor entirely, leaving the hinge a passive pin+axis constraint - set this above 0 to drive a wheel, door, or turntable continuously without fighting the hinge's own constraint solving the way externally overwriting a body's angular velocity every frame does.")]
+    public double MotorMaximumTorque { get; init; }
 }
 
 [RekallAgeComponent("Distance Joint", Description = "Keeps this dynamic body's center and another dynamic body's center at an authored target distance apart, like a rigid rod or taut rope. Both entities must have a rigid body and collider. ConnectedEntityId must reference a different, existing, dynamic entity.")]

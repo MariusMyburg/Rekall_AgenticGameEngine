@@ -371,6 +371,32 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneAcceptsAHingeJointMotor()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var wheel = RekallAgeEntityDocument.Create("Wheel", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.SphereCollider3D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.HingeJoint",
+                new JsonObject
+                {
+                    ["connectedEntityId"] = "chassis",
+                    ["motorTargetVelocity"] = 180,
+                    ["motorMaximumTorque"] = 20
+                }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["physics"])
+            .AddEntity(wheel);
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        Assert.DoesNotContain(report.Issues, issue =>
+            issue.Code == "REKALL_COMPONENT_PROPERTY_UNKNOWN" || issue.Code == "REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN");
+    }
+
+    [Fact]
     public async Task ValidateSceneAcceptsAnAuthoredCollisionFilter()
     {
         var root = TestPaths.CreateTempDirectory();

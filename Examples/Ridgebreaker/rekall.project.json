@@ -1,0 +1,9 @@
+{
+  "name": "Ridgebreaker",
+  "schemaVersion": 1,
+  "capabilities": [
+    "modules",
+    "physics3d",
+    "world"
+  ]
+}

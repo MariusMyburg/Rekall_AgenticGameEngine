@@ -1,0 +1,1792 @@
+{
+  "schemaVersion": 1,
+  "id": "scene_ae1b3b851eb44a7ebcc5c0bbc521872c",
+  "name": "Main",
+  "capabilities": [
+    "physics3d",
+    "world"
+  ],
+  "entities": [
+    {
+      "id": "chase-camera",
+      "name": "Chase Camera",
+      "tags": [
+        "camera"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "fieldOfView": 55,
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 1.5,
+            "y": 3.6,
+            "z": 15,
+            "pitch": -8,
+            "yaw": 180
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_f4cb82417d09426fb668d0043c12ad1c",
+      "name": "Crystal Outcrop 1",
+      "tags": [
+        "crystal"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "crystal"
+          }
+        },
+        {
+          "type": "Rekall.Destructible",
+          "properties": {
+            "chunkMeshAssetIds": [
+              "crystal-chunk-0",
+              "crystal-chunk-1",
+              "crystal-chunk-2",
+              "crystal-chunk-3",
+              "crystal-chunk-4"
+            ],
+            "explosionImpulse": 5
+          }
+        },
+        {
+          "type": "Rekall.EventBindings",
+          "properties": {
+            "events": [
+              {
+                "event": "collision.begin",
+                "handler": "crystalHit"
+              }
+            ]
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#7fe8ff",
+            "metallicFactor": 0.2,
+            "roughnessFactor": 0.15,
+            "emissiveColor": "#2fb8ff",
+            "emissiveStrength": 1.4
+          }
+        },
+        {
+          "type": "Rekall.MeshAssetReference",
+          "properties": {
+            "assetId": "crystal-body"
+          }
+        },
+        {
+          "type": "Rekall.MeshCollider",
+          "properties": {
+            "convex": true
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 0.6,
+            "restitution": 0.1
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 43.33692308889002,
+            "y": 5.510517194124971,
+            "z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_3d514d8a22fe4c0cbe1e528249979e83",
+      "name": "Crystal Outcrop 2",
+      "tags": [
+        "crystal"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "crystal"
+          }
+        },
+        {
+          "type": "Rekall.Destructible",
+          "properties": {
+            "chunkMeshAssetIds": [
+              "crystal-chunk-0",
+              "crystal-chunk-1",
+              "crystal-chunk-2",
+              "crystal-chunk-3",
+              "crystal-chunk-4"
+            ],
+            "explosionImpulse": 5
+          }
+        },
+        {
+          "type": "Rekall.EventBindings",
+          "properties": {
+            "events": [
+              {
+                "event": "collision.begin",
+                "handler": "crystalHit"
+              }
+            ]
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#7fe8ff",
+            "metallicFactor": 0.2,
+            "roughnessFactor": 0.15,
+            "emissiveColor": "#2fb8ff",
+            "emissiveStrength": 1.4
+          }
+        },
+        {
+          "type": "Rekall.MeshAssetReference",
+          "properties": {
+            "assetId": "crystal-body"
+          }
+        },
+        {
+          "type": "Rekall.MeshCollider",
+          "properties": {
+            "convex": true
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 0.6,
+            "restitution": 0.1
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 65.99437525331986,
+            "y": 7.512484312959193,
+            "z": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "rover-wheel-front",
+      "name": "Front Wheel",
+      "tags": [
+        "vehicle",
+        "wheel"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "vehicle",
+            "collidesWith": [
+              "terrain",
+              "crystal",
+              "fuel"
+            ]
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "sphere"
+          }
+        },
+        {
+          "type": "Rekall.HingeJoint",
+          "properties": {
+            "connectedEntityId": "rover-chassis",
+            "anchorAX": 0,
+            "anchorAY": 0,
+            "anchorAZ": 0,
+            "anchorBX": 0.95,
+            "anchorBY": -0.55,
+            "anchorBZ": 0,
+            "axisX": 0,
+            "axisY": 0,
+            "axisZ": 1,
+            "springFrequency": 150,
+            "dampingRatio": 10
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#20232a",
+            "metallicFactor": 0.1,
+            "roughnessFactor": 0.6
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.6,
+            "restitution": 0.02
+          }
+        },
+        {
+          "type": "Rekall.Rigidbody3D",
+          "properties": {
+            "mass": 3
+          }
+        },
+        {
+          "type": "Rekall.SphereCollider3D",
+          "properties": {
+            "radius": 0.55
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 2.45,
+            "y": 1.05,
+            "z": 0,
+            "scaleX": 1.1,
+            "scaleY": 1.1,
+            "scaleZ": 1.1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_6e10d9d7a9f341448aff278e994f8e45",
+      "name": "Fuel Cell 1",
+      "tags": [
+        "fuel"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "fuel"
+          }
+        },
+        {
+          "type": "Rekall.EventBindings",
+          "properties": {
+            "events": [
+              {
+                "event": "trigger.enter",
+                "handler": "fuelPickup"
+              }
+            ]
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "sphere"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#ffd23f",
+            "metallicFactor": 0.4,
+            "roughnessFactor": 0.3,
+            "emissiveColor": "#ffb400",
+            "emissiveStrength": 1.0
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 15.190813158066922,
+            "y": 3.1884417214117953,
+            "z": 0,
+            "scaleX": 0.9,
+            "scaleY": 0.9,
+            "scaleZ": 0.9
+          }
+        },
+        {
+          "type": "Rekall.Trigger",
+          "properties": {
+            "shape": "sphere",
+            "radius": 0.6
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_12da87bd81254bcea71f8122419e7b6a",
+      "name": "Fuel Cell 2",
+      "tags": [
+        "fuel"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "fuel"
+          }
+        },
+        {
+          "type": "Rekall.EventBindings",
+          "properties": {
+            "events": [
+              {
+                "event": "trigger.enter",
+                "handler": "fuelPickup"
+              }
+            ]
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "sphere"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#ffd23f",
+            "metallicFactor": 0.4,
+            "roughnessFactor": 0.3,
+            "emissiveColor": "#ffb400",
+            "emissiveStrength": 1.0
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 38.46027972391025,
+            "y": 5.644532636429129,
+            "z": 0,
+            "scaleX": 0.9,
+            "scaleY": 0.9,
+            "scaleZ": 0.9
+          }
+        },
+        {
+          "type": "Rekall.Trigger",
+          "properties": {
+            "shape": "sphere",
+            "radius": 0.6
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_55085ca6898a4ca68f28932e3a641007",
+      "name": "Fuel Cell 3",
+      "tags": [
+        "fuel"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "fuel"
+          }
+        },
+        {
+          "type": "Rekall.EventBindings",
+          "properties": {
+            "events": [
+              {
+                "event": "trigger.enter",
+                "handler": "fuelPickup"
+              }
+            ]
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "sphere"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#ffd23f",
+            "metallicFactor": 0.4,
+            "roughnessFactor": 0.3,
+            "emissiveColor": "#ffb400",
+            "emissiveStrength": 1.0
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 60.450994401175365,
+            "y": 8.301338694959025,
+            "z": 0,
+            "scaleX": 0.9,
+            "scaleY": 0.9,
+            "scaleZ": 0.9
+          }
+        },
+        {
+          "type": "Rekall.Trigger",
+          "properties": {
+            "shape": "sphere",
+            "radius": 0.6
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_01d543f19b3147ea999ae2d176d27973",
+      "name": "Fuel Cell 4",
+      "tags": [
+        "fuel"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "fuel"
+          }
+        },
+        {
+          "type": "Rekall.EventBindings",
+          "properties": {
+            "events": [
+              {
+                "event": "trigger.enter",
+                "handler": "fuelPickup"
+              }
+            ]
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "sphere"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#ffd23f",
+            "metallicFactor": 0.4,
+            "roughnessFactor": 0.3,
+            "emissiveColor": "#ffb400",
+            "emissiveStrength": 1.0
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 84.69492166036521,
+            "y": 9.960854659991526,
+            "z": 0,
+            "scaleX": 0.9,
+            "scaleY": 0.9,
+            "scaleZ": 0.9
+          }
+        },
+        {
+          "type": "Rekall.Trigger",
+          "properties": {
+            "shape": "sphere",
+            "radius": 0.6
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_43ea09d9166d422fac74c0c07659752f",
+      "name": "Guide Rail Left",
+      "tags": [
+        "rail",
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 129.76213769708366,
+            "height": 14,
+            "depth": 0.4
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 54.88106884854183,
+            "y": 6,
+            "z": -12.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_9065d6f2a8824d3f9ade063dc7b4c7d1",
+      "name": "Guide Rail Right",
+      "tags": [
+        "rail",
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 129.76213769708366,
+            "height": 14,
+            "depth": 0.4
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 54.88106884854183,
+            "y": 6,
+            "z": 12.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "rover-wheel-rear",
+      "name": "Rear Wheel",
+      "tags": [
+        "vehicle",
+        "wheel"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "vehicle",
+            "collidesWith": [
+              "terrain",
+              "crystal",
+              "fuel"
+            ]
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "sphere"
+          }
+        },
+        {
+          "type": "Rekall.HingeJoint",
+          "properties": {
+            "connectedEntityId": "rover-chassis",
+            "anchorAX": 0,
+            "anchorAY": 0,
+            "anchorAZ": 0,
+            "anchorBX": -0.95,
+            "anchorBY": -0.55,
+            "anchorBZ": 0,
+            "axisX": 0,
+            "axisY": 0,
+            "axisZ": 1,
+            "springFrequency": 150,
+            "dampingRatio": 10
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#20232a",
+            "metallicFactor": 0.1,
+            "roughnessFactor": 0.6
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.6,
+            "restitution": 0.02
+          }
+        },
+        {
+          "type": "Rekall.Rigidbody3D",
+          "properties": {
+            "mass": 3
+          }
+        },
+        {
+          "type": "Rekall.SphereCollider3D",
+          "properties": {
+            "radius": 0.55
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0.55,
+            "y": 1.05,
+            "z": 0,
+            "scaleX": 1.1,
+            "scaleY": 1.1,
+            "scaleZ": 1.1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "rover-chassis",
+      "name": "Rover Chassis",
+      "tags": [
+        "chassis",
+        "vehicle"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.RidgebreakerRules.RunState",
+          "properties": {
+            "fuel": 100.0,
+            "maxFuel": 100.0,
+            "startX": 1.5,
+            "finishX": 109.76,
+            "wheelRearId": "rover-wheel-rear",
+            "wheelFrontId": "rover-wheel-front",
+            "cameraId": "chase-camera",
+            "outOfFuel": false,
+            "crashed": false,
+            "finished": false,
+            "throttleSpeed": 120.0
+          }
+        },
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 2.4,
+            "height": 0.7,
+            "depth": 1.4
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "vehicle",
+            "collidesWith": [
+              "terrain",
+              "crystal",
+              "fuel"
+            ]
+          }
+        },
+        {
+          "type": "Rekall.EventBindings",
+          "properties": {
+            "events": [
+              {
+                "event": "collision.begin",
+                "handler": "chassisHit"
+              }
+            ]
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube"
+          }
+        },
+        {
+          "type": "Rekall.InputActionMap",
+          "properties": {
+            "actions": [
+              {
+                "name": "throttle",
+                "key": "Up",
+                "positiveKey": "Up",
+                "negativeKey": "Down"
+              },
+              {
+                "name": "accelerate",
+                "key": "Up"
+              },
+              {
+                "name": "brake",
+                "key": "Down"
+              }
+            ]
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#e8462f",
+            "metallicFactor": 0.6,
+            "roughnessFactor": 0.35
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 0.4,
+            "restitution": 0.05
+          }
+        },
+        {
+          "type": "Rekall.Rigidbody3D",
+          "properties": {
+            "mass": 12
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 1.5,
+            "y": 1.6,
+            "z": 0,
+            "scaleX": 2.4,
+            "scaleY": 0.7,
+            "scaleZ": 1.4
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_9ffc8b87288f46db81795aa17d206396",
+      "name": "Sun",
+      "tags": [
+        "lighting"
+      ],
+      "components": [
+        {
+          "type": "Rekall.DirectionalLight",
+          "properties": {
+            "intensity": 3.2,
+            "color": "#fff2d8"
+          }
+        },
+        {
+          "type": "Rekall.ShadowSettings",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "pitch": -55,
+            "yaw": 35
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_cedfc66e24b14c0b87cf159fc442b42b",
+      "name": "Terrain Segment 1",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 10.4,
+            "height": 2.0,
+            "depth": 24.0
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a6d4a",
+            "metallicFactor": 0.0,
+            "roughnessFactor": 0.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.1,
+            "restitution": 0.05
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 5.0,
+            "y": -1.0,
+            "z": 0,
+            "roll": 0,
+            "scaleX": 10.4,
+            "scaleY": 2.0,
+            "scaleZ": 24.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_37903748cc4647a9a9f1148ed11046c2",
+      "name": "Terrain Segment 10",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 12.4,
+            "height": 2.0,
+            "depth": 24.0
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a6d4a",
+            "metallicFactor": 0.0,
+            "roughnessFactor": 0.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.1,
+            "restitution": 0.05
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 74.05747838072058,
+            "y": 6.932940018887877,
+            "z": 0,
+            "roll": 22,
+            "scaleX": 12.4,
+            "scaleY": 2.0,
+            "scaleZ": 24.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_0832351135644f5990a4ef4e41bc3ef8",
+      "name": "Terrain Segment 11",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 9.4,
+            "height": 2.0,
+            "depth": 24.0
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a6d4a",
+            "metallicFactor": 0.0,
+            "roughnessFactor": 0.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.1,
+            "restitution": 0.05
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 83.84919830165789,
+            "y": 7.628980168198719,
+            "z": 0,
+            "roll": -20,
+            "scaleX": 9.4,
+            "scaleY": 2.0,
+            "scaleZ": 24.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_44d403b7807842adb9464b96584987d1",
+      "name": "Terrain Segment 12",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 13.4,
+            "height": 2.0,
+            "depth": 24.0
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a6d4a",
+            "metallicFactor": 0.0,
+            "roughnessFactor": 0.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.1,
+            "restitution": 0.05
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 93.91997639613906,
+            "y": 8.980200551848954,
+            "z": 0,
+            "roll": 26,
+            "scaleX": 13.4,
+            "scaleY": 2.0,
+            "scaleZ": 24.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_ba8e23d125e44ac6a37aba9f5182d1ff",
+      "name": "Terrain Segment 13",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 10.4,
+            "height": 2.0,
+            "depth": 24.0
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a6d4a",
+            "metallicFactor": 0.0,
+            "roughnessFactor": 0.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.1,
+            "restitution": 0.05
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 104.76213769708366,
+            "y": 11.728407052277124,
+            "z": 0,
+            "roll": 0,
+            "scaleX": 10.4,
+            "scaleY": 2.0,
+            "scaleZ": 24.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_118c8b5a0b0c4859a626b40cdad979cb",
+      "name": "Terrain Segment 2",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 9.4,
+            "height": 2.0,
+            "depth": 24.0
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a6d4a",
+            "metallicFactor": 0.0,
+            "roughnessFactor": 0.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.1,
+            "restitution": 0.05
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 14.325677631722435,
+            "y": 0.2791064052381773,
+            "z": 0,
+            "roll": 16,
+            "scaleX": 9.4,
+            "scaleY": 2.0,
+            "scaleZ": 24.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e3b0ee643ac248e1a896ebb82d909cb6",
+      "name": "Terrain Segment 3",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 7.4,
+            "height": 2.0,
+            "depth": 24.0
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a6d4a",
+            "metallicFactor": 0.0,
+            "roughnessFactor": 0.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.1,
+            "restitution": 0.05
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 22.07487186601319,
+            "y": 0.7748976837570289,
+            "z": 0,
+            "roll": -12,
+            "scaleX": 7.4,
+            "scaleY": 2.0,
+            "scaleZ": 24.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_2c09f7f2be4d4928a13d890699fa20b2",
+      "name": "Terrain Segment 4",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 10.4,
+            "height": 2.0,
+            "depth": 24.0
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a6d4a",
+            "metallicFactor": 0.0,
+            "roughnessFactor": 0.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.1,
+            "restitution": 0.05
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 30.19685157251105,
+            "y": 1.7957624624711124,
+            "z": 0,
+            "roll": 20,
+            "scaleX": 10.4,
+            "scaleY": 2.0,
+            "scaleZ": 24.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_f5f3535d4c5240ffac3593c54787dcdd",
+      "name": "Terrain Segment 5",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 6.4,
+            "height": 2.0,
+            "depth": 24.0
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a6d4a",
+            "metallicFactor": 0.0,
+            "roughnessFactor": 0.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.1,
+            "restitution": 0.05
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 37.866118882665305,
+            "y": 3.0377684282635977,
+            "z": 0,
+            "roll": -8,
+            "scaleX": 6.4,
+            "scaleY": 2.0,
+            "scaleZ": 24.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_1ed47fef0e67463ba7438513be110d5d",
+      "name": "Terrain Segment 6",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 5.4,
+            "height": 2.0,
+            "depth": 24.0
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a6d4a",
+            "metallicFactor": 0.0,
+            "roughnessFactor": 0.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.1,
+            "restitution": 0.05
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 43.33692308889002,
+            "y": 2.610517194124971,
+            "z": 0,
+            "roll": 0,
+            "scaleX": 5.4,
+            "scaleY": 2.0,
+            "scaleZ": 24.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_fa4ddb4c1b9b493b8a1a72c9523a1d41",
+      "name": "Terrain Segment 7",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 11.4,
+            "height": 2.0,
+            "depth": 24.0
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a6d4a",
+            "metallicFactor": 0.0,
+            "roughnessFactor": 0.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.1,
+            "restitution": 0.05
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 50.861423105924324,
+            "y": 4.934023273399271,
+            "z": 0,
+            "roll": 24,
+            "scaleX": 11.4,
+            "scaleY": 2.0,
+            "scaleZ": 24.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_7a94e98ce7ad4effb713b6e330c3ee41",
+      "name": "Terrain Segment 8",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 8.4,
+            "height": 2.0,
+            "depth": 24.0
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a6d4a",
+            "metallicFactor": 0.0,
+            "roughnessFactor": 0.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.1,
+            "restitution": 0.05
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 59.690149188139245,
+            "y": 5.897495774163829,
+            "z": 0,
+            "roll": -18,
+            "scaleX": 8.4,
+            "scaleY": 2.0,
+            "scaleZ": 24.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_9a5cf5522eaf44389daeff3edf7a7cb1",
+      "name": "Terrain Segment 9",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider3D",
+          "properties": {
+            "width": 5.4,
+            "height": 2.0,
+            "depth": 24.0
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "cube"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#8a6d4a",
+            "metallicFactor": 0.0,
+            "roughnessFactor": 0.9
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.PhysicsMaterial3D",
+          "properties": {
+            "friction": 1.1,
+            "restitution": 0.05
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 65.99437525331986,
+            "y": 4.612484312959193,
+            "z": 0,
+            "roll": 0,
+            "scaleX": 5.4,
+            "scaleY": 2.0,
+            "scaleZ": 24.0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_4d2fd308b2f34f17bb2dfec9878a5b57",
+      "name": "World Environment",
+      "tags": [
+        "lighting"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Environment3D",
+          "properties": {
+            "ambientSkyColor": "#3a2b52",
+            "ambientGroundColor": "#241a33",
+            "backgroundColor": "#241436"
+          }
+        },
+        {
+          "type": "Rekall.FogVolume",
+          "properties": {
+            "shape": "global",
+            "density": 0.012,
+            "albedo": "#4a3768"
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

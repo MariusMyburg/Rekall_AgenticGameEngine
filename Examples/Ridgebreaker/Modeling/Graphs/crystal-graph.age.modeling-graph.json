@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "assetId": "crystal-graph",
+  "name": "Crystal Graph",
+  "revision": 1,
+  "nodes": [
+    {
+      "nodeId": "n1",
+      "typeId": "rekall.modeling.primitive.sphere",
+      "typeVersion": 1,
+      "parameters": {
+        "radius": 0.5,
+        "segments": 10,
+        "rings": 7
+      }
+    }
+  ],
+  "links": [],
+  "outputs": [
+    {
+      "name": "crystal",
+      "nodeId": "n1",
+      "portId": "geometry"
+    }
+  ],
+  "exposedParameters": []
+}

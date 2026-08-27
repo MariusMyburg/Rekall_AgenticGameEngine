@@ -1,0 +1,35 @@
+{
+  "assets": [
+    {
+      "id": "asset_little-redfish-lake-sunrise_58618c91",
+      "name": "little-redfish-lake-sunrise",
+      "displayName": "Little Redfish Lake Sunrise",
+      "kind": "texture",
+      "sourcePath": "https://live.staticflickr.com/4473/36934533053_e2495031c2_b.jpg",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\Examples\\RainGlass\\Assets\\texture\\asset_little-redfish-lake-sunrise_58618c91.jpg",
+      "contentHash": "58618c911ddf4170da738d0f1ec99a2d5fc58c92b064002e1bc1e71603a840e5",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "jpeg",
+        "width": 1024,
+        "height": 684,
+        "mipLevelCount": 1,
+        "format": "R8G8B8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": {
+        "originalUrl": "https://live.staticflickr.com/4473/36934533053_e2495031c2_b.jpg",
+        "finalUrl": "https://live.staticflickr.com/4473/36934533053_e2495031c2_b.jpg",
+        "retrievedAtUtc": "2026-08-27T12:05:30.295826+00:00",
+        "mediaType": "image/jpeg",
+        "byteCount": 259379,
+        "sha256": "58618c911ddf4170da738d0f1ec99a2d5fc58c92b064002e1bc1e71603a840e5",
+        "attribution": "\u0022Chuck Knowles - Dramatic sunrise over Little Redfish Lake Idaho\u0022 by Knowles Gallery is licensed under CC BY 2.0.",
+        "license": "CC BY 2.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by/2.0/"
+      },
+      "modelAssetMetadata": null
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Rain Glass",
+  "schemaVersion": 1,
+  "capabilities": [
+    "rendering3d",
+    "world"
+  ]
+}

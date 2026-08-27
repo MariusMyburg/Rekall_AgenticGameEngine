@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "id": "scene_rainglass_main",
+  "name": "Main",
+  "capabilities": [
+    "rendering3d",
+    "world"
+  ],
+  "entities": [
+    {
+      "id": "background",
+      "name": "Background",
+      "tags": ["backdrop"],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": { "primitive": "plane", "color": "#ffffff" }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": { "mesh": "rekall.geometry.plane" }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColorTexture": "asset_little-redfish-lake-sunrise_58618c91",
+            "roughnessFactor": 1
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0, "y": 1.5, "z": 6,
+            "pitch": -90, "yaw": 0, "roll": 0,
+            "scaleX": 24, "scaleY": 1, "scaleZ": 14
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "rainGlass",
+      "name": "Rain Glass",
+      "tags": ["glass"],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": { "primitive": "plane", "color": "#ffffff" }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "mesh": "rekall.geometry.plane",
+            "vertexShader": "agent/rainglass",
+            "fragmentShader": "agent/rainglass"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColorTexture": "asset_little-redfish-lake-sunrise_58618c91",
+            "alphaMode": "blend",
+            "roughnessFactor": 0
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0, "y": 1.5, "z": -2,
+            "pitch": -90, "yaw": 0, "roll": 0,
+            "scaleX": 10, "scaleY": 1, "scaleZ": 5.6
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "keyLight",
+      "name": "Key Light",
+      "tags": ["light"],
+      "components": [
+        {
+          "type": "Rekall.DirectionalLight",
+          "properties": { "intensity": 1.6, "color": "#fff6e8" }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": { "pitch": -35, "yaw": 20 }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "mainCamera",
+      "name": "Main Camera",
+      "tags": ["camera"],
+      "components": [
+        {
+          "type": "Rekall.Camera3D",
+          "properties": { "active": true, "fieldOfView": 50 }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": { "x": 0, "y": 1.5, "z": -8, "pitch": 0, "yaw": 0, "roll": 0 }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

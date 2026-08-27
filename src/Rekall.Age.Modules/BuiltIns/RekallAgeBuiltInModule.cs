@@ -50,6 +50,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeRigidbody2DComponent>();
         builder.RegisterComponent<RekallAgeRigidbody3DComponent>();
         builder.RegisterComponent<RekallAgeTriggerComponent>();
+        builder.RegisterComponent<RekallAgeCollisionFilterComponent>();
         builder.RegisterComponent<RekallAgeBoxCollider2DComponent>();
         builder.RegisterComponent<RekallAgeCircleCollider2DComponent>();
         builder.RegisterComponent<RekallAgeBoxCollider3DComponent>();
@@ -1163,6 +1164,16 @@ public sealed class RekallAgeTriggerComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public string TargetComponentType { get; init; } = string.Empty;
+}
+
+[RekallAgeComponent("Collision Filter", Description = "Restricts which collidables this entity's collider/trigger physically interacts with and generates collision/trigger events against. An entity with no Rekall.CollisionFilter, or an empty/absent collidesWith, interacts with every layer (default, zero-authoring-change behavior).")]
+public sealed class RekallAgeCollisionFilterComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Description = "The layer name this entity's collidable belongs to.")]
+    public string Layer { get; init; } = "default";
+
+    [RekallAgeProperty(Description = "Native JSON array of layer names this entity's collidable is allowed to interact with. Pass a native array, never an encoded string. Absent/empty means it interacts with every layer.")]
+    public string[]? CollidesWith { get; init; }
 }
 
 [RekallAgeComponent("Box Collider 2D", Description = "A planar box collision shape with explicit world-unit width and height. Transform2D supplies position and rotation; transform scale does not resize the collider. Add Rigidbody2D for a dynamic body or omit it for a static surface.")]

@@ -201,6 +201,24 @@ public sealed class ModuleMetadataTests
     }
 
     [Fact]
+    public async Task CollisionFilterIsDiscoverableAsAPhysicsConcept()
+    {
+        var command = new SearchComponentSchemasCommand(typeof(RekallAgeBuiltInModule).Assembly);
+        var context = new RekallAgeCommandContext(
+            "agent",
+            RekallAgeTransaction.Begin("search collision filter"),
+            CancellationToken.None);
+
+        var result = await command.ExecuteAsync(
+            new SearchComponentSchemasRequest("collision layer filter mask", Limit: 24),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        var types = result.Value.Components.Select(component => component.TypeName).ToHashSet(StringComparer.Ordinal);
+        Assert.Contains("Rekall.CollisionFilter", types);
+    }
+
+    [Fact]
     public async Task ComponentSchemaSearchRejectsMissingQueryWithStructuredError()
     {
         var command = new SearchComponentSchemasCommand(typeof(RekallAgeBuiltInModule).Assembly);

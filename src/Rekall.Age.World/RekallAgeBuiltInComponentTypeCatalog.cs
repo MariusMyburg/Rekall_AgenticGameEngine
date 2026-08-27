@@ -46,6 +46,7 @@ public static class RekallAgeBuiltInComponentTypeCatalog
         "Rekall.Rigidbody2D",
         "Rekall.Rigidbody3D",
         "Rekall.Trigger",
+        "Rekall.CollisionFilter",
         "Rekall.BoxCollider2D",
         "Rekall.CircleCollider2D",
         "Rekall.BoxCollider3D",

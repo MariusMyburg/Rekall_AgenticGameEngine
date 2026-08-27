@@ -37,6 +37,34 @@ public sealed class RuntimeCollisionEventSystemTests
     }
 
     [Fact]
+    public async Task CollisionSystemDoesNotEmitBeginForNonAcceptingLayers()
+    {
+        var world = CreateWorld(
+            CreateSphereWithFilter(
+                "actor-a",
+                "Actor A",
+                x: 0,
+                layer: "player",
+                collidesWith: ["terrain"],
+                [
+                    new JsonObject { ["event"] = "collision.begin", ["handler"] = "touchStarted" }
+                ]),
+            CreateSphereWithFilter(
+                "actor-b",
+                "Actor B",
+                x: 0.75,
+                layer: "enemy",
+                collidesWith: null,
+                []));
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, 1, CancellationToken.None);
+
+        Assert.DoesNotContain(result.World.Subsystems.Events.Events, runtimeEvent =>
+            runtimeEvent.Type == "collision.begin");
+    }
+
+    [Fact]
     public async Task CollisionSystemEmitsBeginForOverlapping2DColliders()
     {
         var world = CreateWorld(
@@ -186,6 +214,51 @@ public sealed class RuntimeCollisionEventSystemTests
                 Position3D = new RekallAgeRuntimeVector3(x, 0, 0)
             },
             components);
+    }
+
+    private static RekallAgeRuntimeEntity CreateSphereWithFilter(
+        string id,
+        string name,
+        double x,
+        string layer,
+        IReadOnlyList<string>? collidesWith,
+        JsonArray events)
+    {
+        var filterProperties = new JsonObject { ["layer"] = layer };
+        if (collidesWith is not null)
+        {
+            var array = new JsonArray();
+            foreach (var item in collidesWith)
+            {
+                array.Add(item);
+            }
+
+            filterProperties["collidesWith"] = array;
+        }
+
+        return new RekallAgeRuntimeEntity(
+            id,
+            name,
+            [],
+            null,
+            null,
+            true,
+            false,
+            RekallAgeRuntimeTransform.Identity with
+            {
+                Position3D = new RekallAgeRuntimeVector3(x, 0, 0)
+            },
+            [
+                new RekallAgeRuntimeComponent(
+                    "Rekall.SphereCollider3D",
+                    new JsonObject { ["radius"] = 0.5 }),
+                new RekallAgeRuntimeComponent(
+                    "Rekall.CollisionFilter",
+                    filterProperties),
+                new RekallAgeRuntimeComponent(
+                    "Rekall.EventBindings",
+                    new JsonObject { ["events"] = events })
+            ]);
     }
 
     private static RekallAgeRuntimeEntity CreateCircle2D(

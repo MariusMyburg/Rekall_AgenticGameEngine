@@ -34,7 +34,7 @@ public sealed class RekallAgeCollisionEventSystem : IRekallAgeRuntimeWorldSystem
             {
                 var left = bodies[leftIndex];
                 var right = bodies[rightIndex];
-                if (!Overlaps(left, right))
+                if (!Overlaps(left, right) || !RekallAgeCollisionFilter.Allows(left.Entity, right.Entity))
                 {
                     continue;
                 }

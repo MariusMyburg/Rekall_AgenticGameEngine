@@ -3162,9 +3162,13 @@ behavior.
   retain angular velocity, orientation, and sleep state, and native BEPU
   contacts own friction/restitution response. Collision layers/masks now exist
   (`Rekall.CollisionFilter`, uniform across 2D/3D, physical response, and both
-  `collision.*`/`trigger.*` event systems). Remaining breadth includes generic
-  joints/constraints, a dedicated 2D world/material contract, authored 2D
-  angular control, exact contact manifold/impulse facts, deformables, and
+  `collision.*`/`trigger.*` event systems). 2D now has its own dedicated
+  material contract (`Rekall.PhysicsMaterial2D`) instead of reusing the
+  3D-named component, and authored 2D angular velocity
+  (`Rekall.Rigidbody2D.AngularVelocityZ`) is now schema-discoverable and
+  passes validation (the runtime already applied it correctly; it was only
+  ever blocked by an incomplete schema). Remaining breadth includes generic
+  joints/constraints, exact contact manifold/impulse facts, deformables, and
   measured large-world broadphase performance.
 - 3D rendering is substantial and hardware-backed: perspective/orthographic
   cameras, viewports/layers/stereo/OpenXR, primitives and authored/imported GLB

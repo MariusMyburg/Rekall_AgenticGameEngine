@@ -6033,6 +6033,64 @@ recorded here and in their commit messages instead.
 - `eng/accept-installed-morph-animation.ps1`
 - `Artifacts/InstalledMorphProof/isolated-pass/evidence.json`
 
+## 2026-08-27 Mesh operation and fracture plugin system
+
+Third-party project code can now register custom mesh operations and fracture
+algorithms without modifying engine source, mirroring the existing
+gameplay-component/runtime-system module discovery convention exactly:
+`IRekallAgeMeshOperationPlugin`/`IRekallAgeFractureAlgorithmPlugin` (leaf
+`Rekall.Age.Modeling.Contracts` project, avoiding a circular reference with
+`Rekall.Age.Modules`), `RekallAgeModuleBuilder.RegisterMeshOperation<T>()` /
+`RegisterFractureAlgorithm<T>()` in a project module's `Configure`, and a new
+`RekallAgeProjectMeshPluginLoader` that discovers them the same way
+`RekallAgeProjectRuntimeSystemLoader` discovers runtime systems. Plugin ids
+must be namespaced (contain `.`); bare ids stay reserved for built-ins.
+`RekallAgeMeshOperationExecutor` and the new `RekallAgeMeshFractureExecutor`
+both fall back to a matching plugin when a requested operation/algorithm id
+is not a built-in. Following current real practice (the sandboxed Restricted
+Module Host exists but is not wired into any production execution path),
+plugins load and run in-process, exactly like existing project modules.
+
+CLI/MCP discoverability was addressed directly: `rekall.mesh.operation_types
+.search`/`.inspect` now take a required `projectRoot` and report
+project-registered operations alongside built-ins; a new
+`rekall.mesh.fracture_algorithms.list` command lists the built-in Voronoi
+algorithm plus any project-registered ones; `rekall.mesh.fracture` accepts an
+optional `algorithmId`. `RekallAgeStudioModelingSession` loads a project's
+plugins the first time it opens a project (only when constructed with its
+default executor, so tests that inject an explicit executor are unaffected),
+so `AvailableOperations` includes plugin operations in Studio too.
+
+A separate user-reported bug was fixed in the same window: destruction chunks
+produced by `RekallAgeDestructionSystem` were snapping to identity rotation
+and losing the source entity's material instead of inheriting both, which
+made a fractured north-south wall visibly snap east-west and turn blue at the
+moment of fracture. `BuildChunkEntity` now threads the source's authored
+rotation and `Rekall.Material` component onto every chunk. The CraterField
+example's grenades were also fixed to fall under real gravity (added
+`Rekall.MeshCollider`/`Rekall.Rigidbody3D`, removed the artificial initial
+velocity) and to use an actual UV-sphere mesh instead of a box.
+
+The module host isolation regression this work exposed and fixed follows the
+same shape as the 2026-08-25 entry above: adding
+`Rekall.Age.Modules -> Rekall.Age.Modeling.Contracts` as a project reference
+means the sandboxed AppContainer worker needs that assembly alongside it, and
+`ModuleHostWindowsIsolationTests.CreateRealHostPayloadAsync`'s hand-curated
+payload allowlist needed the same one-line addition again.
+
+Verified: full solution builds Release with zero warnings/errors; the
+targeted `Modeling|Modules|Runtime|Mcp|Workflows` regression passed 879/879;
+the full `Rekall.Age.Studio.Tests` suite passed 109/110 (the one failure,
+`ProviderSwitchCancelsAndAwaitsTheCurrentRunBeforeDisposingItsLeaseAndLoadingTheExactDefault`,
+is an unrelated async-ordering race in the chat provider-switch path,
+confirmed non-reproducing in isolation); and a manual end-to-end CLI smoke
+test (scaffold a project module registering a mesh operation plugin, install
+the SDK, build it, then `rekall.mesh.operation_types.search`) confirmed the
+plugin surfaces with zero engine-source edits.
+
+- `docs/superpowers/specs/2026-08-26-mesh-operation-fracture-plugins-design.md`
+- `docs/superpowers/plans/2026-08-26-mesh-operation-fracture-plugins.md`
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

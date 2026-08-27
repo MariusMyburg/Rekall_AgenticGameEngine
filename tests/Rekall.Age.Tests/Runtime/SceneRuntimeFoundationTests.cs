@@ -568,6 +568,86 @@ public sealed class SceneRuntimeFoundationTests
     }
 
     [Fact]
+    public async Task BepuPhysicsAppliesAuthorableRestitutionFor2DBodies()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics2d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Ground", ["level"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform2D",
+                    new JsonObject { ["Y"] = -0.5 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.BoxCollider2D",
+                    new JsonObject { ["Width"] = 20, ["Height"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsMaterial2D",
+                    new JsonObject { ["Friction"] = 0.35, ["Restitution"] = 0.9 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Bouncy Circle", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform2D",
+                    new JsonObject { ["Y"] = 3 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Rigidbody2D",
+                    new JsonObject { ["Mass"] = 1 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.CircleCollider2D",
+                    new JsonObject { ["Radius"] = 0.5 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsMaterial2D",
+                    new JsonObject
+                    {
+                        ["Friction"] = 0.25,
+                        ["Restitution"] = 0.9,
+                        ["MinimumBounceSpeed"] = 0.4,
+                        ["MaximumRecoveryVelocity"] = 8
+                    })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+        using var loop = RekallAgeRuntimeExecutionLoop.CreateDefault();
+        var contacted = false;
+        var maximumHeightAfterContact = double.MinValue;
+        for (var frame = 0; frame < 120; frame++)
+        {
+            world = (await loop.RunAsync(world, frames: 1, CancellationToken.None)).World;
+            var circle = world.Entities.Single(entity => entity.Name == "Bouncy Circle");
+            contacted |= circle.Transform.Position2D.Y <= 0.55;
+            if (contacted)
+            {
+                maximumHeightAfterContact = Math.Max(maximumHeightAfterContact, circle.Transform.Position2D.Y);
+            }
+        }
+
+        Assert.True(
+            contacted && maximumHeightAfterContact > 1,
+            $"Expected a visible BEPU contact-spring rebound for a 2D body, but the maximum post-contact Y was {maximumHeightAfterContact}.");
+    }
+
+    [Fact]
+    public async Task BepuPhysicsAppliesAuthoredAngularVelocityTo2DBodies()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics2d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Physics Settings", ["settings"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.PhysicsWorld3D",
+                    new JsonObject { ["GravityY"] = 0 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Spinning Box", ["actor"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform2D",
+                    new JsonObject()))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Rigidbody2D",
+                    new JsonObject { ["Mass"] = 1, ["AngularVelocityZ"] = 90 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.BoxCollider2D",
+                    new JsonObject { ["Width"] = 1, ["Height"] = 1 })));
+        var world = new RekallAgeRuntimeWorldBuilder().Build(scene);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(world, frames: 30, CancellationToken.None);
+
+        var body = result.World.Entities.Single(entity => entity.Name == "Spinning Box");
+        Assert.NotEqual(0, body.Transform.Rotation2D, precision: 2);
+    }
+
+    [Fact]
     public async Task BepuPhysicsReadsPascalCaseAuthoringSchemaProperties()
     {
         var scene = RekallAgeSceneDocument.Create("Main", ["world", "physics3d"])

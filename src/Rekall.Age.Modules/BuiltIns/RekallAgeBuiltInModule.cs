@@ -47,6 +47,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeVirtualGeometryComponent>();
         builder.RegisterComponent<RekallAgePhysicsWorld3DComponent>();
         builder.RegisterComponent<RekallAgePhysicsMaterial3DComponent>();
+        builder.RegisterComponent<RekallAgePhysicsMaterial2DComponent>();
         builder.RegisterComponent<RekallAgeRigidbody2DComponent>();
         builder.RegisterComponent<RekallAgeRigidbody3DComponent>();
         builder.RegisterComponent<RekallAgeTriggerComponent>();
@@ -1069,6 +1070,28 @@ public sealed class RekallAgePhysicsMaterial3DComponent : RekallAgeComponent
     public double DampingRatio { get; init; } = 1;
 }
 
+[RekallAgeComponent("Physics Material 2D", Description = "Defines per-collidable BEPU contact response for a planar 2D body. Restitution is implemented with BEPU contact springs rather than post-solve velocity or position correction.")]
+public sealed class RekallAgePhysicsMaterial2DComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(Minimum = 0)]
+    public double Friction { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1, Description = "Requested impact bounciness from 0 to 1. AGE maps this to BEPU contact-spring damping for impacts above MinimumBounceSpeed.")]
+    public double Restitution { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Description = "Minimum relative contact speed that activates the restitution response. Slower resting contacts use DampingRatio so stacks can settle.")]
+    public double MinimumBounceSpeed { get; init; } = 0.5;
+
+    [RekallAgeProperty(Minimum = 0, Description = "Maximum BEPU penetration-recovery speed in world units per second.")]
+    public double MaximumRecoveryVelocity { get; init; } = 2;
+
+    [RekallAgeProperty(Minimum = 0.0001, Description = "BEPU contact-spring frequency. Lower frequencies preserve more bounce; higher frequencies make contacts firmer but require more substeps.")]
+    public double SpringFrequency { get; init; } = 30;
+
+    [RekallAgeProperty(Minimum = 0, Description = "BEPU damping ratio used for non-bouncy and resting contacts: 0 is undamped, 1 is critically damped, and values above 1 are overdamped.")]
+    public double DampingRatio { get; init; } = 1;
+}
+
 [RekallAgeComponent("Rigidbody 3D", Description = "Makes an entity a dynamic 3D physics body. Requires a matching Transform3D and 3D collider on the same entity. For static geometry, use a collider without a rigid body. Initial linear velocity is in world units per second; initial angular velocity is in authored degrees per second.")]
 public sealed class RekallAgeRigidbody3DComponent : RekallAgeComponent
 {
@@ -1137,6 +1160,9 @@ public sealed class RekallAgeRigidbody2DComponent : RekallAgeComponent
 {
     [RekallAgeProperty(Minimum = 0.0001)]
     public double Mass { get; init; } = 1;
+
+    [RekallAgeProperty(Description = "Initial angular velocity around the 2D plane's normal axis, in authored degrees per second.")]
+    public double AngularVelocityZ { get; init; }
 }
 
 [RekallAgeComponent("Trigger", Description = "A generic overlap volume whose radius or box dimensions are explicit world-unit values. Transform2D/3D supplies position and rotation; transform scale does not resize the trigger.")]

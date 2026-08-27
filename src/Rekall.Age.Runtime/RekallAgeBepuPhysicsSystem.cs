@@ -237,6 +237,9 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                 }
             }
         }
+        var is2D = FindComponent(entity, "Rekall.Rigidbody2D") is not null
+            || FindComponent(entity, "Rekall.BoxCollider2D") is not null
+            || FindComponent(entity, "Rekall.CircleCollider2D") is not null;
         return new PhysicsEntity(
             entity,
             FindComponent(entity, "Rekall.Rigidbody3D") ?? FindComponent(entity, "Rekall.Rigidbody2D"),
@@ -244,10 +247,8 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
             FindComponent(entity, "Rekall.GeometryMesh"),
             compiledMesh,
             compiledMeshRevision,
-            ReadPhysicsMaterial(entity),
-            FindComponent(entity, "Rekall.Rigidbody2D") is not null
-                || FindComponent(entity, "Rekall.BoxCollider2D") is not null
-                || FindComponent(entity, "Rekall.CircleCollider2D") is not null);
+            ReadPhysicsMaterial(entity, is2D),
+            is2D);
     }
 
     private static RekallAgeRuntimeComponent? FindCollider(RekallAgeRuntimeEntity entity)
@@ -547,9 +548,9 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
         return entity.Components.FirstOrDefault(component => component.Type.Equals(type, StringComparison.Ordinal));
     }
 
-    private static PhysicsMaterial ReadPhysicsMaterial(RekallAgeRuntimeEntity entity)
+    private static PhysicsMaterial ReadPhysicsMaterial(RekallAgeRuntimeEntity entity, bool is2D)
     {
-        var component = FindComponent(entity, "Rekall.PhysicsMaterial3D");
+        var component = FindComponent(entity, is2D ? "Rekall.PhysicsMaterial2D" : "Rekall.PhysicsMaterial3D");
         return new PhysicsMaterial(
             Math.Max(0, ReadSingle(component, "friction", 1)),
             Math.Clamp(ReadSingle(component, "restitution", 0), 0, 1),

@@ -395,6 +395,48 @@ public sealed class ProjectValidatorTests
     }
 
     [Fact]
+    public async Task ValidateSceneAcceptsAuthoredAngularVelocityOn2DRigidbodies()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var body = RekallAgeEntityDocument.Create("Spinning Box", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Rigidbody2D",
+                new JsonObject { ["mass"] = 1, ["angularVelocityZ"] = 90 }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.BoxCollider2D", new JsonObject()));
+        var scene = RekallAgeSceneDocument.Create("Main", ["physics"])
+            .AddEntity(body);
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        Assert.DoesNotContain(report.Issues, issue => issue.Code == "REKALL_COMPONENT_PROPERTY_UNKNOWN");
+    }
+
+    [Fact]
+    public async Task ValidateSceneAcceptsAnAuthored2DPhysicsMaterial()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var body = RekallAgeEntityDocument.Create("Bouncy Circle", ["physics"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.CircleCollider2D", new JsonObject()))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.PhysicsMaterial2D",
+                new JsonObject { ["friction"] = 0.25, ["restitution"] = 0.9 }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["physics"])
+            .AddEntity(body);
+        var sceneStore = new RekallAgeSceneStore();
+        await sceneStore.SaveAsync(root, scene, CancellationToken.None);
+
+        var report = await new RekallAgeProjectValidator(sceneStore)
+            .ValidateSceneAsync(root, "Main", CancellationToken.None);
+
+        Assert.DoesNotContain(report.Issues, issue =>
+            issue.Code == "REKALL_COMPONENT_PROPERTY_UNKNOWN" || issue.Code == "REKALL_COMPONENT_RESERVED_TYPE_UNKNOWN");
+    }
+
+    [Fact]
     public async Task ValidateSceneRequiresDimensionMatchingTransformForPhysicsBodies()
     {
         var root = TestPaths.CreateTempDirectory();

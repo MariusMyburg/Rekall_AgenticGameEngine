@@ -43,6 +43,7 @@ public static class RekallAgeBuiltInComponentTypeCatalog
         "Rekall.VirtualGeometry",
         "Rekall.PhysicsWorld3D",
         "Rekall.PhysicsMaterial3D",
+        "Rekall.PhysicsMaterial2D",
         "Rekall.Rigidbody2D",
         "Rekall.Rigidbody3D",
         "Rekall.Trigger",

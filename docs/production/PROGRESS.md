@@ -6406,6 +6406,39 @@ benchmark-queue wording, and BaseColor's own alpha channel (an 8-digit hex
 color, independent of a custom shader's output alpha) is not yet wired to
 AlphaCutoff's "mask" mode, since nothing needed it for this proof.
 
+Also iterated on the RainGlass shader itself against direct live-player
+feedback and a user-supplied photo reference (upside-down orientation,
+frozen animation, non-teardrop/wrong-aspect shape, inverted Fresnel,
+sparse density vs. a real reference photo, and finally real two-body
+droplet merging simulated in C# and verified numerically via
+`rekall.runtime.inspect`'s `component.property` assertions rather than by
+eyeballing screenshots after a bug in that simulation - independent path-
+wobble seeds per droplet - silently blocked merges almost entirely).
+
+## 2026-08-27 Camera-as-trigger-volume-occupant needs no new capability
+
+A real question came out of the RainGlass work: does AGE have "volumes"
+that can activate an effect when the camera enters them? Investigated
+rather than guessed. `Rekall.Trigger` is already a real, physics-
+independent spatial volume system (its own occupancy check only needs a
+collider component, never a BEPU rigidbody) that already fires
+`trigger.enter`/`stay`/`exit`, already readable by any project module via
+`world.EventsOfType(...)` - the exact mechanism `Examples/Ridgebreaker`'s
+own module already uses for its fuel-pickup handling. `Rekall.Camera3D` is
+an ordinary entity with nothing special-casing or excluding it from
+carrying a collider like any other entity.
+
+New test `TriggerSystemFiresForACameraEntityGivenAnAttachedCollider`
+proves the one previously-unverified link: a camera entity with a small
+attached collider is correctly detected entering/exiting a trigger volume,
+identically to any other occupant. Conclusion: no new engine capability is
+needed for "run arbitrary project-authored C# when the camera enters a
+region" - it already works end to end through entirely generic,
+already-proven mechanisms; the only prior gap was that a camera is not
+normally authored with a collider, a one-line scene fix.
+
+Verified: 6/6 in the full `RuntimeTriggerEventSystemTests` selection.
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

@@ -4456,7 +4456,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 checked((float)highFidelityPlan.PostSettings.GradeStrength),
                 checked((float)highFidelityPlan.PostSettings.BloomIntensity),
                 checked((float)highFidelityPlan.PostSettings.BloomRadius),
-                0);
+                checked((float)highFidelityPlan.PostSettings.LensDirtStrength),
+                checked((float)highFidelityPlan.PostSettings.LensDirtScale));
             state.Vk.CmdPushConstants(
                 state.CommandBuffer,
                 state.ToneMapPipelineLayout,
@@ -6297,7 +6298,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             float GradeStrength,
             float BloomIntensity,
             float BloomRadius,
-            float Padding);
+            float LensDirtStrength,
+            float LensDirtScale);
 
         [StructLayout(LayoutKind.Sequential)]
         private readonly record struct AnalyticFogPushConstants(

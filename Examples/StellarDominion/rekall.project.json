@@ -1,0 +1,10 @@
+{
+  "name": "StellarDominion",
+  "schemaVersion": 1,
+  "capabilities": [
+    "modules",
+    "physics3d",
+    "rendering3d",
+    "world"
+  ]
+}

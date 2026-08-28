@@ -717,8 +717,19 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 }
             }
 
+            // Cloud and atmosphere shells belong to the planet's own surface projection.
+            // An entity may project more than one mesh - a ringed planet projects both
+            // "rekall.planet.surface" and a "rekall.planet.ring" - and this block derives its
+            // renderable ids from the entity id alone, so without this check a ringed planet
+            // emitted "<entity>:clouds" and "<entity>:atmosphere" twice and the Vulkan capture
+            // path failed with a duplicate-key error.
+            var isPlanetSurfaceProjection = string.Equals(
+                mesh.AssetId,
+                "rekall.planet.surface",
+                StringComparison.Ordinal);
             if (planetComponent is not null
                 && atmosphereComponent is not null
+                && isPlanetSurfaceProjection
                 && orbitPathMesh is null
                 && markerMesh is null
                 && haloMesh is null

@@ -922,6 +922,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             "tone-map" or "tone_map" or "tonemap" => "toneMap",
             "composite" => "composite",
             "blur" => "blur",
+            "lens-dirt" or "lens_dirt" or "lensdirt" => "lensDirt",
             _ => string.IsNullOrWhiteSpace(normalized) ? "composite" : normalized
         };
     }

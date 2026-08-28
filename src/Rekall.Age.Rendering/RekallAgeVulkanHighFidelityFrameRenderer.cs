@@ -73,6 +73,12 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
             || pass.Type.Equals("brightExtract", StringComparison.OrdinalIgnoreCase));
         var composite = frame.PostProcessStack.Passes.FirstOrDefault(pass =>
             pass.Type.Equals("composite", StringComparison.OrdinalIgnoreCase));
+        // Lens dirt modulates the bloom contribution rather than being its own
+        // fullscreen pass: real lens grime scatters only light that already
+        // blooms, so folding it into the tone-map's bloom term is both cheaper
+        // and more physically sensible than compositing a separate overlay.
+        var lensDirt = frame.PostProcessStack.Passes.FirstOrDefault(pass =>
+            pass.Type.Equals("lensDirt", StringComparison.OrdinalIgnoreCase));
         var retainedPasses = new Dictionary<string, int>(StringComparer.Ordinal);
         for (var index = 0; index < frame.PostProcessStack.Passes.Count; index++)
         {
@@ -100,7 +106,11 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
                 BloomIntensity: resolved.Post.Bloom
                     ? ResolveNonNegative(composite?.Intensity ?? bloom?.Intensity ?? 0.65)
                     : 0,
-                BloomRadius: ResolveRadius(bloom?.Radius ?? 1)),
+                BloomRadius: ResolveRadius(bloom?.Radius ?? 1),
+                LensDirtStrength: resolved.Post.Bloom && lensDirt is not null
+                    ? Math.Clamp(lensDirt.Intensity, 0, 4)
+                    : 0,
+                LensDirtScale: lensDirt is { Scale: > 0 } ? Math.Clamp(lensDirt.Scale, 0.05, 64) : 1),
             shadowPlan,
             fogPlan,
             particlePlan)
@@ -514,7 +524,9 @@ public sealed record RekallAgeHighFidelityPostSettings(
     double GradeStrength,
     double BloomThreshold,
     double BloomIntensity,
-    double BloomRadius);
+    double BloomRadius,
+    double LensDirtStrength = 0,
+    double LensDirtScale = 1);
 
 public sealed record RekallAgeHighFidelityFrameReport(
     bool Executed,

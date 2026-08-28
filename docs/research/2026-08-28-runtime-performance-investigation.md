@@ -283,6 +283,40 @@ so every SDK mutation path yields a *new* `JsonObject`. A changed component
 therefore misses the cache and is re-read. No manual invalidation exists or is
 needed.
 
+## Correctness verification
+
+**No in-place mutation path exists.** The risk with keying on `JsonObject`
+identity is a writer that mutates a *nested* node — e.g.
+`Properties["vertices"].AsArray()[0]["y"] = …` — leaving the keyed object's
+identity intact and serving stale geometry forever. Audited and ruled out:
+
+- Every write to `["vertices"]` / `["indices"]` is in an authoring command
+  (`CreateGeometryMeshCommand`, `CreateGeometryExtrusionCommand`) or the GLB
+  exporter, and all construct **new** `JsonObject`s.
+- The runtime only ever *reads* `Rekall.GeometryMesh`
+  (`RekallAgeBepuPhysicsSystem`).
+- The only nested-array writer in `src` is `RekallAgeReversibleJsonDelta`, which
+  operates on persisted **scene documents**, not live runtime components.
+- The player's live-edit path (`apply_scene_diff`, `reload_scene`) routes
+  through `ApplySceneDocument`, which rebuilds the entire runtime world from the
+  document — new components, new identities.
+
+**Rendered output is byte-identical.** Captured frame 90 of MidnightRider at
+640×360 with the cache enabled and with it bypassed:
+
+```
+before  Main_runtime_090.png  6931 bytes  sha256 44687062876888ad…
+after   Main_runtime_090.png  6931 bytes  sha256 44687062876888ad…
+```
+
+Identical hash — the change is provably invisible to the renderer. MidnightRider
+is a good subject here because it spawns trees with fresh `JsonObject`s as road
+chunks recycle, so new geometry enters the world continuously during the run.
+
+Tests: `RuntimeGeometryMeshReuseTests` (new), plus
+`Rekall.Age.Tests.Rendering` (736), `Rekall.Age.Tests.Runtime` (322), and
+`Rekall.Age.Studio.Tests` (110) all pass.
+
 ## Measured result
 
 Same scene and command as above (MidnightRider, 1280×720, vsync off):

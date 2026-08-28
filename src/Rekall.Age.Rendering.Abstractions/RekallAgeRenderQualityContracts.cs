@@ -77,9 +77,13 @@ public sealed record RekallAgeResolvedRenderFeaturePlan(
     IReadOnlyList<RekallAgeRenderFeatureDegradation> Degradations)
 {
     public RekallAgeResolvedLightingQuality Lighting { get; init; } = new(4);
+
+    public RekallAgeResolvedTextureQuality Textures { get; init; } = new(1);
 }
 
 public sealed record RekallAgeResolvedLightingQuality(int MaximumPointLights);
+
+public sealed record RekallAgeResolvedTextureQuality(int MaximumAnisotropy);
 
 public sealed record RekallAgeResolvedShadowQuality(
     int CascadeCount,

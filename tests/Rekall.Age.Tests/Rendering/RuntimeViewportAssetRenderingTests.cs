@@ -601,6 +601,55 @@ public sealed class RuntimeViewportAssetRenderingTests
     }
 
     [Fact]
+    public async Task AssetResolverLoadsSkyTextureReferencedByEnvironment()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var texturePath = Path.Combine(root, "environment.png");
+        await RekallAgePngWriter.WriteRgbaAsync(
+            texturePath,
+            2,
+            1,
+            [8, 12, 24, 255, 220, 180, 96, 255],
+            CancellationToken.None);
+        await new RekallAgeAssetCatalogStore().SaveAsync(
+            root,
+            new RekallAgeAssetCatalogDocument(
+            [
+                new RekallAgeAssetDocument(
+                    "asset_environment",
+                    "environment",
+                    "Environment",
+                    "texture",
+                    texturePath,
+                    texturePath,
+                    "hash")
+            ]),
+            CancellationToken.None);
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main", 0, 0, 160, 90, null, [], [], 0, new(false, 0), [])
+        {
+            Environment = new RekallAgeRuntimeViewportEnvironment(
+                "environment",
+                "Environment",
+                "asset_environment",
+                1,
+                1,
+                "aces",
+                1,
+                null,
+                "sky")
+        };
+
+        var assets = await new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(
+            root,
+            frame,
+            CancellationToken.None);
+
+        Assert.True(assets.Images.ContainsKey("asset_environment"));
+        Assert.Empty(assets.Issues);
+    }
+
+    [Fact]
     public async Task AssetResolverLoadsMaterialGraphAndItsTexturesForCompiledMeshSurface()
     {
         var root = TestPaths.CreateTempDirectory();

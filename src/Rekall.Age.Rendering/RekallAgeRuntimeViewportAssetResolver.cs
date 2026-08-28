@@ -52,6 +52,11 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
             .Distinct(StringComparer.Ordinal)
             .OrderBy(assetId => assetId, StringComparer.Ordinal)
             .ToArray();
+        var environmentTextureAssetIds = new[] { frame.Environment?.SkyAssetId }
+            .Where(assetId => !string.IsNullOrWhiteSpace(assetId))
+            .Select(assetId => assetId!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
         var materialAssetIds = frame.Renderables
             .Where(renderable => renderable.Kind.Equals("mesh", StringComparison.Ordinal))
             .SelectMany(renderable => renderable.GeometryMesh?.Surfaces ?? [])
@@ -78,7 +83,7 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
             .OrderBy(assetId => assetId, StringComparer.Ordinal)
             .ToArray();
         if (spriteAssetIds.Length == 0 && textureAssetIds.Length == 0 && modelAssetIds.Length == 0
-            && fontAssetIds.Length == 0 && materialAssetIds.Length == 0)
+            && environmentTextureAssetIds.Length == 0 && fontAssetIds.Length == 0 && materialAssetIds.Length == 0)
         {
             return RekallAgeRuntimeViewportAssetSet.Empty;
         }
@@ -167,7 +172,11 @@ public sealed class RekallAgeRuntimeViewportAssetResolver
         })
             .Where(assetId => !string.IsNullOrWhiteSpace(assetId))
             .Select(assetId => assetId!);
-        foreach (var assetId in spriteAssetIds.Concat(textureAssetIds).Concat(materialTextureAssetIds).Distinct(StringComparer.Ordinal))
+        foreach (var assetId in spriteAssetIds
+            .Concat(textureAssetIds)
+            .Concat(environmentTextureAssetIds)
+            .Concat(materialTextureAssetIds)
+            .Distinct(StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!catalogById.TryGetValue(assetId, out var asset))

@@ -8,6 +8,48 @@ Last verified: 2026-08-29 Africa/Johannesburg
 
 Branch: `master`
 
+## 2026-08-29 — Authored environment IBL and scalable texture filtering
+
+AGE now resolves an authored `Environment3D.skyAsset` as a first-class scene
+dependency and binds it consistently in both native Vulkan capture and the
+interactive Windows player. The PBR shader samples an equirectangular
+environment for diffuse and reflected lighting, selects progressively blurrier
+mips from material roughness, and retains the analytical sky/ground fallback
+when no image is authored. This replaces the previous probe-less ambient-only
+metal treatment without introducing a game-specific renderer path.
+
+Texture filtering now scales with the existing render-quality presets:
+Performance/Low use 1x, Medium 2x, High 8x, and Ultra/Epic 16x anisotropy,
+clamped to the physical device limit with an inspectable degradation reason.
+Stellar Dominion supplies a deterministic 2048x1024 deep-space environment,
+less crushed armor values, revised camera/planet composition, and authored
+practical fill lights. A rejected geometry-dome experiment was removed rather
+than shipping its visibly faceted background.
+
+Fresh focused evidence: 23 renderer tests passed, the Release Windows player
+built with zero warnings/errors, and all mission probes passed (quiet, camera,
+briefing, victory, missiles, defeat, debrief, moving-owner beam tracking, and
+spatial WAV weapon audio). The current 1920x1080 hardware-Vulkan proof is
+`Examples/StellarDominion/Captures/environment-ibl-1920x1080.png`; it reports
+42 draws, no missing/unsupported assets, and runs through the same authored
+scene used by the live Windows player.
+
+The delivery gate also repaired two concrete package blockers instead of
+waiving them: the project-local SDK was synchronized with the trusted engine
+SDK, and the existing Fleet Rules module gained the minimal
+`IRekallAgePlayableModule` adapter required by native packages. The resulting
+Windows package contains `Play.exe` and `Play.bat`; its consolidated audit
+passed with 397 files, zero missing key artifacts, exit code 0, a nonblank
+informative proof frame, and valid layout (with only the existing advisory that
+the full-viewport HUD canvas has large coverage).
+
+This is a verified engine/rendering milestone, not the claimed photoreal
+ceiling. The next visible ceiling work is a true environment-background pass
+(rather than scene geometry), prefiltered diffuse/specular IBL with a BRDF LUT,
+temporal antialiasing/stability, reusable compiled hero-model assets instead of
+large inline mesh JSON, and a richer agent-authored tactical ability/effects
+loop with deterministic gameplay evidence.
+
 ## 2026-08-29 — Stellar Dominion combat and realism vertical slice
 
 The live game testbed exposed and now covers two concrete combat regressions.

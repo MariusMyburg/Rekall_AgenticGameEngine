@@ -35,6 +35,14 @@ public sealed class RekallAgeRenderQualityProfileResolver
             intent.MaximumActiveParticles, preset.MaximumActiveParticles, "maximumActiveParticles", 0, int.MaxValue, degradations);
         var bloom = intent.Bloom ?? preset.Bloom;
         var ssao = intent.Ssao ?? preset.Ssao;
+        var textureAnisotropy = preset.MaximumAnisotropy;
+        var deviceAnisotropy = Math.Max(1, capabilities.MaximumSamplerAnisotropy);
+        if (textureAnisotropy > deviceAnisotropy)
+        {
+            var requested = textureAnisotropy;
+            textureAnisotropy = deviceAnisotropy;
+            AddDeviceClamp(degradations, "textureAnisotropy", requested, textureAnisotropy);
+        }
 
         if (shadowResolution > capabilities.MaximumTextureDimension2D)
         {
@@ -154,18 +162,19 @@ public sealed class RekallAgeRenderQualityProfileResolver
             persistent,
             degradations)
         {
-            Lighting = new RekallAgeResolvedLightingQuality(preset.MaximumPointLights)
+            Lighting = new RekallAgeResolvedLightingQuality(preset.MaximumPointLights),
+            Textures = new RekallAgeResolvedTextureQuality(textureAnisotropy)
         };
     }
 
     private static readonly IReadOnlyDictionary<string, Preset> Presets = new Dictionary<string, Preset>(StringComparer.Ordinal)
     {
-        ["performance"] = new("Performance", 0.50, 1, 512, "analytic", 2_000, false, false, 2, 2),
-        ["low"] = new("Low", 0.67, 1, 1024, "analytic", 8_000, true, false, 4, 4),
-        ["medium"] = new("Medium", 0.75, 2, 1024, "froxel-low", 24_000, true, true, 8, 8),
-        ["high"] = new("High", 1.00, 3, 2048, "froxel", 64_000, true, true, 12, 16),
-        ["ultra"] = new("Ultra", 1.00, 4, 2048, "froxel-high", 128_000, true, true, 16, 16),
-        ["epic"] = new("Epic", 1.25, 4, 4096, "froxel-epic", 250_000, true, true, 24, 16)
+        ["performance"] = new("Performance", 0.50, 1, 512, "analytic", 2_000, false, false, 2, 2, 1),
+        ["low"] = new("Low", 0.67, 1, 1024, "analytic", 8_000, true, false, 4, 4, 1),
+        ["medium"] = new("Medium", 0.75, 2, 1024, "froxel-low", 24_000, true, true, 8, 8, 2),
+        ["high"] = new("High", 1.00, 3, 2048, "froxel", 64_000, true, true, 12, 16, 8),
+        ["ultra"] = new("Ultra", 1.00, 4, 2048, "froxel-high", 128_000, true, true, 16, 16, 16),
+        ["epic"] = new("Epic", 1.25, 4, 4096, "froxel-epic", 250_000, true, true, 24, 16, 16)
     };
 
     private static string NormalizePreset(string value) => value.Trim().ToLowerInvariant();
@@ -283,5 +292,6 @@ public sealed class RekallAgeRenderQualityProfileResolver
         bool Bloom,
         bool Ssao,
         int FilterTapCount,
-        int MaximumPointLights);
+        int MaximumPointLights,
+        int MaximumAnisotropy);
 }

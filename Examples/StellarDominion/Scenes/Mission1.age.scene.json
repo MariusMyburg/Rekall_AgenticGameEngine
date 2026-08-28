@@ -10,7 +10,7 @@
   ],
   "entities": [
     {
-      "id": "ent_2a37fc87b8344ef495f978bddfd584dd",
+      "id": "ent_0569f36144504fc7add7086e77dc03f6",
       "name": "Ardent Dominion",
       "tags": [
         "capital",
@@ -124461,8 +124461,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 174708542,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -124488,7 +124488,7 @@
       "locked": false
     },
     {
-      "id": "ent_9412504d26194cc88a0c94787f3036ec",
+      "id": "ent_bcd4e2848a4847a79f59360f39e4cc9f",
       "name": "Ardent Dominion Drive",
       "tags": [
         "drive",
@@ -129587,7 +129587,7 @@
       "locked": false
     },
     {
-      "id": "ent_ba70935278534a41a993dd6eacf4c4a6",
+      "id": "ent_5a418aec70af4dab817325d73f059503",
       "name": "Ardent Dominion Fighter 1",
       "tags": [
         "fighter",
@@ -142750,8 +142750,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 307633192,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -142777,7 +142777,7 @@
       "locked": false
     },
     {
-      "id": "ent_d56d196c0e7846558e1cc91aea35caf6",
+      "id": "ent_73b619dac81040baaca41b6ae64f890b",
       "name": "Ardent Dominion Fighter 2",
       "tags": [
         "fighter",
@@ -155940,8 +155940,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 190795154,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -155967,7 +155967,7 @@
       "locked": false
     },
     {
-      "id": "ent_d894f20ae5c749dd8e42d400846b4e31",
+      "id": "ent_fb00156c53894575bb0a0d08f5eb2dcd",
       "name": "Ardent Dominion Fighter 3",
       "tags": [
         "fighter",
@@ -169130,8 +169130,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 2086173956,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -169157,7 +169157,7 @@
       "locked": false
     },
     {
-      "id": "ent_3b65e21372ec44df8c4b8b1dabd5249d",
+      "id": "ent_8018c2d644054be999b9403bcd8a2bf4",
       "name": "Ardent Dominion Fighter 4",
       "tags": [
         "fighter",
@@ -182320,8 +182320,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 1648158887,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -182347,7 +182347,7 @@
       "locked": false
     },
     {
-      "id": "ent_e3906b863b1144299a0e22d1e7fda68f",
+      "id": "ent_b8ffa72121704fa38a94885568af2802",
       "name": "Ardent Dominion Fighter 5",
       "tags": [
         "fighter",
@@ -195510,8 +195510,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 356243505,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -195537,7 +195537,7 @@
       "locked": false
     },
     {
-      "id": "ent_7b4b320bf1074bb4a5bbf2ebd05da525",
+      "id": "ent_dda109850a2d4d159d4b8c216a867fb3",
       "name": "Ardent Dominion Fighter 6",
       "tags": [
         "fighter",
@@ -208700,8 +208700,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 204638603,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -208727,7 +208727,7 @@
       "locked": false
     },
     {
-      "id": "ent_9d5182469526438db5cf5d0009edd7e7",
+      "id": "ent_24cd0a5e3119466dbd7c39357f6da952",
       "name": "Camera",
       "tags": [
         "camera"
@@ -208763,7 +208763,7 @@
           "type": "Rekall.Camera3D",
           "properties": {
             "active": true,
-            "fieldOfView": 62,
+            "fieldOfView": 42,
             "nearClip": 0.2,
             "farClip": 40000
           }
@@ -208786,7 +208786,7 @@
       "locked": false
     },
     {
-      "id": "ent_30af005541bf447cb01ce85f2d304343",
+      "id": "ent_f32e6f818ce143f0b807e8e303b44fc8",
       "name": "Choir Node Ashen",
       "tags": [
         "hostile",
@@ -265905,7 +265905,7 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 437222673,
-            "baseColorA": "#160b0e",
+            "baseColorA": "#241116",
             "baseColorB": "#c19aa0",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
@@ -265932,7 +265932,7 @@
       "locked": false
     },
     {
-      "id": "ent_ea26c4e7b45a46e79d47464e443815e2",
+      "id": "ent_3dd84fcec77b4f78bd4ecdce48f8101d",
       "name": "Choir Node Ashen Drive",
       "tags": [
         "drive",
@@ -269769,7 +269769,7 @@
       "locked": false
     },
     {
-      "id": "ent_6986b731c3884a9aaf3d7ec7cff3c5ec",
+      "id": "ent_d2ebe9e332d1460c8fbd7c84e052c0ff",
       "name": "Choir Node Hymn",
       "tags": [
         "hostile",
@@ -326888,7 +326888,7 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 1090124749,
-            "baseColorA": "#160b0e",
+            "baseColorA": "#241116",
             "baseColorB": "#c19aa0",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
@@ -326915,7 +326915,7 @@
       "locked": false
     },
     {
-      "id": "ent_6abd13dd74684a65ad983ec7ef89be48",
+      "id": "ent_d859a477c63448018ae377699b6b0e5d",
       "name": "Choir Node Hymn Drive",
       "tags": [
         "drive",
@@ -330752,7 +330752,7 @@
       "locked": false
     },
     {
-      "id": "ent_87bb7d707df842698c3f6a5ef395f5f8",
+      "id": "ent_35dff786746b4fafa92a8952d019dcee",
       "name": "Choir Node Salt",
       "tags": [
         "hostile",
@@ -387871,7 +387871,7 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 833425824,
-            "baseColorA": "#160b0e",
+            "baseColorA": "#241116",
             "baseColorB": "#c19aa0",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
@@ -387898,7 +387898,7 @@
       "locked": false
     },
     {
-      "id": "ent_c18ca65ad76c468b9005ae37230e9865",
+      "id": "ent_b883dd2a045c456eacad0a0b32e783da",
       "name": "Choir Node Salt Drive",
       "tags": [
         "drive",
@@ -391735,7 +391735,7 @@
       "locked": false
     },
     {
-      "id": "ent_da838bbd318d4d83a79c0bd32b8d0697",
+      "id": "ent_540b9af709484a70ac4d68cdadf74988",
       "name": "Controls Hint",
       "tags": [
         "ui"
@@ -391766,7 +391766,37 @@
       "locked": false
     },
     {
-      "id": "ent_02640df98b66468198b9b56b03bfeb0d",
+      "id": "ent_e61954c7fc1a420d8a62d5af10b45df2",
+      "name": "Convoy Warm Fill",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PointLight",
+          "properties": {
+            "intensity": 4.0,
+            "range": 210,
+            "color": "#e5a768",
+            "priority": 7
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -38,
+            "y": 24,
+            "z": -92
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_00e3b8e552004840b80a0fea15a0c48d",
       "name": "Environment",
       "tags": [
         "environment"
@@ -391777,12 +391807,13 @@
           "properties": {
             "backgroundPolicy": "color",
             "backgroundColor": "#000000",
+            "skyAsset": "asset_stellar-environment_ce1b6a4f",
             "toneMapper": "agx",
             "exposure": -0.1,
             "whitePoint": 11.2,
-            "ambientEnergy": 1.35,
+            "ambientEnergy": 2.4,
             "ambientSkyColor": "#7890a8",
-            "ambientGroundColor": "#18212b"
+            "ambientGroundColor": "#26313d"
           }
         },
         {
@@ -391821,7 +391852,7 @@
       "locked": false
     },
     {
-      "id": "ent_75cf3803066647e4a9cbef13387f3983",
+      "id": "ent_ca662f972f80472e91c44f8a7adaac03",
       "name": "Fade Curtain",
       "tags": [
         "ui"
@@ -391851,7 +391882,7 @@
       "locked": false
     },
     {
-      "id": "ent_d74a08b9cd8c41ba9bc91370fa70879b",
+      "id": "ent_4387dff1b4bc4ad3b71d51d806f6a5b3",
       "name": "Kell",
       "tags": [
         "planet"
@@ -391883,7 +391914,7 @@
       "locked": false
     },
     {
-      "id": "ent_78a754343a354abba1f5924f17a852c4",
+      "id": "ent_a0303620bcb94e928e724c5a15427018",
       "name": "Long Watch",
       "tags": [
         "capital",
@@ -449002,8 +449033,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 1071814342,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -449029,7 +449060,7 @@
       "locked": false
     },
     {
-      "id": "ent_995cf92754d348b5bc08c7ca7eb2b2b3",
+      "id": "ent_42ca69af34654bb3acdae3f80fdcc518",
       "name": "Long Watch Drive",
       "tags": [
         "drive",
@@ -452866,7 +452897,7 @@
       "locked": false
     },
     {
-      "id": "ent_3cb895ba8edf48a4bbf26b74970fee6f",
+      "id": "ent_3930028011304667adb5795043ef6c56",
       "name": "Long Watch Fighter 1",
       "tags": [
         "fighter",
@@ -466029,8 +466060,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 607665802,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -466056,7 +466087,7 @@
       "locked": false
     },
     {
-      "id": "ent_c59d4bf44fb149708894e90de747e77c",
+      "id": "ent_f3c1f1905c8e409f9a3ba5d1d6a05094",
       "name": "Long Watch Fighter 2",
       "tags": [
         "fighter",
@@ -479219,8 +479250,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 1026649904,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -479246,7 +479277,7 @@
       "locked": false
     },
     {
-      "id": "ent_a2dfcbad3328452db9830ef2874f2d31",
+      "id": "ent_9ed94293e1e64c868f1189a98eb7c1bf",
       "name": "Long Watch Fighter 3",
       "tags": [
         "fighter",
@@ -492409,8 +492440,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 1245077414,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -492436,7 +492467,7 @@
       "locked": false
     },
     {
-      "id": "ent_eccb4ed1db7d44fc8d80fa44ba81a7f4",
+      "id": "ent_1aa8a579c4e648fcab8a059ca8cc5fcc",
       "name": "Long Watch Fighter 4",
       "tags": [
         "fighter",
@@ -505599,8 +505630,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 1414711813,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -505626,7 +505657,37 @@
       "locked": false
     },
     {
-      "id": "ent_6e648639348e4eb59037d23471b4fb6b",
+      "id": "ent_06f00969b58f498c8c690a7cc18595ca",
+      "name": "Long Watch Fill",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PointLight",
+          "properties": {
+            "intensity": 4.0,
+            "range": 180,
+            "color": "#92bce8",
+            "priority": 7
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 66,
+            "y": 26,
+            "z": 60
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_b3bbf448b826415a98640896ed383e06",
       "name": "Meridian",
       "tags": [
         "planet"
@@ -505658,7 +505719,7 @@
         {
           "type": "Rekall.PlanetRenderer",
           "properties": {
-            "radius": 300,
+            "radius": 235,
             "color": "#ffffff",
             "surfaceTexture": "asset_tex-gasgiant_821048d2",
             "meshSlices": 192,
@@ -505670,8 +505731,8 @@
         {
           "type": "Rekall.RingRenderer",
           "properties": {
-            "innerRadius": 415,
-            "outerRadius": 745,
+            "innerRadius": 325,
+            "outerRadius": 585,
             "texture": "asset_tex-rings_f9640733",
             "color": "#ffffff",
             "segments": 384
@@ -505681,8 +505742,8 @@
           "type": "Rekall.Transform3D",
           "properties": {
             "x": 1700,
-            "y": 150,
-            "z": 340,
+            "y": 205,
+            "z": 390,
             "roll": -13.5
           }
         }
@@ -505693,7 +505754,37 @@
       "locked": false
     },
     {
-      "id": "ent_4badf0bac1744ca5b439e5d2decdce95",
+      "id": "ent_7ee69cb824aa438a860856b68a7e55ce",
+      "name": "Meridian Bounce",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PointLight",
+          "properties": {
+            "intensity": 5.0,
+            "range": 260,
+            "color": "#8fb8e8",
+            "priority": 8
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -34,
+            "y": 30,
+            "z": 120
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_4e490f91aa804b05bdb8e14aa00ca9e7",
       "name": "Objective Panel",
       "tags": [
         "ui"
@@ -505726,7 +505817,7 @@
       "locked": false
     },
     {
-      "id": "ent_693ad8737a1e419680ba6180ee4a2513",
+      "id": "ent_fafb820c6d5f4165b533c059df9e8055",
       "name": "Post",
       "tags": [
         "post"
@@ -505771,7 +505862,7 @@
       "locked": false
     },
     {
-      "id": "ent_c6bb8f8efc7c4a579b66beeb3ee853af",
+      "id": "ent_761a774b7e764a2fb81c89482c9ae7d7",
       "name": "Shell",
       "tags": [
         "flow"
@@ -505845,7 +505936,7 @@
       "locked": false
     },
     {
-      "id": "ent_c8ed95c2b8204154bf8fd7e574c4d259",
+      "id": "ent_51bb43f1e1884d8195fdf5a723c48fc9",
       "name": "Skimmer Anneal",
       "tags": [
         "civilian",
@@ -562953,8 +563044,8 @@
             "resolution": 256,
             "scale": 2.8,
             "seed": 292844811,
-            "baseColorA": "#252c34",
-            "baseColorB": "#d0b995",
+            "baseColorA": "#655a4d",
+            "baseColorB": "#c5ad87",
             "metallicFactor": 0.62,
             "roughnessA": 0.78,
             "roughnessB": 0.42,
@@ -562980,7 +563071,7 @@
       "locked": false
     },
     {
-      "id": "ent_49f5ca4cb29e4200aa34b0b664a92662",
+      "id": "ent_33f0d01af6f84aa8b27a32a700fa384a",
       "name": "Skimmer Anneal Drive",
       "tags": [
         "drive",
@@ -565555,7 +565646,7 @@
       "locked": false
     },
     {
-      "id": "ent_f9b035c67e0049cf99fea5ac971bbfa2",
+      "id": "ent_5b594c9449d641fe95f932384e121f43",
       "name": "Skimmer Ferrous",
       "tags": [
         "civilian",
@@ -622663,8 +622754,8 @@
             "resolution": 256,
             "scale": 2.8,
             "seed": 1525497100,
-            "baseColorA": "#252c34",
-            "baseColorB": "#d0b995",
+            "baseColorA": "#655a4d",
+            "baseColorB": "#c5ad87",
             "metallicFactor": 0.62,
             "roughnessA": 0.78,
             "roughnessB": 0.42,
@@ -622690,7 +622781,7 @@
       "locked": false
     },
     {
-      "id": "ent_f3c2ad3d11064e6093513c03571e7e38",
+      "id": "ent_e80a64fc3b4b400380b4326872d31290",
       "name": "Skimmer Ferrous Drive",
       "tags": [
         "drive",
@@ -625265,7 +625356,7 @@
       "locked": false
     },
     {
-      "id": "ent_6c1f4a13160149c593b3fe82ed8a4177",
+      "id": "ent_0ab958f2984f440393017f7e6f8e0ab6",
       "name": "Starfield",
       "tags": [
         "backdrop"
@@ -625295,7 +625386,7 @@
       "locked": false
     },
     {
-      "id": "ent_a3424f87d07c49cdb4b8f8af1fb8e188",
+      "id": "ent_cba6dc9f7f014213b1564e17b7f0e8e4",
       "name": "Sun Disc",
       "tags": [
         "light"
@@ -625343,7 +625434,7 @@
       "locked": false
     },
     {
-      "id": "ent_a49ba643ff8e481c94e14b7a32e77718",
+      "id": "ent_ea42fc6171a249f7821268da1a812cdc",
       "name": "Sun Light",
       "tags": [
         "light"
@@ -625374,7 +625465,7 @@
       "locked": false
     },
     {
-      "id": "ent_614ea2cdab554ce388ffc029cab0ed2d",
+      "id": "ent_f7214ceb7ab942c88d0ace4c330f1977",
       "name": "Tactical HUD",
       "tags": [
         "ui"
@@ -625407,7 +625498,7 @@
       "locked": false
     },
     {
-      "id": "ent_bcd4cb8d7352446e880f9f672b5206aa",
+      "id": "ent_a1faa3865fd34c84bb8f151fd02b5ec2",
       "name": "Unit Panel",
       "tags": [
         "ui"
@@ -625440,7 +625531,37 @@
       "locked": false
     },
     {
-      "id": "ent_0d30f52eb9fe400b938bf326f6b12aa8",
+      "id": "ent_cc0d095da5c94edabf8cd358b53859cc",
+      "name": "Vigil Fill",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PointLight",
+          "properties": {
+            "intensity": 4.0,
+            "range": 180,
+            "color": "#92bce8",
+            "priority": 7
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -102,
+            "y": 26,
+            "z": 182
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_b6bfbc193caf42ecad1bd6b252be35bb",
       "name": "Vigil of Kell",
       "tags": [
         "capital",
@@ -682559,8 +682680,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 1762354224,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -682586,7 +682707,7 @@
       "locked": false
     },
     {
-      "id": "ent_5e0bbd60318647cfa463bb870118a3f1",
+      "id": "ent_a64113331bc049de8840e4cbc556d634",
       "name": "Vigil of Kell Drive",
       "tags": [
         "drive",
@@ -686423,7 +686544,7 @@
       "locked": false
     },
     {
-      "id": "ent_cd314cc18c5247f9947f3055f66216dc",
+      "id": "ent_5eb73957bd49489496c44ca1888d0610",
       "name": "Vigil of Kell Fighter 1",
       "tags": [
         "fighter",
@@ -699586,8 +699707,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 1441145213,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -699613,7 +699734,7 @@
       "locked": false
     },
     {
-      "id": "ent_181839ed62ef492ebb3eea368b6ac49f",
+      "id": "ent_6710fedce8b34e9b8e26f852d4d84745",
       "name": "Vigil of Kell Fighter 2",
       "tags": [
         "fighter",
@@ -712776,8 +712897,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 1290760391,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -712803,7 +712924,7 @@
       "locked": false
     },
     {
-      "id": "ent_d766698cfc9b4d7497d4eb1d0599b620",
+      "id": "ent_8757fd32c419469fbd2a41c6e77956be",
       "name": "Vigil of Kell Fighter 3",
       "tags": [
         "fighter",
@@ -725966,8 +726087,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 1005076561,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,
@@ -725993,7 +726114,7 @@
       "locked": false
     },
     {
-      "id": "ent_5359c0b7784249ae8af3cb3f69448937",
+      "id": "ent_6980f29ce0934a5d919fde31ea472064",
       "name": "Vigil of Kell Fighter 4",
       "tags": [
         "fighter",
@@ -739156,8 +739277,8 @@
             "resolution": 256,
             "scale": 3.5,
             "seed": 629986802,
-            "baseColorA": "#252c34",
-            "baseColorB": "#e0e5e8",
+            "baseColorA": "#4d5762",
+            "baseColorB": "#aeb9c4",
             "metallicFactor": 0.78,
             "roughnessA": 0.78,
             "roughnessB": 0.28,

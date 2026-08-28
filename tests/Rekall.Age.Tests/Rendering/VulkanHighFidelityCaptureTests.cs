@@ -7,6 +7,53 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class VulkanHighFidelityCaptureTests
 {
     [Fact]
+    public async Task AuthoredEnvironmentImageChangesMetallicSurfaceLighting()
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera", "Camera", "Camera3D", true, 0, 0, -4,
+            FieldOfViewDegrees: 55, ClearColor: "#010204");
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Environment IBL", 0, 0, 96, 64, camera, [camera],
+            [new RekallAgeRuntimeViewportRenderable(
+                "metal", "Metal", "mesh", "rekall.primitive.sphere", 0, 0, 0, 0,
+                Variant: "rekall.geometry.sphere", MaterialColor: "#b8c2cc",
+                MetallicFactor: 1, RoughnessFactor: 0.18, MeshSlices: 48, MeshStacks: 24)],
+            0, new(false, 0), [])
+        {
+            Environment = new RekallAgeRuntimeViewportEnvironment(
+                "environment", "Environment", "asset_environment", 1.4, 0, "agx", 11.2, null, "color")
+            {
+                AmbientSkyColor = "#111111",
+                AmbientGroundColor = "#111111"
+            }
+        };
+        var environment = new RekallAgeRgbaImage(
+            4,
+            2,
+            [
+                4, 8, 16, 255, 255, 128, 24, 255, 6, 12, 28, 255, 12, 28, 90, 255,
+                2, 3, 6, 255, 24, 40, 80, 255, 3, 5, 9, 255, 8, 16, 32, 255
+            ]);
+        var authoredAssets = RekallAgeRuntimeViewportAssetSet.Empty with
+        {
+            Images = new Dictionary<string, RekallAgeRgbaImage>(StringComparer.Ordinal)
+            {
+                ["asset_environment"] = environment
+            }
+        };
+        var output = TestPaths.CreateTempDirectory();
+
+        var fallback = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            frame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+        var imageBased = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            frame, authoredAssets, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(fallback.Captured, string.Join(Environment.NewLine, fallback.Errors));
+        Assert.True(imageBased.Captured, string.Join(Environment.NewLine, imageBased.Errors));
+        Assert.NotEqual(fallback.ByteChecksum, imageBased.ByteChecksum);
+    }
+
+    [Fact]
     public async Task AnalyticFogExecutesAndProducesDeterministicVisibleAttenuation()
     {
         var foggedFrame = FogFrame("Performance", density: 0.09);

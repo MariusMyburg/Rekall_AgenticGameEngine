@@ -21,6 +21,7 @@ ROOT = "F:/Dev/Rekall_AGE/Examples/StellarDominion"
 TEX_GAS = "asset_tex-gasgiant_821048d2"
 TEX_MOON = "asset_tex-moon_79224562"
 TEX_RINGS = "asset_tex-rings_f9640733"
+TEX_ENVIRONMENT = "asset_stellar-environment_ce1b6a4f"
 
 CAM = (96, 104, 196)
 # Phase angle (sun-planet-camera) is what sets how much of the disc is lit, not
@@ -54,6 +55,7 @@ entities = [
         ("Rekall.Environment3D", {
             "backgroundPolicy": "color",
             "backgroundColor": "#000000",
+            "skyAsset": TEX_ENVIRONMENT,
             "toneMapper": "agx",
             "exposure": 0.15,
             "whitePoint": 8.0,

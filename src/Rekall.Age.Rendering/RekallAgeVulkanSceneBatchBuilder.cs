@@ -249,7 +249,9 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
                 (float)Math.Clamp(environment.Exposure, -8, 8),
                 (float)Math.Clamp(environment.WhitePoint, 0.1, 64),
                 environment.ToneMapper.Equals("agx", StringComparison.OrdinalIgnoreCase) ? 1 : 0);
-        var environmentAmbientSkyColor = new Vector4(ParseColor(environment?.AmbientSkyColor), 1);
+        var environmentAmbientSkyColor = new Vector4(
+            ParseColor(environment?.AmbientSkyColor),
+            string.IsNullOrWhiteSpace(environment?.SkyAssetId) ? 0 : 1);
         var environmentAmbientGroundColor = new Vector4(ParseColor(environment?.AmbientGroundColor), 1);
         return new RekallAgeVulkanSceneFrameUniform(
             camera.ViewProjection,

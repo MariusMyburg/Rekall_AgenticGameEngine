@@ -268,6 +268,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly TextureBinding _whiteTexture;
     private readonly TextureBinding _flatNormalTexture;
     private readonly TextureBinding _defaultMetallicRoughnessTexture;
+    private readonly TextureBinding _environmentTexture;
     private readonly TextureBinding _hudTexture;
     private readonly ResourceSet _hudTextureSet;
     private TextureBinding _uiTexture;
@@ -408,6 +409,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         TextureBinding whiteTexture,
         TextureBinding flatNormalTexture,
         TextureBinding defaultMetallicRoughnessTexture,
+        TextureBinding environmentTexture,
         TextureBinding hudTexture,
         DirectionalShadowTarget directionalShadowTarget,
         RekallAgeOpenXrSessionBootstrapResult? openXrStatus,
@@ -475,6 +477,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _whiteTexture = whiteTexture;
         _flatNormalTexture = flatNormalTexture;
         _defaultMetallicRoughnessTexture = defaultMetallicRoughnessTexture;
+        _environmentTexture = environmentTexture;
         _hudTexture = hudTexture;
         _directionalShadowTarget = directionalShadowTarget;
         _hudTextureSet = _factory.CreateResourceSet(new ResourceSetDescription(_hudTextureLayout, _hudTexture.Texture, _hudTexture.Sampler));
@@ -664,7 +667,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             new ResourceLayoutElementDescription("FrameUniform", ResourceKind.UniformBuffer, ShaderStages.Vertex | ShaderStages.Fragment),
             new ResourceLayoutElementDescription("DirectionalShadowAtlas", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
             new ResourceLayoutElementDescription("DirectionalShadowSampler", ResourceKind.Sampler, ShaderStages.Fragment),
-            new ResourceLayoutElementDescription("InteractiveFogUniform", ResourceKind.UniformBuffer, ShaderStages.Fragment)));
+            new ResourceLayoutElementDescription("InteractiveFogUniform", ResourceKind.UniformBuffer, ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("EnvironmentTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("EnvironmentSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
         var directionalShadowFrameLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
             new ResourceLayoutElementDescription("DirectionalShadowFrameUniform", ResourceKind.UniformBuffer, ShaderStages.Vertex)));
         var drawLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
@@ -790,12 +795,6 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var postProcessUniformBuffer = factory.CreateBuffer(new BufferDescription(
             checked((uint)Marshal.SizeOf<PostProcessUniform>()),
             BufferUsage.UniformBuffer | BufferUsage.Dynamic));
-        var frameSet = factory.CreateResourceSet(new ResourceSetDescription(
-            frameLayout,
-            frameUniformBuffer,
-            directionalShadowTarget.View,
-            directionalShadowTarget.Sampler,
-            fogUniformBuffer));
         var directionalShadowFrameSet = factory.CreateResourceSet(new ResourceSetDescription(
             directionalShadowFrameLayout,
             directionalShadowFrameUniformBuffer));
@@ -844,7 +843,34 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                     RekallAgeVulkanSceneWrapMode.Repeat,
                     RekallAgeVulkanSceneWrapMode.Repeat)),
             hudTextureLayout);
-        var textures = CreateTextureBindings(device, factory, hudTextureLayout, assets);
+        var initialAuthoredQuality = world.Subsystems.Rendering.QualityProfiles
+            .OrderBy(profile => profile.EntityName, StringComparer.Ordinal)
+            .ThenBy(profile => profile.EntityId, StringComparer.Ordinal)
+            .Select(profile => profile.Intent)
+            .FirstOrDefault();
+        var initialQuality = new RekallAgeRenderQualityProfileResolver().Resolve(
+            initialAuthoredQuality ?? new RekallAgeRenderQualityIntent(),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("veldrid-vulkan"),
+            baseFrame.Width,
+            baseFrame.Height);
+        var textures = CreateTextureBindings(
+            device,
+            factory,
+            hudTextureLayout,
+            assets,
+            checked((uint)initialQuality.Textures.MaximumAnisotropy));
+        var environmentTexture = !string.IsNullOrWhiteSpace(baseFrame.Environment?.SkyAssetId)
+            && textures.TryGetValue(baseFrame.Environment.SkyAssetId, out var authoredEnvironment)
+                ? authoredEnvironment
+                : whiteTexture;
+        var frameSet = factory.CreateResourceSet(new ResourceSetDescription(
+            frameLayout,
+            frameUniformBuffer,
+            directionalShadowTarget.View,
+            directionalShadowTarget.Sampler,
+            fogUniformBuffer,
+            environmentTexture.Texture,
+            environmentTexture.Sampler));
         var hudTexture = CreateTextureBinding(
             device,
             factory,
@@ -901,6 +927,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             whiteTexture,
             flatNormalTexture,
             defaultMetallicRoughnessTexture,
+            environmentTexture,
             hudTexture,
             directionalShadowTarget,
             openXrStatus,
@@ -2922,6 +2949,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 (float)Math.Clamp(environment.WhitePoint, 0.1, 64),
                 environment.ToneMapper.Equals("agx", StringComparison.OrdinalIgnoreCase) ? 1 : 0);
         var ambientSkyColor = ParseEnvironmentColor(environment?.AmbientSkyColor);
+        ambientSkyColor.W = string.IsNullOrWhiteSpace(environment?.SkyAssetId) ? 0 : 1;
         var ambientGroundColor = ParseEnvironmentColor(environment?.AmbientGroundColor);
         return packet with
         {
@@ -3665,7 +3693,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             _frameUniformBuffer,
             _directionalShadowTarget.View,
             _directionalShadowTarget.Sampler,
-            _fogUniformBuffer));
+            _fogUniformBuffer,
+            _environmentTexture.Texture,
+            _environmentTexture.Sampler));
         PlayerLog.Write($"Interactive directional shadow atlas recreated resolution={resolution} cascades={RekallAgeInteractiveShadowFramePlanner.MaximumCascadeCount}.");
     }
 
@@ -3761,7 +3791,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         GraphicsDevice device,
         ResourceFactory factory,
         ResourceLayout layout,
-        RekallAgeRuntimeViewportAssetSet assets)
+        RekallAgeRuntimeViewportAssetSet assets,
+        uint maximumAnisotropy = 8)
     {
         var textures = new Dictionary<string, TextureBinding>(StringComparer.Ordinal);
         foreach (var image in assets.Images)
@@ -3775,7 +3806,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                     image.Value.Height,
                     image.Value.Rgba,
                     DefaultTextureSampler()),
-                layout);
+                layout,
+                maximumAnisotropy);
         }
 
         foreach (var runtimeTexture in assets.Textures)
@@ -3792,7 +3824,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                         decoded.Height,
                         decoded.Rgba,
                         DefaultTextureSampler()),
-                    layout);
+                    layout,
+                    maximumAnisotropy);
                 PlayerLog.Write($"Decoded runtime texture id={runtimeTexture.Key} format={runtimeTexture.Value.Format} size={decoded.Width}x{decoded.Height} to RGBA upload.");
                 continue;
             }
@@ -3807,7 +3840,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                     [],
                     DefaultTextureSampler(),
                     runtimeTexture.Value),
-                layout);
+                layout,
+                maximumAnisotropy);
         }
 
         foreach (var texture in assets.Models.Values
@@ -3827,7 +3861,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         {
             if (!textures.ContainsKey(texture.Id))
             {
-                textures[texture.Id] = CreateTextureBinding(device, factory, texture, layout);
+                textures[texture.Id] = CreateTextureBinding(device, factory, texture, layout, maximumAnisotropy);
             }
         }
 
@@ -3848,13 +3882,14 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         GraphicsDevice device,
         ResourceFactory factory,
         RekallAgeVulkanSceneTexture texture,
-        ResourceLayout layout)
+        ResourceLayout layout,
+        uint maximumAnisotropy = 8)
     {
         if (texture.RuntimeTexture is { } runtimeTexture
             && TryGetTexturePixelFormat(runtimeTexture.Format, out var runtimeFormat)
             && runtimeTexture.MipLevels.Count > 0)
         {
-            return CreateRuntimeTextureBinding(device, factory, texture, runtimeTexture, runtimeFormat, layout);
+            return CreateRuntimeTextureBinding(device, factory, texture, runtimeTexture, runtimeFormat, layout, maximumAnisotropy);
         }
 
         var mipLevels = CalculateMipLevels(texture.Width, texture.Height);
@@ -3886,14 +3921,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             device.WaitForIdle();
         }
 
-        var filter = ToSamplerFilter(texture.Sampler.MinFilter, texture.Sampler.MagFilter, device.Features.SamplerAnisotropy);
+        var anisotropy = device.Features.SamplerAnisotropy ? Math.Max(1u, maximumAnisotropy) : 1u;
+        var filter = ToSamplerFilter(texture.Sampler.MinFilter, texture.Sampler.MagFilter, anisotropy > 1);
         var sampler = factory.CreateSampler(new SamplerDescription(
             ToSamplerAddressMode(texture.Sampler.WrapS),
             ToSamplerAddressMode(texture.Sampler.WrapT),
             SamplerAddressMode.Wrap,
             filter,
             ComparisonKind.Never,
-            maximumAnisotropy: filter == SamplerFilter.Anisotropic ? 8u : 1u,
+            maximumAnisotropy: filter == SamplerFilter.Anisotropic ? anisotropy : 1u,
             minimumLod: 0,
             maximumLod: mipLevels - 1,
             lodBias: 0,
@@ -3908,7 +3944,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         RekallAgeVulkanSceneTexture texture,
         RekallAgeRuntimeTextureAsset runtimeTexture,
         PixelFormat format,
-        ResourceLayout layout)
+        ResourceLayout layout,
+        uint maximumAnisotropy)
     {
         var mipLevels = checked((uint)Math.Max(1, runtimeTexture.MipLevels.Count));
         var gpuTexture = factory.CreateTexture(TextureDescription.Texture2D(
@@ -3933,14 +3970,15 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 arrayLayer: 0);
         }
 
-        var filter = ToSamplerFilter(texture.Sampler.MinFilter, texture.Sampler.MagFilter, device.Features.SamplerAnisotropy);
+        var anisotropy = device.Features.SamplerAnisotropy ? Math.Max(1u, maximumAnisotropy) : 1u;
+        var filter = ToSamplerFilter(texture.Sampler.MinFilter, texture.Sampler.MagFilter, anisotropy > 1);
         var sampler = factory.CreateSampler(new SamplerDescription(
             ToSamplerAddressMode(texture.Sampler.WrapS),
             ToSamplerAddressMode(texture.Sampler.WrapT),
             SamplerAddressMode.Wrap,
             filter,
             ComparisonKind.Never,
-            maximumAnisotropy: filter == SamplerFilter.Anisotropic ? 8u : 1u,
+            maximumAnisotropy: filter == SamplerFilter.Anisotropic ? anisotropy : 1u,
             minimumLod: 0,
             maximumLod: mipLevels - 1,
             lodBias: 0,
@@ -4236,10 +4274,29 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec4 Settings;
             InteractiveFogVolume Volumes[8];
         } Fog;
+
+        layout(set = 0, binding = 4) uniform texture2D EnvironmentTexture;
+        layout(set = 0, binding = 5) uniform sampler EnvironmentSampler;
         
         layout(location = 0) out vec4 fsout_Color;const float PI = 3.14159265359;
         const int MAX_VIEW_SAMPLE_COUNT = 32;
         const int MAX_LIGHT_SAMPLE_COUNT = 16;
+
+        vec2 directionToEquirectangularUv(vec3 direction)
+        {
+            vec3 d = normalize(direction);
+            return vec2(atan(d.z, d.x) / (2.0 * PI) + 0.5, asin(clamp(d.y, -1.0, 1.0)) / PI + 0.5);
+        }
+
+        vec3 sampleEnvironmentRadiance(vec3 direction, float roughness)
+        {
+            float maximumLod = max(float(textureQueryLevels(sampler2D(EnvironmentTexture, EnvironmentSampler)) - 1), 0.0);
+            vec3 encoded = textureLod(
+                sampler2D(EnvironmentTexture, EnvironmentSampler),
+                directionToEquirectangularUv(direction),
+                clamp(roughness, 0.0, 1.0) * maximumLod).rgb;
+            return pow(max(encoded, vec3(0.0)), vec3(2.2));
+        }
         
         vec3 perturbNormal(vec3 normal)
         {
@@ -4974,7 +5031,18 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 : 0.12 * max(Frame.EnvironmentParameters.x, 0.0);
             float ambientHemisphere = clamp(normal.y * 0.5 + 0.5, 0.0, 1.0);
             vec3 environmentAmbientColor = mix(Frame.EnvironmentAmbientGroundColor.rgb, Frame.EnvironmentAmbientSkyColor.rgb, ambientHemisphere);
-            vec3 ambient = albedo * environmentAmbientColor * ambientStrength * occlusion;
+            bool hasEnvironmentImage = Frame.EnvironmentAmbientSkyColor.a > 0.5;
+            vec3 environmentDiffuse = hasEnvironmentImage
+                ? sampleEnvironmentRadiance(normal, 0.82)
+                : environmentAmbientColor;
+            vec3 environmentSpecular = hasEnvironmentImage
+                ? sampleEnvironmentRadiance(reflect(-view, normal), roughness)
+                : environmentAmbientColor * mix(0.28, 1.0, 1.0 - roughness);
+            vec3 ambientFresnel = fresnelSchlick(ndotv, f0);
+            vec3 ambientDiffuse = (1.0 - ambientFresnel) * (1.0 - metallic) * albedo;
+            vec3 ambient = (ambientDiffuse * environmentDiffuse + ambientFresnel * environmentSpecular)
+                * ambientStrength
+                * occlusion;
             vec3 waterFresnel = fresnelSchlick(ndotv, vec3(0.02));
             ambient += waterFresnel * Frame.LightColor.rgb * directTransmittance * waterCoverage * 0.018;
             vec3 emissive = pow(max(texture(sampler2D(EmissiveTexture, EmissiveSampler), fsin_UV).rgb * Draw.EmissiveFactors.rgb, vec3(0.0)), vec3(2.2)) * Draw.EmissiveFactors.a;

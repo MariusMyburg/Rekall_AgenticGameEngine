@@ -5,8 +5,10 @@ namespace Game.Modules.FleetRules;
 
 [RekallAgeModule("Game.Modules.FleetRules", "Fleet Rules")]
 [RekallAgeRequiresCapability("world")]
-public sealed class FleetRulesModule : RekallAgeModule
+public sealed class FleetRulesModule : RekallAgeModule, IRekallAgePlayableModule
 {
+    public string Kind => "agent-authored";
+
     public override void Configure(RekallAgeModuleBuilder builder)
     {
         builder.RegisterComponent<Drift>();
@@ -37,6 +39,26 @@ public sealed class FleetRulesModule : RekallAgeModule
         builder.RegisterComponent<TacticalCamera>();
         builder.RegisterRuntimeSystem<CameraSystem>();
     }
+
+    public RekallAgePlayableModuleState CreateInitialState(RekallAgePlayableModuleContext context)
+    {
+        var state = new RekallAgePlayableModuleState();
+        state.Text["scene"] = context.SceneName;
+        state.Numbers["frame"] = 0;
+        return state;
+    }
+
+    public void Tick(RekallAgePlayableModuleState state, RekallAgePlayableModuleInput input)
+    {
+        if (input.DeltaSeconds > 0)
+        {
+            state.Numbers["frame"] += 1;
+        }
+    }
+
+    public RekallAgePlayableModuleFrame Render(RekallAgePlayableModuleState state) => new(
+        $"STELLAR DOMINION\nScene {state.Text["scene"]} | Runtime ready | Frame {(int)state.Numbers["frame"]}\n"
+        + "Command the Meridian fleet through the Choir blockade.");
 }
 
 [RekallAgeComponent("Drift", Description =

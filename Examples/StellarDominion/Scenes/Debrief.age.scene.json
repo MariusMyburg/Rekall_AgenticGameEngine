@@ -10,7 +10,7 @@
   ],
   "entities": [
     {
-      "id": "ent_5268126a4e9742a5b5d16e776809f656",
+      "id": "ent_b2d72e1668a446ddb61dc72bc1392b2b",
       "name": "Button Return",
       "tags": [
         "menu",
@@ -53,7 +53,7 @@
       "locked": false
     },
     {
-      "id": "ent_2b44ee083cd9478f87df71b42bbcd2dc",
+      "id": "ent_7515b75ab4154e86a306a13cd70c42f4",
       "name": "Camera",
       "tags": [
         "camera"
@@ -89,7 +89,7 @@
           "type": "Rekall.Camera3D",
           "properties": {
             "active": true,
-            "fieldOfView": 62,
+            "fieldOfView": 42,
             "nearClip": 0.2,
             "farClip": 40000
           }
@@ -112,7 +112,7 @@
       "locked": false
     },
     {
-      "id": "ent_4ceb5658ab4343fe87f8f427819033fc",
+      "id": "ent_d7f50d8c1cd148d894e107e8e236d29c",
       "name": "Campaign Store",
       "tags": [
         "flow"
@@ -149,7 +149,37 @@
       "locked": false
     },
     {
-      "id": "ent_f7c9d4e6a4774ab883c62d6b4f63856e",
+      "id": "ent_b51a48d0743549b19ab3335ab7371993",
+      "name": "Convoy Warm Fill",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PointLight",
+          "properties": {
+            "intensity": 4.0,
+            "range": 210,
+            "color": "#e5a768",
+            "priority": 7
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -38,
+            "y": 24,
+            "z": -92
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_8d0f53cb9d0c4e3f9c6d2492882626c5",
       "name": "Debrief Canvas",
       "tags": [
         "ui"
@@ -173,7 +203,7 @@
       "locked": false
     },
     {
-      "id": "ent_1154cc0e98024b9f8af81caaa9f1905d",
+      "id": "ent_d10e43dce3524f0f998a786330b2ad20",
       "name": "Debrief Headline",
       "tags": [
         "ui"
@@ -205,7 +235,7 @@
       "locked": false
     },
     {
-      "id": "ent_9422b9b804fe4195b0dfbdf2cd2b3c3a",
+      "id": "ent_06845940d2e0406eb421539254724226",
       "name": "Debrief Text",
       "tags": [
         "ui"
@@ -236,7 +266,7 @@
       "locked": false
     },
     {
-      "id": "ent_2909d010abf344398963fdb6573d23f2",
+      "id": "ent_3aec2293d37c4edc94d6f708d2670b48",
       "name": "Environment",
       "tags": [
         "environment"
@@ -247,12 +277,13 @@
           "properties": {
             "backgroundPolicy": "color",
             "backgroundColor": "#000000",
+            "skyAsset": "asset_stellar-environment_ce1b6a4f",
             "toneMapper": "agx",
             "exposure": -0.1,
             "whitePoint": 11.2,
-            "ambientEnergy": 1.35,
+            "ambientEnergy": 2.4,
             "ambientSkyColor": "#7890a8",
-            "ambientGroundColor": "#18212b"
+            "ambientGroundColor": "#26313d"
           }
         },
         {
@@ -291,7 +322,7 @@
       "locked": false
     },
     {
-      "id": "ent_7b29b4dd083f4623bc3c793de9fc62fa",
+      "id": "ent_30a0cd5dee3e4799aed08e140c3d4591",
       "name": "Fade Curtain",
       "tags": [
         "ui"
@@ -321,7 +352,7 @@
       "locked": false
     },
     {
-      "id": "ent_97c9759440024cd184c0f942d574047e",
+      "id": "ent_85d8a74f34e54550b71b0537214dad71",
       "name": "Kell",
       "tags": [
         "planet"
@@ -353,7 +384,37 @@
       "locked": false
     },
     {
-      "id": "ent_18d2b9e7f8f041d3a1f8334b9d0fa8fb",
+      "id": "ent_113e617b8e264a96a6366b36a0130d39",
+      "name": "Long Watch Fill",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PointLight",
+          "properties": {
+            "intensity": 4.0,
+            "range": 180,
+            "color": "#92bce8",
+            "priority": 7
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 66,
+            "y": 26,
+            "z": 60
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_be627af61040429aa1f62e4468766f83",
       "name": "Meridian",
       "tags": [
         "planet"
@@ -385,7 +446,7 @@
         {
           "type": "Rekall.PlanetRenderer",
           "properties": {
-            "radius": 300,
+            "radius": 235,
             "color": "#ffffff",
             "surfaceTexture": "asset_tex-gasgiant_821048d2",
             "meshSlices": 192,
@@ -397,8 +458,8 @@
         {
           "type": "Rekall.RingRenderer",
           "properties": {
-            "innerRadius": 415,
-            "outerRadius": 745,
+            "innerRadius": 325,
+            "outerRadius": 585,
             "texture": "asset_tex-rings_f9640733",
             "color": "#ffffff",
             "segments": 384
@@ -408,8 +469,8 @@
           "type": "Rekall.Transform3D",
           "properties": {
             "x": 1700,
-            "y": 150,
-            "z": 340,
+            "y": 205,
+            "z": 390,
             "roll": -13.5
           }
         }
@@ -420,7 +481,37 @@
       "locked": false
     },
     {
-      "id": "ent_15502d96646240ada75c25a76f55c486",
+      "id": "ent_a5be0bc710dc496e8c397ea51470ff75",
+      "name": "Meridian Bounce",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PointLight",
+          "properties": {
+            "intensity": 5.0,
+            "range": 260,
+            "color": "#8fb8e8",
+            "priority": 8
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -34,
+            "y": 30,
+            "z": 120
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_b1b0f0c120934338960539adac6e784b",
       "name": "Post",
       "tags": [
         "post"
@@ -465,7 +556,7 @@
       "locked": false
     },
     {
-      "id": "ent_4d38b85fddf3436c8d6bd72cfedfe120",
+      "id": "ent_2bb65c579d0847648da677731ccde728",
       "name": "Shell",
       "tags": [
         "flow"
@@ -503,7 +594,7 @@
       "locked": false
     },
     {
-      "id": "ent_a5cefcde9847433a889dc2bfce31d795",
+      "id": "ent_f11ae887789247f780d8bc4d27c72cc7",
       "name": "Starfield",
       "tags": [
         "backdrop"
@@ -533,7 +624,7 @@
       "locked": false
     },
     {
-      "id": "ent_63b7ec7232074b36a137110ac778ec70",
+      "id": "ent_5ea4cddc41ff41688c374c0944337246",
       "name": "Sun Disc",
       "tags": [
         "light"
@@ -581,7 +672,7 @@
       "locked": false
     },
     {
-      "id": "ent_1a8eb4e909ef4d91b3fcbb82b0c63fd7",
+      "id": "ent_5c0fd96dbe6f45ceaa72b9b1d49e60f4",
       "name": "Sun Light",
       "tags": [
         "light"
@@ -603,6 +694,36 @@
             "pitch": 34,
             "yaw": 78,
             "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e14eaaae3635484ebb243bbe4b16d20a",
+      "name": "Vigil Fill",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PointLight",
+          "properties": {
+            "intensity": 4.0,
+            "range": 180,
+            "color": "#92bce8",
+            "priority": 7
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -102,
+            "y": 26,
+            "z": 182
           }
         }
       ],

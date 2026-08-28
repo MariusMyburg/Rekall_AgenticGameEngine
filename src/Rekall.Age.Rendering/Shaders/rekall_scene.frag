@@ -87,6 +87,9 @@ layout(set = 0, binding = 0) uniform FrameUniform
     vec4 environmentAmbientGroundColor;
 } frame;
 
+layout(set = 0, binding = 1) uniform texture2D environmentTexture;
+layout(set = 0, binding = 2) uniform sampler environmentSampler;
+
 layout(set = 1, binding = 0) uniform DrawUniformBuffer
 {
     mat4 model;
@@ -128,6 +131,22 @@ const float PI = 3.14159265359;
 const int MAX_VIEW_SAMPLE_COUNT = 32;
 const int MAX_LIGHT_SAMPLE_COUNT = 16;
 const int MAX_SHADOW_FILTER_TAPS = 24;
+
+vec2 directionToEquirectangularUv(vec3 direction)
+{
+    vec3 d = normalize(direction);
+    return vec2(atan(d.z, d.x) / (2.0 * PI) + 0.5, asin(clamp(d.y, -1.0, 1.0)) / PI + 0.5);
+}
+
+vec3 sampleEnvironmentRadiance(vec3 direction, float roughness)
+{
+    float maximumLod = max(float(textureQueryLevels(sampler2D(environmentTexture, environmentSampler)) - 1), 0.0);
+    vec3 encoded = textureLod(
+        sampler2D(environmentTexture, environmentSampler),
+        directionToEquirectangularUv(direction),
+        clamp(roughness, 0.0, 1.0) * maximumLod).rgb;
+    return pow(max(encoded, vec3(0.0)), vec3(2.2));
+}
 
 float sampleDirectionalShadow(vec3 worldPosition, vec3 normal)
 {
@@ -826,10 +845,15 @@ void main()
     vec3 environmentAmbientColor = mix(frame.environmentAmbientGroundColor.rgb, frame.environmentAmbientSkyColor.rgb, ambientHemisphere);
     vec3 ambientFresnel = fresnelSchlickRoughness(ndotv, f0, roughness);
     vec3 ambientDiffuse = (1.0 - ambientFresnel) * (1.0 - metallic) * albedo;
-    vec3 ambientSpecular = ambientFresnel
-        * environmentAmbientColor
-        * mix(0.28, 1.0, 1.0 - roughness);
-    vec3 ambient = (ambientDiffuse * environmentAmbientColor + ambientSpecular)
+    bool hasEnvironmentImage = frame.environmentAmbientSkyColor.a > 0.5;
+    vec3 imageDiffuse = hasEnvironmentImage
+        ? sampleEnvironmentRadiance(normal, 0.82)
+        : environmentAmbientColor;
+    vec3 imageSpecular = hasEnvironmentImage
+        ? sampleEnvironmentRadiance(reflect(-view, normal), roughness)
+        : environmentAmbientColor * mix(0.28, 1.0, 1.0 - roughness);
+    vec3 ambientSpecular = ambientFresnel * imageSpecular;
+    vec3 ambient = (ambientDiffuse * imageDiffuse + ambientSpecular)
         * ambientStrength
         * occlusion;
     vec3 waterFresnel = fresnelSchlick(ndotv, vec3(0.02));

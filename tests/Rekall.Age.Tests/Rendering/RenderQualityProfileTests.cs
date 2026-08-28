@@ -6,6 +6,28 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class RenderQualityProfileTests
 {
     [Theory]
+    [InlineData("Performance", 1)]
+    [InlineData("Low", 1)]
+    [InlineData("Medium", 2)]
+    [InlineData("High", 8)]
+    [InlineData("Ultra", 16)]
+    [InlineData("Epic", 16)]
+    public void ResolverScalesTextureAnisotropyByPresetAndDeviceLimit(string preset, int requested)
+    {
+        var plan = new RekallAgeRenderQualityProfileResolver().Resolve(
+            new RekallAgeRenderQualityIntent(preset),
+            RekallAgeRenderingDeviceCapabilities.DesktopBaseline("test") with { MaximumSamplerAnisotropy = 4 },
+            1920,
+            1080);
+
+        Assert.Equal(Math.Min(requested, 4), plan.Textures.MaximumAnisotropy);
+        Assert.Equal(requested > 4, plan.Degradations.Any(item =>
+            item.Feature == "textureAnisotropy"
+            && item.RequestedValue == requested.ToString()
+            && item.ResolvedValue == "4"));
+    }
+
+    [Theory]
     [InlineData(false, true)]
     [InlineData(true, false)]
     public void ParticleCapacityDegradesToZeroWithoutRequiredComputeAndStorageBufferCapabilities(

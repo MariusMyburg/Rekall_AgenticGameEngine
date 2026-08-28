@@ -137,7 +137,59 @@ def ring_strip(width=2048, height=8, seed=97):
     return width, height, rows
 
 
+def deep_space_environment(width=2048, height=1024, seed=20260829):
+    """Seamless equirectangular radiance source for AGE environment IBL.
+
+    It is deliberately restrained: cold dust supplies broad material reflections,
+    a warm compact source gives metal a readable key highlight, and sparse stars
+    remain accents instead of turning every rough surface into glitter.
+    """
+    rows = []
+    for j in range(height):
+        v = j / (height - 1)
+        latitude = (v - 0.5) * math.pi
+        row = bytearray()
+        for i in range(width):
+            u = i / (width - 1)
+            cx, cy = _cyl(u, 2.4)
+            cloud = fbm(cx + 11.0, cy + v * 8.0, seed, 4)
+            ridge = math.exp(-((v - (0.52 + 0.10 * math.sin(u * math.pi * 2.0 + 0.8))) / 0.16) ** 2)
+            dust = max(0.0, cloud - 0.43) * ridge
+            base = [0.006 + dust * 0.055, 0.009 + dust * 0.075, 0.017 + dust * 0.13]
+
+            star = _hash(i, j, seed + 17)
+            if star > 0.9987:
+                energy = ((star - 0.9987) / 0.0013) ** 2
+                warmth = _hash(i, j, seed + 31)
+                star_color = lerp3((0.62, 0.76, 1.0), (1.0, 0.82, 0.58), warmth)
+                for channel in range(3):
+                    base[channel] += star_color[channel] * (0.35 + energy * 0.65)
+
+            # Wrapped longitude distance keeps the source seamless at u=0/1.
+            du = abs(u - 0.71)
+            du = min(du, 1.0 - du)
+            dv = v - 0.29
+            source = math.exp(-((du / 0.022) ** 2 + (dv / 0.030) ** 2))
+            halo = math.exp(-((du / 0.11) ** 2 + (dv / 0.13) ** 2))
+            base[0] += source * 1.8 + halo * 0.08
+            base[1] += source * 1.15 + halo * 0.045
+            base[2] += source * 0.52 + halo * 0.018
+
+            # Equirectangular poles cover fewer solid-angle samples; darkening them
+            # avoids a false bright cap after rough mip filtering.
+            pole = max(0.28, math.cos(latitude) ** 0.35)
+            # PNG assets are sampled as sRGB colour by AGE's material shaders. Encode
+            # our linear radiance so the shader's pow(2.2) reconstructs it instead of
+            # crushing a useful 2% fill into near-black.
+            row += bytes(
+                max(0, min(255, int((max(0.0, c * pole) ** (1.0 / 2.2)) * 255)))
+                for c in base)
+        rows.append(row)
+    return width, height, rows
+
+
 if __name__ == "__main__":
-    for name, fn in (("gasgiant", gas_giant), ("moon", rocky_moon), ("rings", ring_strip)):
+    for name, fn in (("gasgiant", gas_giant), ("moon", rocky_moon), ("rings", ring_strip),
+                     ("stellar-environment", deep_space_environment)):
         w, h, rows = fn()
         write_png(os.path.join(OUT, f"tex_{name}.png"), w, h, rows)

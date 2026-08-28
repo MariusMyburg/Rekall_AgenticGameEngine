@@ -610,6 +610,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         };
                     }
                 }
+                state.RequestedSamplerAnisotropy = Math.Max(
+                    1,
+                    frame.ResolvedQualityPlan?.Textures.MaximumAnisotropy ?? 1);
                 if (highFidelityPlan is not null)
                 {
                     ValidateParticleAssets(highFidelityPlan.ParticlePlan, assets, errors);
@@ -663,7 +666,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     prepared.GeometryUpload,
                     prepared.ReadbackByteCount,
                     highFidelityPlan?.ShadowPlan);
-                CreateTextures(state, meshes, highFidelityPlan?.ParticlePlan, assets);
+                CreateTextures(state, meshes, highFidelityPlan?.ParticlePlan, assets, frame.Environment?.SkyAssetId);
                 CreateDescriptors(state, prepared.DrawPlan.MaterialKeys, highFidelityPlan?.ShadowPlan);
                 if (!TryCompileSceneShaders(
                     errors,
@@ -1264,8 +1267,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             state.Vk.GetPhysicalDeviceFeatures(state.PhysicalDevice, out var availableFeatures);
             var enabledFeatures = new PhysicalDeviceFeatures
             {
-                FragmentStoresAndAtomics = availableFeatures.FragmentStoresAndAtomics
+                FragmentStoresAndAtomics = availableFeatures.FragmentStoresAndAtomics,
+                SamplerAnisotropy = availableFeatures.SamplerAnisotropy
             };
+            state.SamplerAnisotropyEnabled = availableFeatures.SamplerAnisotropy;
+            state.Vk.GetPhysicalDeviceProperties(state.PhysicalDevice, out var deviceProperties);
+            state.MaximumSamplerAnisotropy = Math.Max(1, deviceProperties.Limits.MaxSamplerAnisotropy);
             var deviceCreateInfo = new DeviceCreateInfo
             {
                 SType = StructureType.DeviceCreateInfo,
@@ -1687,7 +1694,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             VulkanState state,
             IReadOnlyList<RekallAgeVulkanSceneMesh> meshes,
             RekallAgeVulkanParticlePlan? particlePlan = null,
-            RekallAgeRuntimeViewportAssetSet? assets = null)
+            RekallAgeRuntimeViewportAssetSet? assets = null,
+            string? environmentAssetId = null)
         {
             var textures = meshes
                 .SelectMany(mesh => new[]
@@ -1703,6 +1711,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 .GroupBy(texture => texture.Id, StringComparer.Ordinal)
                 .Select(group => group.First())
                 .Concat(ResolveParticleTextures(particlePlan, assets))
+                .Concat(ResolveEnvironmentTextures(environmentAssetId, assets))
                 .Concat(CreateDefaultTextures())
                 .GroupBy(texture => texture.Id, StringComparer.Ordinal)
                 .Select(group => group.First())
@@ -1728,11 +1737,43 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 {
                     state.DefaultMetallicRoughnessTexture = resource;
                 }
+                else if (texture.Id.Equals("__rekall_black_environment", StringComparison.Ordinal))
+                {
+                    state.EnvironmentTexture ??= resource;
+                }
                 else
                 {
                     state.TextureById[texture.Id] = resource;
+                    if (!string.IsNullOrWhiteSpace(environmentAssetId)
+                        && texture.Id.Equals(environmentAssetId, StringComparison.Ordinal))
+                    {
+                        state.EnvironmentTexture = resource;
+                    }
                 }
             }
+        }
+
+        private static IEnumerable<RekallAgeVulkanSceneTexture> ResolveEnvironmentTextures(
+            string? environmentAssetId,
+            RekallAgeRuntimeViewportAssetSet? assets)
+        {
+            if (string.IsNullOrWhiteSpace(environmentAssetId)
+                || assets is null
+                || !assets.Images.TryGetValue(environmentAssetId, out var image))
+            {
+                yield break;
+            }
+
+            yield return new RekallAgeVulkanSceneTexture(
+                environmentAssetId,
+                image.Width,
+                image.Height,
+                image.Rgba,
+                new RekallAgeVulkanSceneSampler(
+                    RekallAgeVulkanSceneFilter.Linear,
+                    RekallAgeVulkanSceneFilter.Linear,
+                    RekallAgeVulkanSceneWrapMode.Repeat,
+                    RekallAgeVulkanSceneWrapMode.ClampToEdge));
         }
 
         private static bool TryCreateTextureResource(
@@ -1871,6 +1912,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             yield return new RekallAgeVulkanSceneTexture("__rekall_white", 1, 1, [255, 255, 255, 255], sampler);
             yield return new RekallAgeVulkanSceneTexture("__rekall_flat_normal", 1, 1, [128, 128, 255, 255], sampler);
             yield return new RekallAgeVulkanSceneTexture("__rekall_default_metallic_roughness", 1, 1, [0, 255, 0, 255], sampler);
+            yield return new RekallAgeVulkanSceneTexture("__rekall_black_environment", 1, 1, [0, 0, 0, 255], sampler);
         }
 
         private static void CreateDescriptors(
@@ -1878,25 +1920,29 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             IReadOnlyList<RekallAgeVulkanSceneMaterialKey> materialKeys,
             RekallAgeVulkanShadowPlan? shadowPlan = null)
         {
-            var uniformBinding = new DescriptorSetLayoutBinding
+            var frameBindings = stackalloc DescriptorSetLayoutBinding[3];
+            frameBindings[0] = new DescriptorSetLayoutBinding
             {
                 Binding = 0,
                 DescriptorCount = 1,
                 DescriptorType = DescriptorType.UniformBuffer,
                 StageFlags = ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit
             };
+            frameBindings[1] = new DescriptorSetLayoutBinding(1, DescriptorType.SampledImage, 1, ShaderStageFlags.FragmentBit);
+            frameBindings[2] = new DescriptorSetLayoutBinding(2, DescriptorType.Sampler, 1, ShaderStageFlags.FragmentBit);
             var uniformLayoutInfo = new DescriptorSetLayoutCreateInfo
             {
                 SType = StructureType.DescriptorSetLayoutCreateInfo,
-                BindingCount = 1,
-                PBindings = &uniformBinding
+                BindingCount = 3,
+                PBindings = frameBindings
             };
             ThrowIfFailed(
                 state.Vk.CreateDescriptorSetLayout(state.Device, &uniformLayoutInfo, null, out state.DescriptorSetLayout),
                 "vkCreateDescriptorSetLayout frame");
-            var drawBinding = uniformBinding;
+            var drawBinding = frameBindings[0];
             drawBinding.DescriptorType = DescriptorType.UniformBufferDynamic;
             var drawLayoutInfo = uniformLayoutInfo;
+            drawLayoutInfo.BindingCount = 1;
             drawLayoutInfo.PBindings = &drawBinding;
             ThrowIfFailed(
                 state.Vk.CreateDescriptorSetLayout(state.Device, &drawLayoutInfo, null, out state.DrawDescriptorSetLayout),
@@ -1951,8 +1997,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             {
                 new(DescriptorType.UniformBuffer, checked(frameSetCount + shadowSetCount)),
                 new(DescriptorType.UniformBufferDynamic, 1),
-                new(DescriptorType.SampledImage, checked(materialSetCount * 7)),
-                new(DescriptorType.Sampler, checked(materialSetCount * 7)),
+                new(DescriptorType.SampledImage, checked(materialSetCount * 7 + frameSetCount)),
+                new(DescriptorType.Sampler, checked(materialSetCount * 7 + frameSetCount)),
                 new(DescriptorType.CombinedImageSampler, 1)
             };
             var poolInfo = new DescriptorPoolCreateInfo
@@ -1974,6 +2020,32 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     (ulong)Marshal.SizeOf<RekallAgeVulkanSceneGpuFrameUniform>());
                 var write = UniformWrite(descriptorSet, &bufferInfo);
                 state.Vk.UpdateDescriptorSets(state.Device, 1, &write, 0, null);
+                var environmentTexture = state.EnvironmentTexture ?? state.WhiteTexture!;
+                var environmentImageInfo = new DescriptorImageInfo(default, environmentTexture.View, ImageLayout.ShaderReadOnlyOptimal);
+                var environmentSamplerInfo = new DescriptorImageInfo(environmentTexture.Sampler, default, ImageLayout.Undefined);
+                var environmentWrites = new WriteDescriptorSet[2];
+                environmentWrites[0] = new WriteDescriptorSet
+                {
+                    SType = StructureType.WriteDescriptorSet,
+                    DstSet = descriptorSet,
+                    DstBinding = 1,
+                    DescriptorCount = 1,
+                    DescriptorType = DescriptorType.SampledImage,
+                    PImageInfo = &environmentImageInfo
+                };
+                environmentWrites[1] = new WriteDescriptorSet
+                {
+                    SType = StructureType.WriteDescriptorSet,
+                    DstSet = descriptorSet,
+                    DstBinding = 2,
+                    DescriptorCount = 1,
+                    DescriptorType = DescriptorType.Sampler,
+                    PImageInfo = &environmentSamplerInfo
+                };
+                fixed (WriteDescriptorSet* environmentWritesPtr = environmentWrites)
+                {
+                    state.Vk.UpdateDescriptorSets(state.Device, 2, environmentWritesPtr, 0, null);
+                }
                 state.FrameDescriptorSets[index] = descriptorSet;
                 if (index == 0)
                 {
@@ -4016,6 +4088,9 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             RekallAgeVulkanSceneSampler sampler,
             uint mipLevels)
         {
+            var anisotropy = state.SamplerAnisotropyEnabled
+                ? Math.Clamp(state.RequestedSamplerAnisotropy, 1, state.MaximumSamplerAnisotropy)
+                : 1;
             var createInfo = new SamplerCreateInfo
             {
                 SType = StructureType.SamplerCreateInfo,
@@ -4025,6 +4100,8 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 AddressModeU = ToVkSamplerAddressMode(sampler.WrapS),
                 AddressModeV = ToVkSamplerAddressMode(sampler.WrapT),
                 AddressModeW = SamplerAddressMode.Repeat,
+                AnisotropyEnable = anisotropy > 1,
+                MaxAnisotropy = anisotropy,
                 MaxLod = Math.Max(0, mipLevels - 1),
                 BorderColor = BorderColor.FloatTransparentBlack
             };
@@ -6776,6 +6853,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public VulkanTextureResource? WhiteTexture;
             public VulkanTextureResource? FlatNormalTexture;
             public VulkanTextureResource? DefaultMetallicRoughnessTexture;
+            public VulkanTextureResource? EnvironmentTexture;
+            public bool SamplerAnisotropyEnabled;
+            public float MaximumSamplerAnisotropy = 1;
+            public float RequestedSamplerAnisotropy = 1;
             public PipelineLayout PipelineLayout;
             public Pipeline Pipeline;
             public Pipeline TransparentPipeline;

@@ -34,6 +34,7 @@ ROOT = "F:/Dev/Rekall_AGE/Examples/StellarDominion"
 TEX_GAS = "asset_tex-gasgiant_821048d2"
 TEX_MOON = "asset_tex-moon_79224562"
 TEX_RINGS = "asset_tex-rings_f9640733"
+TEX_ENVIRONMENT = "asset_stellar-environment_ce1b6a4f"
 
 # Broadside, not down-lane. Looking along the transit lane put every hull nose-on, so
 # a 90-unit dreadnought presented its 12-unit beam and read as a speck. From the side
@@ -77,8 +78,8 @@ def armour_surface(name, side):
         # across on capital ships instead of wallpaper-sized checks.
         "scale": 3.5 if not civilian else 2.8,
         "seed": zlib.crc32(name.encode("utf-8")) & 0x7fffffff,
-        "baseColorA": "#160b0e" if hostile else "#252c34",
-        "baseColorB": "#c19aa0" if hostile else ("#d0b995" if civilian else "#e0e5e8"),
+        "baseColorA": "#241116" if hostile else ("#655a4d" if civilian else "#4d5762"),
+        "baseColorB": "#c19aa0" if hostile else ("#c5ad87" if civilian else "#aeb9c4"),
         "metallicFactor": 0.78 if not civilian else 0.62,
         "roughnessA": 0.78,
         "roughnessB": 0.28 if not civilian else 0.42,
@@ -112,9 +113,10 @@ def space():
             }),
             ("Rekall.Environment3D", {
                 "backgroundPolicy": "color", "backgroundColor": "#000000",
+                "skyAsset": TEX_ENVIRONMENT,
                 "toneMapper": "agx", "exposure": -0.10, "whitePoint": 11.2,
-                "ambientEnergy": 1.35, "ambientSkyColor": "#7890a8",
-                "ambientGroundColor": "#18212b",
+                "ambientEnergy": 2.4, "ambientSkyColor": "#7890a8",
+                "ambientGroundColor": "#26313d",
             }),
             ("Rekall.ShadowSettings", {
                 "cascadeCount": 4, "atlasResolution": 4096,
@@ -156,12 +158,34 @@ def space():
             ("Rekall.Material", {"baseColor": "#fffaf0", "emissiveColor": "#fff3da",
                                  "emissiveStrength": 40.0, "roughnessFactor": 1.0}),
         ]),
+        # Cinematic practicals model reflected light from Meridian and the convoy.
+        # They reveal the broadside armour without flattening the sun-facing key.
+        e("Meridian Bounce", ["light"], [
+            ("Rekall.Transform3D", {"x": -34, "y": 30, "z": 120}),
+            ("Rekall.PointLight", {"intensity": 5.0, "range": 260,
+                                   "color": "#8fb8e8", "priority": 8}),
+        ]),
+        e("Convoy Warm Fill", ["light"], [
+            ("Rekall.Transform3D", {"x": -38, "y": 24, "z": -92}),
+            ("Rekall.PointLight", {"intensity": 4.0, "range": 210,
+                                   "color": "#e5a768", "priority": 7}),
+        ]),
+        e("Vigil Fill", ["light"], [
+            ("Rekall.Transform3D", {"x": -102, "y": 26, "z": 182}),
+            ("Rekall.PointLight", {"intensity": 4.0, "range": 180,
+                                   "color": "#92bce8", "priority": 7}),
+        ]),
+        e("Long Watch Fill", ["light"], [
+            ("Rekall.Transform3D", {"x": 66, "y": 26, "z": 60}),
+            ("Rekall.PointLight", {"intensity": 4.0, "range": 180,
+                                   "color": "#92bce8", "priority": 7}),
+        ]),
         # Meridian sits far beyond the lane, straight down the view axis, so the fleet
         # is read against a lit disc instead of against empty black.
         e("Meridian", ["planet"], [
-            ("Rekall.Transform3D", {"x": 1700, "y": 150, "z": 340, "roll": -13.5}),
+            ("Rekall.Transform3D", {"x": 1700, "y": 205, "z": 390, "roll": -13.5}),
             ("Rekall.PlanetRenderer", {
-                "radius": 300, "color": "#ffffff", "surfaceTexture": TEX_GAS,
+                "radius": 235, "color": "#ffffff", "surfaceTexture": TEX_GAS,
                 "meshSlices": 192, "meshStacks": 96,
                 "waterCoverage": 0, "waterSpecularStrength": 0,
             }),
@@ -172,7 +196,7 @@ def space():
                 "mieColor": "#ffe9cc", "ozoneAbsorptionColor": "#ffcf9a",
             }),
             ("Rekall.RingRenderer", {
-                "innerRadius": 415, "outerRadius": 745,
+                "innerRadius": 325, "outerRadius": 585,
                 "texture": TEX_RINGS, "color": "#ffffff", "segments": 384,
             }),
             ("Rekall.CelestialRotation", {
@@ -189,7 +213,7 @@ def space():
         e("Camera", ["camera"], [
             ("Rekall.Transform3D", {"x": CAM[0], "y": CAM[1], "z": CAM[2],
                                     "pitch": CAM_PITCH, "yaw": CAM_YAW, "roll": 0}),
-            ("Rekall.Camera3D", {"active": True, "fieldOfView": 62,
+            ("Rekall.Camera3D", {"active": True, "fieldOfView": 42,
                                  "nearClip": 0.2, "farClip": 40000}),
             # Ears ride the camera: what you are looking at is what you hear, and
             # zooming into a firefight brings it forward.

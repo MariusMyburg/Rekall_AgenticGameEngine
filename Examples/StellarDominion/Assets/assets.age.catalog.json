@@ -40,6 +40,27 @@
       "modelAssetMetadata": null
     },
     {
+      "id": "asset_stellar-environment_ce1b6a4f",
+      "name": "stellar-environment",
+      "displayName": "Stellar Environment",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Tools\\tex_stellar-environment.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Assets\\texture\\asset_stellar-environment_ce1b6a4f.png",
+      "contentHash": "ce1b6a4ffe7f74cc2e1941f2e1076fd0ed26148fafa1594d630757e55dd7d1ef",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 2048,
+        "height": 1024,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
       "id": "asset_tex-gasgiant_127c10c8",
       "name": "tex-gasgiant",
       "displayName": "tex_gasgiant",

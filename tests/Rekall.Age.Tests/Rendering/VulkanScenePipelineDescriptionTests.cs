@@ -85,6 +85,8 @@ public sealed class VulkanScenePipelineDescriptionTests
         Assert.Contains("vec4 environmentAmbientGroundColor;", fragment);
         Assert.Contains("0.12 * max(frame.environmentParameters.x, 0.0)", fragment);
         Assert.Contains("mix(frame.environmentAmbientGroundColor.rgb, frame.environmentAmbientSkyColor.rgb", fragment);
+        Assert.Contains("fresnelSchlickRoughness", fragment);
+        Assert.Contains("vec3 ambientSpecular =", fragment);
         var toneMap = File.ReadAllText(Path.Combine(shaderDirectory, "rekall_tonemap.frag"));
         Assert.Contains("hdr *= 11.2 / max(parameters.whitePoint, 0.0001);", toneMap);
         Assert.Contains("frame.lightPosition.w > 0.5", fragment);

@@ -10,7 +10,7 @@
   ],
   "entities": [
     {
-      "id": "ent_bdfb1e9238254d6f89030c868f7af098",
+      "id": "ent_5268126a4e9742a5b5d16e776809f656",
       "name": "Button Return",
       "tags": [
         "menu",
@@ -53,12 +53,38 @@
       "locked": false
     },
     {
-      "id": "ent_f6d2c25db3f94795a1e38ff9a617ecb6",
+      "id": "ent_2b44ee083cd9478f87df71b42bbcd2dc",
       "name": "Camera",
       "tags": [
         "camera"
       ],
       "components": [
+        {
+          "type": "Game.Modules.FleetRules.TacticalCamera",
+          "properties": {
+            "enabled": true,
+            "pivotX": 0,
+            "pivotY": 0,
+            "pivotZ": 120,
+            "distance": 360,
+            "yaw": 85,
+            "pitch": 22,
+            "minimumDistance": 40,
+            "maximumDistance": 2400,
+            "minimumPitch": -12,
+            "maximumPitch": 82,
+            "orbitDegreesPerPixel": 0.35,
+            "panUnitsPerSecond": 260,
+            "zoomStep": 0.12,
+            "frameOnStart": false
+          }
+        },
+        {
+          "type": "Rekall.AudioListener",
+          "properties": {
+            "active": true
+          }
+        },
         {
           "type": "Rekall.Camera3D",
           "properties": {
@@ -71,9 +97,9 @@
         {
           "type": "Rekall.Transform3D",
           "properties": {
-            "x": -360,
-            "y": 150,
-            "z": 170,
+            "x": -332,
+            "y": 135,
+            "z": 91,
             "pitch": 22,
             "yaw": 85,
             "roll": 0
@@ -86,7 +112,7 @@
       "locked": false
     },
     {
-      "id": "ent_b5f36f97bdcd4fd9805174e1d06a9e6b",
+      "id": "ent_4ceb5658ab4343fe87f8f427819033fc",
       "name": "Campaign Store",
       "tags": [
         "flow"
@@ -123,7 +149,7 @@
       "locked": false
     },
     {
-      "id": "ent_5d025e30ae8048acb4a78bc0d387e174",
+      "id": "ent_f7c9d4e6a4774ab883c62d6b4f63856e",
       "name": "Debrief Canvas",
       "tags": [
         "ui"
@@ -147,7 +173,7 @@
       "locked": false
     },
     {
-      "id": "ent_bb857885797e4a0699102b23815a1b6b",
+      "id": "ent_1154cc0e98024b9f8af81caaa9f1905d",
       "name": "Debrief Headline",
       "tags": [
         "ui"
@@ -179,7 +205,7 @@
       "locked": false
     },
     {
-      "id": "ent_dab9c4d485e34d64b451479f8577d9dc",
+      "id": "ent_9422b9b804fe4195b0dfbdf2cd2b3c3a",
       "name": "Debrief Text",
       "tags": [
         "ui"
@@ -210,7 +236,7 @@
       "locked": false
     },
     {
-      "id": "ent_14c8f285940045f68346617b0c7b86fa",
+      "id": "ent_2909d010abf344398963fdb6573d23f2",
       "name": "Environment",
       "tags": [
         "environment"
@@ -222,11 +248,40 @@
             "backgroundPolicy": "color",
             "backgroundColor": "#000000",
             "toneMapper": "agx",
-            "exposure": 0.15,
-            "whitePoint": 8.0,
-            "ambientEnergy": 0.25,
-            "ambientSkyColor": "#33507f",
-            "ambientGroundColor": "#0a0810"
+            "exposure": -0.1,
+            "whitePoint": 11.2,
+            "ambientEnergy": 1.35,
+            "ambientSkyColor": "#7890a8",
+            "ambientGroundColor": "#18212b"
+          }
+        },
+        {
+          "type": "Rekall.RenderQualityProfile",
+          "properties": {
+            "preset": "High",
+            "resolutionScale": 1.0,
+            "shadowCascadeCount": 4,
+            "shadowResolution": 4096,
+            "fogMode": "froxel",
+            "bloom": true,
+            "ssao": true,
+            "maximumActiveParticles": 48000,
+            "automaticScaling": true,
+            "targetFramesPerSecond": 60,
+            "enableGpuTimestamps": true
+          }
+        },
+        {
+          "type": "Rekall.ShadowSettings",
+          "properties": {
+            "cascadeCount": 4,
+            "atlasResolution": 4096,
+            "maximumDistance": 2600,
+            "splitPolicy": "practical",
+            "bias": 0.0012,
+            "normalBias": 0.012,
+            "filter": "pcf",
+            "stabilization": true
           }
         }
       ],
@@ -236,7 +291,7 @@
       "locked": false
     },
     {
-      "id": "ent_ec97855cde15427ca445fe1c990f11ec",
+      "id": "ent_7b29b4dd083f4623bc3c793de9fc62fa",
       "name": "Fade Curtain",
       "tags": [
         "ui"
@@ -266,7 +321,7 @@
       "locked": false
     },
     {
-      "id": "ent_4b51b1b7de40412ebb222251c8fde1ec",
+      "id": "ent_97c9759440024cd184c0f942d574047e",
       "name": "Kell",
       "tags": [
         "planet"
@@ -298,7 +353,7 @@
       "locked": false
     },
     {
-      "id": "ent_2d232203c1a947ada33a49920504789e",
+      "id": "ent_18d2b9e7f8f041d3a1f8334b9d0fa8fb",
       "name": "Meridian",
       "tags": [
         "planet"
@@ -365,7 +420,7 @@
       "locked": false
     },
     {
-      "id": "ent_53c8d6d822d341208414e8a58561b594",
+      "id": "ent_15502d96646240ada75c25a76f55c486",
       "name": "Post",
       "tags": [
         "post"
@@ -379,25 +434,25 @@
               {
                 "name": "bright",
                 "type": "brightExtract",
-                "threshold": 1.05,
-                "scale": 4.0
+                "threshold": 1.8,
+                "scale": 2.0
               },
               {
                 "name": "blurA",
                 "type": "blur",
-                "iterations": 5,
-                "radius": 3.0
+                "iterations": 4,
+                "radius": 2.2
               },
               {
                 "name": "composite",
                 "type": "composite",
-                "intensity": 1.0,
+                "intensity": 0.42,
                 "blendMode": "add"
               },
               {
                 "name": "dirt",
                 "type": "lensDirt",
-                "intensity": 0.55,
+                "intensity": 0.08,
                 "scale": 1.0
               }
             ]
@@ -410,7 +465,7 @@
       "locked": false
     },
     {
-      "id": "ent_9c8fe838886a4130a648b919fe5f9156",
+      "id": "ent_4d38b85fddf3436c8d6bd72cfedfe120",
       "name": "Shell",
       "tags": [
         "flow"
@@ -448,7 +503,7 @@
       "locked": false
     },
     {
-      "id": "ent_7ed9bdc2ee76418a9ba2b5c76f6353e6",
+      "id": "ent_a5cefcde9847433a889dc2bfce31d795",
       "name": "Starfield",
       "tags": [
         "backdrop"
@@ -462,8 +517,8 @@
             "size": 2.1,
             "seed": 20260828,
             "color": "#dfe9ffff",
-            "brightness": 2.6,
-            "milkyWayStrength": 0.5,
+            "brightness": 1.35,
+            "milkyWayStrength": 0.22,
             "active": true
           }
         },
@@ -478,7 +533,7 @@
       "locked": false
     },
     {
-      "id": "ent_d72d2296bb724d43b826e4f02a6829a4",
+      "id": "ent_63b7ec7232074b36a137110ac778ec70",
       "name": "Sun Disc",
       "tags": [
         "light"
@@ -526,7 +581,7 @@
       "locked": false
     },
     {
-      "id": "ent_59b8224ddbd94cc495e1cf5683a480b0",
+      "id": "ent_1a8eb4e909ef4d91b3fcbb82b0c63fd7",
       "name": "Sun Light",
       "tags": [
         "light"
@@ -535,8 +590,8 @@
         {
           "type": "Rekall.DirectionalLight",
           "properties": {
-            "intensity": 4.0,
-            "color": "#fff4e2"
+            "intensity": 4.8,
+            "color": "#fff2dc"
           }
         },
         {
@@ -545,8 +600,8 @@
             "x": -709,
             "y": 1204,
             "z": 1134,
-            "pitch": 42,
-            "yaw": 148,
+            "pitch": 34,
+            "yaw": 78,
             "roll": 0
           }
         }

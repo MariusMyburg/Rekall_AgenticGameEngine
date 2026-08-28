@@ -4,10 +4,43 @@ This is the durable execution ledger for Rekall AGE. Update it only from
 verified repository or acceptance evidence. Conversational recency does not
 change the priority order.
 
-Last verified: 2026-08-26 16:24 Africa/Johannesburg
+Last verified: 2026-08-29 Africa/Johannesburg
 
-Branch: `codex/high-fidelity-forward-plus` (Task 5A began from exact clean
-commit `01f48ff`)
+Branch: `master`
+
+## 2026-08-29 — Stellar Dominion combat and realism vertical slice
+
+The live game testbed exposed and now covers two concrete combat regressions.
+Beam geometry is authored in emitter-local space and is re-aimed from the
+current owner and target transforms every runtime step; a deterministic probe
+requires the moving owner and beam emitter to advance by the same nonzero
+delta. Heavy beam and impact reports now use spatialized CC0 WAV assets instead
+of cartoon-like procedural tones. That work also exposed a generic decoder bug:
+RIFF/WAVE payload bytes could be mistaken for an MPEG frame, so explicit WAVE
+containers now take precedence over MP3 heuristic scanning.
+
+The first ship-realism tranche is playable in the real Vulkan path. AGE adds a
+generic `hard-surface-panels` procedural PBR generator with recessed seams,
+continuous plate wear, packed roughness variation, and normal detail. Stellar
+Dominion supplies stable box-projected UVs, neutral material multipliers,
+chamfered machinery and greebles, a closer broadside camera, 4K cascaded-shadow
+intent, SSAO, restrained bloom/exposure, and physically motivated impact cores,
+sparks, and local lights. The scene itself uncovered the next renderer gap:
+metallic materials had only diffuse hemispherical ambient and went black away
+from the key. The shader now includes a roughness-aware Fresnel ambient-specular
+fallback for authored sky/ground radiance. This is an interim probe-less IBL
+path; reflection cubemaps/probes remain required for the final photoreal ceiling.
+
+Fresh evidence for this checkpoint includes the 1920×1080 hardware Vulkan
+capture at `Examples/StellarDominion/Captures/realism-vertical-slice-1920x1080.png`,
+focused procedural-material and shader-contract tests, the WAV container
+regression, the deterministic beam and weapon-audio probes, and the mission
+gameplay verification. The visual slice is materially better but is not called
+final hyper-realism: temporal antialiasing, reflection probes/cubemap IBL,
+texture mip/aniso quality, and imported or sculpted hero assets remain visible
+priorities.
+
+## Earlier checkpoint
 
 The current Warden material/form slice resolves the washed-out hero response
 from evidence rather than global exposure changes. Controlled Vulkan captures

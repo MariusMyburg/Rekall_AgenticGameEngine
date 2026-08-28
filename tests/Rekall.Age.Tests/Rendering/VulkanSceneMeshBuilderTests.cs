@@ -405,6 +405,39 @@ public sealed class VulkanSceneMeshBuilderTests
     }
 
     [Fact]
+    public void HardSurfacePanelsGenerateSeamsWearAndNormalDetail()
+    {
+        var material = new RekallAgeRuntimeViewportProceduralMaterial(
+            "hard-surface-panels",
+            64,
+            8,
+            37,
+            "#11151a",
+            "#66717b",
+            0.82,
+            0.72,
+            0.24,
+            1.15,
+            0);
+
+        var generated = RekallAgeProceduralMaterialTextureGenerator.Generate("armour", material);
+        var redValues = generated.BaseColorTexture.Rgba
+            .Where((_, index) => index % 4 == 0)
+            .Distinct()
+            .ToArray();
+        var roughnessValues = generated.MetallicRoughnessTexture.Rgba
+            .Where((_, index) => index % 4 == 1)
+            .Distinct()
+            .ToArray();
+
+        Assert.True(redValues.Length > 8, "Panel paint should contain more than two flat checker colours.");
+        Assert.True(roughnessValues.Length > 8, "Panel wear should vary roughness across the surface.");
+        Assert.Contains((byte)0x11, redValues); // recessed seams preserve the authored dark colour
+        Assert.NotNull(generated.NormalTexture);
+        Assert.Contains(generated.NormalTexture.Rgba.Where((value, index) => index % 4 == 0), value => value != 128);
+    }
+
+    [Fact]
     public void BuildMeshesKeepsAuthoredTextureAssetsAheadOfProceduralBaseColor()
     {
         var frame = CreateFrame(new RekallAgeRuntimeViewportRenderable(

@@ -14,6 +14,32 @@
       "modelAssetMetadata": null
     },
     {
+      "id": "asset_stellar-dominion-heavy-beam_434b3a06",
+      "name": "stellar-dominion-heavy-beam",
+      "displayName": "Stellar Dominion Heavy Beam",
+      "kind": "audio",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Assets\\SourceAudio\\doomsday-laser-cannon-short.wav",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Assets\\audio\\asset_stellar-dominion-heavy-beam_434b3a06.wav",
+      "contentHash": "434b3a06d91260e61452b5cde8ff71ab8306cf0ad4551af6fd2a11b674937ba6",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_stellar-dominion-heavy-impact_13a0bf75",
+      "name": "stellar-dominion-heavy-impact",
+      "displayName": "Stellar Dominion Heavy Impact",
+      "kind": "audio",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Assets\\SourceAudio\\muffled-distant-explosion.wav",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Assets\\audio\\asset_stellar-dominion-heavy-impact_13a0bf75.wav",
+      "contentHash": "13a0bf75af94ec6d332bc71cba489b573466e05c4b17288158b3d683b41de39f",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
       "id": "asset_tex-gasgiant_127c10c8",
       "name": "tex-gasgiant",
       "displayName": "tex_gasgiant",

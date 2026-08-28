@@ -22,6 +22,7 @@ public static class RekallAgeProceduralMaterialTextureGenerator
         var metallic = ToByte(material.MetallicFactor);
         var roughnessA = ToByte(material.RoughnessA);
         var roughnessB = ToByte(material.RoughnessB);
+        var generator = NormalizeGenerator(material.Generator);
 
         for (var y = 0; y < resolution; y++)
         {
@@ -36,7 +37,9 @@ public static class RekallAgeProceduralMaterialTextureGenerator
                 baseColor[offset + 2] = ToByte(color.Z);
                 baseColor[offset + 3] = ToByte(color.W);
                 metallicRoughness[offset + 0] = 0;
-                metallicRoughness[offset + 1] = sample < 0.5f ? roughnessA : roughnessB;
+                metallicRoughness[offset + 1] = generator == "hard-surface-panels"
+                    ? ToByte(material.RoughnessA + (material.RoughnessB - material.RoughnessA) * sample)
+                    : sample < 0.5f ? roughnessA : roughnessB;
                 metallicRoughness[offset + 2] = metallic;
                 metallicRoughness[offset + 3] = 255;
                 if (emissive is not null)
@@ -111,6 +114,7 @@ public static class RekallAgeProceduralMaterialTextureGenerator
             "stripes" => MathF.Floor(u + material.Seed * 0.017f) % 2 == 0 ? 0 : 1,
             "rings" => RingSample(u, v, material.Seed),
             "noise" => NoiseSample(x, y, material.Seed),
+            "hard-surface-panels" => HardSurfacePanelSample(u, v, material.Seed),
             _ => (MathF.Floor(u) + MathF.Floor(v) + material.Seed) % 2 == 0 ? 0 : 1
         };
     }
@@ -127,6 +131,41 @@ public static class RekallAgeProceduralMaterialTextureGenerator
         var dx = u - MathF.Floor(u) - 0.5f;
         var dy = v - MathF.Floor(v) - 0.5f;
         return MathF.Floor(MathF.Sqrt(dx * dx + dy * dy) * 8 + seed * 0.031f) % 2 == 0 ? 0 : 1;
+    }
+
+    private static float HardSurfacePanelSample(float u, float v, int seed)
+    {
+        // Recessed panel lines provide the large-scale height signal; broad, continuous
+        // variation inside each plate supplies worn paint and roughness without the
+        // television-static noise that made earlier procedural surfaces look stippled.
+        var cellX = (int)MathF.Floor(u);
+        var cellY = (int)MathF.Floor(v);
+        var localU = u - MathF.Floor(u);
+        var localV = v - MathF.Floor(v);
+        var edgeDistance = MathF.Min(
+            MathF.Min(localU, 1 - localU),
+            MathF.Min(localV, 1 - localV));
+        const float seamWidth = 0.055f;
+        if (edgeDistance < seamWidth)
+        {
+            return Math.Clamp(edgeDistance / seamWidth * 0.12f, 0, 0.12f);
+        }
+
+        var plate = Hash01(cellX, cellY, seed);
+        var broadWear = MathF.Sin((u * 1.73f) + (v * 1.17f) + seed * 0.113f) * 0.075f;
+        var brushedGrain = MathF.Sin((u * 47.0f) + (v * 2.3f) + seed) * 0.018f;
+        var edgeWear = Math.Clamp((edgeDistance - seamWidth) / 0.16f, 0, 1);
+        return Math.Clamp(0.48f + plate * 0.34f + broadWear + brushedGrain + (1 - edgeWear) * 0.10f, 0, 1);
+    }
+
+    private static float Hash01(int x, int y, int seed)
+    {
+        unchecked
+        {
+            var value = (uint)(x * 374761393 + y * 668265263 + seed * 1442695041);
+            value = (value ^ (value >> 13)) * 1274126177;
+            return ((value ^ (value >> 16)) & 0xffff) / 65535f;
+        }
     }
 
     private static float NoiseSample(int x, int y, int seed)

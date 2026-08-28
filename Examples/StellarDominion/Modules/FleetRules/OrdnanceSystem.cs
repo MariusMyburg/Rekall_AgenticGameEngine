@@ -7,11 +7,12 @@ namespace Game.Modules.FleetRules;
 
 [RekallAgeComponent("Ordnance", Description =
     "A shot in flight, or the mark one leaves. Missiles travel and detonate on arrival; beams " +
-    "are instantaneous and only draw; trails follow a missile; flashes are the impact itself. " +
+    "are instantaneous and only draw; trails follow a missile; flashes are the impact itself; " +
+    "audio reports retain a spatial one-shot after its short-lived visual has faded. " +
     "Spawned by CombatSystem and reaped by OrdnanceSystem - never authored into a scene.")]
 public sealed class Ordnance : RekallAgeComponent
 {
-    [RekallAgeProperty(AllowedValues = ["missile", "beam", "trail", "flash"])]
+    [RekallAgeProperty(AllowedValues = ["missile", "beam", "trail", "flash", "audio"])]
     public string Kind { get; init; } = "missile";
 
     [RekallAgeProperty]
@@ -135,12 +136,36 @@ public sealed class OrdnanceSystem : IRekallAgeRuntimeModuleSystem
                 continue;
             }
 
-            if (kind is "beam" or "flash" or "trail")
+            if (kind == "audio")
             {
-                // These only age. All three fade over their life so a burst of fire reads as a
+                updated[round.Id] = round.WithComponentNumber(OrdnanceType, "life", life);
+                continue;
+            }
+
+            if (kind is "flash" or "trail")
+            {
+                // These only age. Both fade over their life so a burst of fire reads as a
                 // rhythm rather than a strobe.
                 updated[round.Id] = Fade(round, kind, life, maxLife)
                     .WithComponentNumber(OrdnanceType, "life", life);
+                continue;
+            }
+
+            if (kind == "beam")
+            {
+                // A beam is a line between two ships, and both of them are moving. Fixing it
+                // at the muzzle it was fired from leaves it hanging in space behind whatever
+                // fired it, which is what it looked like.
+                var aged = Fade(round, kind, life, maxLife)
+                    .WithComponentNumber(OrdnanceType, "life", life);
+
+                var ownerId = round.ComponentString(OrdnanceType, "ownerId", string.Empty) ?? string.Empty;
+                var beamTargetId = round.ComponentString(OrdnanceType, "targetId", string.Empty) ?? string.Empty;
+                updated[round.Id] = byId.TryGetValue(ownerId, out var owner)
+                    && byId.TryGetValue(beamTargetId, out var struck)
+                        ? OrdnanceFactory.Reaim(
+                            aged, owner.Transform.Position3D, struck.Transform.Position3D)
+                        : aged;
                 continue;
             }
 
@@ -241,6 +266,9 @@ public sealed class OrdnanceSystem : IRekallAgeRuntimeModuleSystem
 /// </summary>
 internal static class OrdnanceFactory
 {
+    public const string HeavyBeamClip = "asset_stellar-dominion-heavy-beam_434b3a06";
+    public const string HeavyImpactClip = "asset_stellar-dominion-heavy-impact_13a0bf75";
+
     private const string OrdnanceType = OrdnanceSystem.OrdnanceType;
 
     /// <summary>
@@ -300,53 +328,75 @@ internal static class OrdnanceFactory
         RekallAgeRuntimeVector3 from,
         RekallAgeRuntimeVector3 to,
         string colour,
-        bool hostile)
+        string ownerId,
+        string targetId)
     {
-        var segments = new JsonArray { Segment(from, to) };
-        // The report is placed at the muzzle so it pans and attenuates from where the shot
-        // was fired, while the line itself stays in world space at the origin.
+        // Line segments are expressed in the entity's own space and the renderer applies the
+        // entity transform to them. The entity sits at the muzzle so the report pans from the
+        // firing ship, so the segment has to run from the local origin to the target's offset -
+        // holding world coordinates here would translate the whole beam twice.
+        var segments = new JsonArray { Segment(Zero, Delta(from, to)) };
         return Base(id, "Beam", from, 1)
             .UpsertComponent("Rekall.LineSegments", Props(
                 ("segments", segments), ("thickness", 1.1), ("color", colour + "ff")))
             .UpsertComponent("Rekall.Material", Props(
                 ("baseColor", colour), ("emissiveColor", colour), ("emissiveStrength", 10.0)))
             .UpsertComponent(OrdnanceType, Props(
-                // Outlives the flash of the line so the report is not cut off mid-sound.
-                ("kind", "beam"), ("life", 0.0), ("maxLife", 0.30)))
-            .UpsertComponent("Rekall.AudioEmitter", Emitter(0.55, 6000))
-            .UpsertComponent("Rekall.ProceduralAudioClip", Props(
-                ("waveform", "saw"),
-                ("durationSeconds", 0.26),
-                ("startFrequency", hostile ? 760.0 : 1500.0),
-                ("endFrequency", hostile ? 150.0 : 300.0),
-                ("sweep", "exponential"),
-                ("attack", 0.002), ("decay", 0.06),
-                ("sustain", 0.25), ("release", 0.16),
-                ("noiseMix", 0.18), ("harmonics", 3.0),
-                ("amplitude", 0.55), ("seed", hostile ? 91.0 : 17.0)));
+                ("kind", "beam"), ("life", 0.0), ("maxLife", 0.30),
+                ("ownerId", ownerId), ("targetId", targetId)));
     }
 
     public static RekallAgeRuntimeEntity Flash(string id, RekallAgeRuntimeVector3 at, string colour)
     {
-        return Base(id, "Impact", at, 1)
-            .UpsertComponent("Rekall.HaloRenderer", Props(
-                ("radius", 5.5), ("segments", 32.0), ("rings", 3.0),
-                ("falloff", 2.0), ("intensity", 6.0), ("color", colour + "ff"),
-                ("facingMode", "camera")))
+        return Base(id, "Impact", at, 2.4)
+            .UpsertComponent("Rekall.GeometryPrimitive", Props(
+                ("primitive", "sphere"), ("color", "#fff4dd")))
+            .UpsertComponent("Rekall.MeshRenderer", Props(
+                ("active", true), ("castShadows", false), ("receiveShadows", false)))
             .UpsertComponent("Rekall.Material", Props(
-                ("baseColor", colour), ("emissiveColor", colour), ("emissiveStrength", 12.0)))
+                ("baseColor", "#fff4dd"), ("emissiveColor", colour),
+                ("emissiveStrength", 18.0), ("roughnessFactor", 0.18)))
+            .UpsertComponent("Rekall.PointLight", Props(
+                ("color", colour), ("intensity", 14.0), ("range", 22.0),
+                ("priority", 120.0), ("shadowPriority", 0.0), ("castShadows", false)))
+            .UpsertComponent("Rekall.ParticleEmitter3D", Props(
+                ("role", "kinetic-impact"), ("enabled", true),
+                ("simulationSpace", "world"), ("capacity", 96.0),
+                ("spawnRate", 190.0), ("lifetime", 0.48), ("seed", 971.0),
+                ("velocityDirection", new JsonObject { ["x"] = 0, ["y"] = 1, ["z"] = 0 }),
+                ("velocityConeDegrees", 180.0), ("minimumSpeed", 8.0), ("maximumSpeed", 38.0),
+                ("gravity", new JsonObject { ["x"] = 0, ["y"] = 0, ["z"] = 0 }),
+                ("drag", 1.8),
+                ("sizeCurve", new JsonArray {
+                    new JsonObject { ["time"] = 0, ["value"] = 0.48 },
+                    new JsonObject { ["time"] = 1, ["value"] = 0.0 },
+                }),
+                ("colorCurve", new JsonArray {
+                    new JsonObject { ["time"] = 0, ["color"] = "#fff1d8ff" },
+                    new JsonObject { ["time"] = 0.28, ["color"] = colour + "dd" },
+                    new JsonObject { ["time"] = 1, ["color"] = colour + "00" },
+                }),
+                ("drawMode", "quad"), ("lit", false),
+                ("emissiveIntensity", 7.0), ("softParticleFade", 0.7),
+                ("blendMode", "add"), ("priority", 100.0), ("visibilityDistance", 5000.0)))
             .UpsertComponent(OrdnanceType, Props(
-                ("kind", "flash"), ("life", 0.0), ("maxLife", 0.40)))
-            .UpsertComponent("Rekall.AudioEmitter", Emitter(0.5, 6000))
-            .UpsertComponent("Rekall.ProceduralAudioClip", Props(
-                ("waveform", "triangle"),
-                ("durationSeconds", 0.38),
-                ("startFrequency", 240.0), ("endFrequency", 55.0),
-                ("sweep", "exponential"),
-                ("attack", 0.004), ("decay", 0.13),
-                ("sustain", 0.22), ("release", 0.22),
-                ("noiseMix", 0.55), ("harmonics", 2.0),
-                ("amplitude", 0.6), ("seed", 41.0)));
+                ("kind", "flash"), ("life", 0.0), ("maxLife", 0.55)));
+    }
+
+    public static RekallAgeRuntimeEntity AudioReport(
+        string id,
+        string name,
+        RekallAgeRuntimeVector3 at,
+        string clip,
+        double lifeSeconds,
+        double gain,
+        double pitch)
+    {
+        return Base(id, name, at, 1)
+            .UpsertComponent(OrdnanceType, Props(
+                ("kind", "audio"), ("life", 0.0), ("maxLife", lifeSeconds)))
+            .UpsertComponent("Rekall.AudioEmitter", FileEmitter(
+                clip, gain, 6000, pitch));
     }
 
     /// <summary>Adds this step's travel to a trail and drops the oldest segment.</summary>
@@ -370,6 +420,26 @@ internal static class OrdnanceFactory
             properties["segments"] = kept;
             return properties;
         });
+    }
+
+    public static readonly RekallAgeRuntimeVector3 Zero = new(0, 0, 0);
+
+    public static RekallAgeRuntimeVector3 Delta(RekallAgeRuntimeVector3 from, RekallAgeRuntimeVector3 to) =>
+        new(to.X - from.X, to.Y - from.Y, to.Z - from.Z);
+
+    /// <summary>Re-aims a live beam at where its firer and its target are now.</summary>
+    public static RekallAgeRuntimeEntity Reaim(
+        RekallAgeRuntimeEntity beam,
+        RekallAgeRuntimeVector3 from,
+        RekallAgeRuntimeVector3 to)
+    {
+        return beam
+            .WithPosition3D(from)
+            .UpdateComponent("Rekall.LineSegments", properties =>
+            {
+                properties["segments"] = new JsonArray { Segment(Zero, Delta(from, to)) };
+                return properties;
+            });
     }
 
     private static JsonObject Segment(RekallAgeRuntimeVector3 from, RekallAgeRuntimeVector3 to) =>
@@ -405,6 +475,15 @@ internal static class OrdnanceFactory
         // engagement the camera sits over a thousand units back, so a reference distance
         // and a cutoff picked for human scale silenced every shot: attenuation is
         // referenceDistance/distance, and past maxDistance it is flatly zero.
+        ("spatial", true), ("referenceDistance", 450.0), ("maxDistance", maxDistance));
+
+    private static JsonObject FileEmitter(
+        string clip,
+        double gain,
+        double maxDistance,
+        double pitch) => Props(
+        ("clip", clip), ("gain", gain), ("pitch", pitch),
+        ("playOnStart", true), ("loop", false),
         ("spatial", true), ("referenceDistance", 450.0), ("maxDistance", maxDistance));
 
     private static JsonObject Props(params (string Key, object Value)[] values)

@@ -5,7 +5,7 @@ surface — no scene JSON was hand-edited. Built as an assessment of how well an
 LLM agent can author with the CLI/MCP tooling; the findings are in
 `docs/research/2026-08-28-agent-authoring-evaluation.md`.
 
-![hero](Captures/hero-1920x1080.png)
+![realism vertical slice](Captures/realism-vertical-slice-1920x1080.png)
 
 ## What is in it
 
@@ -14,9 +14,13 @@ LLM agent can author with the CLI/MCP tooling; the findings are in
 - **Kell** — a textured moon.
 - An 8,000-star field with a Milky Way band.
 - A sun driving both the key light and the bloom.
-- Three capital ships with procedurally lofted hulls and separate emissive drive
-  blocks, plus twenty fighters flying inclined patrol orbits around them.
-- A `lensDirt` post-process pass scattering the bloom the way grime on a lens does.
+- Three capital ships with procedurally lofted hulls, chamfered hard-surface
+  superstructures, UV-projected armour panels, varied metallic/roughness and
+  normal response, and separate emissive drive blocks; twenty fighters fly
+  inclined patrol orbits around them.
+- Scalable High/60 FPS rendering intent with 4K cascaded shadows, SSAO, AgX HDR,
+  restrained bloom, and automatic quality scaling.
+- File-backed CC0 heavy-beam and impact reports, spatialized at fleet scale.
 
 Fleet motion lives in `Modules/FleetRules`: capitals integrate along their
 heading with the fixed step's `DeltaTime`, while fighter orbits are solved
@@ -46,6 +50,8 @@ python Examples/StellarDominion/Tools/mcp_client.py \
   rekall.scene.apply_blueprint <scratch>/scene_Mission1.json \
   rekall.scene.apply_blueprint <scratch>/scene_Debrief.json
 python Examples/StellarDominion/Tools/verify_mission.py
+python Examples/StellarDominion/Tools/verify_beam_tracking.py
+python Examples/StellarDominion/Tools/verify_weapon_audio.py
 ```
 
 `verify_mission.py` runs four cases — quiet, victory, defeat and debrief — as
@@ -53,6 +59,11 @@ runtime assertions, so a regression fails the command instead of needing someone
 to read numbers out of a dump. It deliberately does not cover issuing an order
 with the mouse: that path runs through the player's input bridge, which headless
 inspection bypasses entirely, and has to be exercised in the player.
+
+The two smaller probes are regressions for defects found in live play. The beam
+probe proves that a moving emitter and its local-space beam advance by the same
+fixed-step delta; the audio probe makes the real combat system fire and requires
+the imported heavy-beam WAV to be playing with nonzero spatial gains.
 
 ## Rebuilding it
 

@@ -223,6 +223,16 @@ vec3 fresnelSchlick(float cosTheta, vec3 f0)
     return f0 + (1.0 - f0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 f0, float roughness)
+{
+    // Split-sum IBL approximation used when an authored environment supplies a
+    // hemispherical sky/ground radiance but no reflection cubemap. This keeps metals
+    // physically reflective instead of turning them into black diffuse voids; a future
+    // probe/cubemap path can replace the radiance lookup without changing materials.
+    vec3 grazing = max(vec3(1.0 - roughness), f0);
+    return f0 + (grazing - f0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
 float phaseRayleigh(float cosTheta)
 {
     return 3.0 / (16.0 * PI) * (1.0 + cosTheta * cosTheta);
@@ -814,7 +824,14 @@ void main()
         : 0.12 * max(frame.environmentParameters.x, 0.0);
     float ambientHemisphere = clamp(normal.y * 0.5 + 0.5, 0.0, 1.0);
     vec3 environmentAmbientColor = mix(frame.environmentAmbientGroundColor.rgb, frame.environmentAmbientSkyColor.rgb, ambientHemisphere);
-    vec3 ambient = albedo * environmentAmbientColor * ambientStrength * occlusion;
+    vec3 ambientFresnel = fresnelSchlickRoughness(ndotv, f0, roughness);
+    vec3 ambientDiffuse = (1.0 - ambientFresnel) * (1.0 - metallic) * albedo;
+    vec3 ambientSpecular = ambientFresnel
+        * environmentAmbientColor
+        * mix(0.28, 1.0, 1.0 - roughness);
+    vec3 ambient = (ambientDiffuse * environmentAmbientColor + ambientSpecular)
+        * ambientStrength
+        * occlusion;
     vec3 waterFresnel = fresnelSchlick(ndotv, vec3(0.02));
     ambient += waterFresnel * frame.lightColor.rgb * directTransmittance * waterCoverage * 0.018;
     vec3 emissive = pow(max(texture(sampler2D(emissiveTexture, emissiveSampler), fragUv).rgb * draw.emissiveFactors.rgb, vec3(0.0)), vec3(2.2)) * draw.emissiveFactors.a;

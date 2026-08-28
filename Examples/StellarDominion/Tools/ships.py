@@ -41,9 +41,11 @@ class Mesh:
         nx, ny, nz = nx / n, ny / n, nz / n
         base = len(self.v)
         for (x, y, z) in (p0, p1, p2, p3):
+            u, v = self._face_uv(x, y, z, nx, ny, nz)
             self.v.append({
                 "x": round(x, 4), "y": round(y, 4), "z": round(z, 4),
                 "nx": round(nx, 4), "ny": round(ny, 4), "nz": round(nz, 4),
+                "u": round(u, 4), "v": round(v, 4),
                 "r": round(min(self.tint[0] * shade, 1.0), 4),
                 "g": round(min(self.tint[1] * shade, 1.0), 4),
                 "b": round(min(self.tint[2] * shade, 1.0), 4),
@@ -59,15 +61,32 @@ class Mesh:
         nx, ny, nz = nx / n, ny / n, nz / n
         base = len(self.v)
         for (x, y, z) in (p0, p1, p2):
+            u, v = self._face_uv(x, y, z, nx, ny, nz)
             self.v.append({
                 "x": round(x, 4), "y": round(y, 4), "z": round(z, 4),
                 "nx": round(nx, 4), "ny": round(ny, 4), "nz": round(nz, 4),
+                "u": round(u, 4), "v": round(v, 4),
                 "r": round(min(self.tint[0] * shade, 1.0), 4),
                 "g": round(min(self.tint[1] * shade, 1.0), 4),
                 "b": round(min(self.tint[2] * shade, 1.0), 4),
                 "a": 1,
             })
         self.i += [base, base + 1, base + 2]
+
+    @staticmethod
+    def _face_uv(x, y, z, nx, ny, nz):
+        """Stable box projection for authored PBR maps.
+
+        Each flat face uses the two axes most nearly tangent to it. This is the same
+        practical projection used by hard-surface blockouts: it avoids collapsed UVs
+        on side plates while preserving deterministic world-scale panel dimensions.
+        """
+        ax, ay, az = abs(nx), abs(ny), abs(nz)
+        if ay >= ax and ay >= az:
+            return x * 0.08, z * 0.08
+        if ax >= az:
+            return z * 0.08, y * 0.08
+        return x * 0.08, y * 0.08
 
     def section(self, z0, z1, r0, r1, shade, sides=8, cx=0.0, cy=0.0, squash=1.0):
         """A prism band between two cross-sections - the hull building block.
@@ -102,14 +121,61 @@ class Mesh:
                 self.tri((a[0], a[1], z), (b[0], b[1], z), (c[0], c[1], z), shade)
 
     def box(self, cx, cy, cz, sx, sy, sz, shade):
+        """Chamfered hard-surface block.
+
+        Razor-edged cuboids are a blockout tell: real fabricated edges always catch a
+        highlight. Four nested rounded-rectangle rings create end bevels and corner
+        chamfers while keeping the primitive deterministic and inexpensive enough for
+        dense greeble fields.
+        """
+        hx, hy, hz = sx / 2, sy / 2, sz / 2
+        bevel = max(0.001, min(sx, sy, sz) * 0.12)
+
+        def rounded_ring(ex, ey, chamfer, z):
+            c = min(chamfer, ex * 0.45, ey * 0.45)
+            return [
+                (cx - ex + c, cy - ey, z), (cx + ex - c, cy - ey, z),
+                (cx + ex, cy - ey + c, z), (cx + ex, cy + ey - c, z),
+                (cx + ex - c, cy + ey, z), (cx - ex + c, cy + ey, z),
+                (cx - ex, cy + ey - c, z), (cx - ex, cy - ey + c, z),
+            ]
+
+        inset_x = max(hx - bevel * 0.55, hx * 0.55)
+        inset_y = max(hy - bevel * 0.55, hy * 0.55)
+        rings = [
+            rounded_ring(inset_x, inset_y, bevel * 0.45, cz - hz),
+            rounded_ring(hx, hy, bevel, min(cz - hz + bevel, cz)),
+            rounded_ring(hx, hy, bevel, max(cz + hz - bevel, cz)),
+            rounded_ring(inset_x, inset_y, bevel * 0.45, cz + hz),
+        ]
+        for band in range(3):
+            for k in range(8):
+                j = (k + 1) % 8
+                face_shade = shade * (0.88 + 0.14 * ((k % 4) / 3.0))
+                self.quad(rings[band][k], rings[band][j],
+                          rings[band + 1][j], rings[band + 1][k], face_shade)
+
+        bottom_centre = (cx, cy, cz - hz)
+        top_centre = (cx, cy, cz + hz)
+        for k in range(8):
+            j = (k + 1) % 8
+            self.tri(bottom_centre, rings[0][j], rings[0][k], shade * 0.82)
+            self.tri(top_centre, rings[3][k], rings[3][j], min(shade * 1.04, 1.0))
+
+    def detail_box(self, cx, cy, cz, sx, sy, sz, shade):
+        """Compact six-face block for sub-pixel surface scatter.
+
+        Major masses use ``box`` and receive real chamfers. Thousands of tiny vents and
+        conduits would spend five times the scene data on bevels smaller than a pixel, so
+        this bounded primitive keeps dense authored detail practical.
+        """
         hx, hy, hz = sx / 2, sy / 2, sz / 2
         x0, x1 = cx - hx, cx + hx
         y0, y1 = cy - hy, cy + hy
         z0, z1 = cz - hz, cz + hz
-        # Faces shaded slightly apart so edges stay legible under flat light.
         self.quad((x0, y1, z0), (x1, y1, z0), (x1, y1, z1), (x0, y1, z1), min(shade * 1.06, 1.0))
         self.quad((x0, y0, z0), (x0, y0, z1), (x1, y0, z1), (x1, y0, z0), shade * 0.80)
-        self.quad((x0, y0, z1), (x0, y1, z1), (x1, y1, z1), (x1, y0, z1), shade * 1.00)
+        self.quad((x0, y0, z1), (x0, y1, z1), (x1, y1, z1), (x1, y0, z1), shade)
         self.quad((x1, y0, z0), (x1, y1, z0), (x0, y1, z0), (x0, y0, z0), shade * 0.86)
         self.quad((x1, y0, z1), (x1, y1, z1), (x1, y1, z0), (x1, y0, z0), shade * 0.93)
         self.quad((x0, y0, z0), (x0, y1, z0), (x0, y1, z1), (x0, y0, z1), shade * 0.93)
@@ -159,15 +225,15 @@ def _greeble_field(m, rng, profile, L, B, count, scale, shade):
         b = rng.uniform(0.25, 0.8) * scale
         c = rng.uniform(0.8, 3.0) * scale
         if face == "top":
-            m.box(rng.uniform(-hw * 0.5, hw * 0.5), hh - b * 0.35, z,
-                  a, b, c, shade * rng.uniform(0.82, 0.98))
+            m.detail_box(rng.uniform(-hw * 0.5, hw * 0.5), hh - b * 0.35, z,
+                         a, b, c, shade * rng.uniform(0.82, 0.98))
         elif face == "bottom":
-            m.box(rng.uniform(-hw * 0.45, hw * 0.45), -hh + b * 0.35, z,
-                  a, b, c, shade * rng.uniform(0.62, 0.78))
+            m.detail_box(rng.uniform(-hw * 0.45, hw * 0.45), -hh + b * 0.35, z,
+                         a, b, c, shade * rng.uniform(0.62, 0.78))
         else:
             side = rng.choice((-1, 1))
-            m.box(side * (hw - b * 0.35), rng.uniform(-hh * 0.35, hh * 0.45), z,
-                  b, a, c, shade * rng.uniform(0.70, 0.88))
+            m.detail_box(side * (hw - b * 0.35), rng.uniform(-hh * 0.35, hh * 0.45), z,
+                         b, a, c, shade * rng.uniform(0.70, 0.88))
 
 
 def _turret(m, x, y, z, scale, shade, barrel_dir=1):

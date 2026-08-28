@@ -25,6 +25,7 @@ import json
 import math
 import os
 import sys
+import zlib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ships
@@ -37,10 +38,12 @@ TEX_RINGS = "asset_tex-rings_f9640733"
 # Broadside, not down-lane. Looking along the transit lane put every hull nose-on, so
 # a 90-unit dreadnought presented its 12-unit beam and read as a speck. From the side
 # the lane runs across the screen and the ships show their length.
-CAM = (-360, 150, 170)
+CAM = (-332, 135, 91)
 CAM_PITCH, CAM_YAW = 22, 85
 SUN = (-709, 1204, 1134)
-SUN_PITCH, SUN_YAW = 42, 148
+# Key light approaches from just above the camera. The ships are presented broadside;
+# lighting that face, with a small angle offset, reveals plate normals and silhouette.
+SUN_PITCH, SUN_YAW = 34, 78
 
 
 def e(name, tags, components, **kw):
@@ -50,7 +53,10 @@ def e(name, tags, components, **kw):
     return d
 
 
-def hull_material(base, metallic=0.25, rough=0.42):
+def hull_material(base, metallic=1.0, rough=1.0):
+    # When a ProceduralMaterial supplies packed metallic/roughness pixels these are
+    # neutral multipliers. Values below one here would crush the authored roughness
+    # range and turn even recessed, weathered plates into glossy plastic.
     return ("Rekall.Material", {"baseColor": base, "metallicFactor": metallic,
                                 "roughnessFactor": rough})
 
@@ -58,6 +64,27 @@ def hull_material(base, metallic=0.25, rough=0.42):
 def drive_material(base="#bfe9ff", emissive="#8fd4ff", strength=4.0):
     return ("Rekall.Material", {"baseColor": base, "emissiveColor": emissive,
                                 "emissiveStrength": strength, "roughnessFactor": 1.0})
+
+
+def armour_surface(name, side):
+    """Seeded, UV-driven PBR armour shared by every ordinary authored mesh path."""
+    hostile = side == "choir"
+    civilian = side == "civilian"
+    return ("Rekall.ProceduralMaterial", {
+        "generator": "hard-surface-panels",
+        "resolution": 256,
+        # Mesh UVs are world-scale box projections. This produces plates several metres
+        # across on capital ships instead of wallpaper-sized checks.
+        "scale": 3.5 if not civilian else 2.8,
+        "seed": zlib.crc32(name.encode("utf-8")) & 0x7fffffff,
+        "baseColorA": "#160b0e" if hostile else "#252c34",
+        "baseColorB": "#c19aa0" if hostile else ("#d0b995" if civilian else "#e0e5e8"),
+        "metallicFactor": 0.78 if not civilian else 0.62,
+        "roughnessA": 0.78,
+        "roughnessB": 0.28 if not civilian else 0.42,
+        "normalStrength": 0.72,
+        "emissiveStrength": 0,
+    })
 
 
 def curtain():
@@ -75,21 +102,35 @@ def space():
     """Sun, starfield and the two bodies. Shared by the mission and the debrief."""
     return [
         e("Environment", ["environment"], [
+            ("Rekall.RenderQualityProfile", {
+                "preset": "High", "resolutionScale": 1.0,
+                "shadowCascadeCount": 4, "shadowResolution": 4096,
+                "fogMode": "froxel", "bloom": True, "ssao": True,
+                "maximumActiveParticles": 48000,
+                "automaticScaling": True, "targetFramesPerSecond": 60,
+                "enableGpuTimestamps": True,
+            }),
             ("Rekall.Environment3D", {
                 "backgroundPolicy": "color", "backgroundColor": "#000000",
-                "toneMapper": "agx", "exposure": 0.15, "whitePoint": 8.0,
-                "ambientEnergy": 0.25, "ambientSkyColor": "#33507f",
-                "ambientGroundColor": "#0a0810",
+                "toneMapper": "agx", "exposure": -0.10, "whitePoint": 11.2,
+                "ambientEnergy": 1.35, "ambientSkyColor": "#7890a8",
+                "ambientGroundColor": "#18212b",
+            }),
+            ("Rekall.ShadowSettings", {
+                "cascadeCount": 4, "atlasResolution": 4096,
+                "maximumDistance": 2600, "splitPolicy": "practical",
+                "bias": 0.0012, "normalBias": 0.012,
+                "filter": "pcf", "stabilization": True,
             }),
         ]),
         e("Post", ["post"], [
             ("Rekall.PostProcessStack", {
                 "enabled": True,
                 "passes": [
-                    {"name": "bright", "type": "brightExtract", "threshold": 1.05, "scale": 4.0},
-                    {"name": "blurA", "type": "blur", "iterations": 5, "radius": 3.0},
-                    {"name": "composite", "type": "composite", "intensity": 1.0, "blendMode": "add"},
-                    {"name": "dirt", "type": "lensDirt", "intensity": 0.55, "scale": 1.0},
+                    {"name": "bright", "type": "brightExtract", "threshold": 1.8, "scale": 2.0},
+                    {"name": "blurA", "type": "blur", "iterations": 4, "radius": 2.2},
+                    {"name": "composite", "type": "composite", "intensity": 0.42, "blendMode": "add"},
+                    {"name": "dirt", "type": "lensDirt", "intensity": 0.08, "scale": 1.0},
                 ],
             }),
         ]),
@@ -97,14 +138,14 @@ def space():
             ("Rekall.Transform3D", {}),
             ("Rekall.StarfieldRenderer", {
                 "count": 8000, "radius": 16000, "size": 2.1, "seed": 20260828,
-                "color": "#dfe9ffff", "brightness": 2.6, "milkyWayStrength": 0.5,
+                "color": "#dfe9ffff", "brightness": 1.35, "milkyWayStrength": 0.22,
                 "active": True,
             }),
         ]),
         e("Sun Light", ["light"], [
             ("Rekall.Transform3D", {"x": SUN[0], "y": SUN[1], "z": SUN[2],
                                     "pitch": SUN_PITCH, "yaw": SUN_YAW, "roll": 0}),
-            ("Rekall.DirectionalLight", {"intensity": 4.0, "color": "#fff4e2"}),
+            ("Rekall.DirectionalLight", {"intensity": 4.8, "color": "#fff2dc"}),
         ]),
         e("Sun Disc", ["light"], [
             ("Rekall.Transform3D", {"x": SUN[0], "y": SUN[1], "z": SUN[2],
@@ -158,13 +199,15 @@ def space():
             # first one, so the numbers here stop mattering as soon as the scene runs.
             ("Game.Modules.FleetRules.TacticalCamera", {
                 "enabled": True,
-                "pivotX": 10, "pivotY": 0, "pivotZ": 200,
-                "distance": 420, "yaw": CAM_YAW, "pitch": CAM_PITCH,
+                "pivotX": 0, "pivotY": 0, "pivotZ": 120,
+                "distance": 360, "yaw": CAM_YAW, "pitch": CAM_PITCH,
                 "minimumDistance": 40, "maximumDistance": 2400,
                 "minimumPitch": -12, "maximumPitch": 82,
                 "orbitDegreesPerPixel": 0.35,
                 "panUnitsPerSecond": 260, "zoomStep": 0.12,
-                "frameOnStart": True,
+                # Open on the player's squadron at a scale where authored hull detail is
+                # visible. SPACE remains the deliberate command to frame the full battle.
+                "frameOnStart": False,
             }),
         ]),
     ]
@@ -209,6 +252,7 @@ def warship(name, side, pos, yaw, mesh, drive, stats, weapon, order_speed,
         ("Rekall.MeshRenderer", {"active": True, "castShadows": True,
                                  "receiveShadows": True}),
         hull_material(hull_color),
+        armour_surface(name, side),
         ("Game.Modules.FleetRules.Faction", {
             "side": side, "storyCritical": story_critical, "destroyed": False,
         }),
@@ -298,7 +342,8 @@ for leader, count, radius in WINGS:
             ("Rekall.GeometryMesh", {"vertices": fig_v, "indices": fig_i}),
             ("Rekall.MeshRenderer", {"active": True, "castShadows": True,
                                      "receiveShadows": True}),
-            hull_material("#5b6470", rough=0.30),
+            hull_material("#5b6470"),
+            armour_surface(f"{leader} Fighter {k + 1}", "compact"),
             ("Game.Modules.FleetRules.Escort", {
                 "enabled": True, "leader": leader, "radius": radius,
                 "phase": math.degrees(a), "angularSpeed": 48.0,
@@ -399,7 +444,7 @@ entities.append(e("Tactical HUD", ["ui"], [
 entities.append(e("Objective Panel", ["ui"], [
     ("Rekall.Transform3D", {}),
     ("Rekall.UiElement", {
-        "x": 36, "y": 36, "width": 560, "height": 128,
+        "x": 36, "y": 36, "width": 720, "height": 142,
         "text": "MISSION 1 - STANDING WATCH",
         "backgroundColor": "#0a1520e0", "foregroundColor": "#cfe9ff",
         "borderColor": "#3f7fa8", "borderWidth": 1.5,

@@ -24,6 +24,13 @@ public static class RekallAgeMp3Decoder
     /// </summary>
     public static bool LooksLikeMp3(ReadOnlySpan<byte> data)
     {
+        if (data.Length >= 12
+            && data[..4].SequenceEqual("RIFF"u8)
+            && data.Slice(8, 4).SequenceEqual("WAVE"u8))
+        {
+            return false;
+        }
+
         if (data.Length >= 3 && data[0] == 'I' && data[1] == 'D' && data[2] == '3')
         {
             return true;

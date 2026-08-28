@@ -341,10 +341,27 @@ public sealed class CombatSystem : IRekallAgeRuntimeModuleSystem
                             OrderSystem.FactionType, "side", string.Empty) == "choir";
                         spawned.Add(OrdnanceFactory.Beam(
                             $"ord_b_{stamp}_{sequence++}",
-                            muzzle, target.Transform.Position3D, colour, hostile));
+                            muzzle, target.Transform.Position3D, colour,
+                            entity.Id, targetId));
+                        spawned.Add(OrdnanceFactory.AudioReport(
+                            $"ord_audio_beam_{stamp}_{sequence++}",
+                            "Heavy Beam Report",
+                            muzzle,
+                            OrdnanceFactory.HeavyBeamClip,
+                            hostile ? 4.2 : 3.7,
+                            hostile ? 0.62 : 0.72,
+                            hostile ? 0.84 : 1.0));
                         spawned.Add(OrdnanceFactory.Flash(
                             $"ord_f_{stamp}_{sequence++}",
                             target.Transform.Position3D, colour));
+                        spawned.Add(OrdnanceFactory.AudioReport(
+                            $"ord_audio_impact_{stamp}_{sequence++}",
+                            "Heavy Beam Impact",
+                            target.Transform.Position3D,
+                            OrdnanceFactory.HeavyImpactClip,
+                            1.6,
+                            0.58,
+                            hostile ? 0.9 : 1.0));
                     }
 
                     cooldown = Math.Max(0.05, entity.ComponentNumber(WeaponType, "cycleSeconds", 1.6));

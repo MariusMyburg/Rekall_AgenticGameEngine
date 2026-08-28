@@ -44,6 +44,21 @@ public sealed class Mp3DecoderTests
     }
 
     [Fact]
+    public void WavePayloadFrameLikeBytesCannotOverrideTheRiffContainerSignature()
+    {
+        // Real PCM and metadata can contain 0xFF followed by MPEG-like sync bits. Once the
+        // outer container is unambiguously RIFF/WAVE, scanning its payload for an unrelated
+        // codec signature must not reroute the asset away from the WAVE decoder.
+        var data = new byte[64];
+        Encoding.ASCII.GetBytes("RIFF").CopyTo(data, 0);
+        Encoding.ASCII.GetBytes("WAVE").CopyTo(data, 8);
+        data[32] = 0xFF;
+        data[33] = 0xFB;
+
+        Assert.False(RekallAgeMp3Decoder.LooksLikeMp3(data));
+    }
+
+    [Fact]
     public void ReservedLayerEncodingIsNotMistakenForAFrameSync()
     {
         // Eleven set bits followed by the reserved layer encoding is not a real header, so

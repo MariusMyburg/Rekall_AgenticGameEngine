@@ -81,17 +81,27 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
     private const double MaxForkMotorDegreesPerSecond = 160;
     private const double BalanceProportionalGain = 2.4;
     private const double BalanceDerivativeGain = 0.35;
-    // A real, physically-genuine emergent yaw drift shows up on a long unattended throttle-only
-    // run (confirmed via a zero-balance-gain control run that still drifted, ruling out the roll
-    // balance controller's own limit cycle as the cause) - the rear wheel's large spin angular
-    // momentum at speed couples with chassis pitch/roll into a slow yaw precession, plus real
-    // wheel slip (measured rear-wheel angular speed runs ~6x faster than v/r implies - see
-    // docs/production/PROGRESS.md's 2026-08-28 checkpoint). Left at 0 (disabled): tested with a
-    // meaningful gain and it did not reliably reduce the drift over a 30-second run, and
-    // increasing wheel/road friction to try to fix the underlying slip made propulsion worse
-    // (the wheel locked up instead of rolling) rather than better. This is a genuine open gap,
-    // not resolved by this term - the wiring (PreviousYaw tracking, yawRate below) is kept as
-    // the hook for whoever picks this up next, not as a working fix.
+    // A real, physically-genuine emergent roll/yaw drift ("weave", a classic coupled roll-yaw
+    // precession from the spinning rear wheel's own angular momentum) shows up on a long
+    // unattended throttle-only run. Originally ruled the balance controller's own limit cycle out
+    // via a zero-balance-gain control run - but that run predated the roll/pitch axis fix below,
+    // so it was reading the wrong axis and its conclusion, though it happened to be correct, was
+    // unsound at the time. Re-ran the same zero-gain control test after the axis fix: identical
+    // growth curve, frame-for-frame within noise, which re-confirms the balance controller is not
+    // the cause, now for real reasons. Separately tried direct per-axis PD correction via
+    // Rekall.Rigidbody3D.angularCorrectionX/Y (the same mechanism the pitch stabilizer below uses
+    // successfully) - and found it cannot fix this mode: angularCorrectionX/Y adds velocity
+    // directly rather than routing through the body's inertia tensor, so it does not remove
+    // angular momentum from the system, it only relocates which axis the disturbance shows up on.
+    // Correcting roll alone (gain 150/15) pushed the divergence into yaw (54 degrees by frame 300,
+    // eventually falling through the world); correcting yaw rate alone (gain 80) pushed it back
+    // into roll (104 degrees); correcting both together still crashed via roll, 12m less travel
+    // than doing nothing. Also tried increasing wheel/road friction to address the underlying
+    // wheel slip - made propulsion worse (the wheel locked up) rather than better. This remains a
+    // genuine open gap that needs an actual torque/energy-removing fix (through the inertia
+    // tensor, or addressing the wheel-slip root cause), not a velocity nudge on any single axis -
+    // the wiring (PreviousYaw tracking, yawRate below) is kept as the hook for whoever picks this
+    // up next, not as a working fix.
     private const double YawDampingGain = 0;
     private const double CrashRollDegrees = 62;
     private const double CrashPitchDegrees = 70;

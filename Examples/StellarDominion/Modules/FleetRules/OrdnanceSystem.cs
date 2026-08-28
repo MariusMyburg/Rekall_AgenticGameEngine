@@ -271,7 +271,18 @@ internal static class OrdnanceFactory
             .UpsertComponent(OrdnanceType, Props(
                 ("kind", "missile"), ("ownerId", ownerId), ("targetId", targetId),
                 ("trailId", trailId), ("damage", damage), ("speed", speed),
-                ("life", 0.0), ("maxLife", 7.0), ("detonated", false)));
+                ("life", 0.0), ("maxLife", 7.0), ("detonated", false)))
+            .UpsertComponent("Rekall.AudioEmitter", Emitter(0.4, 5000))
+            .UpsertComponent("Rekall.ProceduralAudioClip", Props(
+                // Launch: mostly noise, rising, so it reads as a rail rather than a beam.
+                ("waveform", "noise"),
+                ("durationSeconds", 0.45),
+                ("startFrequency", 220.0), ("endFrequency", 1000.0),
+                ("sweep", "exponential"),
+                ("attack", 0.01), ("decay", 0.10),
+                ("sustain", 0.4), ("release", 0.30),
+                ("noiseMix", 0.85), ("harmonics", 1.0),
+                ("amplitude", 0.4), ("seed", 63.0)));
 
         // Untransformed, because its segments are world-space. Outlives the round by a little
         // so the streak is still there after the warhead goes off.
@@ -288,16 +299,31 @@ internal static class OrdnanceFactory
         string id,
         RekallAgeRuntimeVector3 from,
         RekallAgeRuntimeVector3 to,
-        string colour)
+        string colour,
+        bool hostile)
     {
         var segments = new JsonArray { Segment(from, to) };
-        return Base(id, "Beam", new RekallAgeRuntimeVector3(0, 0, 0), 1)
+        // The report is placed at the muzzle so it pans and attenuates from where the shot
+        // was fired, while the line itself stays in world space at the origin.
+        return Base(id, "Beam", from, 1)
             .UpsertComponent("Rekall.LineSegments", Props(
                 ("segments", segments), ("thickness", 1.1), ("color", colour + "ff")))
             .UpsertComponent("Rekall.Material", Props(
                 ("baseColor", colour), ("emissiveColor", colour), ("emissiveStrength", 10.0)))
             .UpsertComponent(OrdnanceType, Props(
-                ("kind", "beam"), ("life", 0.0), ("maxLife", 0.14)));
+                // Outlives the flash of the line so the report is not cut off mid-sound.
+                ("kind", "beam"), ("life", 0.0), ("maxLife", 0.30)))
+            .UpsertComponent("Rekall.AudioEmitter", Emitter(0.55, 6000))
+            .UpsertComponent("Rekall.ProceduralAudioClip", Props(
+                ("waveform", "saw"),
+                ("durationSeconds", 0.26),
+                ("startFrequency", hostile ? 760.0 : 1500.0),
+                ("endFrequency", hostile ? 150.0 : 300.0),
+                ("sweep", "exponential"),
+                ("attack", 0.002), ("decay", 0.06),
+                ("sustain", 0.25), ("release", 0.16),
+                ("noiseMix", 0.18), ("harmonics", 3.0),
+                ("amplitude", 0.55), ("seed", hostile ? 91.0 : 17.0)));
     }
 
     public static RekallAgeRuntimeEntity Flash(string id, RekallAgeRuntimeVector3 at, string colour)
@@ -310,7 +336,17 @@ internal static class OrdnanceFactory
             .UpsertComponent("Rekall.Material", Props(
                 ("baseColor", colour), ("emissiveColor", colour), ("emissiveStrength", 12.0)))
             .UpsertComponent(OrdnanceType, Props(
-                ("kind", "flash"), ("life", 0.0), ("maxLife", 0.35)));
+                ("kind", "flash"), ("life", 0.0), ("maxLife", 0.40)))
+            .UpsertComponent("Rekall.AudioEmitter", Emitter(0.5, 6000))
+            .UpsertComponent("Rekall.ProceduralAudioClip", Props(
+                ("waveform", "triangle"),
+                ("durationSeconds", 0.38),
+                ("startFrequency", 240.0), ("endFrequency", 55.0),
+                ("sweep", "exponential"),
+                ("attack", 0.004), ("decay", 0.13),
+                ("sustain", 0.22), ("release", 0.22),
+                ("noiseMix", 0.55), ("harmonics", 2.0),
+                ("amplitude", 0.6), ("seed", 41.0)));
     }
 
     /// <summary>Adds this step's travel to a trail and drops the oldest segment.</summary>
@@ -358,6 +394,18 @@ internal static class OrdnanceFactory
                 Scale3D = new RekallAgeRuntimeVector3(scale, scale, scale),
             },
         };
+
+    /// <summary>
+    /// Positional one-shot. Spatial so a distant exchange sits behind a near one, and so
+    /// zooming in on a firefight brings it forward.
+    /// </summary>
+    private static JsonObject Emitter(double gain, double maxDistance) => Props(
+        ("gain", gain), ("playOnStart", true), ("loop", false),
+        // Falloff has to be sized to the scene, not to a room. Framed on the whole
+        // engagement the camera sits over a thousand units back, so a reference distance
+        // and a cutoff picked for human scale silenced every shot: attenuation is
+        // referenceDistance/distance, and past maxDistance it is flatly zero.
+        ("spatial", true), ("referenceDistance", 450.0), ("maxDistance", maxDistance));
 
     private static JsonObject Props(params (string Key, object Value)[] values)
     {

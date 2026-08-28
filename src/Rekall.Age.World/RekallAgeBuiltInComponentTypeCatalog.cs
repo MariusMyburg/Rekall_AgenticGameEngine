@@ -20,6 +20,7 @@ public static class RekallAgeBuiltInComponentTypeCatalog
         "Rekall.Environment3D",
         "Rekall.SceneTransition",
         "Rekall.PersistentState",
+        "Rekall.ProceduralAudioClip",
         "Rekall.ShadowSettings",
         "Rekall.FogVolume",
         "Rekall.ParticleEmitter3D",

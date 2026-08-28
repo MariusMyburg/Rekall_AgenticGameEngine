@@ -13,9 +13,11 @@ Layout notes:
   * The camera watches the lane broadside from -X, high enough to see the plane.
     Angles are solved from the engine's convention: forward = (cos(p)sin(y), -sin(p),
     cos(p)cos(y)), so positive pitch looks down and yaw 0 faces +Z.
-  * The picket sits ~200 units up-lane from the squadron - beyond every weapon's
-    reach. Nothing happens until the player orders someone to close, which is the
-    point of the mission.
+  * The picket sits ~650 units up-lane from the squadron, far beyond every weapon's
+    reach, and is held motionless until the briefing finishes. The mission opens with
+    the squadron alone and quiet: time to read, try the camera, and pick a formation
+    before anything shoots. An opening that is already a battle teaches nobody
+    anything.
 
 usage: python build_mission.py <output-directory>
 """
@@ -148,6 +150,9 @@ def space():
                                     "pitch": CAM_PITCH, "yaw": CAM_YAW, "roll": 0}),
             ("Rekall.Camera3D", {"active": True, "fieldOfView": 62,
                                  "nearClip": 0.2, "farClip": 40000}),
+            # Ears ride the camera: what you are looking at is what you hear, and
+            # zooming into a firefight brings it forward.
+            ("Rekall.AudioListener", {"active": True}),
             # The transform above is only the opening pose. CameraSystem derives it from
             # the pivot/yaw/pitch/distance below every step, and frames the fleet on the
             # first one, so the numbers here stop mattering as soon as the scene runs.
@@ -321,8 +326,8 @@ for leader, count, radius in WINGS:
 
 # --- The Hollow Choir picket -----------------------------------------------
 # Up-lane and out of everyone's reach. Nothing happens until the player closes.
-CHOIR = [("Choir Node Ashen", -74, 360), ("Choir Node Salt", 14, 402),
-         ("Choir Node Hymn", 96, 352)]
+CHOIR = [("Choir Node Ashen", -96, 830), ("Choir Node Salt", 18, 880),
+         ("Choir Node Hymn", 120, 815)]
 for name, x, z in CHOIR:
     entities += warship(
         name, "choir", (x, 0, z), 180, (choir_v, choir_i), (choir_d),
@@ -346,6 +351,30 @@ entities.append(e("Shell", ["flow"], [
         "title": "MISSION 1 - STANDING WATCH",
         "objective": "Clear the Choir picket from the transit lane.",
         "outcome": "active", "engaged": False,
+        # The mission opens with the squadron alone. Nothing hostile moves until these
+        # lines have run, which is the difference between a battle and an ambush.
+        "phase": "briefing",
+        "phaseElapsed": 0,
+        "briefingSecondsPerLine": 8,
+        "briefingLines": [
+            "Fuel convoy Skimmer Ferrous and Skimmer Anneal are yours to see through.\n"
+            "They are slow, they are unarmed, and the Reach does not have others.",
+
+            "LEFT CLICK any vessel to bring up its readout.\n"
+            "Start with the Ardent Dominion - the big one. She is the flagship.",
+
+            "RIGHT CLICK empty space to order the selected vessel there.\n"
+            "RIGHT CLICK a hostile to engage it instead.",
+
+            "MIDDLE DRAG orbits the camera. WASD pans. The WHEEL zooms.\n"
+            "SPACE frames everything still flying.",
+
+            "Long-range returns: three Choir platforms holding the transit lane.\n"
+            "They have not moved in eleven years. They are about to.",
+
+            "Get your screen out ahead of the tankers before they close.\n"
+            "The Dominion cannot be replaced. Do not lose her.",
+        ],
         "panelEntityName": "Objective Panel",
         "debriefScene": "Debrief",
         "endDelaySeconds": 4.0, "elapsed": 0,

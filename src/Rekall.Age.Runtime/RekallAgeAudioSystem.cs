@@ -8,6 +8,7 @@ namespace Rekall.Age.Runtime;
 public sealed class RekallAgeAudioSystem(string? projectRoot) : IRekallAgeRuntimeWorldSystem
 {
     private const string StateComponentType = "Rekall.AudioPlaybackState";
+    private const string ProceduralComponentType = "Rekall.ProceduralAudioClip";
     private readonly string? _projectRoot = string.IsNullOrWhiteSpace(projectRoot) ? null : Path.GetFullPath(projectRoot);
     private readonly RekallAgeAssetCatalogStore _catalogStore = new();
     private IReadOnlyDictionary<string, RekallAgeAssetDocument>? _assets;
@@ -57,26 +58,49 @@ public sealed class RekallAgeAudioSystem(string? projectRoot) : IRekallAgeRuntim
         List<RekallAgeRuntimeObservation> observations)
     {
         var existing = entity.Components.FirstOrDefault(component => component.Type == StateComponentType);
-        var clipId = ReadString(emitter.Properties, "clip") ?? ReadString(emitter.Properties, "assetId");
-        if (string.IsNullOrWhiteSpace(clipId) || _assets is null || !_assets.TryGetValue(clipId, out var asset))
-        {
-            observations.Add(Observation(context.FrameIndex, "REKALL_AUDIO_ASSET_MISSING", entity,
-                string.IsNullOrWhiteSpace(clipId)
-                    ? "Audio emitter has no clip asset reference."
-                    : $"Audio clip asset '{clipId}' is not present in the project catalog."));
-            return ReplaceState(entity, CreateState(clipId ?? string.Empty, "missing", 0, 0, emitter, 0, 0));
-        }
 
+        // A described sound takes precedence over the asset catalog. An entity carrying
+        // Rekall.ProceduralAudioClip is asking for a sound that has no file behind it, so
+        // there is nothing to look up and a missing-asset complaint would be wrong.
+        var procedural = entity.Components.FirstOrDefault(
+            component => component.Type == ProceduralComponentType);
+        string clipId;
         RekallAgePcmAudioClip clip;
-        try
+
+        if (procedural is not null)
         {
-            clip = await LoadClipAsync(asset, context.CancellationToken);
+            var spec = RekallAgeProceduralAudioSpec.FromJson(procedural.Properties);
+            clipId = spec.CacheKey;
+            if (!_clips.TryGetValue(clipId, out var synthesized))
+            {
+                synthesized = RekallAgeProceduralAudioSynthesizer.Synthesize(spec);
+                _clips[clipId] = synthesized;
+            }
+
+            clip = synthesized;
         }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
+        else
         {
-            observations.Add(Observation(context.FrameIndex, "REKALL_AUDIO_CLIP_INVALID", entity,
-                $"Audio clip '{clipId}' could not be decoded: {exception.Message}"));
-            return ReplaceState(entity, CreateState(clipId, "invalid", 0, 0, emitter, 0, 0));
+            clipId = ReadString(emitter.Properties, "clip") ?? ReadString(emitter.Properties, "assetId") ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(clipId) || _assets is null || !_assets.TryGetValue(clipId, out var asset))
+            {
+                observations.Add(Observation(context.FrameIndex, "REKALL_AUDIO_ASSET_MISSING", entity,
+                    string.IsNullOrWhiteSpace(clipId)
+                        ? "Audio emitter has no clip asset reference and no Rekall.ProceduralAudioClip to synthesize."
+                        : $"Audio clip asset '{clipId}' is not present in the project catalog."));
+                return ReplaceState(entity, CreateState(clipId, "missing", 0, 0, emitter, 0, 0));
+            }
+
+            try
+            {
+                clip = await LoadClipAsync(asset, context.CancellationToken);
+            }
+            catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
+            {
+                observations.Add(Observation(context.FrameIndex, "REKALL_AUDIO_CLIP_INVALID", entity,
+                    $"Audio clip '{clipId}' could not be decoded: {exception.Message}"));
+                return ReplaceState(entity, CreateState(clipId, "invalid", 0, 0, emitter, 0, 0));
+            }
         }
 
         var existingClip = existing is null ? null : ReadString(existing.Properties, "clipAssetId");

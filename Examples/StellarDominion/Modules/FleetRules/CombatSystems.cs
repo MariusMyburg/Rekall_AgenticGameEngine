@@ -111,6 +111,24 @@ public sealed class MissionState : RekallAgeComponent
     /// </summary>
     [RekallAgeProperty]
     public bool Engaged { get; init; }
+
+    /// <summary>
+    /// briefing while the squadron is still alone and the player is reading; engaged once the
+    /// Choir is released to act. A mission that opens in contact gives nobody time to learn
+    /// what they are looking at.
+    /// </summary>
+    [RekallAgeProperty(AllowedValues = ["briefing", "engaged"])]
+    public string Phase { get; init; } = "briefing";
+
+    /// <summary>Lines shown one at a time during the briefing.</summary>
+    [RekallAgeProperty]
+    public object? BriefingLines { get; init; }
+
+    [RekallAgeProperty(Minimum = 0.5, Maximum = 60)]
+    public double BriefingSecondsPerLine { get; init; } = 7;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 600)]
+    public double PhaseElapsed { get; init; }
 }
 
 /// <summary>
@@ -319,9 +337,11 @@ public sealed class CombatSystem : IRekallAgeRuntimeModuleSystem
                     else
                     {
                         damage[targetId] = damage.GetValueOrDefault(targetId) + shot;
+                        var hostile = entity.ComponentString(
+                            OrderSystem.FactionType, "side", string.Empty) == "choir";
                         spawned.Add(OrdnanceFactory.Beam(
                             $"ord_b_{stamp}_{sequence++}",
-                            muzzle, target.Transform.Position3D, colour));
+                            muzzle, target.Transform.Position3D, colour, hostile));
                         spawned.Add(OrdnanceFactory.Flash(
                             $"ord_f_{stamp}_{sequence++}",
                             target.Transform.Position3D, colour));
@@ -428,6 +448,17 @@ public sealed class ChoirAiSystem : IRekallAgeRuntimeModuleSystem
         RekallAgeRuntimeWorld world,
         RekallAgeRuntimeModuleFrameContext context)
     {
+        // Nothing the Choir does is a reaction, so holding it back costs the fiction nothing:
+        // the platforms were always going to run their task, and they start when the mission
+        // says they start.
+        var mission = world.Entities.FirstOrDefault(entity =>
+            entity.FindComponent("Game.Modules.FleetRules.MissionState") is not null);
+        if (mission is not null
+            && mission.ComponentString("Game.Modules.FleetRules.MissionState", "phase", "engaged") == "briefing")
+        {
+            return ValueTask.FromResult(world);
+        }
+
         var hostiles = world.Entities
             .Where(entity => entity.ComponentString(OrderSystem.FactionType, "side", string.Empty) == "choir"
                 && !CombatRules.IsDestroyed(entity))
@@ -505,6 +536,29 @@ public sealed class MissionSystem : IRekallAgeRuntimeModuleSystem
         var outcome = host.ComponentString(MissionType, "outcome", "active") ?? "active";
         var elapsed = host.ComponentNumber(MissionType, "elapsed");
 
+        // The briefing runs on its own clock so the end-of-mission delay never has to share a
+        // counter with it. Nothing hostile moves until it finishes.
+        var phase = host.ComponentString(MissionType, "phase", "engaged") ?? "engaged";
+        var phaseElapsed = host.ComponentNumber(MissionType, "phaseElapsed");
+        var briefing = MissionText.Lines(host.FindComponent(MissionType)!.Properties, "briefingLines");
+        var perLine = Math.Max(0.5, host.ComponentNumber(MissionType, "briefingSecondsPerLine", 7));
+        var briefingLine = string.Empty;
+
+        if (phase == "briefing")
+        {
+            phaseElapsed += context.DeltaTime.TotalSeconds;
+            var index = (int)(phaseElapsed / perLine);
+            if (briefing.Count == 0 || index >= briefing.Count)
+            {
+                phase = "engaged";
+                phaseElapsed = 0;
+            }
+            else
+            {
+                briefingLine = briefing[index];
+            }
+        }
+
         var hostilesLeft = world.Entities.Count(entity =>
             entity.ComponentString(OrderSystem.FactionType, "side", string.Empty) == "choir"
             && !CombatRules.IsDestroyed(entity));
@@ -530,7 +584,7 @@ public sealed class MissionSystem : IRekallAgeRuntimeModuleSystem
                 outcome = "defeat";
                 elapsed = 0;
             }
-            else if (engaged && hostilesLeft == 0)
+            else if (engaged && phase != "briefing" && hostilesLeft == 0)
             {
                 outcome = "victory";
                 elapsed = 0;
@@ -550,6 +604,7 @@ public sealed class MissionSystem : IRekallAgeRuntimeModuleSystem
             "defeat" => string.Join("\n", title, "", "MISSION FAILED", criticalLost
                 ? "A vessel the fleet cannot replace was lost."
                 : "The squadron was destroyed."),
+            _ when phase == "briefing" => string.Join("\n", title, "", briefingLine),
             _ => string.Join("\n", title, "", objective,
                 $"Hostiles remaining: {hostilesLeft}    Losses: {losses}"),
         };
@@ -569,7 +624,9 @@ public sealed class MissionSystem : IRekallAgeRuntimeModuleSystem
                 next = next
                     .WithComponentString(MissionType, "outcome", outcome)
                     .WithComponentNumber(MissionType, "elapsed", elapsed)
-                    .WithComponentBoolean(MissionType, "engaged", engaged);
+                    .WithComponentBoolean(MissionType, "engaged", engaged)
+                    .WithComponentString(MissionType, "phase", phase)
+                    .WithComponentNumber(MissionType, "phaseElapsed", phaseElapsed);
                 if (handOver && next.FindComponent(ShellTransitionType) is not null
                     && next.ComponentString(ShellTransitionType, "phase", string.Empty) != "fadingOut")
                 {
@@ -613,6 +670,25 @@ public sealed class MissionSystem : IRekallAgeRuntimeModuleSystem
         }
 
         return ValueTask.FromResult(world with { Entities = entities });
+    }
+}
+
+internal static class MissionText
+{
+    public static IReadOnlyList<string> Lines(JsonObject properties, string propertyName)
+    {
+        if (properties[propertyName] is not JsonArray array)
+        {
+            return [];
+        }
+
+        var lines = new List<string>(array.Count);
+        foreach (var node in array)
+        {
+            lines.Add(node?.GetValue<string>() ?? string.Empty);
+        }
+
+        return lines;
     }
 }
 

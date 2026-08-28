@@ -84,6 +84,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeAudioListenerComponent>();
         builder.RegisterComponent<RekallAgeAudioEmitterComponent>();
         builder.RegisterComponent<RekallAgeAudioBusComponent>();
+        builder.RegisterComponent<RekallAgeProceduralAudioClipComponent>();
         builder.RegisterComponent<RekallAgeAnimationClipComponent>();
         builder.RegisterComponent<RekallAgeAnimationPlayerComponent>();
         builder.RegisterComponent<RekallAgeAnimationMixerComponent>();
@@ -953,6 +954,57 @@ public sealed record RekallAgeGeometryMeshVertex(
     double A = double.NaN,
     double U = 0,
     double V = 0);
+
+[RekallAgeComponent("Procedural Audio Clip", Description =
+    "A sound described rather than recorded: an oscillator, a pitch sweep, a noise mix and an " +
+    "amplitude envelope. Place beside a Rekall.AudioEmitter and the runtime synthesizes the " +
+    "clip instead of loading an asset. Deterministic - the same values always yield the same " +
+    "samples.")]
+public sealed class RekallAgeProceduralAudioClipComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(AllowedValues = ["sine", "square", "saw", "triangle", "noise"])]
+    public string Waveform { get; init; } = "sine";
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 60)]
+    public double DurationSeconds { get; init; } = 0.25;
+
+    [RekallAgeProperty(Minimum = 1, Maximum = 20000)]
+    public double StartFrequency { get; init; } = 880;
+
+    [RekallAgeProperty(Minimum = 1, Maximum = 20000)]
+    public double EndFrequency { get; init; } = 220;
+
+    [RekallAgeProperty(AllowedValues = ["linear", "exponential"])]
+    public string Sweep { get; init; } = "exponential";
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 60)]
+    public double Attack { get; init; } = 0.005;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 60)]
+    public double Decay { get; init; } = 0.08;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    public double Sustain { get; init; } = 0.35;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 60)]
+    public double Release { get; init; } = 0.12;
+
+    /// <summary>How much of the output is noise rather than the oscillator.</summary>
+    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    public double NoiseMix { get; init; }
+
+    [RekallAgeProperty(Minimum = 1, Maximum = 16)]
+    public double Harmonics { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 1)]
+    public double Amplitude { get; init; } = 0.7;
+
+    [RekallAgeProperty(Minimum = 0, Maximum = 2147483647)]
+    public double Seed { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 8000, Maximum = 48000)]
+    public double SampleRate { get; init; } = 44100;
+}
 
 [RekallAgeComponent("Line Segments")]
 public sealed class RekallAgeLineSegmentsComponent : RekallAgeComponent

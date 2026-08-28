@@ -54,8 +54,42 @@ def load(scene_name):
     return scene, {x["name"]: x for x in scene["entities"]}
 
 
+def engage_now(scene):
+    """Drops a probe straight into contact.
+
+    The real mission opens with a briefing that holds the Choir back, which is the
+    point of the pacing - but a combat case should be testing combat, not waiting out
+    prose. case_briefing covers the pacing itself.
+    """
+    shell = next(x for x in scene["entities"] if x["name"] == "Shell")
+    state = component(shell, "MissionState")
+    state["phase"] = "engaged"
+    state["briefingLines"] = []
+    return scene
+
+
+def case_briefing(scene, by_name):
+    """Nothing hostile moves, and nothing is decided, while the briefing runs."""
+    hostiles = [x for x in scene["entities"]
+                if (component(x, "Faction") or {}).get("side") == "choir"]
+    checks = [
+        assertion("Shell", "component.property", "equals", "briefing",
+                  "MissionState", "phase"),
+        assertion("Shell", "component.property", "equals", "active",
+                  "MissionState", "outcome"),
+    ]
+    # A held platform holds station: no order, and no movement.
+    for hostile in hostiles:
+        checks.append(assertion(hostile["name"], "component.property", "equals", "hold",
+                                "Order", "kind"))
+        checks.append({"entityName": hostile["name"], "subject": "delta.position3d.z",
+                       "operator": "equals", "expected": 0})
+    return "briefing", scene, checks, 600
+
+
 def case_victory(scene, by_name):
     """Three warships each engage a picket node. Every hostile should die."""
+    engage_now(scene)
     hostiles = [x for x in scene["entities"]
                 if (component(x, "Faction") or {}).get("side") == "choir"]
     for index, name in enumerate(WARSHIPS):
@@ -102,6 +136,7 @@ def case_missiles(scene, by_name):
     round has to arrive - so nothing else in this file proves that path. The capitals are
     stripped of their batteries so a beam cannot get the credit.
     """
+    engage_now(scene)
     hostiles = [x for x in scene["entities"]
                 if (component(x, "Faction") or {}).get("side") == "choir"]
     target = hostiles[0]
@@ -137,6 +172,7 @@ def case_defeat(scene, by_name):
     Story-critical loss is the campaign rule: the ship later missions need cannot be
     allowed to die quietly.
     """
+    engage_now(scene)
     keep = {"Ardent Dominion", "Ardent Dominion Drive"}
     scene["entities"] = [x for x in scene["entities"]
                          if (component(x, "Faction") or {}).get("side") != "compact"
@@ -236,7 +272,8 @@ def main():
         m.call("initialize", {"protocolVersion": "2024-11-05", "capabilities": {},
                               "clientInfo": {"name": "verify", "version": "1"}})
 
-        for build in (case_quiet, case_camera, case_victory, case_missiles, case_defeat, case_debrief):
+        for build in (case_quiet, case_camera, case_briefing, case_victory,
+                      case_missiles, case_defeat, case_debrief):
             scene, by_name = load(
                 "Debrief" if build is case_debrief else "Mission1")
             label, scene, checks, frames = build(scene, by_name)

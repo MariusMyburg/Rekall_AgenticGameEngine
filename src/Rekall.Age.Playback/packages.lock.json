@@ -15,6 +15,11 @@
         "resolved": "2.4.0",
         "contentHash": "KNMxkzKLHAvV7jRtErxs3rPv71fHToqo/WN96HlT6iomWuwL97tohEbt0B1WA8A6sO5t6PP+qF08d4T9A8k2uA=="
       },
+      "NLayer": {
+        "type": "Transitive",
+        "resolved": "3.0.0",
+        "contentHash": "aQrCT93NjIrJNXA7wiTSHMp9OUhGNb8YTJAwnsx2FtaNdAe74vwfguFExf6QFNU72XhNPb/bLAcdMbxvaNZgWg=="
+      },
       "SamuelRe.CSG.Sharp": {
         "type": "Transitive",
         "resolved": "1.0.0",
@@ -74,6 +79,7 @@
         "type": "Project",
         "dependencies": {
           "BepuPhysics": "[2.4.0, )",
+          "NLayer": "[3.0.0, )",
           "Rekall.Age.AssetPipeline": "[0.1.0-preview.1, )",
           "Rekall.Age.Assets": "[0.1.0-preview.1, )",
           "Rekall.Age.Core": "[0.1.0-preview.1, )",

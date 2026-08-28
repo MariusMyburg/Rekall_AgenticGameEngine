@@ -233,7 +233,12 @@ public sealed class RekallAgeAudioSystem(string? projectRoot) : IRekallAgeRuntim
             throw new InvalidDataException("Audio asset path is missing or outside the project root.");
         }
 
-        var decoded = RekallAgeWaveDecoder.Decode(await File.ReadAllBytesAsync(path, cancellationToken), asset.Id);
+        // Dispatch on content, not extension: a mislabelled asset still decodes, and adding a
+        // format later means adding a probe here rather than touching every call site.
+        var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+        var decoded = RekallAgeMp3Decoder.LooksLikeMp3(bytes)
+            ? RekallAgeMp3Decoder.Decode(bytes, asset.Id)
+            : RekallAgeWaveDecoder.Decode(bytes, asset.Id);
         _clips.Add(asset.Id, decoded);
         return decoded;
     }

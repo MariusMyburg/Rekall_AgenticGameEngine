@@ -348,6 +348,59 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
             world = SpawnHazard(world, chunkIndex, startX + offset, seed, chunkIndex);
         }
 
+        world = SpawnRoadsideTrees(world, chunkIndex, startX, seed);
+
+        return world;
+    }
+
+    /// <summary>
+    /// Scatters procedurally generated trees (see ProceduralTreeGenerator) along both shoulders
+    /// of the road, well outside the guard rails so they read as roadside dressing rather than a
+    /// driving hazard. Every tree in a chunk shares the chunk's own deterministic seed sequence,
+    /// so a given seed always regrows the identical forest - the same replay-stability guarantee
+    /// the hazard and street-light spawns already rely on.
+    /// </summary>
+    private static RekallAgeRuntimeWorld SpawnRoadsideTrees(RekallAgeRuntimeWorld world, int chunkIndex, double startX, int seed)
+    {
+        const int treesPerSide = 1;
+        const double spawnChance = 0.5; // thins concurrent tree count further - see the per-frame render cost note on ProceduralTreeGenerator
+        for (var side = -1; side <= 1; side += 2)
+        {
+            for (var slot = 0; slot < treesPerSide; slot++)
+            {
+                var sequenceBase = (chunkIndex * 7919L) + (side > 0 ? 1000L : 2000L) + (slot * 97L);
+                if (RekallAgeRuntimeModuleSdk.DeterministicUnit(seed, sequenceBase) > spawnChance)
+                {
+                    continue;
+                }
+
+                var alongChunk = RekallAgeRuntimeModuleSdk.DeterministicRange(seed, sequenceBase + 1, 0, ChunkLength);
+                var lateral = RekallAgeRuntimeModuleSdk.DeterministicRange(seed, sequenceBase + 2, RoadHalfWidth + 2.5, RoadHalfWidth + 9);
+                var x = startX + alongChunk;
+                var treeSeed = seed + chunkIndex + (side > 0 ? 500 : 0) + slot;
+                var mesh = ProceduralTreeGenerator.Generate(treeSeed, sequenceBase + 3);
+                var treeId = $"tree-{chunkIndex}-{side}-{slot}";
+                var tree = RekallAgeRuntimeModuleSdk.CreateEntity(treeId, $"Tree {chunkIndex}/{side}/{slot}")
+                    .WithTag("road-chunk")
+                    .WithPosition3D(new RekallAgeRuntimeVector3(x, 0, lateral * side))
+                    .UpsertComponent("Rekall.GeometryMesh", new JsonObject
+                    {
+                        ["vertices"] = mesh.Vertices,
+                        ["indices"] = mesh.Indices
+                    })
+                    .UpsertComponent("Rekall.Material", new JsonObject
+                    {
+                        ["baseColor"] = "#3a2a18",
+                        ["metallicFactor"] = 0.02,
+                        ["roughnessFactor"] = 0.95
+                    })
+                    .UpsertComponent("Rekall.MeshRenderer", new JsonObject { ["active"] = true, ["castShadows"] = true, ["receiveShadows"] = true })
+                    .UpsertComponent("Rekall.CapsuleCollider3D", new JsonObject { ["radius"] = 0.24, ["length"] = 1.6 })
+                    .UpsertComponent("Rekall.PhysicsMaterial3D", new JsonObject { ["friction"] = 0.9, ["restitution"] = 0.05 });
+                world = world.AddEntity(tree);
+            }
+        }
+
         return world;
     }
 

@@ -7109,6 +7109,53 @@ starting from frame 1 (no straight-line warm-up first), run through
 `dotnet run --project src/Rekall.Age.Cli -- runtime inspect examples/MidnightRider Main <N> <inputs.json>`
 and watching the Chassis's `rotation3D` for roll (X) runaway.
 
+## 2026-08-28 (procedural trees) Recursive branching tree generator, wired into MidnightRider
+
+Per the feasibility research in `docs/superpowers/specs/2026-08-27-procedural-tree-generation-
+feasibility.md` (research-only, unimplemented at the time), built the actual generator and
+integrated it into the bike game as roadside dressing.
+
+**What was built.** `ProceduralTreeGenerator` (new file,
+`Examples/MidnightRider/Modules/MidnightRiderRules/ProceduralTreeGenerator.cs`) implements the
+same "tapered tube along a curve" mechanic the spec identified as the real geometric problem,
+directly in C# rather than through the full modeling-graph node system (`rekall.modeling.curve
+.profile_sweep` etc.) - a much smaller integration for a first working version, at the cost of
+not living in the "proper" architectural home the spec recommended for a future, more general
+pass. A recursive branch generator produces a skeleton of tapered tube segments (parallel-
+transported ring frames, per-generation length/radius falloff, randomized organic bend and
+spread angle) plus small octahedral foliage clusters at terminal branch tips, all deterministic
+from a (seed, sequence) pair via the same `RekallAgeRuntimeModuleSdk.DeterministicUnit/Range`
+primitives the hazard/street-light spawns already use. The result is authored directly as a
+`Rekall.GeometryMesh` component (raw vertices/indices JSON) - a format the renderer already
+reads with no asset-import step, confirmed by reading `RekallAgeRuntimeRenderFrameBuilder
+.ReadGeometryMesh` directly.
+
+**Integration.** `SpawnRoadsideTrees`, called from the existing `SpawnChunk`, scatters trees
+along both shoulders of the road (well outside the guard rails), tagged `road-chunk` so they
+stream and despawn with the rest of the world exactly like hazards and street lights.
+
+**Real performance cost found and mitigated, not fully fixed.** Measured directly (headless
+`runtime inspect` wall-clock, isolating dotnet startup via a 5-frame baseline): the first version
+(3 branch generations, 6 radial segments, 2 trees/side/chunk) added ~16ms/frame over a 300-frame
+run with ~16 trees visible - a real, user-visible cost (the user reported "FPS is TERRIBLE" after
+trying the build). Root cause: `RekallAgeRuntimeRenderFrameBuilder` has no cache for authored
+`Rekall.GeometryMesh` content - it re-parses each tree's full vertex/index JSON into a viewport
+renderable every single frame, unlike physics (which gates joint/body rebuilds behind content
+signatures - see the joint-signature-churn checkpoint earlier in this file). Mitigated by cutting
+generated complexity (2 branch generations, 5 radial segments, 3 centerline segments) and spawn
+density (1 tree/side/chunk instead of 2, at a 50% spawn chance) - brought the per-frame overhead
+down to ~4-5ms/frame, roughly a 3-4x improvement. This is a content-side mitigation, not a fix:
+the underlying per-frame re-parse cost is architectural and will recur for any future authored-
+mesh content at this scale. **A real fix would add a content-hash-keyed cache for authored
+GeometryMesh parsing in RekallAgeRuntimeRenderFrameBuilder**, the same pattern physics already
+uses - worth doing before adding more procedurally-authored-mesh content to any scene.
+
+**Also noted, unrelated:** the Windows player's Vulkan swapchain occasionally fails with "The
+Swapchain's underlying surface has been lost" (`REKALL_PLAYER_GRAPHICS_RECOVERY_EXHAUSTED`),
+confirmed via the diagnostics folder to be a pre-existing, recurring issue going back to at
+least 2026-08-22 (long before this session's tree work), at wildly varying frame counts (52 to
+93709) - not something the tree changes caused or something this session investigated further.
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

@@ -67,6 +67,7 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
         _physicsWorld.SynchronizeAuthoredChanges(dynamicBodies);
         _physicsWorld.SyncJoints(world.Entities, observations, context.FrameIndex);
         _physicsWorld.ApplyDrag(dynamicBodies, (float)context.DeltaTime.TotalSeconds);
+        _physicsWorld.ApplyAngularCorrection(dynamicBodies, (float)context.DeltaTime.TotalSeconds);
         var preStepBodies = _physicsWorld.CapturePreStepBodies(dynamicBodies);
         _physicsWorld.Simulation.Timestep((float)context.DeltaTime.TotalSeconds);
 
@@ -969,6 +970,47 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
                     velocity.Angular /= 1 + (angularDrag * deltaSeconds);
                 }
 
+                body.Velocity = velocity;
+            }
+        }
+
+        /// <summary>
+        /// A bounded, continuous angular-velocity nudge a game module can drive every frame via
+        /// Rigidbody3D's optional angularCorrectionX/Y/Z (degrees/sec, applied as a per-second
+        /// rate scaled by deltaSeconds so it is framerate-stable) - the same direct
+        /// Simulation.Bodies[handle].Velocity access ApplyDrag already uses. This is a stabilizer
+        /// nudge, not a physically-modeled torque (it does not go through the body's inertia
+        /// tensor) - intended for gameplay-level corrections like keeping a vehicle chassis from
+        /// tumbling about an axis no joint or motor otherwise constrains, the same role a real
+        /// rider's continuous small corrections play. Left at 0 (the default) a body is completely
+        /// unaffected.
+        /// </summary>
+        public void ApplyAngularCorrection(IReadOnlyList<PhysicsEntity> dynamicBodies, float deltaSeconds)
+        {
+            if (deltaSeconds <= 0)
+            {
+                return;
+            }
+
+            foreach (var item in dynamicBodies)
+            {
+                if (item.Rigidbody is null || !_dynamicBodies.TryGetValue(item.Entity.Id, out var persistent))
+                {
+                    continue;
+                }
+
+                var correctionDegrees = new Vector3(
+                    ReadSingle(item.Rigidbody, "angularCorrectionX", 0),
+                    ReadSingle(item.Rigidbody, "angularCorrectionY", 0),
+                    ReadSingle(item.Rigidbody, "angularCorrectionZ", 0));
+                if (correctionDegrees == Vector3.Zero)
+                {
+                    continue;
+                }
+
+                var body = Simulation.Bodies[persistent.Handle];
+                var velocity = body.Velocity;
+                velocity.Angular += correctionDegrees * (MathF.PI / 180) * deltaSeconds;
                 body.Velocity = velocity;
             }
         }

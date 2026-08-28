@@ -34,6 +34,9 @@ public sealed class RunState : RekallAgeComponent
     public double PreviousYaw { get; init; }
 
     [RekallAgeProperty]
+    public double PreviousPitch { get; init; }
+
+    [RekallAgeProperty]
     public double DistanceTraveled { get; init; }
 
     [RekallAgeProperty]
@@ -92,6 +95,29 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
     private const double YawDampingGain = 0;
     private const double CrashRollDegrees = 62;
     private const double CrashPitchDegrees = 70;
+    // Anti-wheelie stabilizer: measured directly (a zero-torque/zero-input control run holds the
+    // chassis dead still, while a full-throttle run spins it to 200+ deg/s about the wheel's own
+    // spin axis - see the roll/pitch axis note above), the rear wheel's motor reaction plus the
+    // ground-friction reaction at the contact patch (a real wheelie/traction-torque effect, not a
+    // scene-authoring bug) drive the chassis's pitch with nothing in the control loop to check it
+    // - the balance controller only ever acted on steering/lean, never on pitch. Scaling the
+    // motor's own torque down as pitch grew was tried and did not arrest it (the ground-friction
+    // component keeps driving the spin independently of motor torque). This instead applies a
+    // direct PD correction via Rekall.Rigidbody3D.angularCorrectionZ (see
+    // RekallAgeBepuPhysicsSystem.ApplyAngularCorrection) - the same continuous-micro-correction
+    // idiom the roll/steering balance controller already uses, just acting directly on the axis
+    // nothing else constrains instead of indirectly through steering.
+    private const double PitchStabilizerProportionalGain = 150;
+    private const double PitchStabilizerDerivativeGain = 15;
+    // A direct roll-axis analog (mirroring the pitch stabilizer above, layered on top of the
+    // existing steering-mediated balance controller below) was tried as a fix for the slow roll
+    // divergence documented on long unattended throttle-only runs, at both a stronger and a
+    // gentler gain. Neither prevented the eventual crash - one produced a later but more violent
+    // snap (peak angular speed roughly tripled), the other converged no better than the
+    // steering-only path already in place. Left out: this remains the same open, previously
+    // documented gap (rear-wheel spin momentum coupling into a gradual precession - see
+    // docs/production/PROGRESS.md's 2026-08-28 checkpoint), now confirmed NOT to be a simple
+    // missing-direct-correction problem the way the pitch/wheelie instability was.
 
     private const double ChunkLength = 40;
     private const double SpawnAheadDistance = 160;
@@ -132,14 +158,21 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
         var targetSpeed = run.Properties.ReadNumber("targetSpeed", 0);
         var previousRoll = run.Properties.ReadNumber("previousRoll", 0);
         var previousYaw = run.Properties.ReadNumber("previousYaw", 0);
+        var previousPitch = run.Properties.ReadNumber("previousPitch", 0);
         var distanceTraveled = run.Properties.ReadNumber("distanceTraveled", 0);
         var nextSpawnX = run.Properties.ReadNumber("nextSpawnX", 0);
         var nextChunkIndex = (int)run.Properties.ReadNumber("nextChunkIndex", 0);
         var seed = (int)run.Properties.ReadNumber("seed", 1);
         var startX = 0.0;
 
-        var roll = Normalize180(chassis.Transform.Rotation3D.Z);
-        var pitch = Normalize180(chassis.Transform.Rotation3D.X);
+        // The wheels' spin axis is Z (Rekall.HingeJoint.axisZ=1 on Front/Rear Wheel), and the
+        // bike travels along X with Y up - so rotation about Z is the wheelie/pitch axis, and
+        // rotation about X (leaning the chassis toward +Z/-Z) is the true roll/lean axis. This
+        // was previously swapped: `roll` read Z (wheelie angle) and `pitch` read X (true lean),
+        // which fed the balance controller's PD correction the wrong physical quantity - no
+        // gain on the wrongly-wired axis could ever stabilize actual side-to-side lean.
+        var roll = Normalize180(chassis.Transform.Rotation3D.X);
+        var pitch = Normalize180(chassis.Transform.Rotation3D.Z);
         var chassisYaw = chassis.Transform.Rotation3D.Y;
         var chassisX = chassis.Transform.Position3D.X;
 
@@ -167,13 +200,21 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
             world = world.UpdateEntity(rearWheelId, wheel => wheel.WithComponentNumber(HingeJointType, "motorTargetVelocity", motorTarget));
         }
 
+        // --- Anti-wheelie stabilizer: a direct PD correction on the chassis's own pitch, applied
+        // as a continuous angular-velocity nudge via Rekall.Rigidbody3D.angularCorrectionZ (see
+        // RekallAgeBepuPhysicsSystem.ApplyAngularCorrection) rather than through any joint/motor -
+        // pitch is an axis nothing else in this rig constrains. ---
+        var pitchRate = seconds > 0 ? (pitch - previousPitch) / seconds : 0;
+        var pitchCorrection = -(PitchStabilizerProportionalGain * pitch) - (PitchStabilizerDerivativeGain * pitchRate);
+        var rollRate = seconds > 0 ? (roll - previousRoll) / seconds : 0;
+        world = world.UpdateEntity(chassisId, c => c.WithComponentNumber("Rekall.Rigidbody3D", "angularCorrectionZ", pitchCorrection));
+
         // --- Steering + balance: the player's Left/Right input sets a desired lean/turn angle;
         // a small proportional-derivative correction on the chassis's own measured roll and
         // roll rate is added on top, exactly the kind of continuous micro-correction a real
         // rider supplies to stay upright - it nudges the STEERING target, never the lean itself,
         // so the resulting lean stays a genuine consequence of real contact/inertia physics. ---
         var steerInput = running ? Math.Clamp(world.InputActionValue("steer"), -1, 1) : 0;
-        var rollRate = seconds > 0 ? (roll - previousRoll) / seconds : 0;
         var balanceCorrection = (BalanceProportionalGain * roll) + (BalanceDerivativeGain * rollRate);
         var yawRate = seconds > 0 ? Normalize180(chassisYaw - previousYaw) / seconds : 0;
         var yawDamping = -YawDampingGain * yawRate;
@@ -218,6 +259,7 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
             .WithComponentNumber(RunStateType, "targetSpeed", targetSpeed)
             .WithComponentNumber(RunStateType, "previousRoll", roll)
             .WithComponentNumber(RunStateType, "previousYaw", chassisYaw)
+            .WithComponentNumber(RunStateType, "previousPitch", pitch)
             .WithComponentNumber(RunStateType, "distanceTraveled", distanceTraveled)
             .WithComponentNumber(RunStateType, "nextSpawnX", nextSpawnX)
             .WithComponentNumber(RunStateType, "nextChunkIndex", nextChunkIndex));

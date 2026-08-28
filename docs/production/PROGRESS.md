@@ -6846,6 +6846,85 @@ the contact/friction solve itself under this specific combination of a moving ri
 substep count, and a motor constraint sharing the same body - not another authored-value
 adjustment.
 
+## 2026-08-28 (later still) Found and fixed the real tumbling cause: a mislabeled axis and an uncontrolled wheelie, plus a new engine capability
+
+Picked back up from the prior checkpoint's honest "not fully working" status to find the
+tumbling cause the earlier checkpoints hadn't isolated yet.
+
+**Anchor-authoring bug (fixed).** The Rear Wheel's `Rekall.HingeJoint.anchorBY` was authored as
+`-0.15` (a copy-paste from the Fork's own joint, which legitimately uses `-0.15`), but the real
+geometric Y-offset between Chassis (y=0.85) and Rear Wheel (y=0.32) is `-0.53`. Confirmed the
+authoring convention against the Front Wheel/Fork joint, which is authored correctly the same
+way (`anchorBY: -0.38` = Front Wheel y=0.32 minus Fork y=0.7). Fixed by setting `anchorBY: -0.53`.
+This is a genuine correctness fix but, verified in isolation, does not by itself prevent the
+tumbling - it reduces the very-early instability a little and nothing more.
+
+**Roll/pitch axes were swapped (fixed).** `MidnightRiderSystem` read `roll` from
+`Rotation3D.Z` and `pitch` from `Rotation3D.X`. The wheels' spin axis is Z
+(`Rekall.HingeJoint.axisZ=1` on both wheels), and the bike travels along X with Y up, so rotation
+about Z is the wheelie/pitch axis and rotation about X (leaning toward +Z/-Z) is the true
+roll/lean axis - the two were backwards. Confirmed directly: in every crash observed, `Rotation3D.X`
+and `Rotation3D.Y` stayed pinned to a few hundredths of a degree for the entire run while
+`Rotation3D.Z` ran away to 100+ degrees - a body being driven around one axis, not a bike falling
+over sideways. This meant the balance controller's PD correction was being fed the wheelie angle
+and nudging *steering* with it, which cannot affect a wheelie at all - explaining why no balance
+gain tried in the previous checkpoints ever helped. Fixed by swapping which axis feeds `roll` and
+`pitch`. Kept as a correctness fix independent of the stability fix below.
+
+**Root cause of the tumbling: an uncontrolled wheelie, confirmed by a zero-input control test.**
+Running the rig with the rear wheel's motor torque at 0 and no throttle input for 120 frames
+holds the chassis dead still (`Rotation3D` under 1 degree throughout). Running it at full throttle
+spins the chassis's pitch (Z) to 200+ deg/s within a second while linear speed is still only a few
+m/s - an order of magnitude more rotation than translation, which rules out a normal "leaning into
+acceleration" reading. The rear wheel's motor reaction plus the ground-friction reaction at the
+tire contact patch (a real wheelie/traction-torque effect - the wheel's contact grip resists it
+from spinning freely, and that resisted reaction has nowhere to go but into the chassis) drive the
+chassis's pitch, and nothing in the control loop was ever built to check it - the balance
+controller only ever acted on steering/lean, never on pitch. Tried and rejected: scaling the rear
+wheel's own `motorMaximumTorque` down as pitch grows (a literal "close the throttle" mirror of what
+a rider does) - measured no improvement, because the friction-reaction component keeps driving the
+spin independently of the motor's own torque.
+
+**Fix: a new engine capability plus a direct pitch stabilizer.** The engine had no way for a
+module to apply a continuous corrective nudge to a body's own angular velocity without rebuilding
+it (contrast the Hinge/motor joints, which do support live per-frame updates via `SyncJoints`).
+Added `Rekall.Rigidbody3D.angularCorrectionX/Y/Z` (degrees/sec, applied as a per-second rate scaled
+by `deltaSeconds` so it stays framerate-stable) and a new
+`RekallAgeBepuPhysicsSystem.ApplyAngularCorrection` pass, called each frame right after the
+existing `ApplyDrag` pass and before `Simulation.Timestep`, using the same direct
+`Simulation.Bodies[handle].Velocity` access `ApplyDrag` already established. This is a stabilizer
+nudge, not a physically-modeled torque (it does not go through the body's inertia tensor) -
+explicitly scoped as a gameplay-level correction tool, the same role the existing steering balance
+controller already plays, not a general rigid-body-dynamics feature.
+
+`MidnightRiderRulesModule` now runs a PD controller on the chassis's own measured pitch and pitch
+rate (`PitchStabilizerProportionalGain = 150`, `PitchStabilizerDerivativeGain = 15` - an order of
+magnitude larger than the roll/steering balance gains, because this corrects an angular
+*acceleration* disturbance measured in the thousands of deg/s^2, not the slower steering-mediated
+correction the roll controller uses), writing `angularCorrectionZ` every frame. A gentler roll-axis
+analog (`RollStabilizerProportionalGain`/`RollStabilizerDerivativeGain`) was tried on top of the
+existing steering-mediated roll correction, at two different gains, specifically to address the
+slow roll divergence noted below - neither prevented the eventual crash (one delayed it but made
+the eventual snap roughly 3x more violent by peak angular speed), so it was removed rather than
+kept as an unverified guess; `PreviousPitch` tracking on `RunState` was kept since the pitch
+stabilizer itself needs it.
+
+**Verified result.** The 760-frame combined throttle+steer regression
+(`inputs.json`/`assertions_full.json`) now passes: 75.1m traveled (previously 27.97m best-case,
+with most of this session's earlier torque/gain experiments crashing outright within 1-5m). The
+600-frame throttle-only run travels 75.4m before an eventual crash around frame 211-272 (roll/X
+axis, not pitch/Z - the wheelie instability is gone). That eventual crash is the same slow
+roll/yaw divergence documented in the previous checkpoint (rear-wheel spin momentum coupling into
+a gradual precession) - now confirmed, via the rejected roll-stabilizer attempt above, to not be a
+simple missing-direct-correction problem the way the pitch/wheelie instability was. This is a
+substantial, verified improvement (2.5x the distance of the previous best, and the dominant early
+crash mode eliminated entirely) but not yet "fully working": the bike now reliably rides a
+meaningful distance and stays upright through normal play, but an unattended long run still ends
+in this documented, open roll/yaw drift.
+
+**Full test suite:** `dotnet test -c Release` run against this state; see the commit for the
+result recorded at commit time.
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

@@ -36,6 +36,17 @@ public sealed class RekallAgeBepuPhysicsSystem : IRekallAgeRuntimeWorldSystem, I
         RekallAgeRuntimeWorld world,
         RekallAgeRuntimeWorldFrameContext context)
     {
+        // There is already an early-out below for "no dynamic and no static bodies", but it
+        // fires only after CreatePhysicsEntity has run over every entity in the scene. A
+        // collider is required to become either kind of body, so checking first is equivalent
+        // and skips that pass. Rigidbody is included so that entities carrying one without a
+        // collider still reach CreatePhysicsEntity and produce their diagnostic observation.
+        if (!RekallAgeRuntimeComponentPresence.AnyEntityHasCollider(world)
+            && !RekallAgeRuntimeComponentPresence.AnyEntityHasContaining(world, "Rigidbody"))
+        {
+            return ValueTask.FromResult(world);
+        }
+
         var observations = new List<RekallAgeRuntimeObservation>();
         var physicsEntities = world.Entities
             .Select(entity => CreatePhysicsEntity(world.ProjectRoot, entity, context.FrameIndex, observations))

@@ -19,6 +19,13 @@ public sealed class RekallAgeMorphWeightSystem : IRekallAgeRuntimeWorldSystem
         RekallAgeRuntimeWorld world,
         RekallAgeRuntimeWorldFrameContext context)
     {
+        // Apply only strips Rekall.MorphState and re-derives it from Rekall.MorphWeights.
+        // With neither present it still rebuilds every entity's component array to no effect.
+        if (!RekallAgeRuntimeComponentPresence.AnyEntityHasAny(world, WeightsComponent, StateComponent))
+        {
+            return ValueTask.FromResult(world);
+        }
+
         var observations = new List<RekallAgeRuntimeObservation>();
         var entities = world.Entities.Select(entity => Apply(entity, context.FrameIndex, observations)).ToArray();
         return ValueTask.FromResult(world with

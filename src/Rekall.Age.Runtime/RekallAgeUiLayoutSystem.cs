@@ -17,6 +17,13 @@ public sealed class RekallAgeUiLayoutSystem : IRekallAgeRuntimeWorldSystem
         RekallAgeRuntimeWorld world,
         RekallAgeRuntimeWorldFrameContext context)
     {
+        // Layout state is only ever written for entities resolved through a Rekall.UiCanvas;
+        // with no UI components at all the pass rebuilds every entity to no effect.
+        if (!RekallAgeRuntimeComponentPresence.AnyEntityHasPrefixed(world, "Rekall.Ui"))
+        {
+            return ValueTask.FromResult(world);
+        }
+
         var entitiesById = world.Entities.ToDictionary(entity => entity.Id, StringComparer.Ordinal);
         var canvasById = world.Entities
             .Select(entity => (Entity: entity, Component: entity.Components.FirstOrDefault(component => component.Type == "Rekall.UiCanvas")))

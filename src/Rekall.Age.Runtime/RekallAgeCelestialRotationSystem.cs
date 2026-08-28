@@ -14,6 +14,12 @@ public sealed class RekallAgeCelestialRotationSystem : IRekallAgeRuntimeWorldSys
         RekallAgeRuntimeWorld world,
         RekallAgeRuntimeWorldFrameContext context)
     {
+        // ApplyRotation only ever changes an entity that carries Rekall.CelestialRotation.
+        if (!RekallAgeRuntimeComponentPresence.AnyEntityHas(world, "Rekall.CelestialRotation"))
+        {
+            return ValueTask.FromResult(world);
+        }
+
         var entities = world.Entities
             .Select(entity => ApplyRotation(entity, context.ElapsedTime.TotalSeconds))
             .ToArray();

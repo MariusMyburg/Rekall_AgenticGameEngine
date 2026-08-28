@@ -18,6 +18,16 @@ public sealed class RekallAgeTriggerEventSystem : IRekallAgeRuntimeWorldSystem
         RekallAgeRuntimeWorld world,
         RekallAgeRuntimeWorldFrameContext context)
     {
+        // Every entity without a Rekall.Trigger returns unchanged, so with none present the
+        // pass rebuilds the entity array and both id dictionaries to no effect. The canonical
+        // event ordering this system applies is still honoured on the skip path: other
+        // systems' events depend on it, and it must not become contingent on whether the
+        // scene happens to contain a trigger.
+        if (!RekallAgeRuntimeComponentPresence.AnyEntityHas(world, TriggerComponent))
+        {
+            return ValueTask.FromResult(RekallAgeRuntimeEventOrdering.WithCanonicalEvents(world));
+        }
+
         var colliders = world.Entities
             .Where(entity => entity.Visible)
             .Select(CreateColliderBody)
@@ -68,13 +78,7 @@ public sealed class RekallAgeTriggerEventSystem : IRekallAgeRuntimeWorldSystem
             Subsystems = world.Subsystems with
             {
                 Events = new RekallAgeRuntimeEventView(
-                    world.Subsystems.Events.Events
-                        .Concat(emitted)
-                        .OrderBy(runtimeEvent => runtimeEvent.Frame)
-                        .ThenBy(runtimeEvent => runtimeEvent.EntityName, StringComparer.Ordinal)
-                        .ThenBy(runtimeEvent => runtimeEvent.Type, StringComparer.Ordinal)
-                        .ThenBy(runtimeEvent => runtimeEvent.Handler, StringComparer.Ordinal)
-                        .ToArray())
+                    RekallAgeRuntimeEventOrdering.Canonical(world.Subsystems.Events.Events.Concat(emitted)))
             }
         });
     }

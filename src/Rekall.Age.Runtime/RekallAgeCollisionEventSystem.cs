@@ -17,6 +17,15 @@ public sealed class RekallAgeCollisionEventSystem : IRekallAgeRuntimeWorldSystem
         RekallAgeRuntimeWorld world,
         RekallAgeRuntimeWorldFrameContext context)
     {
+        // Collision bodies are derived entirely from collider components; with none present
+        // there are no pairs to test and no entity changes. This also skips the O(n^2)
+        // broadphase below, which remains a scaling concern for collider-heavy scenes. The
+        // canonical event ordering is still applied, as other systems' events depend on it.
+        if (!RekallAgeRuntimeComponentPresence.AnyEntityHasCollider(world))
+        {
+            return ValueTask.FromResult(RekallAgeRuntimeEventOrdering.WithCanonicalEvents(world));
+        }
+
         var bodies = world.Entities
             .Where(entity => entity.Visible)
             .Select(CreateCollisionBody)
@@ -72,13 +81,7 @@ public sealed class RekallAgeCollisionEventSystem : IRekallAgeRuntimeWorldSystem
             Subsystems = world.Subsystems with
             {
                 Events = new RekallAgeRuntimeEventView(
-                    world.Subsystems.Events.Events
-                        .Concat(emitted)
-                        .OrderBy(runtimeEvent => runtimeEvent.Frame)
-                        .ThenBy(runtimeEvent => runtimeEvent.EntityName, StringComparer.Ordinal)
-                        .ThenBy(runtimeEvent => runtimeEvent.Type, StringComparer.Ordinal)
-                        .ThenBy(runtimeEvent => runtimeEvent.Handler, StringComparer.Ordinal)
-                        .ToArray())
+                    RekallAgeRuntimeEventOrdering.Canonical(world.Subsystems.Events.Events.Concat(emitted)))
             }
         });
     }

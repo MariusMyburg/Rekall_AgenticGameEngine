@@ -16,6 +16,13 @@ public sealed class RekallAgeKeplerOrbitSystem : IRekallAgeRuntimeWorldSystem
         RekallAgeRuntimeWorld world,
         RekallAgeRuntimeWorldFrameContext context)
     {
+        // ResolveOrbit only ever changes an entity that carries Rekall.KeplerOrbit, so with
+        // none present the whole pass rebuilds the entity array to no effect.
+        if (!RekallAgeRuntimeComponentPresence.AnyEntityHas(world, "Rekall.KeplerOrbit"))
+        {
+            return ValueTask.FromResult(world);
+        }
+
         var bodyById = world.Entities
             .Select(entity => (Entity: entity, Body: entity.Components.FirstOrDefault(component =>
                 component.Type.Equals("Rekall.CelestialBody", StringComparison.Ordinal))))

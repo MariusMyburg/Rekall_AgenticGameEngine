@@ -36,6 +36,16 @@ public sealed class RekallAgeTransformAnimationSystem : IRekallAgeRuntimeWorldSy
 
     public async ValueTask<RekallAgeRuntimeWorld> UpdateAsync(RekallAgeRuntimeWorld world, RekallAgeRuntimeWorldFrameContext context)
     {
+        // Every path through ApplyAnimation needs one of the Rekall.Animation* components or
+        // Rekall.TransformAnimation; without them the pass rebuilds every entity, emits no
+        // events and no observations. Prefix-matching the animation family rather than listing
+        // each type keeps this correct if another Rekall.Animation* component is added later.
+        if (!RekallAgeRuntimeComponentPresence.AnyEntityHasPrefixed(world, "Rekall.Animation")
+            && !RekallAgeRuntimeComponentPresence.AnyEntityHas(world, "Rekall.TransformAnimation"))
+        {
+            return world;
+        }
+
         await EnsureAssetsAsync(context.CancellationToken);
         var emitted = new List<RekallAgeRuntimeEvent>();
         var observations = new List<RekallAgeRuntimeObservation>();

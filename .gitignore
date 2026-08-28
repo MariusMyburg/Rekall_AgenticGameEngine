@@ -62,3 +62,6 @@ desktop.ini
 # Python bytecode from example tooling
 __pycache__/
 *.pyc
+
+# Runtime-written game state (settings, saves) is per-machine, not source
+Examples/**/State/

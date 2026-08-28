@@ -23,6 +23,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeRenderQualityProfileComponent>();
         builder.RegisterComponent<RekallAgeEnvironment3DComponent>();
         builder.RegisterComponent<RekallAgeSceneTransitionComponent>();
+        builder.RegisterComponent<RekallAgePersistentStateComponent>();
         builder.RegisterComponent<RekallAgeShadowSettingsComponent>();
         builder.RegisterComponent<RekallAgeFogVolumeComponent>();
         builder.RegisterComponent<RekallAgeParticleEmitter3DComponent>();
@@ -504,6 +505,22 @@ public sealed class RekallAgeRenderQualityProfileComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public bool EnableGpuTimestamps { get; init; }
+}
+
+[RekallAgeComponent("Persistent State", Description =
+    "Project-scoped state that survives a restart: settings, campaign progress, save slots. " +
+    "The runtime loads the named slot into Document when the scene starts, and writes Document " +
+    "back whenever an authored module changes it. Without this a game cannot remember anything " +
+    "a player does between sessions.")]
+public sealed class RekallAgePersistentStateComponent : RekallAgeComponent
+{
+    /// <summary>Slot name: letters, digits, '-', '_' and '.' only. Not a path.</summary>
+    [RekallAgeProperty]
+    public string Slot { get; init; } = "settings";
+
+    /// <summary>The stored document. Loaded by the runtime, written back when modules change it.</summary>
+    [RekallAgeProperty]
+    public object? Document { get; init; }
 }
 
 [RekallAgeComponent("Scene Transition", Description =

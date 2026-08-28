@@ -133,6 +133,11 @@ Built on the selection that already works.
   things that fire.
 - **Damage.** Extends `Selectable`'s hull/shields. Shields regenerate; hull does
   not. A destroyed ship leaves a wreck entity.
+- **Loss and permanence.** A destroyed ship is gone for the rest of the campaign.
+  Ships the story needs later are marked `StoryCritical`, and losing one is an
+  immediate game-over rather than a silently unwinnable campaign. That keeps the
+  tension of permanent loss without the failure mode where a player continues
+  for hours into a state the campaign cannot resolve.
 - **AI.** The Choir is deliberately simple and readable: acquire nearest target
   in range, hold formation, never retreat. Its predictability is the story.
 - **Pause.** `Paused` gates the fleet systems only, so the camera and UI stay
@@ -179,5 +184,5 @@ Missions 2–7 are then content against a proven frame.
 
 - Is the tone right? The "enemy is a stuck process" premise drives every mission
   and is the hardest thing to change later.
-- Ship permanence: should losses be permanent across the campaign? It is the
-  strongest source of tension and the strongest source of frustration.
+- Resolved: losses are permanent, and a story-critical ship's destruction is an
+  immediate game-over rather than a campaign that quietly cannot be completed.

@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Rekall.Age.Core.Persistence;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Recovery;
@@ -277,6 +278,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly bool _simulateXrInput;
     private readonly bool _debugHudEnabled;
     private const string SceneTransitionComponentType = "Rekall.SceneTransition";
+    private const string PersistentStateComponentType = "Rekall.PersistentState";
+    private readonly Dictionary<string, string> _persistedStateBySlot = new(StringComparer.Ordinal);
     private string? _screenshotPath;
     private int _screenshotFrame;
     private int _lastUiVertexCount;
@@ -469,6 +472,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _openXrCompositorSession = openXrCompositorSession;
         _simulateXrInput = simulateXrInput;
         _debugHudEnabled = debugHudEnabled;
+        LoadPersistentState();
         _screenshotPath = RekallAgePlayerScreenshotRequest.Path;
         _screenshotFrame = Math.Max(1, RekallAgePlayerScreenshotRequest.Frame);
         _sceneSupersampleFactor = Math.Clamp(sceneSupersampleFactor, 1, 4);
@@ -1710,6 +1714,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             .GetResult();
         _sceneDocument = scene;
         _runtimeWorld = runResult.World;
+        LoadPersistentState();
         _entityCount = _runtimeWorld.Entities.Count;
         _sceneRevision++;
         _simulationClock.Reset(_clock.Elapsed);
@@ -2317,11 +2322,121 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             .GetResult();
         _runtimeWorld = result.World;
         _audioOutput?.Submit(result.AudioFrames);
+        PersistChangedState();
         HonourSceneTransitionRequest();
         if (!_audioSubmissionLogged && _audioOutput is { SubmittedFrameCount: > 0 } audioOutput)
         {
             _audioSubmissionLogged = true;
             PlayerLog.Write($"Audio output queued runtime mix frames={audioOutput.SubmittedFrameCount} bytes={audioOutput.QueuedBytes}.");
+        }
+    }
+
+    /// <summary>
+    /// Loads every Rekall.PersistentState slot the scene declares into its Document.
+    ///
+    /// Called once when a scene becomes active, so an authored module sees its saved settings
+    /// and campaign progress as ordinary component state rather than needing file access.
+    /// </summary>
+    private void LoadPersistentState()
+    {
+        _persistedStateBySlot.Clear();
+        var entities = new List<RekallAgeRuntimeEntity>(_runtimeWorld.Entities.Count);
+        var changed = false;
+        foreach (var entity in _runtimeWorld.Entities)
+        {
+            var component = entity.Components.FirstOrDefault(item =>
+                item.Type.Equals(PersistentStateComponentType, StringComparison.Ordinal));
+            var slot = component?.Properties["slot"]?.GetValue<string>();
+            if (component is null || string.IsNullOrWhiteSpace(slot))
+            {
+                entities.Add(entity);
+                continue;
+            }
+
+            try
+            {
+                var document = RekallAgePersistentStateStore
+                    .ReadAsync(_projectRoot, slot, CancellationToken.None)
+                    .AsTask()
+                    .GetAwaiter()
+                    .GetResult();
+                if (document is null)
+                {
+                    entities.Add(entity);
+                    continue;
+                }
+
+                var properties = component.Properties.DeepClone().AsObject();
+                properties["document"] = document.DeepClone();
+                _persistedStateBySlot[slot] = document.ToJsonString();
+                entities.Add(entity with
+                {
+                    Components = entity.Components
+                        .Select(item => ReferenceEquals(item, component)
+                            ? item with { Properties = properties }
+                            : item)
+                        .ToArray()
+                });
+                changed = true;
+                PlayerLog.Write($"Loaded persistent state slot '{slot}'.");
+            }
+            catch (Exception exception)
+            {
+                // Unreadable saved state must not stop the game starting: keep the authored
+                // defaults and say so.
+                PlayerLog.Write($"Persistent state slot '{slot}' could not be loaded: {exception.Message}");
+                entities.Add(entity);
+            }
+        }
+
+        if (changed)
+        {
+            _runtimeWorld = _runtimeWorld with { Entities = entities };
+        }
+    }
+
+    /// <summary>
+    /// Writes back any Rekall.PersistentState document a module has changed this step.
+    ///
+    /// Compared against the last value written rather than saved unconditionally, so a scene
+    /// that never touches its settings never touches the disk.
+    /// </summary>
+    private void PersistChangedState()
+    {
+        foreach (var entity in _runtimeWorld.Entities)
+        {
+            var component = entity.Components.FirstOrDefault(item =>
+                item.Type.Equals(PersistentStateComponentType, StringComparison.Ordinal));
+            var slot = component?.Properties["slot"]?.GetValue<string>();
+            if (component is null
+                || string.IsNullOrWhiteSpace(slot)
+                || component.Properties["document"] is not JsonObject document)
+            {
+                continue;
+            }
+
+            var serialized = document.ToJsonString();
+            if (_persistedStateBySlot.TryGetValue(slot, out var previous)
+                && string.Equals(previous, serialized, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            try
+            {
+                RekallAgePersistentStateStore
+                    .WriteAsync(_projectRoot, slot, document, CancellationToken.None)
+                    .AsTask()
+                    .GetAwaiter()
+                    .GetResult();
+                _persistedStateBySlot[slot] = serialized;
+            }
+            catch (Exception exception)
+            {
+                // Record the attempt so a failing write is not retried every step.
+                _persistedStateBySlot[slot] = serialized;
+                PlayerLog.Write($"Persistent state slot '{slot}' could not be saved: {exception.Message}");
+            }
         }
     }
 

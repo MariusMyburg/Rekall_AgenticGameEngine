@@ -261,4 +261,8 @@ entities.append(e("Unit Panel", ["ui"], [
 
 payload = {"projectRoot": ROOT, "sceneName": "Main",
            "clearExisting": True, "entities": entities}
-print(json.dumps(payload))
+
+# Only emit when run directly: build_menu.py imports this module to reuse the
+# fleet scene as its backdrop, and an import that printed would corrupt its output.
+if __name__ == "__main__":
+    print(json.dumps(payload))

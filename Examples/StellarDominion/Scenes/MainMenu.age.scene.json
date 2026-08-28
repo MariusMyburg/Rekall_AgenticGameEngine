@@ -1,16 +1,15 @@
 {
   "schemaVersion": 1,
-  "id": "scene_8781f68fbf624f77b7c6196dafcc8a84",
-  "name": "Main",
+  "id": "scene_2707bd302dee485d9d16019df234f3cb",
+  "name": "MainMenu",
   "capabilities": [
     "modules",
-    "physics3d",
     "rendering3d",
     "world"
   ],
   "entities": [
     {
-      "id": "ent_7e565ba464ef46dd9f801f256b7b5ce7",
+      "id": "ent_ff7360cd45e04aa29695b90419b54c89",
       "name": "Ardent Dominion",
       "tags": [
         "capital",
@@ -49222,7 +49221,7 @@
       "locked": false
     },
     {
-      "id": "ent_edffc9519456403bbc603229ec345145",
+      "id": "ent_e7aa0b9d960046a6b223eaa953b13c25",
       "name": "Ardent Dominion Drive",
       "tags": [
         "drive",
@@ -53668,7 +53667,7 @@
       "locked": false
     },
     {
-      "id": "ent_aa2152ffc87e45fc9a18e2079969eff6",
+      "id": "ent_36137028dbf54091a20518d6e7fb1e65",
       "name": "Ardent Dominion Fighter 1",
       "tags": [
         "fighter",
@@ -57127,7 +57126,7 @@
       "locked": false
     },
     {
-      "id": "ent_993c83c4bdba4786982084e8d735bb15",
+      "id": "ent_8ef899312b4541fca742fbb4f028c066",
       "name": "Ardent Dominion Fighter 2",
       "tags": [
         "fighter",
@@ -60586,7 +60585,7 @@
       "locked": false
     },
     {
-      "id": "ent_e2e4bc09a8f8426780144e674a1b9fdb",
+      "id": "ent_a068232ebc7c4cdb808c92e85c8694c8",
       "name": "Ardent Dominion Fighter 3",
       "tags": [
         "fighter",
@@ -64045,7 +64044,7 @@
       "locked": false
     },
     {
-      "id": "ent_85bc97ce86dd40a79f672381bc9d3352",
+      "id": "ent_5c59d86c23b9403e84b133e39e403650",
       "name": "Ardent Dominion Fighter 4",
       "tags": [
         "fighter",
@@ -67504,7 +67503,7 @@
       "locked": false
     },
     {
-      "id": "ent_cf2b686c6e7041d2a54d5f212367c633",
+      "id": "ent_c98a21c62b3646b4b76aca613cecf102",
       "name": "Ardent Dominion Fighter 5",
       "tags": [
         "fighter",
@@ -70963,7 +70962,7 @@
       "locked": false
     },
     {
-      "id": "ent_77477b0b500b46a1ab4cef81f971389d",
+      "id": "ent_be5f7b9afedf4f589c69fc321ad7b4ff",
       "name": "Ardent Dominion Fighter 6",
       "tags": [
         "fighter",
@@ -74422,7 +74421,7 @@
       "locked": false
     },
     {
-      "id": "ent_9a343331326b41609abd6c00cd8edde2",
+      "id": "ent_96e51cff7c8646c283b45a41169b5026",
       "name": "Ardent Dominion Fighter 7",
       "tags": [
         "fighter",
@@ -77881,7 +77880,7 @@
       "locked": false
     },
     {
-      "id": "ent_66a6794ca99b4325a386e06f407007b8",
+      "id": "ent_860ef332698a47c08d26a8e8a78a5547",
       "name": "Ardent Dominion Fighter 8",
       "tags": [
         "fighter",
@@ -81340,7 +81339,7 @@
       "locked": false
     },
     {
-      "id": "ent_95c0f805889d402c8bb1a8aef45b9840",
+      "id": "ent_e386881319b747a083f1856ddae80c47",
       "name": "Ardent Dominion Fighter 9",
       "tags": [
         "fighter",
@@ -84799,30 +84798,40 @@
       "locked": false
     },
     {
-      "id": "ent_e67df0019b2c41bc8493fd28a515a963",
-      "name": "Camera",
+      "id": "ent_1fe6b60b9041451a8db832dacbd6a69e",
+      "name": "Button New Campaign",
       "tags": [
-        "camera"
+        "menu",
+        "ui"
       ],
       "components": [
         {
-          "type": "Rekall.Camera3D",
+          "type": "Game.Modules.FleetRules.MenuAction",
           "properties": {
-            "active": true,
-            "fieldOfView": 62,
-            "nearClip": 0.2,
-            "farClip": 40000
+            "enabled": true,
+            "action": "loadScene",
+            "targetScene": "Main"
           }
         },
         {
           "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
           "properties": {
-            "roll": 0,
-            "x": 96.0,
-            "y": 104.0,
-            "z": 196.0,
-            "pitch": 25.4788768496395,
-            "yaw": -153.90457584261168
+            "x": 144,
+            "y": 420,
+            "width": 380,
+            "height": 58,
+            "text": "  NEW CAMPAIGN",
+            "backgroundColor": "#0a1520c0",
+            "foregroundColor": "#b8e4ff",
+            "borderColor": "#3f7fa8",
+            "borderWidth": 1.5,
+            "fontSize": 28,
+            "fontFamily": "Consolas",
+            "interactive": true
           }
         }
       ],
@@ -84832,7 +84841,83 @@
       "locked": false
     },
     {
-      "id": "ent_c4963a94214142b4888c53d33cc6347c",
+      "id": "ent_aab741108c194eebbcd36aadf93b6ba4",
+      "name": "Button Settings",
+      "tags": [
+        "menu",
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.FleetRules.MenuAction",
+          "properties": {
+            "enabled": true,
+            "action": "loadScene",
+            "targetScene": "Settings"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 144,
+            "y": 500,
+            "width": 380,
+            "height": 58,
+            "text": "  SETTINGS",
+            "backgroundColor": "#0a1520c0",
+            "foregroundColor": "#b8e4ff",
+            "borderColor": "#3f7fa8",
+            "borderWidth": 1.5,
+            "fontSize": 28,
+            "fontFamily": "Consolas",
+            "interactive": true
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_715730cd62154af2ba8b5c4bee525458",
+      "name": "Camera",
+      "tags": [
+        "camera"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "active": true,
+            "fieldOfView": 52,
+            "nearClip": 0.2,
+            "farClip": 40000
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 128,
+            "y": 96,
+            "z": 214,
+            "pitch": 22.0,
+            "yaw": -150.0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_b66fa8b86abb49b1a9c45aa3e5bb7a17",
       "name": "Environment",
       "tags": [
         "environment"
@@ -84858,7 +84943,37 @@
       "locked": false
     },
     {
-      "id": "ent_2511bac624a249a299ccb1e321a3fa6f",
+      "id": "ent_6de2a8826cbf4122b835b112c6aa0229",
+      "name": "Fade Curtain",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "text": "",
+            "backgroundColor": "#000000ff",
+            "foregroundColor": "#00000000",
+            "fontSize": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_33ab3ad974024e928b7c71ad34f8804b",
       "name": "Kell",
       "tags": [
         "planet"
@@ -84890,7 +85005,30 @@
       "locked": false
     },
     {
-      "id": "ent_b71aebfe8f914d7cb8b251d52e62f93a",
+      "id": "ent_6dcc82d0afb548769d2b94f40d0fa9e5",
+      "name": "Listener",
+      "tags": [
+        "audio"
+      ],
+      "components": [
+        {
+          "type": "Rekall.AudioListener",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_8f2b0a1d039447de9447cfbe3e5b58ab",
       "name": "Long Watch",
       "tags": [
         "capital",
@@ -109046,7 +109184,7 @@
       "locked": false
     },
     {
-      "id": "ent_0f261928ab794137a1a0939431a0ddfb",
+      "id": "ent_0aefb530a9df40f7be8bd954fe440166",
       "name": "Long Watch Drive",
       "tags": [
         "drive",
@@ -112394,7 +112532,7 @@
       "locked": false
     },
     {
-      "id": "ent_b6a86afc0f7b48f2a27b05c970a93fae",
+      "id": "ent_3085ce4f94404da491eb8bcc7c09c747",
       "name": "Long Watch Fighter 1",
       "tags": [
         "fighter",
@@ -115853,7 +115991,7 @@
       "locked": false
     },
     {
-      "id": "ent_a31b322e47fa470cb6c9883b1fc9bbea",
+      "id": "ent_2787d30b39f04de9841bbdb4dd98b1c0",
       "name": "Long Watch Fighter 2",
       "tags": [
         "fighter",
@@ -119312,7 +119450,7 @@
       "locked": false
     },
     {
-      "id": "ent_7217ea17b1c94e44a7aa9b2df4108ff1",
+      "id": "ent_c1baac0370384cc18731a504d00b24b2",
       "name": "Long Watch Fighter 3",
       "tags": [
         "fighter",
@@ -122771,7 +122909,7 @@
       "locked": false
     },
     {
-      "id": "ent_da7135305c724dada584aa7c61e9b4f6",
+      "id": "ent_9424e982c2c946a08720fff76884f434",
       "name": "Long Watch Fighter 4",
       "tags": [
         "fighter",
@@ -126230,7 +126368,7 @@
       "locked": false
     },
     {
-      "id": "ent_0a6fa278de3d43179d023d68d00f30f2",
+      "id": "ent_cffc549ea255471ba5a08e2ed367e49a",
       "name": "Long Watch Fighter 5",
       "tags": [
         "fighter",
@@ -129689,7 +129827,57 @@
       "locked": false
     },
     {
-      "id": "ent_96091ee6e54e43f38c5f9efb1d20f410",
+      "id": "ent_f10dc8ad7add4cb5aaa3836acd6e206d",
+      "name": "Menu Canvas",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiCanvas",
+          "properties": {
+            "referenceWidth": 1920,
+            "referenceHeight": 1080
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_b48d3e7dd1f2475f9825e33bbe4f8353",
+      "name": "Menu Music",
+      "tags": [
+        "audio"
+      ],
+      "components": [
+        {
+          "type": "Rekall.AudioEmitter",
+          "properties": {
+            "clip": "asset_menu-theme_e91ed2cf",
+            "playing": true,
+            "loop": true,
+            "gain": 0.0
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e73ea58cd3cb4cf5832d63b7b01043f5",
       "name": "Meridian",
       "tags": [
         "planet"
@@ -129756,7 +129944,7 @@
       "locked": false
     },
     {
-      "id": "ent_f46968982ef54812b0517c8b330318a8",
+      "id": "ent_c2f1eee74bf74316b05f4470ed8c496e",
       "name": "Post",
       "tags": [
         "post"
@@ -129801,19 +129989,31 @@
       "locked": false
     },
     {
-      "id": "ent_d369c01d31f149f4a87dff242f27aff8",
-      "name": "Settings",
+      "id": "ent_35ca24b369894a788bc6e00aa8dcef70",
+      "name": "Shell",
       "tags": [
         "flow"
       ],
       "components": [
         {
-          "type": "Rekall.PersistentState",
+          "type": "Game.Modules.FleetRules.ShellTransition",
           "properties": {
-            "slot": "settings",
-            "document": {
-              "masterVolume": 0.0
-            }
+            "enabled": true,
+            "phase": "fadingIn",
+            "elapsed": 0,
+            "fadeInSeconds": 3.0,
+            "fadeOutSeconds": 2.0,
+            "targetScene": "",
+            "overlayEntityName": "Fade Curtain",
+            "musicEntityName": "Menu Music",
+            "musicGain": 0.85
+          }
+        },
+        {
+          "type": "Rekall.SceneTransition",
+          "properties": {
+            "requestedScene": "",
+            "reason": "main menu"
           }
         },
         {
@@ -129827,7 +130027,7 @@
       "locked": false
     },
     {
-      "id": "ent_5445abb5ccc548fe8b404bc7eda7587d",
+      "id": "ent_560a96052cba4784ab9da94cc2b31b64",
       "name": "Starfield",
       "tags": [
         "backdrop"
@@ -129857,7 +130057,38 @@
       "locked": false
     },
     {
-      "id": "ent_a58033b5e45c4b5ca1d218f3fd543359",
+      "id": "ent_11c4b8e84d254a59aab1f483e2a2580a",
+      "name": "Subtitle",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 144,
+            "y": 272,
+            "width": 1000,
+            "height": 48,
+            "text": "The Meridian Reach  ---  a war nobody called off",
+            "backgroundColor": "#00000000",
+            "foregroundColor": "#7fa8c8",
+            "fontSize": 26,
+            "fontFamily": "Consolas"
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_632296572d0b4f6a9060bae5c6b17415",
       "name": "Sun Disc",
       "tags": [
         "light"
@@ -129905,7 +130136,7 @@
       "locked": false
     },
     {
-      "id": "ent_f06c24a3cb3f4f1fb11e4a17eaffc6dc",
+      "id": "ent_859c2658764f4555ba447eb27820d9a4",
       "name": "Sun Light",
       "tags": [
         "light"
@@ -129936,41 +130167,8 @@
       "locked": false
     },
     {
-      "id": "ent_d2bf55cb311540caa9a477033f3c3c4f",
-      "name": "Tactical HUD",
-      "tags": [
-        "ui"
-      ],
-      "components": [
-        {
-          "type": "Game.Modules.FleetRules.FleetCommand",
-          "properties": {
-            "enabled": true,
-            "selectedEntityId": "",
-            "selectedName": "",
-            "panelEntityName": "Unit Panel"
-          }
-        },
-        {
-          "type": "Rekall.Transform3D",
-          "properties": {}
-        },
-        {
-          "type": "Rekall.UiCanvas",
-          "properties": {
-            "referenceWidth": 1920,
-            "referenceHeight": 1080
-          }
-        }
-      ],
-      "parentId": null,
-      "prefabSourceId": null,
-      "visible": true,
-      "locked": false
-    },
-    {
-      "id": "ent_45a1cc24d06545a7b466fc7b9bd684cd",
-      "name": "Unit Panel",
+      "id": "ent_b2b552bdcfe749089d07f0ea68d0e9c2",
+      "name": "Title",
       "tags": [
         "ui"
       ],
@@ -129982,17 +130180,16 @@
         {
           "type": "Rekall.UiElement",
           "properties": {
-            "x": 36,
-            "y": 720,
-            "width": 430,
-            "height": 200,
-            "text": "NO UNIT SELECTED\nClick a vessel to inspect it.",
-            "backgroundColor": "#0a1520e0",
-            "foregroundColor": "#b8e4ff",
-            "borderColor": "#3f7fa8",
-            "borderWidth": 1.5,
-            "fontSize": 17,
-            "fontFamily": "Consolas"
+            "x": 140,
+            "y": 150,
+            "width": 1000,
+            "height": 120,
+            "text": "STELLAR DOMINION",
+            "backgroundColor": "#00000000",
+            "foregroundColor": "#dff0ff",
+            "fontSize": 76,
+            "fontFamily": "Consolas",
+            "fontWeight": "bold"
           }
         }
       ],
@@ -130002,7 +130199,7 @@
       "locked": false
     },
     {
-      "id": "ent_ff9356d6d3cb423d8e66187286b34f3d",
+      "id": "ent_bb3b9ed1c2a84ec2bb3ba3fe30044bcf",
       "name": "Vigil of Kell",
       "tags": [
         "capital",
@@ -154158,7 +154355,7 @@
       "locked": false
     },
     {
-      "id": "ent_84f144a89ebd469b983fd7752d9be2d3",
+      "id": "ent_07418e829b964277a935f8d4a37df77f",
       "name": "Vigil of Kell Drive",
       "tags": [
         "drive",
@@ -157506,7 +157703,7 @@
       "locked": false
     },
     {
-      "id": "ent_03b5f075e25545b79104c52b306a6274",
+      "id": "ent_231132660667465eb14c54d2706ba496",
       "name": "Vigil of Kell Fighter 1",
       "tags": [
         "fighter",
@@ -160965,7 +161162,7 @@
       "locked": false
     },
     {
-      "id": "ent_d31f971ef6d24480aaf768110df3755f",
+      "id": "ent_12e4fabafafa4c33ae564d375c716119",
       "name": "Vigil of Kell Fighter 2",
       "tags": [
         "fighter",
@@ -164424,7 +164621,7 @@
       "locked": false
     },
     {
-      "id": "ent_af5260bb19a5431da42ed2d56a6ce314",
+      "id": "ent_cc26e39cd4ff45ddb1306a067ac40746",
       "name": "Vigil of Kell Fighter 3",
       "tags": [
         "fighter",
@@ -167883,7 +168080,7 @@
       "locked": false
     },
     {
-      "id": "ent_6d57a12ef2094fa9bde17aca981fcf60",
+      "id": "ent_e788da2fcdd5434d82355886f9f07d23",
       "name": "Vigil of Kell Fighter 4",
       "tags": [
         "fighter",
@@ -171342,7 +171539,7 @@
       "locked": false
     },
     {
-      "id": "ent_8dc9cbf82381455b966d2590326e0dcb",
+      "id": "ent_ad9e710bb9be4a379d12b9889029367d",
       "name": "Vigil of Kell Fighter 5",
       "tags": [
         "fighter",
@@ -174801,7 +174998,7 @@
       "locked": false
     },
     {
-      "id": "ent_7f1d3c0701654c8592d3d69ca167d7d5",
+      "id": "ent_2e17c843fea84d8fb57b25767b93eaf9",
       "name": "Vigil of Kell Fighter 6",
       "tags": [
         "fighter",

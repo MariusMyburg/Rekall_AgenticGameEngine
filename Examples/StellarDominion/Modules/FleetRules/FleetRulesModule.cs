@@ -14,7 +14,10 @@ public sealed class FleetRulesModule : RekallAgeModule
         builder.RegisterComponent<Selectable>();
         builder.RegisterComponent<FleetCommand>();
         builder.RegisterRuntimeSystem<FleetSystem>();
+        builder.RegisterComponent<ShellTransition>();
+        builder.RegisterComponent<MenuAction>();
         builder.RegisterRuntimeSystem<SelectionSystem>();
+        builder.RegisterRuntimeSystem<ShellSystem>();
     }
 }
 

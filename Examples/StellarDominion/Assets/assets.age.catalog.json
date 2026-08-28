@@ -1,6 +1,19 @@
 {
   "assets": [
     {
+      "id": "asset_menu-theme_e91ed2cf",
+      "name": "menu-theme",
+      "displayName": "menu-theme",
+      "kind": "audio",
+      "sourcePath": "C:\\Users\\Marius\\Music\\4K YouTube to MP3\\Faith of the Heart- Star Trek Enterprise.mp3",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Assets\\audio\\asset_menu-theme_e91ed2cf.mp3",
+      "contentHash": "e91ed2cf2c79f61e0720f22777838e7cd40693f405d4c26e3b71a9fcc4311ee4",
+      "glbMetadata": null,
+      "textureMetadata": null,
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
       "id": "asset_tex-gasgiant_127c10c8",
       "name": "tex-gasgiant",
       "displayName": "tex_gasgiant",

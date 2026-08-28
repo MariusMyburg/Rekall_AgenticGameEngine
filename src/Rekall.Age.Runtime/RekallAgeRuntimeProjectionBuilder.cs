@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using Rekall.Age.Core.Rendering;
 using Rekall.Age.Rendering.Abstractions;
@@ -1262,7 +1263,15 @@ public sealed class RekallAgeRuntimeProjectionBuilder
 
         if (name.Length > 0)
         {
-            var pascalName = char.ToUpperInvariant(name[0]) + name[1..];
+            // Memoized: Project runs every fixed step over every entity and component, and this
+            // fallback is taken whenever a property is absent in camelCase - the common case.
+            // Building the pascal-case spelling per miss allocated a string per probe per
+            // entity per step. The set of names is small, fixed, and drawn from call-site
+            // literals. (The same camel/pascal probe is duplicated in a dozen other systems;
+            // only the two on the measured hot path are memoized here.)
+            var pascalName = PascalPropertyNames.GetOrAdd(
+                name,
+                static key => char.ToUpperInvariant(key[0]) + key[1..]);
             if (properties.TryGetPropertyValue(pascalName, out node))
             {
                 return true;
@@ -1272,6 +1281,8 @@ public sealed class RekallAgeRuntimeProjectionBuilder
         node = null;
         return false;
     }
+
+    private static readonly ConcurrentDictionary<string, string> PascalPropertyNames = new(StringComparer.Ordinal);
 
     private static string NormalizeProjectionMode(string value)
     {

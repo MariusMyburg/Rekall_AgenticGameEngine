@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
@@ -2514,6 +2515,18 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             : fallback;
     }
 
+    /// <summary>
+    /// Pascal-case spellings of property names, memoized.
+    ///
+    /// The fallback lookup below is taken whenever a property is absent in camelCase, which is
+    /// the common case: each renderable probes ~20 optional properties through long "??"
+    /// chains, and most of them miss. Building the pascal-case string on each miss allocated
+    /// once per probe per renderable per frame. The set of distinct names is small, fixed, and
+    /// comes from call-site literals, so memoizing it bounds the allocation to one per name
+    /// for the lifetime of the process.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, string> PascalPropertyNames = new(StringComparer.Ordinal);
+
     private static bool TryGetPropertyValue(JsonObject properties, string name, out JsonNode? node)
     {
         if (properties.TryGetPropertyValue(name, out node))
@@ -2523,7 +2536,9 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
 
         if (name.Length > 0)
         {
-            var pascalName = char.ToUpperInvariant(name[0]) + name[1..];
+            var pascalName = PascalPropertyNames.GetOrAdd(
+                name,
+                static key => char.ToUpperInvariant(key[0]) + key[1..]);
             if (properties.TryGetPropertyValue(pascalName, out node))
             {
                 return true;

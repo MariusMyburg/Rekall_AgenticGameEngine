@@ -280,6 +280,18 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private const string SceneTransitionComponentType = "Rekall.SceneTransition";
     private const string PersistentStateComponentType = "Rekall.PersistentState";
     private readonly Dictionary<string, string> _persistedStateBySlot = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Slots whose stored document could not be read. Writing is refused for these: a scene
+    /// carries authored defaults, so saving after a failed read would replace a player's real
+    /// saved state with those defaults and destroy it. A read that fails must never cause a
+    /// write.
+    /// </summary>
+    private readonly HashSet<string> _stateSlotsBlockedFromWriting = new(StringComparer.Ordinal);
+    private static readonly MouseButton[] PolledMouseButtons =
+        [MouseButton.Left, MouseButton.Right, MouseButton.Middle];
+
+    private readonly Dictionary<string, bool> _mouseButtonDown = new(StringComparer.Ordinal);
     private string? _screenshotPath;
     private int _screenshotFrame;
     private int _lastUiVertexCount;
@@ -1268,18 +1280,31 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             _inputBridge.RecordKey(key, keyEvent.Down);
         }
 
-        foreach (var mouseEvent in snapshot.MouseEvents)
+        // Poll button state rather than reading snapshot.MouseEvents. That event list is empty
+        // in this window configuration, so nothing was ever recorded and mouse buttons never
+        // reached the runtime at all - the pointer moved, but no click, selection or UI press
+        // could ever fire. Polling the held state and deriving the edges here does not depend
+        // on the event list being populated.
+        foreach (var button in PolledMouseButtons)
         {
-            var button = mouseEvent.MouseButton.ToString();
+            var down = snapshot.IsMouseDown(button);
+            var name = button.ToString();
+            if (down == _mouseButtonDown.GetValueOrDefault(name))
+            {
+                continue;
+            }
+
+            _mouseButtonDown[name] = down;
+
             // Re-capturing on click is only correct for scenes that steer with mouse motion.
             // For a click-to-select scene it would swallow the pointer on the player's very
             // first interaction, which is the opposite of what the click was for.
-            if (mouseEvent.Down && !_mouseCaptured && SceneBindsMouseLook(_runtimeWorld))
+            if (down && !_mouseCaptured && SceneBindsMouseLook(_runtimeWorld))
             {
                 SetMouseCapture(true);
             }
 
-            _inputBridge.RecordMouseButton(button, mouseEvent.Down);
+            _inputBridge.RecordMouseButton(name, down);
         }
 
         if (Math.Abs(snapshot.WheelDelta) <= 0.000001f)
@@ -2340,6 +2365,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private void LoadPersistentState()
     {
         _persistedStateBySlot.Clear();
+        _stateSlotsBlockedFromWriting.Clear();
         var entities = new List<RekallAgeRuntimeEntity>(_runtimeWorld.Entities.Count);
         var changed = false;
         foreach (var entity in _runtimeWorld.Entities)
@@ -2362,6 +2388,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                     .GetResult();
                 if (document is null)
                 {
+                    // No stored document yet: this is a first run, and the authored defaults
+                    // are the right thing to save once something changes them.
                     entities.Add(entity);
                     continue;
                 }
@@ -2384,7 +2412,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             {
                 // Unreadable saved state must not stop the game starting: keep the authored
                 // defaults and say so.
-                PlayerLog.Write($"Persistent state slot '{slot}' could not be loaded: {exception.Message}");
+                _stateSlotsBlockedFromWriting.Add(slot);
+                PlayerLog.Write(
+                    $"Persistent state slot '{slot}' could not be loaded: {exception.Message} "
+                    + "Saving to this slot is disabled for this session so the stored document is not overwritten.");
                 entities.Add(entity);
             }
         }
@@ -2410,6 +2441,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             var slot = component?.Properties["slot"]?.GetValue<string>();
             if (component is null
                 || string.IsNullOrWhiteSpace(slot)
+                || _stateSlotsBlockedFromWriting.Contains(slot)
                 || component.Properties["document"] is not JsonObject document)
             {
                 continue;

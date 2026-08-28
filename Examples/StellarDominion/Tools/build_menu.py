@@ -109,7 +109,7 @@ entities.append(e("Subtitle", ["ui"], [
 ]))
 
 BUTTONS = [
-    ("New Campaign", "Main", 420),
+    ("New Campaign", "Intro", 420),
     ("Settings", "Settings", 500),
 ]
 for label, scene, y in BUTTONS:

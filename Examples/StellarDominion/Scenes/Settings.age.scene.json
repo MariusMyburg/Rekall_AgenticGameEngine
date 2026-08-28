@@ -1,0 +1,562 @@
+{
+  "schemaVersion": 1,
+  "id": "scene_0281a08aade140f3be7b0dc343fa5b46",
+  "name": "Settings",
+  "capabilities": [
+    "modules",
+    "rendering3d",
+    "world"
+  ],
+  "entities": [
+    {
+      "id": "ent_86f66993f36d462e8efba59d4f7afc7b",
+      "name": "Button Back",
+      "tags": [
+        "menu",
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.FleetRules.MenuAction",
+          "properties": {
+            "enabled": true,
+            "action": "loadScene",
+            "targetScene": "MainMenu"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 200,
+            "y": 740,
+            "width": 320,
+            "height": 56,
+            "text": "  BACK",
+            "backgroundColor": "#0a1520c0",
+            "foregroundColor": "#b8e4ff",
+            "borderColor": "#3f7fa8",
+            "borderWidth": 1.5,
+            "fontSize": 24,
+            "fontFamily": "Consolas",
+            "interactive": true
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_8f97cc0013924a618be09b9c559d1ab6",
+      "name": "Camera",
+      "tags": [
+        "camera"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "active": true,
+            "fieldOfView": 60,
+            "nearClip": 0.2,
+            "farClip": 40000
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "pitch": 6,
+            "yaw": 24,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_f32922b86dc64ca18bfc7e7866900671",
+      "name": "Environment",
+      "tags": [
+        "environment"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Environment3D",
+          "properties": {
+            "backgroundPolicy": "color",
+            "backgroundColor": "#000000",
+            "toneMapper": "agx",
+            "exposure": 0.1,
+            "whitePoint": 8.0,
+            "ambientEnergy": 0.2
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_4272785199004fb9ad28603ee55c5717",
+      "name": "Fade Curtain",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "text": "",
+            "backgroundColor": "#000000ff",
+            "foregroundColor": "#00000000",
+            "fontSize": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_c36ed692d7c943e7a952911e13ddb735",
+      "name": "Setting bloomIntensity",
+      "tags": [
+        "setting",
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.FleetRules.SettingBinding",
+          "properties": {
+            "enabled": true,
+            "key": "bloomIntensity",
+            "label": "BLOOM",
+            "kind": "range",
+            "minimum": 0.0,
+            "maximum": 1.5,
+            "step": 0.25
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 200,
+            "y": 404,
+            "width": 720,
+            "height": 56,
+            "text": "  BLOOM",
+            "backgroundColor": "#0a1520c0",
+            "foregroundColor": "#b8e4ff",
+            "borderColor": "#3f7fa8",
+            "borderWidth": 1.5,
+            "fontSize": 24,
+            "fontFamily": "Consolas",
+            "interactive": true
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_152f473825964e8390d9460228ddac67",
+      "name": "Setting lensDirt",
+      "tags": [
+        "setting",
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.FleetRules.SettingBinding",
+          "properties": {
+            "enabled": true,
+            "key": "lensDirt",
+            "label": "LENS DIRT",
+            "kind": "range",
+            "minimum": 0.0,
+            "maximum": 1.5,
+            "step": 0.25
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 200,
+            "y": 478,
+            "width": 720,
+            "height": 56,
+            "text": "  LENS DIRT",
+            "backgroundColor": "#0a1520c0",
+            "foregroundColor": "#b8e4ff",
+            "borderColor": "#3f7fa8",
+            "borderWidth": 1.5,
+            "fontSize": 24,
+            "fontFamily": "Consolas",
+            "interactive": true
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_9e2cb7f80ee6422f92418c55eea49f76",
+      "name": "Setting masterVolume",
+      "tags": [
+        "setting",
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.FleetRules.SettingBinding",
+          "properties": {
+            "enabled": true,
+            "key": "masterVolume",
+            "label": "MASTER VOLUME",
+            "kind": "range",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "step": 0.1
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 200,
+            "y": 552,
+            "width": 720,
+            "height": 56,
+            "text": "  MASTER VOLUME",
+            "backgroundColor": "#0a1520c0",
+            "foregroundColor": "#b8e4ff",
+            "borderColor": "#3f7fa8",
+            "borderWidth": 1.5,
+            "fontSize": 24,
+            "fontFamily": "Consolas",
+            "interactive": true
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_71ff70766d0a404985214e1372c8ee2b",
+      "name": "Setting showHints",
+      "tags": [
+        "setting",
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.FleetRules.SettingBinding",
+          "properties": {
+            "enabled": true,
+            "key": "showHints",
+            "label": "TACTICAL HINTS",
+            "kind": "toggle",
+            "minimum": 0,
+            "maximum": 1,
+            "step": 1
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 200,
+            "y": 626,
+            "width": 720,
+            "height": 56,
+            "text": "  TACTICAL HINTS",
+            "backgroundColor": "#0a1520c0",
+            "foregroundColor": "#b8e4ff",
+            "borderColor": "#3f7fa8",
+            "borderWidth": 1.5,
+            "fontSize": 24,
+            "fontFamily": "Consolas",
+            "interactive": true
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_0188c173928846d891d1269fc43d4f85",
+      "name": "Setting vsync",
+      "tags": [
+        "setting",
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.FleetRules.SettingBinding",
+          "properties": {
+            "enabled": true,
+            "key": "vsync",
+            "label": "VSYNC",
+            "kind": "toggle",
+            "minimum": 0,
+            "maximum": 1,
+            "step": 1
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 200,
+            "y": 330,
+            "width": 720,
+            "height": 56,
+            "text": "  VSYNC",
+            "backgroundColor": "#0a1520c0",
+            "foregroundColor": "#b8e4ff",
+            "borderColor": "#3f7fa8",
+            "borderWidth": 1.5,
+            "fontSize": 24,
+            "fontFamily": "Consolas",
+            "interactive": true
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_7c5ea7085aae44eaab44194fd8944429",
+      "name": "Settings Canvas",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiCanvas",
+          "properties": {
+            "referenceWidth": 1920,
+            "referenceHeight": 1080
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_ff64008cceab4107a11386968588a218",
+      "name": "Settings Hint",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 204,
+            "y": 246,
+            "width": 1000,
+            "height": 40,
+            "text": "Click a row to change it. Changes are saved immediately.",
+            "backgroundColor": "#00000000",
+            "foregroundColor": "#6f96b4",
+            "fontSize": 22,
+            "fontFamily": "Consolas"
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_08d9c3c2401a44b48e40a09e3592901a",
+      "name": "Settings Store",
+      "tags": [
+        "flow"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PersistentState",
+          "properties": {
+            "slot": "settings",
+            "document": {
+              "vsync": true,
+              "bloomIntensity": 1.0,
+              "lensDirt": 0.55,
+              "masterVolume": 0.8,
+              "showHints": true
+            }
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_ae95163937294b44b2c4a6973d4bbf4c",
+      "name": "Settings Title",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 200,
+            "y": 150,
+            "width": 900,
+            "height": 90,
+            "text": "SETTINGS",
+            "backgroundColor": "#00000000",
+            "foregroundColor": "#dff0ff",
+            "fontSize": 58,
+            "fontFamily": "Consolas",
+            "fontWeight": "bold"
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e5aec8b887394b2895f6a36d911ac996",
+      "name": "Shell",
+      "tags": [
+        "flow"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.FleetRules.ShellTransition",
+          "properties": {
+            "enabled": true,
+            "phase": "fadingIn",
+            "elapsed": 0,
+            "fadeInSeconds": 1.0,
+            "fadeOutSeconds": 1.0,
+            "targetScene": "",
+            "overlayEntityName": "Fade Curtain",
+            "musicEntityName": "",
+            "musicGain": 0.0
+          }
+        },
+        {
+          "type": "Rekall.SceneTransition",
+          "properties": {
+            "requestedScene": "",
+            "reason": "settings"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e219c9ea60b24b3b881a25964a1a0da4",
+      "name": "Starfield",
+      "tags": [
+        "backdrop"
+      ],
+      "components": [
+        {
+          "type": "Rekall.StarfieldRenderer",
+          "properties": {
+            "count": 6000,
+            "radius": 16000,
+            "size": 1.9,
+            "seed": 4242,
+            "color": "#dfe9ffff",
+            "brightness": 2.0,
+            "milkyWayStrength": 0.45,
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

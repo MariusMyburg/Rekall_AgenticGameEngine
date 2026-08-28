@@ -1,0 +1,288 @@
+{
+  "schemaVersion": 1,
+  "id": "scene_ae58e1501d644376956a4baef671185c",
+  "name": "Intro",
+  "capabilities": [
+    "modules",
+    "rendering3d",
+    "world"
+  ],
+  "entities": [
+    {
+      "id": "ent_784c062d0a2f494d83a1c0537dd0737f",
+      "name": "Camera",
+      "tags": [
+        "camera"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "active": true,
+            "fieldOfView": 60,
+            "nearClip": 0.2,
+            "farClip": 40000
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "pitch": 6,
+            "yaw": 24,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_43f71ec505e24310b54d7e277a28b9c1",
+      "name": "Environment",
+      "tags": [
+        "environment"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Environment3D",
+          "properties": {
+            "backgroundPolicy": "color",
+            "backgroundColor": "#000000",
+            "toneMapper": "agx",
+            "exposure": 0.1,
+            "whitePoint": 8.0,
+            "ambientEnergy": 0.2
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_82af4af08c61453cb1ccefeffe63e1cc",
+      "name": "Fade Curtain",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "text": "",
+            "backgroundColor": "#000000ff",
+            "foregroundColor": "#00000000",
+            "fontSize": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_db3d1451319b44d498616f2773482c1e",
+      "name": "Intro Canvas",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiCanvas",
+          "properties": {
+            "referenceWidth": 1920,
+            "referenceHeight": 1080
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_a2abb76602cd4c84916b407a37a5134f",
+      "name": "Prologue Text",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 200,
+            "y": 160,
+            "width": 1520,
+            "height": 720,
+            "text": "",
+            "backgroundColor": "#00000000",
+            "foregroundColor": "#c8e2f5",
+            "fontSize": 27,
+            "fontFamily": "Consolas"
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_d00178dc9270489494b55ecc19dde4e7",
+      "name": "Prompt",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 200,
+            "y": 950,
+            "width": 700,
+            "height": 40,
+            "text": "PRESS ANY KEY TO SKIP",
+            "backgroundColor": "#00000000",
+            "foregroundColor": "#5f88a8",
+            "fontSize": 20,
+            "fontFamily": "Consolas"
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_40bd20a825ec4382928f12440626ad47",
+      "name": "Shell",
+      "tags": [
+        "flow"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.FleetRules.IntroSequence",
+          "properties": {
+            "enabled": true,
+            "lines": [
+              "MERIDIAN REACH",
+              "Forty-one years since the relays failed.",
+              "",
+              "When the jump network collapsed, the Reach was left holding three things:",
+              "a gas giant full of fuel, one habitable moon, and more warships than",
+              "anyone left alive could crew.",
+              "",
+              "The Ardent Compact still flies patrols. Still keeps the skimmers safe.",
+              "Still maintains hulls that cannot be replaced, for a war that ended",
+              "before most of the crews were born.",
+              "",
+              "Nobody told the Hollow Choir.",
+              "",
+              "Their platforms never received a stand-down order. They do not raid.",
+              "They do not negotiate. There is nobody inside them to negotiate with.",
+              "They simply continue, exactly and patiently, the task they were given.",
+              "",
+              "You command what is left of the Compact\u0027s capital squadron.",
+              "",
+              "Today you are escorting fuel."
+            ],
+            "elapsed": 0,
+            "charactersPerSecond": 46,
+            "holdSeconds": 5,
+            "targetScene": "Main",
+            "textEntityName": "Prologue Text",
+            "promptEntityName": "Prompt",
+            "finished": false
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.ShellTransition",
+          "properties": {
+            "enabled": true,
+            "phase": "fadingIn",
+            "elapsed": 0,
+            "fadeInSeconds": 2.0,
+            "fadeOutSeconds": 2.0,
+            "targetScene": "",
+            "overlayEntityName": "Fade Curtain",
+            "musicEntityName": "",
+            "musicGain": 0.0
+          }
+        },
+        {
+          "type": "Rekall.SceneTransition",
+          "properties": {
+            "requestedScene": "",
+            "reason": "prologue"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_6f866e70da0840ad8ae9624b860f8b40",
+      "name": "Starfield",
+      "tags": [
+        "backdrop"
+      ],
+      "components": [
+        {
+          "type": "Rekall.StarfieldRenderer",
+          "properties": {
+            "count": 6000,
+            "radius": 16000,
+            "size": 1.9,
+            "seed": 4242,
+            "color": "#dfe9ffff",
+            "brightness": 2.0,
+            "milkyWayStrength": 0.45,
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

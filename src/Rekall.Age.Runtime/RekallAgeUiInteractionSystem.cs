@@ -80,9 +80,16 @@ public sealed class RekallAgeUiInteractionSystem : IRekallAgeRuntimeWorldSystem
 
         var pressed = previousPressed;
         var focused = previousFocused;
+        // Tracks a press seen in *this* step. The runtime advances a variable number of fixed
+        // steps per rendered frame, so a quick click's press and release edges are often
+        // batched into one input state. Without this the release would compare against the
+        // previous step's pressed id, find nothing, and silently drop the click - which is
+        // every fast click at a high frame rate.
+        string? pressedThisStep = null;
         if (pointerAvailable && Contains(context.Input.PressedButtonsThisFrame, "Left"))
         {
             pressed = hit?.Id;
+            pressedThisStep = hit?.Id;
             if (hit is not null)
             {
                 AddBoundEvents(events, "pointer.down", hit, context, pointerX, pointerY);
@@ -94,7 +101,7 @@ public sealed class RekallAgeUiInteractionSystem : IRekallAgeRuntimeWorldSystem
             if (hit is not null)
             {
                 AddBoundEvents(events, "pointer.up", hit, context, pointerX, pointerY);
-                if (previousPressed == hit.Id)
+                if (previousPressed == hit.Id || pressedThisStep == hit.Id)
                 {
                     AddBoundEvents(events, "pointer.click", hit, context, pointerX, pointerY);
                     if (focused != hit.Id)
@@ -240,6 +247,7 @@ public sealed class RekallAgeUiInteractionSystem : IRekallAgeRuntimeWorldSystem
         string source = "pointer",
         string? button = "Left")
     {
+        var emitted = false;
         foreach (var binding in entity.Components
                      .Where(component => component.Type == "Rekall.EventBindings")
                      .SelectMany(component => TryGetPropertyValue(component.Properties, "events", out var node) && node is JsonArray array
@@ -253,6 +261,7 @@ public sealed class RekallAgeUiInteractionSystem : IRekallAgeRuntimeWorldSystem
                 continue;
             }
 
+            emitted = true;
             events.Add(new RekallAgeRuntimeEvent(
                 context.FrameIndex,
                 eventType,
@@ -262,6 +271,26 @@ public sealed class RekallAgeUiInteractionSystem : IRekallAgeRuntimeWorldSystem
                 handler,
                 new JsonObject { ["x"] = x, ["y"] = y, ["source"] = source, ["button"] = button }));
         }
+
+        if (emitted)
+        {
+            return;
+        }
+
+        // An interaction on an interactive element is a fact whether or not the author declared
+        // a handler for it. Emitting only bound events meant a module could not observe UI
+        // clicks generically - every button had to carry a Rekall.EventBindings component
+        // naming a handler before anything could see it, which is not how the rest of the
+        // engine's event facts behave. Bound events are unchanged; this is the unbound fact,
+        // emitted only when no binding already covered this event type.
+        events.Add(new RekallAgeRuntimeEvent(
+            context.FrameIndex,
+            eventType,
+            entity.Id,
+            entity.Name,
+            "runtime.ui",
+            null,
+            new JsonObject { ["x"] = x, ["y"] = y, ["source"] = source, ["button"] = button }));
     }
 
     private static bool WasActionPressed(RekallAgeRuntimeWorld world, string name) =>

@@ -73,7 +73,9 @@ public sealed class ShellSystem : IRekallAgeRuntimeModuleSystem
 
     public string Id => "game.shell";
 
-    public int Priority => -50;
+    // After the UI interaction system (priority 20) so this step's pointer.click is visible;
+    // event facts are cleared at the start of each frame.
+    public int Priority => 31;
 
     public ValueTask<RekallAgeRuntimeWorld> UpdateAsync(
         RekallAgeRuntimeWorld world,

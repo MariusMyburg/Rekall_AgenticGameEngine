@@ -278,6 +278,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly bool _debugHudEnabled;
     private string? _screenshotPath;
     private int _screenshotFrame;
+    private int _lastUiVertexCount;
+    private int _lastHudVertexCount;
     private readonly int _sceneSupersampleFactor;
     private readonly int _openXrEyeWidth;
     private readonly int _openXrEyeHeight;
@@ -1129,6 +1131,24 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 (int)width,
                 (int)height,
                 new RgbaFloat(0.08f, 0.10f, 0.14f, 1f));
+            // Replay the overlay draws so the authored UI appears in the screenshot.
+            if (_lastUiVertexCount > 0 || _lastHudVertexCount > 0)
+            {
+                commands.SetPipeline(_hudPipeline);
+                commands.SetVertexBuffer(0, _hudVertexBuffer);
+                if (_lastUiVertexCount > 0)
+                {
+                    commands.SetGraphicsResourceSet(0, _uiTexture.ResourceSet);
+                    commands.Draw((uint)_lastUiVertexCount);
+                }
+
+                if (_lastHudVertexCount > 0)
+                {
+                    commands.SetGraphicsResourceSet(0, _hudTextureSet);
+                    commands.Draw((uint)_lastHudVertexCount, 1, (uint)_lastUiVertexCount, 0);
+                }
+            }
+
             commands.CopyTexture(color, staging);
             commands.End();
             _device.SubmitCommands(commands);
@@ -2032,6 +2052,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             EnsureHudVertexBufferCapacity(overlayVertices);
             _device.UpdateBuffer(_hudVertexBuffer, 0, overlayVertices);
         }
+
+        // Remembered so a screenshot can replay the same overlay draws. A screenshot that
+        // omits the authored UI is not a picture of the game.
+        _lastUiVertexCount = uiVertices.Length;
+        _lastHudVertexCount = hudVertices.Length;
 
         _device.UpdateBuffer(
             _postProcessUniformBuffer,

@@ -92,15 +92,21 @@ public sealed class SelectionSystem : IRekallAgeRuntimeModuleSystem
         var selectedId = command.ComponentString(CommandType, "selectedEntityId", string.Empty) ?? string.Empty;
         var selectedName = command.ComponentString(CommandType, "selectedName", string.Empty) ?? string.Empty;
 
-        if (context.Input.PressedButtonsThisFrame?.Contains("Left") == true
-            && TryPick(world, context, out var picked))
+        // Hover is resolved every step, not just on click. It drives the "under cursor" line
+        // in the panel, and it is what makes a selection failure diagnosable: if hover tracks
+        // the pointer then picking works and only the click edge is at fault.
+        var hovered = TryPick(world, context, out var underCursor) ? underCursor : null;
+
+        var clicked = context.Input.PressedButtonsThisFrame?.Contains("Left") == true
+            || context.Input.PressedButtons?.Contains("Left") == true;
+        if (clicked)
         {
-            selectedId = picked?.Id ?? string.Empty;
-            selectedName = picked?.Name ?? string.Empty;
+            selectedId = hovered?.Id ?? string.Empty;
+            selectedName = hovered?.Name ?? string.Empty;
         }
 
         var panelName = command.ComponentString(CommandType, "panelEntityName", string.Empty) ?? string.Empty;
-        var readout = BuildReadout(world, selectedId);
+        var readout = BuildReadout(world, selectedId, hovered);
 
         var entities = new List<RekallAgeRuntimeEntity>(world.Entities.Count);
         foreach (var entity in world.Entities)
@@ -140,14 +146,20 @@ public sealed class SelectionSystem : IRekallAgeRuntimeModuleSystem
         return ValueTask.FromResult(world with { Entities = entities });
     }
 
-    private static string BuildReadout(RekallAgeRuntimeWorld world, string selectedId)
+    private static string BuildReadout(
+        RekallAgeRuntimeWorld world,
+        string selectedId,
+        RekallAgeRuntimeEntity? hovered)
     {
         var unit = selectedId.Length == 0
             ? null
             : world.Entities.FirstOrDefault(entity => entity.Id.Equals(selectedId, StringComparison.Ordinal));
         if (unit is null)
         {
-            return "NO UNIT SELECTED" + "\n" + "Click a vessel to inspect it.";
+            var under = hovered is null
+                ? "Click a vessel to inspect it."
+                : "UNDER CURSOR: " + hovered.Name;
+            return string.Join("\n", "NO UNIT SELECTED", under);
         }
 
         var hull = unit.ComponentNumber(SelectableType, "hull");

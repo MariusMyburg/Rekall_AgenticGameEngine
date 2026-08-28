@@ -81,33 +81,39 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
     private const double MaxForkMotorDegreesPerSecond = 160;
     private const double BalanceProportionalGain = 2.4;
     private const double BalanceDerivativeGain = 0.35;
-    // A real crash shows up around frame 250-300 of a long unattended throttle-only run (chassis
-    // roll runs away to ~104 degrees). Extensively investigated and NOT resolved - see
-    // docs/production/PROGRESS.md's 2026-08-28 checkpoints for the full record. Eliminated so
-    // far, each independently verified: the balance controller at five gain/sign combinations
-    // (zero, committed 2.4/0.35, 24/3.5, and the negated sign of both - all reproduce the same
-    // crash timing within noise, meaning the controller is neither the cause nor a fix, in either
-    // direction); direct per-axis angular correction via Rekall.Rigidbody3D.angularCorrectionX/Y
-    // (adds velocity directly rather than routing through the body's inertia tensor, so it
-    // relocates the disturbance between axes instead of removing it - roll-only correction pushed
-    // it into yaw and vice versa); chassis angularDrag up to 25x its committed value (no effect,
-    // because ApplyDrag runs before Simulation.Timestep and the solver re-derives the disturbance
-    // within its own step regardless); rear-wheel motor softness (either collapsed propulsion or
-    // changed nothing); MaxSpeed lowered from 22 to 14 (crash timing unchanged, ruling out a speed
-    // threshold). An earlier claim that the rear wheel was slipping at ~6x v/r was itself
-    // re-measured and found wrong - the wheel tracks v/r almost exactly; that was never the cause.
-    // A coast test (both motors at zero torque, an initial velocity authored directly onto every
-    // body) was attempted to isolate whether the motor's reaction torque is the driver at all, but
-    // the test method itself was invalid - authoring a large instantaneous velocity teleports
-    // every body through the ground plane on the very first physics step, and the resulting
-    // penetration-resolution transient is indistinguishable from genuine instability. That
-    // question remains genuinely open. The one lead never yet tried: the Fork's HingeJoint axis
-    // (axisY: 1) is perfectly vertical - zero rake, zero trail. Real motorcycles are stable at
-    // speed specifically because of trail (the steering axis meeting the ground ahead of the
-    // contact patch, so the wheel self-centers); a zero-trail front end is a textbook cause of a
-    // shimmy that builds into a fall. That is an authored-geometry change, not engine code, and
-    // is the natural next thing to try - the wiring below (PreviousYaw tracking, yawRate) is kept
-    // as a hook for whoever picks this up next, not as a working fix.
+    // The straight-line version of this crash (chassis roll runs away to ~104 degrees around
+    // frame 250-300 of a long unattended throttle-only run) is FIXED - see the Fork's HingeJoint
+    // axis in Main.age.scene.json, raked 25 degrees off vertical instead of the perfectly
+    // vertical axis it originally had (see docs/production/PROGRESS.md's final 2026-08-28
+    // checkpoint). Straight-line travel now reaches ~101m before an eventual much-later crash,
+    // versus ~75m with an early crash before the fix.
+    //
+    // Still open: turning destabilizes fast regardless of the rake fix - a throttle+steer test
+    // crashes by frame ~180 (roll ~101-108 degrees), almost unchanged from before the rake fix.
+    // Reducing MaxSteerAngleDegrees from 24 to 10 (a gentler commanded turn) did not help, ruling
+    // out "the steer angle is too aggressive for the new geometry." This is a separate problem
+    // from the straight-line weave and needs its own investigation, not an assumption it shares
+    // the same cause. Everything below this point in the comment is the pre-rake-fix elimination
+    // record, kept because most of it (balance controller, per-axis correction, angularDrag,
+    // motor softness, MaxSpeed) was about the crash mode the rake fix addressed and remains
+    // useful context for the turning-crash investigation, which hasn't ruled any of it back in or
+    // out yet: the balance controller at five gain/sign combinations (zero, committed 2.4/0.35,
+    // 24/3.5, and the negated sign of both - all reproduced the same crash timing within noise);
+    // direct per-axis angular correction via Rekall.Rigidbody3D.angularCorrectionX/Y (adds
+    // velocity directly rather than routing through the body's inertia tensor, so it relocates
+    // the disturbance between axes instead of removing it); chassis angularDrag up to 25x its
+    // committed value (no effect, because ApplyDrag runs before Simulation.Timestep and the
+    // solver re-derives the disturbance within its own step regardless); rear-wheel motor
+    // softness (either collapsed propulsion or changed nothing); MaxSpeed lowered from 22 to 14
+    // (crash timing unchanged, ruling out a speed threshold, at least for the straight-line
+    // mode). An earlier claim that the rear wheel was slipping at ~6x v/r was itself re-measured
+    // and found wrong - the wheel tracks v/r almost exactly; that was never the cause. A coast
+    // test (both motors at zero torque, an initial velocity authored directly onto every body)
+    // was attempted to isolate whether the motor's reaction torque is the driver at all, but the
+    // test method itself was invalid - authoring a large instantaneous velocity teleports every
+    // body through the ground plane on the very first physics step, and the resulting
+    // penetration-resolution transient is indistinguishable from genuine instability. Whether the
+    // propulsion motor's reaction torque plays any role remains genuinely untested.
     private const double YawDampingGain = 0;
     private const double CrashRollDegrees = 62;
     private const double CrashPitchDegrees = 70;

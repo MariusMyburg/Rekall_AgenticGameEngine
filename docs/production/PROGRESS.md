@@ -7038,6 +7038,38 @@ what the solver is actually being asked to solve (the constraint configuration i
 splitting the wheel's spin motor from its hinge onto a formulation that doesn't couple this
 tightly to the chassis) rather than compensating after the fact.
 
+## 2026-08-28 (final) Fork rake fixes the straight-line weave crash; turning still destabilizes
+
+User called out the Fork's perfectly vertical steering axis directly ("idiotic to have it
+completely vertical") after the previous checkpoint named it as the one untried lead. Fixed.
+
+**What changed.** The Fork's `Rekall.HingeJoint` axis was `axisX: 0, axisY: 1, axisZ: 0` -
+straight up, matching neither the top of the steering head nor a real motorcycle's raked
+fork. Tilted it 25 degrees: `axisX: 0.4226183, axisY: 0.9063078, axisZ: 0` (unit vector,
+`sin(25deg)`/`cos(25deg)`). The opposite sign (`axisX: -0.4226183`) was tried first and made
+the crash arrive *sooner* with a shorter travel distance - a clean, cheap, decisive A/B that
+settled the sign empirically rather than by re-deriving the geometry. Note for whoever tunes
+this further: the sign that helps put the ground-projection of the raked axis roughly under
+the wheel's own contact point given this rig's specific proportions (0.55m fork offset, 0.32m
+wheel radius) - it is not claimed to exactly match standard motorcycle "positive trail"
+convention, and shouldn't be assumed to without re-deriving it for this rig's own geometry.
+
+**Verified effect: straight-line stability, dramatically better.** The long unattended
+throttle-only run previously crashed at frame ~250-300 (chassis roll to ~104 degrees) in
+every configuration tried this session. With the raked axis, roll stays under 0.2 degrees
+through frame 600 and the bike travels 101m (vs. the previous best of ~75m with an early
+crash) before an eventual crash around frame 778-900. The standard 760-frame steer+throttle
+regression passes at 71.8m. This is the single biggest stability improvement found this
+session, after five categories of controller/damping/softness fixes all failed.
+
+**Not fixed: turning still destabilizes fast.** A throttle+steer-right test from frame 1
+still crashes by frame ~180 (roll ~101-108 degrees) with the raked axis in place - almost
+identical timing to before the rake fix. Tried reducing `MaxSteerAngleDegrees` from 24 to 10
+(a gentler commanded turn) - no improvement, ruling out "the commanded steer angle is too
+aggressive for the new geometry" as the explanation. Turning-induced instability is a
+separate, still-open problem from the straight-line weave the rake fix solved - worth its own
+investigation rather than assuming the same root cause.
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

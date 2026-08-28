@@ -22,6 +22,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeRenderLayerComponent>();
         builder.RegisterComponent<RekallAgeRenderQualityProfileComponent>();
         builder.RegisterComponent<RekallAgeEnvironment3DComponent>();
+        builder.RegisterComponent<RekallAgeSceneTransitionComponent>();
         builder.RegisterComponent<RekallAgeShadowSettingsComponent>();
         builder.RegisterComponent<RekallAgeFogVolumeComponent>();
         builder.RegisterComponent<RekallAgeParticleEmitter3DComponent>();
@@ -503,6 +504,21 @@ public sealed class RekallAgeRenderQualityProfileComponent : RekallAgeComponent
 
     [RekallAgeProperty]
     public bool EnableGpuTimestamps { get; init; }
+}
+
+[RekallAgeComponent("Scene Transition", Description =
+    "Requests that the runtime load a different scene. Authored modules set RequestedScene to " +
+    "move between levels, menus and missions; the request is satisfied by loading that scene, " +
+    "which necessarily replaces this component's world. Without this a game can only be moved " +
+    "between scenes from outside the running player, so it cannot drive its own level flow.")]
+public sealed class RekallAgeSceneTransitionComponent : RekallAgeComponent
+{
+    [RekallAgeProperty]
+    public string RequestedScene { get; init; } = string.Empty;
+
+    /// <summary>Free-text note carried into diagnostics, e.g. "player pressed Deploy".</summary>
+    [RekallAgeProperty]
+    public string Reason { get; init; } = string.Empty;
 }
 
 [RekallAgeComponent(

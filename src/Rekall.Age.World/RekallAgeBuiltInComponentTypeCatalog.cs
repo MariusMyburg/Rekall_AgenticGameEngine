@@ -18,6 +18,7 @@ public static class RekallAgeBuiltInComponentTypeCatalog
         "Rekall.RenderLayer",
         "Rekall.RenderQualityProfile",
         "Rekall.Environment3D",
+        "Rekall.SceneTransition",
         "Rekall.ShadowSettings",
         "Rekall.FogVolume",
         "Rekall.ParticleEmitter3D",

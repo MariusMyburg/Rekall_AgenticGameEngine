@@ -222,7 +222,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     };
 
     private readonly string _projectRoot;
-    private readonly string _sceneName;
+    private string _sceneName;
     private readonly bool _playableMode;
     private readonly IRekallAgePlayableGame? _playableGame;
     private readonly RekallAgePlayableFrameRasterizer _playableRasterizer = new();
@@ -276,6 +276,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly RekallAgeOpenXrCompositorSessionBootstrapResult? _openXrCompositorSession;
     private readonly bool _simulateXrInput;
     private readonly bool _debugHudEnabled;
+    private const string SceneTransitionComponentType = "Rekall.SceneTransition";
     private string? _screenshotPath;
     private int _screenshotFrame;
     private int _lastUiVertexCount;
@@ -2316,10 +2317,69 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             .GetResult();
         _runtimeWorld = result.World;
         _audioOutput?.Submit(result.AudioFrames);
+        HonourSceneTransitionRequest();
         if (!_audioSubmissionLogged && _audioOutput is { SubmittedFrameCount: > 0 } audioOutput)
         {
             _audioSubmissionLogged = true;
             PlayerLog.Write($"Audio output queued runtime mix frames={audioOutput.SubmittedFrameCount} bytes={audioOutput.QueuedBytes}.");
+        }
+    }
+
+    /// <summary>
+    /// Loads the scene an authored module has asked for through Rekall.SceneTransition.
+    ///
+    /// Scene changes were previously only reachable from outside the running player over the
+    /// live-edit pipe, which meant a game could not move between its own menus, briefings and
+    /// missions. Honouring the request here reuses the same ApplySceneDocument path a live
+    /// reload already takes, so a game drives its own level flow through an ordinary component.
+    ///
+    /// The request needs no explicit acknowledgement: satisfying it replaces the world that
+    /// carried it, so a scene cannot re-trigger its own transition.
+    /// </summary>
+    private void HonourSceneTransitionRequest()
+    {
+        string? requested = null;
+        string? reason = null;
+        foreach (var entity in _runtimeWorld.Entities)
+        {
+            var component = entity.Components.FirstOrDefault(item =>
+                item.Type.Equals(SceneTransitionComponentType, StringComparison.Ordinal));
+            if (component is null)
+            {
+                continue;
+            }
+
+            var value = component.Properties["requestedScene"]?.GetValue<string>();
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                requested = value.Trim();
+                reason = component.Properties["reason"]?.GetValue<string>();
+                break;
+            }
+        }
+
+        if (requested is null
+            || requested.Equals(_sceneName, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        try
+        {
+            var scene = new RekallAgeSceneStore()
+                .LoadAsync(_projectRoot, requested, CancellationToken.None)
+                .AsTask()
+                .GetAwaiter()
+                .GetResult();
+            _sceneName = requested;
+            ApplySceneDocument(scene);
+            PlayerLog.Write($"Scene transition to '{requested}' honoured. reason={reason}");
+        }
+        catch (Exception exception)
+        {
+            // A bad scene name must not take the player down: report it and keep playing the
+            // scene that is already loaded.
+            PlayerLog.Write($"Scene transition to '{requested}' failed: {exception.Message}");
         }
     }
 

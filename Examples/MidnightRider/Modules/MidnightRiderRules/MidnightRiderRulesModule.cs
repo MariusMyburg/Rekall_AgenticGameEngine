@@ -81,27 +81,33 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
     private const double MaxForkMotorDegreesPerSecond = 160;
     private const double BalanceProportionalGain = 2.4;
     private const double BalanceDerivativeGain = 0.35;
-    // A real, physically-genuine emergent roll/yaw drift ("weave", a classic coupled roll-yaw
-    // precession from the spinning rear wheel's own angular momentum) shows up on a long
-    // unattended throttle-only run. Originally ruled the balance controller's own limit cycle out
-    // via a zero-balance-gain control run - but that run predated the roll/pitch axis fix below,
-    // so it was reading the wrong axis and its conclusion, though it happened to be correct, was
-    // unsound at the time. Re-ran the same zero-gain control test after the axis fix: identical
-    // growth curve, frame-for-frame within noise, which re-confirms the balance controller is not
-    // the cause, now for real reasons. Separately tried direct per-axis PD correction via
-    // Rekall.Rigidbody3D.angularCorrectionX/Y (the same mechanism the pitch stabilizer below uses
-    // successfully) - and found it cannot fix this mode: angularCorrectionX/Y adds velocity
-    // directly rather than routing through the body's inertia tensor, so it does not remove
-    // angular momentum from the system, it only relocates which axis the disturbance shows up on.
-    // Correcting roll alone (gain 150/15) pushed the divergence into yaw (54 degrees by frame 300,
-    // eventually falling through the world); correcting yaw rate alone (gain 80) pushed it back
-    // into roll (104 degrees); correcting both together still crashed via roll, 12m less travel
-    // than doing nothing. Also tried increasing wheel/road friction to address the underlying
-    // wheel slip - made propulsion worse (the wheel locked up) rather than better. This remains a
-    // genuine open gap that needs an actual torque/energy-removing fix (through the inertia
-    // tensor, or addressing the wheel-slip root cause), not a velocity nudge on any single axis -
-    // the wiring (PreviousYaw tracking, yawRate below) is kept as the hook for whoever picks this
-    // up next, not as a working fix.
+    // A real crash shows up around frame 250-300 of a long unattended throttle-only run (chassis
+    // roll runs away to ~104 degrees). Extensively investigated and NOT resolved - see
+    // docs/production/PROGRESS.md's 2026-08-28 checkpoints for the full record. Eliminated so
+    // far, each independently verified: the balance controller at five gain/sign combinations
+    // (zero, committed 2.4/0.35, 24/3.5, and the negated sign of both - all reproduce the same
+    // crash timing within noise, meaning the controller is neither the cause nor a fix, in either
+    // direction); direct per-axis angular correction via Rekall.Rigidbody3D.angularCorrectionX/Y
+    // (adds velocity directly rather than routing through the body's inertia tensor, so it
+    // relocates the disturbance between axes instead of removing it - roll-only correction pushed
+    // it into yaw and vice versa); chassis angularDrag up to 25x its committed value (no effect,
+    // because ApplyDrag runs before Simulation.Timestep and the solver re-derives the disturbance
+    // within its own step regardless); rear-wheel motor softness (either collapsed propulsion or
+    // changed nothing); MaxSpeed lowered from 22 to 14 (crash timing unchanged, ruling out a speed
+    // threshold). An earlier claim that the rear wheel was slipping at ~6x v/r was itself
+    // re-measured and found wrong - the wheel tracks v/r almost exactly; that was never the cause.
+    // A coast test (both motors at zero torque, an initial velocity authored directly onto every
+    // body) was attempted to isolate whether the motor's reaction torque is the driver at all, but
+    // the test method itself was invalid - authoring a large instantaneous velocity teleports
+    // every body through the ground plane on the very first physics step, and the resulting
+    // penetration-resolution transient is indistinguishable from genuine instability. That
+    // question remains genuinely open. The one lead never yet tried: the Fork's HingeJoint axis
+    // (axisY: 1) is perfectly vertical - zero rake, zero trail. Real motorcycles are stable at
+    // speed specifically because of trail (the steering axis meeting the ground ahead of the
+    // contact patch, so the wheel self-centers); a zero-trail front end is a textbook cause of a
+    // shimmy that builds into a fall. That is an authored-geometry change, not engine code, and
+    // is the natural next thing to try - the wiring below (PreviousYaw tracking, yawRate) is kept
+    // as a hook for whoever picks this up next, not as a working fix.
     private const double YawDampingGain = 0;
     private const double CrashRollDegrees = 62;
     private const double CrashPitchDegrees = 70;

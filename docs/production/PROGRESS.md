@@ -6994,6 +6994,50 @@ steering controller, so it visibly resists that same chassis yaw longer. This as
 consequence of the rig's structure, not a new defect - worth revisiting once the underlying
 weave crash (still open, see the two checkpoints above) is actually fixed.
 
+## 2026-08-28 (still later) Confirmed steering works; two more weave-crash fixes tried and ruled out
+
+User reported the bike "falls over too quickly to know if steering ever works." Verified
+directly with a headless throttle+steer test from frame 1 (no delay before steering, unlike
+the standard regression fixture): holding Right while driving produces a clean, symmetric
+negative-Z lateral drift (-0.006m at frame 60, -0.59m at frame 180); holding Left produces the
+mirror-image positive drift. Steering is confirmed working correctly and symmetrically - the
+perception of it "not working" is the still-open weave crash cutting the window short, and
+steering input appears to bring the crash on faster (roll already ~109 degrees by frame 180
+with steering held, vs. -2 degrees straight-only at the same frame).
+
+Given steering now visibly interacts with the crash, tried two more categorically different
+fixes for it (distinct from the previous per-axis-correction attempts, which are already
+documented above as relocating rather than removing the disturbance):
+
+1. **Chassis angularDrag increase** - a genuine energy-dissipating term (unlike the rejected
+   angularCorrection nudges), applied via the existing `ApplyDrag` pass. Tried 0.6 -> 4 -> 15
+   (25x the original). No meaningful effect at any level - crash still lands at the same
+   frame (~250-300) with the same ~104-106 degree roll. Root cause: `ApplyDrag` runs BEFORE
+   `Simulation.Timestep` each frame, so it damps the PRE-solve velocity; the solver then
+   resolves the Hinge+AngularAxisMotor constraint fresh from scratch within that same step,
+   free to re-inject the disturbance regardless of what drag did beforehand. Passive
+   pre-step damping cannot fight a disturbance the solver injects during its own step.
+
+2. **Motor softness** - added a new authorable `Rekall.HingeJoint.motorSoftness` engine
+   property (BEPU's `MotorSettings` softness parameter, previously hardcoded to 0/rigid) on
+   the theory that a perfectly rigid motor forcing an unachievable target dumps its unmet
+   correction into the chassis, and yielding a little might reduce that. Tried on the rear
+   wheel at 0.03 (propulsion collapsed - only 0.6m by frame 200, crashed by frame 300 anyway)
+   and 0.002 (propulsion intact but crash timing unchanged, ~frame 250-300, roll 105 degrees).
+   Reverted the engine addition entirely - unlike `angularCorrectionX/Y/Z`, it produced no
+   verified benefit at any tested value and isn't used anywhere, so it was removed rather
+   than kept as untested surface area.
+
+Three categorically different fix classes (per-axis velocity correction, passive chassis
+damping, motor compliance) have now failed to touch this crash's timing. The consistent
+~250-300 frame / ~4-5 second onset regardless of the specific intervention increasingly
+suggests the disturbance originates and gets fully injected within a single BEPU solver step
+from the coupled Hinge+AngularAxisMotor constraint itself, not from anything downstream that a
+per-frame post-processing pass (drag, velocity nudge) can reach. A fix likely needs to change
+what the solver is actually being asked to solve (the constraint configuration itself, e.g.
+splitting the wheel's spin motor from its hinge onto a formulation that doesn't couple this
+tightly to the chassis) rather than compensating after the fact.
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

@@ -6925,6 +6925,44 @@ in this documented, open roll/yaw drift.
 **Full test suite:** `dotnet test -c Release` run against this state; see the commit for the
 result recorded at commit time.
 
+## 2026-08-28 (yet later) Wheels were rendered ~6x too wide; speed-threshold weave hypothesis refuted
+
+Showed the running game to the user for the first time this session (launched
+`Rekall.Age.Player.Windows.exe examples/MidnightRider Main --graphics --backend vulkan`
+directly - a real Vulkan-backed windowed player exists independent of the Studio editor,
+confirmed via `RekallAgeStudioViewModel.PlayAsync`'s `ResolvePlayerExecutable`). The user
+immediately flagged that the wheels look implausibly wide for the bike to ever tip over.
+
+**Confirmed as a real rendering bug, not a misreading.** Both wheels' `Rekall.Transform3D`
+authored no `scaleX/Y/Z`, defaulting to (1,1,1). `RekallAgeVulkanSceneMeshBuilder.BuildCylinder`
+generates a unit cylinder (radius 0.5, height 1) that gets scaled directly by
+`transform.Scale3D` in `RekallAgeRuntimeRenderFrameBuilder` (the non-planet, non-authored-scale
+path). The wheels' actual `Rekall.CapsuleCollider3D` is radius 0.32 / length 0.15 (0.64m
+diameter, 0.15m wide) - so with no authored scale, the rendered wheel was ~1.56x too wide in
+diameter and ~6.7x too wide axially, looking like a fat, obviously-stable wheel while the
+physics simulated a narrow motorcycle tire. Fixed by adding `scaleX: 0.64, scaleY: 0.15,
+scaleZ: 0.64` to both Front Wheel and Rear Wheel `Transform3D` (Y is the cylinder's height
+axis pre-rotation, matching the capsule's own local-Y-is-long-axis convention noted in the
+anchor-fix checkpoint above). Purely visual - no physics/collider change.
+
+Worth noting for anyone else touching this rig's visuals: the wheel width genuinely does not
+provide the bike's lateral stability (front and rear wheel are both authored at z=0, i.e. a
+single line of contact, same as a real motorcycle) - the wide-looking wheels were masking a
+real instability, not causing a false one.
+
+**Speed-threshold weave hypothesis tested and refuted.** Every roll/yaw-weave crash recorded
+so far lands at frame ~211-272 and the peak speed reached before crashing was consistently
+~18.8 m/s (`MaxSpeed = 22`), which raised a real hypothesis: real motorcycle weave modes are
+speed-threshold phenomena, so the crash might only occur once the bike is fast enough. Tested
+by lowering `MaxSpeed` to 14 for the same long throttle-only run: the crash still lands at
+frame ~214 (`peakAngularDeg=302.819@214`), even though the bike now only reaches 14.18 m/s
+before cruising. Crash timing is unchanged by top speed - this rules out a speed threshold as
+the mechanism. Reverted `MaxSpeed` to 22 (lowering it bought nothing and only makes the game
+slower). The near-constant ~3.5-second-from-throttle-start crash timing across very different
+final speeds is itself a new, unexplained data point - worth investigating time-domain causes
+(e.g. the pitch stabilizer's own PD dynamics, tuned at P=150/D=15, have a natural period on a
+similar order of magnitude) rather than further speed-domain experiments.
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

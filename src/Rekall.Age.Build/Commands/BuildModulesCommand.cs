@@ -213,9 +213,16 @@ public sealed class BuildModulesCommand
             var sdkIntegrity = _sdkIntegrityVerifier.Verify(request.ProjectRoot);
             if (!sdkIntegrity.Ready)
             {
+                var summary = sdkIntegrity.StaleAgainstRunningEngine
+                    ? "Project-local module SDK integrity verification failed before compilation: the "
+                      + "project's SDK copy does not match the running engine. This is expected after "
+                      + "the engine itself is rebuilt. Run rekall.module.install_sdk to refresh it. It "
+                      + "is not refreshed automatically because a stale copy and a tampered one are "
+                      + "indistinguishable here."
+                    : "Project-local module SDK integrity verification failed before compilation.";
                 return RekallAgeCommandResult<BuildModulesResult>.Failure(
                     new BuildModulesResult(results),
-                    "Project-local module SDK integrity verification failed before compilation.",
+                    summary,
                     sdkIntegrity.Issues
                         .Select(issue => new RekallAgeCommandError(
                             "REKALL_MODULE_SDK_INTEGRITY_FAILED",

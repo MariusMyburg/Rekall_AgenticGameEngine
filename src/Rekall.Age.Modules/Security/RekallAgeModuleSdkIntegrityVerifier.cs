@@ -16,7 +16,8 @@ public sealed record RekallAgeModuleSdkIntegrityIssue(string Message, string Tar
 public sealed record RekallAgeModuleSdkIntegrityResult(
     bool Ready,
     string SdkRoot,
-    IReadOnlyList<RekallAgeModuleSdkIntegrityIssue> Issues);
+    IReadOnlyList<RekallAgeModuleSdkIntegrityIssue> Issues,
+    bool StaleAgainstRunningEngine = false);
 
 public sealed class RekallAgeModuleSdkIntegrityVerifier
 {
@@ -138,7 +139,7 @@ public sealed class RekallAgeModuleSdkIntegrityVerifier
         if (!manifest.Assemblies.OrderBy(name => name, StringComparer.Ordinal).SequenceEqual(expectedAssemblies, StringComparer.Ordinal))
         {
             issues.Add(new RekallAgeModuleSdkIntegrityIssue("Project-local module SDK assembly contract differs from the running engine.", manifestPath));
-            return new RekallAgeModuleSdkIntegrityResult(false, sdkRoot, issues);
+            return new RekallAgeModuleSdkIntegrityResult(false, sdkRoot, issues, StaleAgainstRunningEngine: true);
         }
 
         var actualEntries = Directory.EnumerateFileSystemEntries(sdkRoot, "*", SearchOption.TopDirectoryOnly)
@@ -189,6 +190,9 @@ public sealed class RekallAgeModuleSdkIntegrityVerifier
         }
 
         long totalBytes = 0;
+        // Counts only the "matches its own manifest but not the running engine" issues, which
+        // are staleness rather than tampering and can be repaired by reinstalling the SDK.
+        var staleAgainstEngineIssues = 0;
         foreach (var name in expectedNames)
         {
             var path = Path.Combine(sdkRoot, name);
@@ -224,12 +228,17 @@ public sealed class RekallAgeModuleSdkIntegrityVerifier
                 continue;
             }
 
+            staleAgainstEngineIssues++;
             var canonicalHash = name.Equals("Rekall.Age.Sdk.props", StringComparison.Ordinal)
                 ? ComputeContentSha256(RekallAgeModuleSdkInstaller.CreatePropsFile())
                 : ComputeSha256(RekallAgeModuleSdkInstaller.ResolveAssembly(name));
             if (!string.Equals(hash, canonicalHash, StringComparison.Ordinal))
             {
                 issues.Add(new RekallAgeModuleSdkIntegrityIssue("Project-local module SDK resource differs from the running engine's trusted resource.", path));
+            }
+            else
+            {
+                staleAgainstEngineIssues--;
             }
         }
 
@@ -238,7 +247,11 @@ public sealed class RekallAgeModuleSdkIntegrityVerifier
             issues.Add(new RekallAgeModuleSdkIntegrityIssue("Project-local module SDK exceeds its total-size limit.", sdkRoot));
         }
 
-        return new RekallAgeModuleSdkIntegrityResult(issues.Count == 0, sdkRoot, issues);
+        return new RekallAgeModuleSdkIntegrityResult(
+            issues.Count == 0,
+            sdkRoot,
+            issues,
+            StaleAgainstRunningEngine: issues.Count > 0 && staleAgainstEngineIssues == issues.Count);
     }
 
     private bool IsReparsePoint(string path) =>

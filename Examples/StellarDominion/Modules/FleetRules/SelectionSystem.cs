@@ -62,17 +62,24 @@ public sealed class FleetCommand : RekallAgeComponent
 ///
 /// The engine's built-in Rekall.PointerRay casts a *fixed* direction from an entity, which is
 /// the right primitive for a gun or a gaze ray but not for a mouse cursor, so this system
-/// unprojects the pointer itself: it builds the camera basis from the SDK's Forward/Right/Up
-/// helpers rather than re-deriving Euler signs by hand, and intersects the resulting ray
-/// against each unit's pick sphere. Picking against a sphere rather than a collider keeps
-/// selection independent of the physics subsystem - these ships carry no rigidbodies and should
-/// not need any in order to be clickable.
+/// resolves the pointer itself. It builds the camera basis from the SDK's Forward/Right/Up
+/// helpers rather than re-deriving Euler signs by hand.
+///
+/// Picking is done in screen space: each unit is projected to pixels and compared against the
+/// cursor, with a minimum pixel radius. That is what the player is actually aiming with, it
+/// does not depend on authoring a correct world-space radius per hull size, and small or
+/// distant craft stay clickable instead of shrinking below a ray. It also keeps selection
+/// independent of the physics subsystem - these ships carry no colliders and should not need
+/// any in order to be clickable.
 /// </summary>
 public sealed class SelectionSystem : IRekallAgeRuntimeModuleSystem
 {
     internal const string SelectableType = "Game.Modules.FleetRules.Selectable";
     internal const string CommandType = "Game.Modules.FleetRules.FleetCommand";
     private const string UiElementType = "Rekall.UiElement";
+
+    /// <summary>Pixel slack around a unit so small or distant craft stay clickable.</summary>
+    private const double MinimumPickRadiusPixels = 22.0;
 
     public string Id => "game.fleet.selection";
 
@@ -215,30 +222,14 @@ public sealed class SelectionSystem : IRekallAgeRuntimeModuleSystem
 
         var transform = cameraEntity.Transform;
         var forward = transform.Forward3D();
-        var right = transform.Right3D();
-        var up = transform.Up3D();
+        var rightAxis = transform.Right3D();
+        var upAxis = transform.Up3D();
 
-        // Normalised device coordinates, y flipped: pointer y grows downward.
-        var ndcX = (2.0 * (input.MouseX / input.ViewportWidth)) - 1.0;
-        var ndcY = 1.0 - (2.0 * (input.MouseY / input.ViewportHeight));
         var aspect = input.ViewportWidth / input.ViewportHeight;
         var tanHalfFov = Math.Tan(Math.Max(1.0, camera.FieldOfViewDegrees) * Math.PI / 360.0);
 
-        var dirX = forward.X + (right.X * ndcX * tanHalfFov * aspect) + (up.X * ndcY * tanHalfFov);
-        var dirY = forward.Y + (right.Y * ndcX * tanHalfFov * aspect) + (up.Y * ndcY * tanHalfFov);
-        var dirZ = forward.Z + (right.Z * ndcX * tanHalfFov * aspect) + (up.Z * ndcY * tanHalfFov);
-        var length = Math.Sqrt((dirX * dirX) + (dirY * dirY) + (dirZ * dirZ));
-        if (length <= 0.000001)
-        {
-            return false;
-        }
-
-        dirX /= length;
-        dirY /= length;
-        dirZ /= length;
-
         var origin = transform.Position3D;
-        var nearest = double.MaxValue;
+        var nearestDepth = double.MaxValue;
         foreach (var entity in world.Entities)
         {
             if (entity.FindComponent(SelectableType) is null
@@ -247,29 +238,41 @@ public sealed class SelectionSystem : IRekallAgeRuntimeModuleSystem
                 continue;
             }
 
-            var radius = Math.Max(0.01, entity.ComponentNumber(SelectableType, "selectRadius", 5));
             var ox = entity.Transform.Position3D.X - origin.X;
             var oy = entity.Transform.Position3D.Y - origin.Y;
             var oz = entity.Transform.Position3D.Z - origin.Z;
 
-            // Project the sphere centre onto the ray, then measure how far off-axis it sits.
-            var along = (ox * dirX) + (oy * dirY) + (oz * dirZ);
-            if (along <= 0)
+            var depth = (ox * forward.X) + (oy * forward.Y) + (oz * forward.Z);
+            if (depth <= 0.001)
             {
                 continue;                                   // behind the camera
             }
 
-            var perpX = ox - (dirX * along);
-            var perpY = oy - (dirY * along);
-            var perpZ = oz - (dirZ * along);
-            if ((perpX * perpX) + (perpY * perpY) + (perpZ * perpZ) > radius * radius)
+            // Project the unit to screen and compare in pixels rather than intersecting a
+            // world-space sphere. Pixel proximity is what the player is actually aiming with,
+            // it does not depend on getting an authored world radius right for every hull
+            // size, and it keeps distant units clickable instead of shrinking below the ray.
+            var right = (ox * rightAxis.X) + (oy * rightAxis.Y) + (oz * rightAxis.Z);
+            var upAmount = (ox * upAxis.X) + (oy * upAxis.Y) + (oz * upAxis.Z);
+            var screenX = (((right / depth / (tanHalfFov * aspect)) + 1.0) * 0.5) * input.ViewportWidth;
+            var screenY = ((1.0 - (upAmount / depth / tanHalfFov)) * 0.5) * input.ViewportHeight;
+
+            // The unit's own extent in pixels, with a floor so small craft stay clickable.
+            var worldRadius = Math.Max(0.01, entity.ComponentNumber(SelectableType, "selectRadius", 5));
+            var radiusPixels = Math.Max(
+                MinimumPickRadiusPixels,
+                worldRadius / depth / tanHalfFov * (input.ViewportHeight * 0.5));
+
+            var dx = screenX - input.MouseX;
+            var dy = screenY - input.MouseY;
+            if ((dx * dx) + (dy * dy) > radiusPixels * radiusPixels)
             {
                 continue;
             }
 
-            if (along < nearest)
+            if (depth < nearestDepth)
             {
-                nearest = along;
+                nearestDepth = depth;
                 picked = entity;
             }
         }

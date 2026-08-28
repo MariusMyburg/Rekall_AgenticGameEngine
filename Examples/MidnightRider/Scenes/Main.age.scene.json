@@ -217,7 +217,7 @@
             "springFrequency": 45,
             "dampingRatio": 3,
             "motorTargetVelocity": 0,
-            "motorMaximumTorque": 60,
+            "motorMaximumTorque": 400,
             "angleLimitMinimum": -30,
             "angleLimitMaximum": 30
           }

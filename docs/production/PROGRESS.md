@@ -6963,6 +6963,37 @@ final speeds is itself a new, unexplained data point - worth investigating time-
 (e.g. the pitch stabilizer's own PD dynamics, tuned at P=150/D=15, have a natural period on a
 similar order of magnitude) rather than further speed-domain experiments.
 
+## 2026-08-28 (still later) Steering wasn't turning at all - Fork motor was torque-starved the same way the rear wheel once was
+
+User played the corrected-wheel build directly and reported two things: the rear wheel looks
+"turned sideways" when the bike falls while the front stays straight, and steering input does
+nothing.
+
+**Steering torque bug (fixed).** Isolated with a steer-only headless test (60 frames of "Right"
+held, no throttle, bike stationary): the Fork's yaw barely moved at all (0.3 degrees total over
+one full second) despite the balance/steering controller commanding a 160 deg/s target - the
+motor was clamped to its `motorMaximumTorque` cap and that cap, `60`, was not enough to
+overcome the front assembly's own inertia and ground contact to actually turn it. This is the
+exact same failure mode the rear-wheel propulsion motor had before its iteration/substep fix,
+just never caught because no test before this exercised steering in isolation - the combined
+throttle+steer regression's distance assertion passed regardless of whether steering was doing
+anything, because it only checks forward travel. Confirmed via a discriminating A/B: widening
+the Fork's angle limit to +-90 alongside the torque bump reproduced the exact same result as
+the torque bump alone (both give ~17-19 degrees of yaw within 20 frames) - it was never the
++-30 degree limit, purely the torque cap. Fixed by raising the Fork's
+`Rekall.HingeJoint.motorMaximumTorque` from 60 to 400 (matching the rear wheel's own value).
+Verified the standard 760-frame regression is unaffected (74.6m vs. 75.1m, within noise).
+
+**"Rear wheel turned sideways, front straight" is the already-documented roll/yaw weave, not a
+separate bug.** The rear wheel has no steering degree of freedom - it's rigidly hinged to the
+chassis about its own spin axis only - so when the whole chassis+rear-wheel assembly yaws
+during the still-open weave crash, the rear wheel visibly swings with it, reading as "turned
+sideways." The front wheel is mounted through the Fork's separate hinge, which (now that its
+motor actually has enough torque to work) actively fights to keep the wheel pointed by the
+steering controller, so it visibly resists that same chassis yaw longer. This asymmetry is a
+consequence of the rig's structure, not a new defect - worth revisiting once the underlying
+weave crash (still open, see the two checkpoints above) is actually fixed.
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

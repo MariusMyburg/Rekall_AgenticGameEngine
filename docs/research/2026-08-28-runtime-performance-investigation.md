@@ -375,3 +375,117 @@ Revised priorities:
    heavier scenes; it will not raise FPS on a scene this light.
 3. Recommendations 3–5 and the deferred renderer work are unchanged, and are
    even less urgent now: draw submission is 4.7% of a frame that is 3× shorter.
+
+---
+
+# Scaling: what actually breaks on large scenes
+
+Everything above was measured on 46 renderables. That is far too small to rank
+the remaining work, and the original question was about *large* scenes. A
+generated stress project (`.age-perf-stress`, gitignored) provides scenes at
+several sizes so the **slope** of each cost can be read rather than one point.
+
+Scene shape: N cubes, no colliders (the debug HUD builds collider wireframes
+every frame, which would distort the measurement), half of them placed behind
+the camera so frustum culling would have something to win. `Dense50` carries
+the same total vertex budget as `Cubes5000` but concentrated in 50 renderables,
+which separates per-vertex cost from per-renderable cost.
+
+Regenerate with `scratchpad/genstress.py`. Entities need an explicit
+`"visible": true` — it defaults to false, and a scene without it loads with
+zero renderables and no active camera.
+
+## The decisive result: cost is per-renderable, not per-vertex
+
+| scene | renderables | vertices | frameBuild |
+|---|---|---|---|
+| `Cubes50` | 50 | 400 | 0.30 ms |
+| `Dense50` | 50 | **42,050** | **0.26 ms** |
+| `Cubes5000` | 5,000 | 40,000 | **15.21 ms** |
+
+`Dense50` carries **105× the vertices** of `Cubes50` at the same cost.
+`Cubes5000` carries the *same vertex budget* as `Dense50` spread over 100× the
+renderables and costs **58× more**.
+
+Per-vertex cost is effectively zero. Everything that matters scales with the
+number of renderables. This is the single most useful finding for planning:
+optimizations targeting vertex throughput — LOD, mesh decimation, virtual
+geometry — address a cost that is not being paid. Optimizations targeting
+per-renderable overhead are the whole game.
+
+## Scaling before and after the O(n²) fix
+
+`BuildRenderables` called `FindEntity` once per mesh renderable, and
+`FindEntity` did `world.Entities.FirstOrDefault(…)` with an ordinal string
+compare — a linear scan per renderable, so frame build was **quadratic** in
+scene size. It was 37% of the frame on `Cubes5000`, 11% of it string comparison
+alone. Fixed by resolving through the transform resolver's existing
+entity-by-id dictionary.
+
+| scene | fps before | fps after | frameBuild before | frameBuild after |
+|---|---|---|---|---|
+| `Cubes500` | 273 | 262 | 1.39 ms | 1.01 ms |
+| `Cubes2000` | 73 | **159** | 9.42 ms | **3.96 ms** |
+| `Cubes5000` | 6 | **21** | 50.70 ms | **15.21 ms** |
+
+Frame build was clearly quadratic before (4× the entities cost 6.8×) and is
+close to linear after (4× the entities cost 3.9×), degrading somewhat beyond
+2000 — likely allocation pressure, not yet investigated.
+
+## The simulation column is contaminated — read it per step, not per frame
+
+`AdvanceToAsync` runs fixed 1/60 s steps to catch up to the wall clock, so
+**steps-per-frame rises as frames get slower**. That makes per-frame simulation
+cost a feedback loop rather than a scaling law: more entities → slower frames →
+more steps per frame → more simulation per frame.
+
+Normalizing by `steps/frame = frameMs / 16.67`:
+
+| scene | sim/frame before | sim/**step** before | sim/frame after | sim/**step** after |
+|---|---|---|---|---|
+| `Cubes500` | 0.37 ms | 1.68 ms | 0.45 ms | 1.96 ms |
+| `Cubes2000` | 2.81 ms | 3.42 ms | 1.07 ms | 2.84 ms |
+| `Cubes5000` | 89.61 ms | **8.96 ms** | 28.35 ms | **9.92 ms** |
+
+Per *step*, simulation is unchanged — as it must be, since the fix touched only
+the frame builder. The apparent 89.61 → 28.35 ms improvement is **entirely** the
+steps-per-frame artifact and must not be credited to this change. This is the
+same trap flagged after the geometry-cache change, now confirmed twice.
+
+The real simulation scaling is 1.68 → 3.42 → 8.96 ms per step for
+500 → 2000 → 5000 entities: superlinear, but nothing like the 32× the raw
+per-frame numbers suggest.
+
+## Next target, with the evidence to justify it
+
+At 5000 entities the frame is now 71.6% simulation, 19.9% frame build.
+Inside simulation, the largest single item is **not** a system:
+
+- `RekallAgeRuntimeProjectionBuilder.Project` — **~13%**, one call site
+- a long tail of ~20 systems at 2–3% each
+
+`Project` walks every entity and every component rebuilding ~28 subsystem lists,
+once per simulation step, whether or not anything changed. It runs in every
+scene, so it is worth more than it looks.
+
+The tempting alternative — a `HasWork(world)` precondition on
+`IRekallAgeRuntimeWorldSystem` so idle systems can be skipped — is **not**
+recommended as the next step. It is a core contract change requiring
+per-system proof that an idle-looking system does not still clear events or
+observations, it buys ~20%, and much of that 20% is an artifact of this
+synthetic scene: `KeplerOrbitSystem`, `AudioSystem`, and `MorphWeightSystem`
+look cheap to skip only because this scene has no orbits, audio, or morphs. In
+a real scene they have work and the check returns true.
+
+`Project` is one call site, needs no contract change, and pays in every scene.
+It does need a real design though — caching it requires change detection on a
+world that each system rebuilds wholesale — so it deserves its own brainstorm
+rather than an opportunistic patch.
+
+## Still not the bottleneck: the renderer
+
+At 5000 draw calls, `submit` is **1.04 ms**. Draw submission remains a rounding
+error even at 100× the original scene size, and the deliberate off-screen half
+of the stress scene means frustum culling had a fair chance to matter and
+still would not have. The renderer optimizations from the original question
+remain the wrong place to spend effort.

@@ -209,7 +209,17 @@ public sealed class RekallAgeVulkanHighFidelityFrameRenderer
         RekallAgeRuntimeViewportFrame frame,
         IReadOnlyList<RekallAgeVulkanSceneMesh>? meshes)
     {
-        var renderables = frame.Renderables.ToDictionary(item => item.EntityId, StringComparer.Ordinal);
+        // One entity can contribute several renderables - a planet and its rings, a missile and
+        // its trail. They all share the entity's transform, which is the only thing this lookup
+        // is for, so the first one wins. Building this with ToDictionary threw on the duplicate
+        // key and took the entire frame down instead of drawing a shadow slightly differently.
+        var renderables = new Dictionary<string, RekallAgeRuntimeViewportRenderable>(
+            frame.Renderables.Count,
+            StringComparer.Ordinal);
+        foreach (var item in frame.Renderables)
+        {
+            renderables.TryAdd(item.EntityId, item);
+        }
         if (meshes is null)
         {
             return frame.Renderables

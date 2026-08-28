@@ -32,6 +32,8 @@ public sealed class FleetRulesModule : RekallAgeModule
         builder.RegisterRuntimeSystem<MissionSystem>();
         builder.RegisterComponent<DebriefPanel>();
         builder.RegisterRuntimeSystem<DebriefSystem>();
+        builder.RegisterComponent<Ordnance>();
+        builder.RegisterRuntimeSystem<OrdnanceSystem>();
     }
 }
 

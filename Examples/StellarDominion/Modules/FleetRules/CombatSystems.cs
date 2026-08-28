@@ -42,6 +42,16 @@ public sealed class Weapon : RekallAgeComponent
 
     [RekallAgeProperty(Minimum = 0, Maximum = 60)]
     public double Cooldown { get; init; }
+
+    /// <summary>
+    /// A beam hits the instant it fires. A missile is a round that has to get there, and can
+    /// arrive after its target is already dead.
+    /// </summary>
+    [RekallAgeProperty(AllowedValues = ["beam", "missile"])]
+    public string Kind { get; init; } = "beam";
+
+    [RekallAgeProperty(Minimum = 1, Maximum = 10000)]
+    public double ProjectileSpeed { get; init; } = 110;
 }
 
 [RekallAgeComponent("Order", Description =
@@ -252,6 +262,27 @@ public sealed class CombatSystem : IRekallAgeRuntimeModuleSystem
         var byId = world.Entities.ToDictionary(entity => entity.Id, StringComparer.Ordinal);
         var damage = new Dictionary<string, double>(StringComparer.Ordinal);
         var cooldowns = new Dictionary<string, double>(StringComparer.Ordinal);
+        var spawned = new List<RekallAgeRuntimeEntity>();
+        var sequence = 0;
+        // Elapsed ticks, not FrameIndex: a rendered frame can run several fixed steps and
+        // FrameIndex does not change between them, so keying ids on it collided - and a
+        // duplicate entity id takes the renderer down when it builds its shadow caster map.
+        var stamp = context.ElapsedTime.Ticks;
+
+        // A round that arrived this step is paid for here, so all hull and shield arithmetic
+        // stays in one place no matter which kind of weapon started it.
+        foreach (var round in world.Entities)
+        {
+            if (round.ComponentBoolean(OrdnanceSystem.OrdnanceType, "detonated"))
+            {
+                var hitId = round.ComponentString(OrdnanceSystem.OrdnanceType, "targetId", string.Empty) ?? string.Empty;
+                if (hitId.Length > 0)
+                {
+                    damage[hitId] = damage.GetValueOrDefault(hitId)
+                        + round.ComponentNumber(OrdnanceSystem.OrdnanceType, "damage");
+                }
+            }
+        }
 
         foreach (var entity in world.Entities)
         {
@@ -272,8 +303,30 @@ public sealed class CombatSystem : IRekallAgeRuntimeModuleSystem
                 var range = entity.ComponentNumber(WeaponType, "range", 70);
                 if (CombatRules.Distance(entity, target) <= range)
                 {
-                    damage[targetId] = damage.GetValueOrDefault(targetId)
-                        + entity.ComponentNumber(WeaponType, "damage", 90);
+                    var shot = entity.ComponentNumber(WeaponType, "damage", 90);
+                    var colour = OrdnanceColour(entity);
+                    var muzzle = entity.Transform.Position3D;
+
+                    if (entity.ComponentString(WeaponType, "kind", "beam") == "missile")
+                    {
+                        // The round carries the damage with it; nothing is subtracted until it
+                        // arrives, which is what makes a missile a missile.
+                        spawned.AddRange(OrdnanceFactory.Missile(
+                            $"ord_m_{stamp}_{sequence++}",
+                            muzzle, entity.Id, targetId, shot,
+                            entity.ComponentNumber(WeaponType, "projectileSpeed", 110), colour));
+                    }
+                    else
+                    {
+                        damage[targetId] = damage.GetValueOrDefault(targetId) + shot;
+                        spawned.Add(OrdnanceFactory.Beam(
+                            $"ord_b_{stamp}_{sequence++}",
+                            muzzle, target.Transform.Position3D, colour));
+                        spawned.Add(OrdnanceFactory.Flash(
+                            $"ord_f_{stamp}_{sequence++}",
+                            target.Transform.Position3D, colour));
+                    }
+
                     cooldown = Math.Max(0.05, entity.ComponentNumber(WeaponType, "cycleSeconds", 1.6));
                 }
             }
@@ -344,8 +397,20 @@ public sealed class CombatSystem : IRekallAgeRuntimeModuleSystem
             }
         }
 
+        // Defensive: never let a colliding id reach the renderer.
+        var existing = entities.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
+        entities.AddRange(spawned.Where(item => existing.Add(item.Id)));
         return ValueTask.FromResult(world with { Entities = entities });
     }
+
+    /// <summary>
+    /// Fire is tinted by who is shooting, so an exchange is readable at a glance: you can see
+    /// which way a volley is going without reading a single label.
+    /// </summary>
+    private static string OrdnanceColour(RekallAgeRuntimeEntity firer) =>
+        firer.ComponentString(OrderSystem.FactionType, "side", string.Empty) == "choir"
+            ? "#ff5a6e"
+            : "#bfe9ff";
 }
 
 /// <summary>

@@ -207,7 +207,7 @@ def warship(name, side, pos, yaw, mesh, drive, stats, weapon, order_speed,
         }),
     ] + ([("Game.Modules.FleetRules.Weapon", {
         "enabled": True, "range": weapon[0], "damage": weapon[1],
-        "cycleSeconds": weapon[2], "cooldown": 0,
+        "cycleSeconds": weapon[2], "cooldown": 0, "kind": "beam",
     })] if weapon else []))]
 
     out.append(e(f"{name} Drive", ["ship", "drive"], [
@@ -294,7 +294,7 @@ for leader, count, radius in WINGS:
             }),
             ("Game.Modules.FleetRules.Weapon", {
                 "enabled": True, "range": 58, "damage": 22, "cycleSeconds": 1.1,
-                "cooldown": 0,
+                "cooldown": 0, "kind": "missile", "projectileSpeed": 115,
             }),
             ("Game.Modules.FleetRules.Selectable", {
                 "enabled": True,

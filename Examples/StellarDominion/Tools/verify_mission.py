@@ -95,6 +95,42 @@ def case_victory(scene, by_name):
     return "victory", scene, checks, 5400
 
 
+def case_missiles(scene, by_name):
+    """Fighters alone against one picket node.
+
+    Missiles are the only weapon whose damage is not applied at the moment of firing - the
+    round has to arrive - so nothing else in this file proves that path. The capitals are
+    stripped of their batteries so a beam cannot get the credit.
+    """
+    hostiles = [x for x in scene["entities"]
+                if (component(x, "Faction") or {}).get("side") == "choir"]
+    target = hostiles[0]
+    # Leave one node; the others would only pull fighters away.
+    scene["entities"] = [x for x in scene["entities"]
+                         if x not in hostiles[1:]
+                         and not any(x["name"].startswith(h["name"] + " ") for h in hostiles[1:])]
+
+    for entity in scene["entities"]:
+        if component(entity, "Weapon") and "Fighter" not in entity["name"]:
+            component(entity, "Weapon")["enabled"] = False
+        if "Fighter" in entity["name"]:
+            order = component(entity, "Order")
+            order["kind"] = "attack"
+            order["targetId"] = target["id"]
+
+    checks = [
+        assertion(target["name"], "component.property", "equals", True,
+                  "Faction", "destroyed"),
+        assertion("Shell", "component.property", "equals", "victory",
+                  "MissionState", "outcome"),
+        # Shields first, then hull - a missile that skipped the shield pool would still
+        # destroy the node, so assert the pool actually drained.
+        assertion(target["name"], "component.property", "equals", 0,
+                  "Selectable", "shields"),
+    ]
+    return "missiles", scene, checks, 5400
+
+
 def case_defeat(scene, by_name):
     """The flagship alone, hopelessly outgunned, with the rest of the squadron gone.
 
@@ -179,7 +215,7 @@ def main():
         m.call("initialize", {"protocolVersion": "2024-11-05", "capabilities": {},
                               "clientInfo": {"name": "verify", "version": "1"}})
 
-        for build in (case_quiet, case_victory, case_defeat, case_debrief):
+        for build in (case_quiet, case_victory, case_missiles, case_defeat, case_debrief):
             scene, by_name = load(
                 "Debrief" if build is case_debrief else "Mission1")
             label, scene, checks, frames = build(scene, by_name)

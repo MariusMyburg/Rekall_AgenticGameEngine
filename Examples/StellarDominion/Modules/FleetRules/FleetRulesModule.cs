@@ -111,14 +111,10 @@ public sealed class FleetSystem : IRekallAgeRuntimeModuleSystem
             }
 
             // Drift is what a vessel does when nobody has told it otherwise. A standing order
-            // takes over the hull, so the two never move the same ship in one step. The hull
-            // still registers as a leader either way, so its drive block and its fighter wing
-            // keep following it wherever the order took it.
+            // takes over the hull, so the two never move the same ship in one step.
             if (CombatRules.IsDestroyed(entity)
                 || entity.ComponentString(OrderSystem.OrderType, "kind", "hold") is "move" or "attack")
             {
-                var held = entity.Transform.Position3D;
-                leaders[entity.Name] = (held.X, held.Y, held.Z, entity.Transform.Rotation3D.Y);
                 continue;
             }
 
@@ -139,6 +135,22 @@ public sealed class FleetSystem : IRekallAgeRuntimeModuleSystem
             leaders[entity.Name] = (x, entity.Transform.Position3D.Y, z, headingYaw);
         }
 
+        // Every hull is a leader, not just the drifting ones. Building this table from the
+        // drift branch alone meant a ship moving under orders - which is every ship in a
+        // mission, since orders replaced drift there - towed nothing: its drive block and its
+        // fighter wing stayed wherever they were authored.
+        foreach (var entity in world.Entities)
+        {
+            if (moved.ContainsKey(entity.Name))
+            {
+                continue;
+            }
+
+            var pose = entity.Transform;
+            leaders[entity.Name] = (pose.Position3D.X, pose.Position3D.Y, pose.Position3D.Z,
+                pose.Rotation3D.Y);
+        }
+
         var entities = new List<RekallAgeRuntimeEntity>(world.Entities.Count);
         foreach (var entity in world.Entities)
         {
@@ -148,11 +160,16 @@ public sealed class FleetSystem : IRekallAgeRuntimeModuleSystem
                 continue;
             }
 
-            // Drive blocks share their hull's name plus " Drive" and simply track it.
+            // Drive blocks share their hull's name plus " Drive" and simply track it - pose and
+            // all. Position alone leaves the plume pointing whichever way the hull was authored
+            // facing, which is wrong the moment the ship comes about.
             if (entity.Name.EndsWith(" Drive", StringComparison.Ordinal)
                 && leaders.TryGetValue(entity.Name[..^" Drive".Length], out var hull))
             {
-                entities.Add(entity.WithPosition3D(new RekallAgeRuntimeVector3(hull.X, hull.Y, hull.Z)));
+                entities.Add(entity
+                    .WithPosition3D(new RekallAgeRuntimeVector3(hull.X, hull.Y, hull.Z))
+                    .WithRotation3D(new RekallAgeRuntimeVector3(
+                        entity.Transform.Rotation3D.X, hull.Yaw, entity.Transform.Rotation3D.Z)));
                 continue;
             }
 

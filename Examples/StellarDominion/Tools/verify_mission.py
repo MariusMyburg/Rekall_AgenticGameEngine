@@ -74,6 +74,20 @@ def case_victory(scene, by_name):
                             "Selectable", "hull"))
     checks.append(assertion(hostiles[0]["name"], "component.property", "equals", "attack",
                             "Order", "kind"))
+    # A drive block must ride its hull. This shipped broken because every earlier check
+    # asserted on gameplay components and none on a transform: FleetSystem built its
+    # leader table only from Drift entities, and orders replaced Drift in this mission,
+    # so no plume followed anything. The Choir is the case to check - it is the only
+    # side that moves without the player telling it to.
+    for hostile in hostiles:
+        for axis in ("x", "z"):
+            checks.append({
+                "entityName": hostile["name"] + " Drive",
+                "subject": f"delta.position3d.{axis}",
+                "operator": "not-equals", "expected": 0})
+    checks.append({"entityName": hostiles[0]["name"] + " Drive",
+                   "subject": "delta.position3d.z", "operator": "less-than", "expected": 0})
+
     # And the mission must actually hand over: outcome alone is a readout, not a flow.
     checks.append({"entityName": "Shell", "subject": "component.property",
                    "operator": "equals", "componentType": "Rekall.SceneTransition",

@@ -759,6 +759,50 @@ public static class RekallAgeRuntimeModuleSdk
         return Normalize3D(Rotate3D(0, 1, 0, transform.Rotation3D));
     }
 
+    /// <summary>
+    /// The rightward axis of the image a camera with this transform produces - the direction a
+    /// point moves in the world when it moves toward the right-hand edge of the screen.
+    ///
+    /// This is deliberately not <see cref="Right3D"/>. Right3D is the body +X axis, which is
+    /// what you want for "step to my right" and is pinned to (1,0,0) at identity. The renderer
+    /// builds its view with a right-handed look-at and so takes screen right as
+    /// cross(forward, up), which at identity is (-1,0,0) - the opposite sign. Both conventions
+    /// are correct for their own purpose, and code that projects world points to pixels needs
+    /// this one; using Right3D there mirrors the image about its vertical centre line, so
+    /// picking appears to work near the middle of the screen and fails toward the edges.
+    /// </summary>
+    public static RekallAgeRuntimeVector3 ScreenRight3D(this RekallAgeRuntimeTransform transform)
+    {
+        var forward = transform.Forward3D();
+        var up = transform.Up3D();
+        var screenRight = new RekallAgeRuntimeVector3(
+            (forward.Y * up.Z) - (forward.Z * up.Y),
+            (forward.Z * up.X) - (forward.X * up.Z),
+            (forward.X * up.Y) - (forward.Y * up.X));
+
+        // Degenerate only if forward and up are parallel, which a well-formed Euler rotation
+        // cannot produce. The renderer falls back to the body axis there, so match it.
+        return LengthSquared(screenRight) < 1e-12
+            ? transform.Right3D()
+            : Normalize3D(screenRight);
+    }
+
+    /// <summary>
+    /// The upward axis of the image, completing the basis with
+    /// <see cref="ScreenRight3D"/> and <see cref="Forward3D"/>.
+    /// </summary>
+    public static RekallAgeRuntimeVector3 ScreenUp3D(this RekallAgeRuntimeTransform transform)
+    {
+        var forward = transform.Forward3D();
+        var screenRight = transform.ScreenRight3D();
+        var screenUp = new RekallAgeRuntimeVector3(
+            (screenRight.Y * forward.Z) - (screenRight.Z * forward.Y),
+            (screenRight.Z * forward.X) - (screenRight.X * forward.Z),
+            (screenRight.X * forward.Y) - (screenRight.Y * forward.X));
+
+        return LengthSquared(screenUp) < 1e-12 ? transform.Up3D() : Normalize3D(screenUp);
+    }
+
     public static RekallAgeRuntimeVector3 Offset3D(
         this RekallAgeRuntimeTransform transform,
         double forward = 0,

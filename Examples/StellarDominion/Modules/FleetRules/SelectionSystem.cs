@@ -62,8 +62,8 @@ public sealed class FleetCommand : RekallAgeComponent
 ///
 /// The engine's built-in Rekall.PointerRay casts a *fixed* direction from an entity, which is
 /// the right primitive for a gun or a gaze ray but not for a mouse cursor, so this system
-/// resolves the pointer itself. It builds the camera basis from the SDK's Forward/Right/Up
-/// helpers rather than re-deriving Euler signs by hand.
+/// resolves the pointer itself. It builds the camera basis from the SDK's Forward3D /
+/// ScreenRight3D / ScreenUp3D helpers rather than re-deriving Euler signs by hand.
 ///
 /// Picking is done in screen space: each unit is projected to pixels and compared against the
 /// cursor, with a minimum pixel radius. That is what the player is actually aiming with, it
@@ -232,9 +232,13 @@ public sealed class SelectionSystem : IRekallAgeRuntimeModuleSystem
         }
 
         var transform = cameraEntity.Transform;
+        // ScreenRight3D, not Right3D: Right3D is the body +X axis, while the renderer takes
+        // screen right as cross(forward, up), which is the opposite sign. Using Right3D here
+        // mirrors every projected position about the screen's vertical centre line - picking
+        // then appears to work near the middle and fails toward the edges.
         var forward = transform.Forward3D();
-        var rightAxis = transform.Right3D();
-        var upAxis = transform.Up3D();
+        var rightAxis = transform.ScreenRight3D();
+        var upAxis = transform.ScreenUp3D();
 
         var aspect = input.ViewportWidth / input.ViewportHeight;
         var tanHalfFov = Math.Tan(Math.Max(1.0, camera.FieldOfViewDegrees) * Math.PI / 360.0);
@@ -360,9 +364,13 @@ public sealed class SelectionSystem : IRekallAgeRuntimeModuleSystem
         }
 
         var transform = cameraEntity.Transform;
+        // ScreenRight3D, not Right3D: Right3D is the body +X axis, while the renderer takes
+        // screen right as cross(forward, up), which is the opposite sign. Using Right3D here
+        // mirrors every projected position about the screen's vertical centre line - picking
+        // then appears to work near the middle and fails toward the edges.
         var forward = transform.Forward3D();
-        var rightAxis = transform.Right3D();
-        var upAxis = transform.Up3D();
+        var rightAxis = transform.ScreenRight3D();
+        var upAxis = transform.ScreenUp3D();
 
         var aspect = input.ViewportWidth / input.ViewportHeight;
         var tanHalfFov = Math.Tan(Math.Max(1.0, camera.FieldOfViewDegrees) * Math.PI / 360.0);

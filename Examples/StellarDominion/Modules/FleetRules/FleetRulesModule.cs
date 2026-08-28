@@ -22,6 +22,16 @@ public sealed class FleetRulesModule : RekallAgeModule
         builder.RegisterRuntimeSystem<ShellSystem>();
         builder.RegisterRuntimeSystem<IntroSystem>();
         builder.RegisterRuntimeSystem<SettingsSystem>();
+        builder.RegisterComponent<Faction>();
+        builder.RegisterComponent<Weapon>();
+        builder.RegisterComponent<Order>();
+        builder.RegisterComponent<MissionState>();
+        builder.RegisterRuntimeSystem<ChoirAiSystem>();
+        builder.RegisterRuntimeSystem<OrderSystem>();
+        builder.RegisterRuntimeSystem<CombatSystem>();
+        builder.RegisterRuntimeSystem<MissionSystem>();
+        builder.RegisterComponent<DebriefPanel>();
+        builder.RegisterRuntimeSystem<DebriefSystem>();
     }
 }
 
@@ -100,6 +110,18 @@ public sealed class FleetSystem : IRekallAgeRuntimeModuleSystem
                 continue;
             }
 
+            // Drift is what a vessel does when nobody has told it otherwise. A standing order
+            // takes over the hull, so the two never move the same ship in one step. The hull
+            // still registers as a leader either way, so its drive block and its fighter wing
+            // keep following it wherever the order took it.
+            if (CombatRules.IsDestroyed(entity)
+                || entity.ComponentString(OrderSystem.OrderType, "kind", "hold") is "move" or "attack")
+            {
+                var held = entity.Transform.Position3D;
+                leaders[entity.Name] = (held.X, held.Y, held.Z, entity.Transform.Rotation3D.Y);
+                continue;
+            }
+
             var speed = drift.Properties.ReadNumber("speed", 1);
             var headingYaw = drift.Properties.ReadNumber("headingYaw", entity.Transform.Rotation3D.Y);
             var radians = headingYaw * Math.PI / 180.0;
@@ -135,7 +157,13 @@ public sealed class FleetSystem : IRekallAgeRuntimeModuleSystem
             }
 
             var escort = entity.FindComponent(EscortType);
-            if (escort is null || !escort.Properties.ReadBoolean("enabled", true))
+            if (escort is null
+                || !escort.Properties.ReadBoolean("enabled", true)
+                // Same rule as drift: a fighter flying a patrol is a fighter nobody has given
+                // an order to. Without this the escort branch would snap an ordered fighter
+                // straight back onto its patrol circle every step.
+                || CombatRules.IsDestroyed(entity)
+                || entity.ComponentString(OrderSystem.OrderType, "kind", "hold") is "move" or "attack")
             {
                 entities.Add(entity);
                 continue;

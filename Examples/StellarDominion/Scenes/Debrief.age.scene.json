@@ -1,0 +1,560 @@
+{
+  "schemaVersion": 1,
+  "id": "scene_633fa33bf09e439bb0fb21919a3045ca",
+  "name": "Debrief",
+  "capabilities": [
+    "modules",
+    "physics3d",
+    "rendering3d",
+    "world"
+  ],
+  "entities": [
+    {
+      "id": "ent_bdfb1e9238254d6f89030c868f7af098",
+      "name": "Button Return",
+      "tags": [
+        "menu",
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.FleetRules.MenuAction",
+          "properties": {
+            "enabled": true,
+            "action": "loadScene",
+            "targetScene": "MainMenu"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 200,
+            "y": 780,
+            "width": 420,
+            "height": 58,
+            "text": "  RETURN TO COMMAND",
+            "backgroundColor": "#0a1520c0",
+            "foregroundColor": "#b8e4ff",
+            "borderColor": "#3f7fa8",
+            "borderWidth": 1.5,
+            "fontSize": 24,
+            "fontFamily": "Consolas",
+            "interactive": true
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_f6d2c25db3f94795a1e38ff9a617ecb6",
+      "name": "Camera",
+      "tags": [
+        "camera"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Camera3D",
+          "properties": {
+            "active": true,
+            "fieldOfView": 62,
+            "nearClip": 0.2,
+            "farClip": 40000
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -360,
+            "y": 150,
+            "z": 170,
+            "pitch": 22,
+            "yaw": 85,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_b5f36f97bdcd4fd9805174e1d06a9e6b",
+      "name": "Campaign Store",
+      "tags": [
+        "flow"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.FleetRules.DebriefPanel",
+          "properties": {
+            "enabled": true,
+            "textEntityName": "Debrief Text",
+            "headlineEntityName": "Debrief Headline"
+          }
+        },
+        {
+          "type": "Rekall.PersistentState",
+          "properties": {
+            "slot": "campaign",
+            "document": {
+              "lastMission": "",
+              "lastOutcome": "",
+              "lastLosses": 0,
+              "lastCriticalLoss": false
+            }
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_5d025e30ae8048acb4a78bc0d387e174",
+      "name": "Debrief Canvas",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiCanvas",
+          "properties": {
+            "referenceWidth": 1920,
+            "referenceHeight": 1080
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_bb857885797e4a0699102b23815a1b6b",
+      "name": "Debrief Headline",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 200,
+            "y": 170,
+            "width": 1100,
+            "height": 90,
+            "text": "OPERATION COMPLETE",
+            "backgroundColor": "#00000000",
+            "foregroundColor": "#dff0ff",
+            "fontSize": 54,
+            "fontFamily": "Consolas",
+            "fontWeight": "bold"
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_dab9c4d485e34d64b451479f8577d9dc",
+      "name": "Debrief Text",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 200,
+            "y": 300,
+            "width": 1400,
+            "height": 420,
+            "text": "",
+            "backgroundColor": "#00000000",
+            "foregroundColor": "#c8e2f5",
+            "fontSize": 25,
+            "fontFamily": "Consolas"
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_14c8f285940045f68346617b0c7b86fa",
+      "name": "Environment",
+      "tags": [
+        "environment"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Environment3D",
+          "properties": {
+            "backgroundPolicy": "color",
+            "backgroundColor": "#000000",
+            "toneMapper": "agx",
+            "exposure": 0.15,
+            "whitePoint": 8.0,
+            "ambientEnergy": 0.25,
+            "ambientSkyColor": "#33507f",
+            "ambientGroundColor": "#0a0810"
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_ec97855cde15427ca445fe1c990f11ec",
+      "name": "Fade Curtain",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "width": 1920,
+            "height": 1080,
+            "text": "",
+            "backgroundColor": "#000000ff",
+            "foregroundColor": "#00000000",
+            "fontSize": 1
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_4b51b1b7de40412ebb222251c8fde1ec",
+      "name": "Kell",
+      "tags": [
+        "planet"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 60,
+            "color": "#ffffff",
+            "surfaceTexture": "asset_tex-moon_79224562",
+            "meshSlices": 96,
+            "meshStacks": 48,
+            "waterCoverage": 0
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 980,
+            "y": 430,
+            "z": -420
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_2d232203c1a947ada33a49920504789e",
+      "name": "Meridian",
+      "tags": [
+        "planet"
+      ],
+      "components": [
+        {
+          "type": "Rekall.AtmosphereRenderer",
+          "properties": {
+            "height": 0.055,
+            "renderShell": true,
+            "rayleighColor": "#9dc0ff",
+            "density": 2.6,
+            "densityFalloff": 0.2,
+            "rayleighScattering": 0.008,
+            "mieScattering": 0.006,
+            "mieAnisotropy": 0.78,
+            "mieColor": "#ffe9cc",
+            "ozoneAbsorptionColor": "#ffcf9a"
+          }
+        },
+        {
+          "type": "Rekall.CelestialRotation",
+          "properties": {
+            "active": true,
+            "siderealPeriodSeconds": 300,
+            "tiltDegrees": -13.5
+          }
+        },
+        {
+          "type": "Rekall.PlanetRenderer",
+          "properties": {
+            "radius": 300,
+            "color": "#ffffff",
+            "surfaceTexture": "asset_tex-gasgiant_821048d2",
+            "meshSlices": 192,
+            "meshStacks": 96,
+            "waterCoverage": 0,
+            "waterSpecularStrength": 0
+          }
+        },
+        {
+          "type": "Rekall.RingRenderer",
+          "properties": {
+            "innerRadius": 415,
+            "outerRadius": 745,
+            "texture": "asset_tex-rings_f9640733",
+            "color": "#ffffff",
+            "segments": 384
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 1700,
+            "y": 150,
+            "z": 340,
+            "roll": -13.5
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_53c8d6d822d341208414e8a58561b594",
+      "name": "Post",
+      "tags": [
+        "post"
+      ],
+      "components": [
+        {
+          "type": "Rekall.PostProcessStack",
+          "properties": {
+            "enabled": true,
+            "passes": [
+              {
+                "name": "bright",
+                "type": "brightExtract",
+                "threshold": 1.05,
+                "scale": 4.0
+              },
+              {
+                "name": "blurA",
+                "type": "blur",
+                "iterations": 5,
+                "radius": 3.0
+              },
+              {
+                "name": "composite",
+                "type": "composite",
+                "intensity": 1.0,
+                "blendMode": "add"
+              },
+              {
+                "name": "dirt",
+                "type": "lensDirt",
+                "intensity": 0.55,
+                "scale": 1.0
+              }
+            ]
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_9c8fe838886a4130a648b919fe5f9156",
+      "name": "Shell",
+      "tags": [
+        "flow"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.FleetRules.ShellTransition",
+          "properties": {
+            "enabled": true,
+            "phase": "fadingIn",
+            "elapsed": 0,
+            "fadeInSeconds": 1.6,
+            "fadeOutSeconds": 1.2,
+            "targetScene": "",
+            "overlayEntityName": "Fade Curtain",
+            "musicEntityName": "",
+            "musicGain": 0.0
+          }
+        },
+        {
+          "type": "Rekall.SceneTransition",
+          "properties": {
+            "requestedScene": "",
+            "reason": "debrief"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_7ed9bdc2ee76418a9ba2b5c76f6353e6",
+      "name": "Starfield",
+      "tags": [
+        "backdrop"
+      ],
+      "components": [
+        {
+          "type": "Rekall.StarfieldRenderer",
+          "properties": {
+            "count": 8000,
+            "radius": 16000,
+            "size": 2.1,
+            "seed": 20260828,
+            "color": "#dfe9ffff",
+            "brightness": 2.6,
+            "milkyWayStrength": 0.5,
+            "active": true
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_d72d2296bb724d43b826e4f02a6829a4",
+      "name": "Sun Disc",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.GeometryPrimitive",
+          "properties": {
+            "primitive": "sphere",
+            "color": "#fffaf0"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#fffaf0",
+            "emissiveColor": "#fff3da",
+            "emissiveStrength": 40.0,
+            "roughnessFactor": 1.0
+          }
+        },
+        {
+          "type": "Rekall.MeshRenderer",
+          "properties": {
+            "active": true,
+            "castShadows": false,
+            "receiveShadows": false
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -709,
+            "y": 1204,
+            "z": 1134,
+            "scaleX": 74,
+            "scaleY": 74,
+            "scaleZ": 74
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_59b8224ddbd94cc495e1cf5683a480b0",
+      "name": "Sun Light",
+      "tags": [
+        "light"
+      ],
+      "components": [
+        {
+          "type": "Rekall.DirectionalLight",
+          "properties": {
+            "intensity": 4.0,
+            "color": "#fff4e2"
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -709,
+            "y": 1204,
+            "z": 1134,
+            "pitch": 42,
+            "yaw": 148,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

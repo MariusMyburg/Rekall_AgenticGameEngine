@@ -9,7 +9,7 @@
   ],
   "entities": [
     {
-      "id": "ent_784c062d0a2f494d83a1c0537dd0737f",
+      "id": "ent_2aff5df90ea64758875c1396ed543ba5",
       "name": "Camera",
       "tags": [
         "camera"
@@ -42,7 +42,7 @@
       "locked": false
     },
     {
-      "id": "ent_43f71ec505e24310b54d7e277a28b9c1",
+      "id": "ent_adacb62521544248912e80d782ff3d73",
       "name": "Environment",
       "tags": [
         "environment"
@@ -66,7 +66,7 @@
       "locked": false
     },
     {
-      "id": "ent_82af4af08c61453cb1ccefeffe63e1cc",
+      "id": "ent_84de421ec7bb46289f70ebf97838ba9f",
       "name": "Fade Curtain",
       "tags": [
         "ui"
@@ -96,7 +96,7 @@
       "locked": false
     },
     {
-      "id": "ent_db3d1451319b44d498616f2773482c1e",
+      "id": "ent_62a0b287887344f4ad1ee0c2ce858f80",
       "name": "Intro Canvas",
       "tags": [
         "ui"
@@ -120,7 +120,7 @@
       "locked": false
     },
     {
-      "id": "ent_a2abb76602cd4c84916b407a37a5134f",
+      "id": "ent_1b603f21e4514f61b2e6245a9c97ec3f",
       "name": "Prologue Text",
       "tags": [
         "ui"
@@ -151,7 +151,7 @@
       "locked": false
     },
     {
-      "id": "ent_d00178dc9270489494b55ecc19dde4e7",
+      "id": "ent_c200d1ab07ec402c95c59fb2cbcd43dd",
       "name": "Prompt",
       "tags": [
         "ui"
@@ -182,7 +182,7 @@
       "locked": false
     },
     {
-      "id": "ent_40bd20a825ec4382928f12440626ad47",
+      "id": "ent_560558c25c0545dca1f83147c8185fc2",
       "name": "Shell",
       "tags": [
         "flow"
@@ -217,7 +217,7 @@
             "elapsed": 0,
             "charactersPerSecond": 46,
             "holdSeconds": 5,
-            "targetScene": "Main",
+            "targetScene": "Mission1",
             "textEntityName": "Prologue Text",
             "promptEntityName": "Prompt",
             "finished": false
@@ -255,7 +255,7 @@
       "locked": false
     },
     {
-      "id": "ent_6f866e70da0840ad8ae9624b860f8b40",
+      "id": "ent_0c15b1433c7c4be4b62e47f3fcdbec9f",
       "name": "Starfield",
       "tags": [
         "backdrop"

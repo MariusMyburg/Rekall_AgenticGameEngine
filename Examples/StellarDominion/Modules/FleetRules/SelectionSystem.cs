@@ -112,6 +112,15 @@ public sealed class SelectionSystem : IRekallAgeRuntimeModuleSystem
             selectedName = hovered?.Name ?? string.Empty;
         }
 
+        // Right-click issues an order to whatever is selected: engage what is under the cursor,
+        // or move to the point under it. One button, and which order it means is decided by
+        // what the player is pointing at, the way every tactical game since Dune II has done it.
+        var ordered = context.Input.PressedButtonsThisFrame?.Contains("Right") == true
+            || context.Input.PressedButtons?.Contains("Right") == true;
+        var issued = ordered && selectedId.Length > 0
+            ? BuildOrder(world, context, selectedId, hovered)
+            : null;
+
         var panelName = command.ComponentString(CommandType, "panelEntityName", string.Empty) ?? string.Empty;
         var readout = BuildReadout(world, selectedId, hovered);
 
@@ -127,6 +136,16 @@ public sealed class SelectionSystem : IRekallAgeRuntimeModuleSystem
                 {
                     next = next.WithComponentBoolean(SelectableType, "selected", isSelected);
                 }
+            }
+
+            if (issued is not null && next.Id.Equals(selectedId, StringComparison.Ordinal))
+            {
+                next = next
+                    .WithComponentString(OrderSystem.OrderType, "kind", issued.Kind)
+                    .WithComponentString(OrderSystem.OrderType, "targetId", issued.TargetId)
+                    .WithComponentNumber(OrderSystem.OrderType, "x", issued.X)
+                    .WithComponentNumber(OrderSystem.OrderType, "y", issued.Y)
+                    .WithComponentNumber(OrderSystem.OrderType, "z", issued.Z);
             }
 
             if (next.Id.Equals(command.Id, StringComparison.Ordinal))
@@ -151,6 +170,100 @@ public sealed class SelectionSystem : IRekallAgeRuntimeModuleSystem
         }
 
         return ValueTask.FromResult(world with { Entities = entities });
+    }
+
+    private sealed record IssuedOrder(string Kind, string TargetId, double X, double Y, double Z);
+
+    /// <summary>
+    /// Turns a right-click into an order for the selected vessel. Pointing at a hostile means
+    /// engage it; pointing at empty space means move there.
+    /// </summary>
+    private static IssuedOrder? BuildOrder(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeModuleFrameContext context,
+        string selectedId,
+        RekallAgeRuntimeEntity? hovered)
+    {
+        var unit = world.Entities.FirstOrDefault(entity => entity.Id.Equals(selectedId, StringComparison.Ordinal));
+        if (unit is null || CombatRules.IsDestroyed(unit))
+        {
+            return null;
+        }
+
+        if (hovered is not null
+            && !hovered.Id.Equals(selectedId, StringComparison.Ordinal)
+            && !CombatRules.IsDestroyed(hovered)
+            && hovered.ComponentString(OrderSystem.FactionType, "side", string.Empty)
+                != unit.ComponentString(OrderSystem.FactionType, "side", string.Empty))
+        {
+            return new IssuedOrder("attack", hovered.Id, 0, 0, 0);
+        }
+
+        // A move order lands on the horizontal plane the vessel already occupies. Holding the
+        // altitude keeps the fleet on one tactical layer, which is what makes a 3D battle
+        // readable from a fixed camera - a free 3D destination is unaimable with a 2D cursor.
+        return TryPointerPlanePoint(world, context, unit.Transform.Position3D.Y, out var point)
+            ? new IssuedOrder("move", string.Empty, point.X, point.Y, point.Z)
+            : null;
+    }
+
+    private static bool TryPointerPlanePoint(
+        RekallAgeRuntimeWorld world,
+        RekallAgeRuntimeModuleFrameContext context,
+        double planeY,
+        out RekallAgeRuntimeVector3 point)
+    {
+        point = new RekallAgeRuntimeVector3(0, planeY, 0);
+
+        var input = context.Input;
+        if (input.ViewportWidth <= 0 || input.ViewportHeight <= 0)
+        {
+            return false;
+        }
+
+        var camera = world.Subsystems.Rendering.Cameras.FirstOrDefault(item => item.Active)
+            ?? world.Subsystems.Rendering.Cameras.FirstOrDefault();
+        var cameraEntity = camera is null
+            ? null
+            : world.Entities.FirstOrDefault(entity => entity.Id.Equals(camera.EntityId, StringComparison.Ordinal));
+        if (camera is null || cameraEntity is null)
+        {
+            return false;
+        }
+
+        var transform = cameraEntity.Transform;
+        var forward = transform.Forward3D();
+        var rightAxis = transform.Right3D();
+        var upAxis = transform.Up3D();
+
+        var aspect = input.ViewportWidth / input.ViewportHeight;
+        var tanHalfFov = Math.Tan(Math.Max(1.0, camera.FieldOfViewDegrees) * Math.PI / 360.0);
+        var ndcX = ((input.MouseX / input.ViewportWidth) * 2.0) - 1.0;
+        var ndcY = 1.0 - ((input.MouseY / input.ViewportHeight) * 2.0);
+
+        var dirX = forward.X + (rightAxis.X * ndcX * tanHalfFov * aspect) + (upAxis.X * ndcY * tanHalfFov);
+        var dirY = forward.Y + (rightAxis.Y * ndcX * tanHalfFov * aspect) + (upAxis.Y * ndcY * tanHalfFov);
+        var dirZ = forward.Z + (rightAxis.Z * ndcX * tanHalfFov * aspect) + (upAxis.Z * ndcY * tanHalfFov);
+
+        var origin = transform.Position3D;
+        // A ray running nearly parallel to the plane meets it a very long way off, or never.
+        // Refusing the order is better than flinging the ship at the horizon.
+        if (Math.Abs(dirY) < 1e-4)
+        {
+            return false;
+        }
+
+        var distance = (planeY - origin.Y) / dirY;
+        if (distance <= 0)
+        {
+            return false;
+        }
+
+        point = new RekallAgeRuntimeVector3(
+            origin.X + (dirX * distance),
+            planeY,
+            origin.Z + (dirZ * distance));
+        return true;
     }
 
     private static string BuildReadout(
@@ -184,8 +297,34 @@ public sealed class SelectionSystem : IRekallAgeRuntimeModuleSystem
             "SHIELDS " + Bar(shields / shieldsMax) + " " + shields.ToString("F0") + "/" + shieldsMax.ToString("F0"),
             "CREW    " + unit.ComponentNumber(SelectableType, "crew").ToString("N0"),
             "POS     " + position.X.ToString("F0") + ", " + position.Y.ToString("F0") + ", " + position.Z.ToString("F0"),
+            "ORDERS  " + DescribeOrder(world, unit),
         };
         return string.Join("\n", lines);
+    }
+
+    private static string DescribeOrder(RekallAgeRuntimeWorld world, RekallAgeRuntimeEntity unit)
+    {
+        if (CombatRules.IsDestroyed(unit))
+        {
+            return "DESTROYED";
+        }
+
+        switch (unit.ComponentString(OrderSystem.OrderType, "kind", "hold"))
+        {
+            case "attack":
+                var targetId = unit.ComponentString(OrderSystem.OrderType, "targetId", string.Empty) ?? string.Empty;
+                var target = world.Entities.FirstOrDefault(entity =>
+                    entity.Id.Equals(targetId, StringComparison.Ordinal));
+                return target is null ? "Holding station" : "Engaging " + target.Name;
+
+            case "move":
+                return "Moving to "
+                    + unit.ComponentNumber(OrderSystem.OrderType, "x").ToString("F0") + ", "
+                    + unit.ComponentNumber(OrderSystem.OrderType, "z").ToString("F0");
+
+            default:
+                return "Holding station";
+        }
     }
 
     private static string Bar(double fraction)

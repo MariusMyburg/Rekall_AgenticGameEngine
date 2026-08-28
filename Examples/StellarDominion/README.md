@@ -22,6 +22,38 @@ Fleet motion lives in `Modules/FleetRules`: capitals integrate along their
 heading with the fixed step's `DeltaTime`, while fighter orbits are solved
 absolutely from `ElapsedTime` so a wing cannot drift out of phase.
 
+## The game
+
+`MainMenu → Intro → Mission1 → Debrief → MainMenu` is a complete loop.
+
+- **Main menu** with an MP3 track that fades with the screen.
+- **Intro** — the prologue typed a character at a time, skippable.
+- **Settings** — rows that read and write a `Rekall.PersistentState` slot.
+- **Mission 1, "Standing Watch"** — left-click selects a vessel and fills the unit
+  readout; right-click orders it to move, or to engage whatever is under the
+  cursor. Weapons fire on a cycle inside their range, shields absorb and
+  regenerate, hulls do not heal, and a destroyed hull stops being a unit. The
+  Hollow Choir acquires the nearest Compact warship and closes. Clearing the
+  picket wins; losing the flagship — a hull later missions need — ends the
+  campaign outright, which is the rule for every story-critical vessel.
+- **Debrief** — reads what the mission wrote into the `campaign` state slot,
+  since the battle's world is gone by the time it runs.
+
+```bash
+# Author the mission and the debrief, then prove the combat chain headlessly.
+python Examples/StellarDominion/Tools/build_mission.py <scratch>
+python Examples/StellarDominion/Tools/mcp_client.py \
+  rekall.scene.apply_blueprint <scratch>/scene_Mission1.json \
+  rekall.scene.apply_blueprint <scratch>/scene_Debrief.json
+python Examples/StellarDominion/Tools/verify_mission.py
+```
+
+`verify_mission.py` runs four cases — quiet, victory, defeat and debrief — as
+runtime assertions, so a regression fails the command instead of needing someone
+to read numbers out of a dump. It deliberately does not cover issuing an order
+with the mouse: that path runs through the player's input bridge, which headless
+inspection bypasses entirely, and has to be exercised in the player.
+
 ## Rebuilding it
 
 Textures are generated rather than committed — `Examples/**/Assets/texture/` is

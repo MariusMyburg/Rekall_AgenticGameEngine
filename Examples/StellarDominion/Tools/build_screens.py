@@ -98,7 +98,7 @@ intro = backdrop() + [
             "elapsed": 0,
             "charactersPerSecond": 46,
             "holdSeconds": 5,
-            "targetScene": "Main",
+            "targetScene": "Mission1",
             "textEntityName": "Prologue Text",
             "promptEntityName": "Prompt",
             "finished": False,

@@ -180,6 +180,22 @@ The thin vertical slice, in order:
 That proves scene flow, persistence, orders, combat, and win/lose end to end.
 Missions 2–7 are then content against a proven frame.
 
+**Delivered.** All five, plus the intro screen. Two departures from the plan
+above, both made while building:
+
+- Weapons are mounted on hulls, not on turret sub-entities. `CombatSystem` reads
+  a ship's target from the `Order` on the firing entity, so splitting the two
+  across parent and child would leave a ship permanently unable to fire. Turrets
+  can come back as a presentation layer without moving the weapon.
+- The convoy is `civilian` and is never acquired by the Choir. Making the escort
+  objective a second set of health bars to babysit added supervision, not
+  tension; the tankers are why the lane matters, and the picket is the fight.
+
+Verified by `Tools/verify_mission.py` — quiet, victory, defeat and debrief as
+runtime assertions. Issuing an order with the mouse is verified in the player
+only: headless inspection bypasses the input bridge, which is exactly where the
+selection bugs lived.
+
 ## Open questions for review
 
 - Is the tone right? The "enemy is a stuck process" premise drives every mission

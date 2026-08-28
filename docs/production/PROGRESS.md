@@ -7070,6 +7070,45 @@ aggressive for the new geometry" as the explanation. Turning-induced instability
 separate, still-open problem from the straight-line weave the rake fix solved - worth its own
 investigation rather than assuming the same root cause.
 
+## OPEN ISSUE: MidnightRider turning instability (for later)
+
+Filed explicitly for a future session, per the user's request. Not investigated further this
+session - work moved to the procedural tree system per the user's direction.
+
+**Symptom:** the straight-line weave crash is fixed (see the fork-rake checkpoint above - the
+bike now rides ~101m before an eventual crash). But steering into a turn while driving still
+crashes fast and reliably: a throttle+steer-right test from frame 1 crashes by frame ~180
+(chassis roll to ~101-108 degrees), essentially unchanged from before the rake fix. In other
+words, straight-line riding is now solid; turning is not.
+
+**What's already been ruled out:** reducing `MaxSteerAngleDegrees` from 24 to 10 (a gentler
+commanded turn angle) made no difference - the crash timing was the same. So it is not simply
+"the controller commands too sharp a turn for the new raked geometry."
+
+**What hasn't been tried yet:**
+- Whether the rake fix's sign/magnitude (25 degrees, `axisX: 0.4226183`) that helped
+  straight-line stability is actually wrong for turning - the two might want different values,
+  or a magnitude between 0 and 25 degrees might serve both better than the current all-or-
+  nothing choice.
+- Whether turning specifically excites the same rear-wheel-momentum coupling the straight-line
+  weave had, just faster, once the front wheel's raked geometry adds camber/lean as a
+  side-effect of yawing (the wheel doesn't just turn flat anymore - the tilted axis means
+  steering also imparts some roll/lean on the wheel itself, which could be feeding a
+  different, faster instability).
+- Whether the fork's `springFrequency: 45, dampingRatio: 3` (the base Hinge's own stiffness,
+  separate from the steering motor) needs retuning now that the axis is raked instead of
+  vertical - those values were chosen for a vertical axis and never revisited.
+- A repeat of the balance-controller gain/sign sweep (five combinations were tried against the
+  old *straight-line* crash and all failed identically - that sweep has never been re-run
+  against the *turning* crash specifically, and the earlier "the controller has no effect"
+  conclusion was scoped to the straight-line failure mode only).
+
+**Test fixtures used to characterize this** (not committed, session-scratchpad only - recreate
+via the pattern shown): `[{"PressedKeys": ["Up", "Right"]}, ...]` repeated for N frames,
+starting from frame 1 (no straight-line warm-up first), run through
+`dotnet run --project src/Rekall.Age.Cli -- runtime inspect examples/MidnightRider Main <N> <inputs.json>`
+and watching the Chassis's `rotation3D` for roll (X) runaway.
+
 ## Update rule
 
 At every verified milestone, update the timestamp, verified status, current

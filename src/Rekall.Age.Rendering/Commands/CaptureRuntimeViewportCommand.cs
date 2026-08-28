@@ -190,6 +190,12 @@ public sealed class CaptureRuntimeViewportCommand
             frame,
             context.CancellationToken);
         var backendId = NormalizeBackendId(request.BackendId);
+        if (backendId.Equals("auto", StringComparison.Ordinal))
+        {
+            var probe = await new RekallAgeNativeVulkanBackendProbe().ProbeAsync(context.CancellationToken);
+            backendId = probe.Available ? "vulkan" : "software";
+        }
+
         if (backendId.Equals("vulkan", StringComparison.Ordinal))
         {
             return await CaptureVulkanViewportAsync(
@@ -252,9 +258,40 @@ public sealed class CaptureRuntimeViewportCommand
         };
 
         context.Transaction.RecordChangedResource(capture.ScreenshotPath);
-        return RekallAgeCommandResult<CaptureRuntimeViewportResult>.Success(
-            result,
-            $"Captured runtime viewport for scene '{request.SceneName}' at frame {result.FrameIndex}.");
+
+        // The software rasterizer cannot execute post processing, atmospheric scattering or
+        // tone mapping. Say so when the scene actually declares them, rather than returning a
+        // flat image that looks like the scene is wrong.
+        var droppedFeatures = SoftwareBackendUnsupportedFeatures(frame);
+        var summary = droppedFeatures.Count == 0
+            ? $"Captured runtime viewport for scene '{request.SceneName}' at frame {result.FrameIndex} on the software backend."
+            : $"Captured runtime viewport for scene '{request.SceneName}' at frame {result.FrameIndex} on the software backend, "
+              + $"which cannot render {string.Join(", ", droppedFeatures)}. Re-run with backend 'vulkan' to see them.";
+
+        return RekallAgeCommandResult<CaptureRuntimeViewportResult>.Success(result, summary);
+    }
+
+    private static IReadOnlyList<string> SoftwareBackendUnsupportedFeatures(
+        Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportFrame frame)
+    {
+        var features = new List<string>();
+        if (frame.PostProcessStack is { Enabled: true, Passes.Count: > 0 })
+        {
+            features.Add("the authored post-process stack");
+        }
+
+        if (frame.Renderables.Any(renderable => renderable.Atmosphere is not null))
+        {
+            features.Add("atmospheric scattering");
+        }
+
+        if (frame.Environment is { } environment
+            && !string.Equals(environment.ToneMapper, "linear", StringComparison.OrdinalIgnoreCase))
+        {
+            features.Add($"{environment.ToneMapper} tone mapping");
+        }
+
+        return features;
     }
 
     private async ValueTask<RekallAgeCommandResult<CaptureRuntimeViewportResult>> CaptureVulkanViewportAsync(
@@ -452,11 +489,11 @@ public sealed class CaptureRuntimeViewportCommand
         }
 
         var backendId = NormalizeBackendId(request.BackendId);
-        if (backendId is not "software" and not "vulkan")
+        if (backendId is not "software" and not "vulkan" and not "auto")
         {
             errors.Add(new RekallAgeCommandError(
                 "REKALL_RUNTIME_VIEWPORT_BACKEND_UNSUPPORTED",
-                "Runtime viewport backend must be 'software' or 'vulkan'.",
+                "Runtime viewport backend must be 'auto', 'software' or 'vulkan'.",
                 request.BackendId));
         }
 
@@ -638,10 +675,19 @@ public sealed class CaptureRuntimeViewportCommand
     private static long EstimatedResourceBytes(RekallAgeResolvedRenderFeaturePlan? plan) =>
         plan is null ? 0 : checked(plan.EstimatedTransientBytes + plan.EstimatedPersistentBytes);
 
+    /// <summary>
+    /// Unspecified means "auto": prefer the Vulkan path and fall back to the software
+    /// rasterizer only when no Vulkan device is available.
+    ///
+    /// The default used to be "software", which silently produced a flat-shaded image with no
+    /// atmosphere, bloom or tone mapping. An agent capturing a frame to check its scene would
+    /// draw the wrong conclusion from that and start debugging a scene that was already
+    /// correct, so the default now matches what the scene actually declares.
+    /// </summary>
     private static string NormalizeBackendId(string backendId)
     {
         return string.IsNullOrWhiteSpace(backendId)
-            ? "software"
+            ? "auto"
             : backendId.Trim().ToLowerInvariant();
     }
 

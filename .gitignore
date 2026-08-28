@@ -58,3 +58,7 @@ Examples/**/Transactions/transactions.age.json
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Python bytecode from example tooling
+__pycache__/
+*.pyc

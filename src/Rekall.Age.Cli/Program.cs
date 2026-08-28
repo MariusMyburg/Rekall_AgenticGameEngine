@@ -222,9 +222,9 @@ internal static class RekallAgeCli
                 ["render", "command-buffer", "record", var root, var id, var queue, var commandsJson] =>
                     await RecordRenderCommandBufferAsync(registry, context, root, id, queue, commandsJson),
                 ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory] =>
-                    await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, "320", "180", "software"),
+                    await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, "320", "180", "auto"),
                 ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory, var width, var height] =>
-                    await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height, "software"),
+                    await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height, "auto"),
                 ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory, var width, var height, var backend] =>
                     await CaptureRuntimeViewportAsync(registry, context, root, scene, frames, outputDirectory, width, height, backend, null),
                 ["render", "viewport", "capture", var root, var scene, var frames, var outputDirectory, var width, var height, var backend, var inputsJson] =>

@@ -22,6 +22,27 @@
       "modelAssetMetadata": null
     },
     {
+      "id": "asset_tex-gasgiant_821048d2",
+      "name": "tex-gasgiant",
+      "displayName": "tex_gasgiant",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Tools\\tex_gasgiant.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Assets\\texture\\asset_tex-gasgiant_821048d2.png",
+      "contentHash": "821048d2e4312d50b1cee8d03ba97c0e44797f7bef8a1238fa7904d9d91ff435",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 2048,
+        "height": 1024,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
       "id": "asset_tex-moon_d6416558",
       "name": "tex-moon",
       "displayName": "tex_moon",
@@ -29,6 +50,27 @@
       "sourcePath": "C:\\Users\\Marius\\AppData\\Local\\Temp\\claude\\F--Dev-Rekall-AGE\\8de42e24-d5b9-4f1b-8ddb-bdeb93977787\\scratchpad\\tex_moon.png",
       "importedPath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Assets\\texture\\asset_tex-moon_d6416558.png",
       "contentHash": "d64165589872060d1f8ae4186762eaf2ae0f1e8c04533800b2b30a8dd9cab335",
+      "glbMetadata": null,
+      "textureMetadata": {
+        "container": "png",
+        "width": 1024,
+        "height": 512,
+        "mipLevelCount": 1,
+        "format": "R8G8B8A8_UNorm",
+        "supercompression": null,
+        "gpuCompressed": false
+      },
+      "provenance": null,
+      "modelAssetMetadata": null
+    },
+    {
+      "id": "asset_tex-moon_79224562",
+      "name": "tex-moon",
+      "displayName": "tex_moon",
+      "kind": "texture",
+      "sourcePath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Tools\\tex_moon.png",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Assets\\texture\\asset_tex-moon_79224562.png",
+      "contentHash": "79224562bf24bf675c25480870fa37dfb8748330e3ae2cacbe21f015ede9aa46",
       "glbMetadata": null,
       "textureMetadata": {
         "container": "png",

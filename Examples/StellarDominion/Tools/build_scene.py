@@ -18,8 +18,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ships
 
 ROOT = "F:/Dev/Rekall_AGE/Examples/StellarDominion"
-TEX_GAS = "asset_tex-gasgiant_127c10c8"
-TEX_MOON = "asset_tex-moon_d6416558"
+TEX_GAS = "asset_tex-gasgiant_821048d2"
+TEX_MOON = "asset_tex-moon_79224562"
 TEX_RINGS = "asset_tex-rings_f9640733"
 
 CAM = (96, 104, 196)
@@ -157,17 +157,33 @@ CAPITALS = [
     ("Long Watch", "cruiser", (-86, 30, 46), (-3, -58, 0), (cru_v, cru_i), cru_d, 5, 9.0),
 ]
 
+# Tactical readout per capital, keyed by name.
+UNIT_STATS = {
+    "Ardent Dominion": ("Dominion-class Dreadnought", "Fleet flagship", 8400, 8400, 5200, 6000, 2140, 34),
+    "Vigil of Kell": ("Kell-pattern Cruiser", "Screening element", 3100, 3600, 2400, 2400, 620, 20),
+    "Long Watch": ("Kell-pattern Cruiser", "Picket / early warning", 2950, 3600, 900, 2400, 604, 20),
+}
+
 for name, cls, pos, rot, (mv, mi), (dv, di), wing, radius in CAPITALS:
     entities.append(e(name, ["ship", "capital"], [
         ("Rekall.Transform3D", {"x": pos[0], "y": pos[1], "z": pos[2],
                                 "pitch": rot[0], "yaw": rot[1], "roll": rot[2]}),
         ("Rekall.GeometryMesh", {"vertices": mv, "indices": mi}),
         ("Rekall.MeshRenderer", {"active": True, "castShadows": True, "receiveShadows": True}),
-        hull_material("#7d8794"),
+        hull_material("#4d5560"),
         ("Game.Modules.FleetRules.Drift", {
             "enabled": True,
             "speed": 0.9 if cls == "dreadnought" else 1.4,
             "headingYaw": rot[1],
+        }),
+        ("Game.Modules.FleetRules.Selectable", {
+            "enabled": True,
+            "unitClass": UNIT_STATS[name][0],
+            "role": UNIT_STATS[name][1],
+            "hull": UNIT_STATS[name][2], "hullMax": UNIT_STATS[name][3],
+            "shields": UNIT_STATS[name][4], "shieldsMax": UNIT_STATS[name][5],
+            "crew": UNIT_STATS[name][6],
+            "selectRadius": UNIT_STATS[name][7],
         }),
     ]))
 
@@ -195,7 +211,7 @@ for name, cls, pos, rot, (mv, mi), (dv, di), wing, radius in CAPITALS:
             }),
             ("Rekall.GeometryMesh", {"vertices": fig_v, "indices": fig_i}),
             ("Rekall.MeshRenderer", {"active": True, "castShadows": True, "receiveShadows": True}),
-            hull_material("#98a1ab", rough=0.28),
+            hull_material("#5b6470", rough=0.30),
             ("Game.Modules.FleetRules.Escort", {
                 "enabled": True,
                 "leader": name,
@@ -204,7 +220,44 @@ for name, cls, pos, rot, (mv, mi), (dv, di), wing, radius in CAPITALS:
                 "angularSpeed": 42.0 if cls == "dreadnought" else 55.0,
                 "inclination": 20.0 + 8.0 * k,
             }),
+            ("Game.Modules.FleetRules.Selectable", {
+                "enabled": True,
+                "unitClass": "Talon-series Interceptor",
+                "role": f"{name} escort wing",
+                "hull": 140, "hullMax": 140,
+                "shields": 60, "shieldsMax": 90,
+                "crew": 1,
+                "selectRadius": 2.6,
+            }),
         ]))
+
+# --- Tactical UI -----------------------------------------------------------
+# The panel's text is written each step by SelectionSystem; the value here is only
+# what shows before the first click.
+entities.append(e("Tactical HUD", ["ui"], [
+    ("Rekall.Transform3D", {}),
+    ("Rekall.UiCanvas", {"referenceWidth": 1920, "referenceHeight": 1080}),
+    ("Game.Modules.FleetRules.FleetCommand", {
+        "enabled": True,
+        "selectedEntityId": "",
+        "selectedName": "",
+        "panelEntityName": "Unit Panel",
+    }),
+]))
+
+entities.append(e("Unit Panel", ["ui"], [
+    ("Rekall.Transform3D", {}),
+    ("Rekall.UiElement", {
+        "x": 36, "y": 720, "width": 430, "height": 200,
+        "text": "NO UNIT SELECTED\nClick a vessel to inspect it.",
+        "backgroundColor": "#0a1520e0",
+        "foregroundColor": "#b8e4ff",
+        "borderColor": "#3f7fa8",
+        "borderWidth": 1.5,
+        "fontSize": 17,
+        "fontFamily": "Consolas",
+    }),
+]))
 
 payload = {"projectRoot": ROOT, "sceneName": "Main",
            "clearExisting": True, "entities": entities}

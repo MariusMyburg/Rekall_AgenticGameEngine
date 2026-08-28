@@ -103,6 +103,8 @@ internal static class Program
         var openXrEyeWidth = ReadPositiveIntOption(args, "--vr-eye-width") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeWidth;
         var openXrEyeHeight = ReadPositiveIntOption(args, "--vr-eye-height") ?? RekallAgeVeldridPlayer.DefaultOpenXrPlayableEyeHeight;
         var frameLimit = ReadPositiveIntOption(args, "--frames") ?? 0;
+        RekallAgePlayerScreenshotRequest.Path = ReadOption(args, "--screenshot");
+        RekallAgePlayerScreenshotRequest.Frame = ReadPositiveIntOption(args, "--screenshot-frame") ?? 60;
         var debugHudEnabled = RekallAgePlayerPresentationPolicy.Plan(args).DebugHudEnabled;
         var audioRequired = HasOption(args, "--audio-required");
         var projectRoot = Path.GetFullPath(args[0]);
@@ -274,6 +276,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly RekallAgeOpenXrCompositorSessionBootstrapResult? _openXrCompositorSession;
     private readonly bool _simulateXrInput;
     private readonly bool _debugHudEnabled;
+    private string? _screenshotPath;
+    private int _screenshotFrame;
     private readonly int _sceneSupersampleFactor;
     private readonly int _openXrEyeWidth;
     private readonly int _openXrEyeHeight;
@@ -462,14 +466,50 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _openXrCompositorSession = openXrCompositorSession;
         _simulateXrInput = simulateXrInput;
         _debugHudEnabled = debugHudEnabled;
+        _screenshotPath = RekallAgePlayerScreenshotRequest.Path;
+        _screenshotFrame = Math.Max(1, RekallAgePlayerScreenshotRequest.Frame);
         _sceneSupersampleFactor = Math.Clamp(sceneSupersampleFactor, 1, 4);
         _openXrEyeWidth = Math.Clamp(openXrEyeWidth, 64, RekallAgeOpenXrHeadsetSubmitPlanner.MaxSceneEyeExtent);
         _openXrEyeHeight = Math.Clamp(openXrEyeHeight, 64, RekallAgeOpenXrHeadsetSubmitPlanner.MaxSceneEyeExtent);
         _sceneTarget = CreateSceneRenderTarget(_factory, InitialWidth, InitialHeight, _sceneSupersampleFactor, _presentTextureLayout);
-        if (!_playableMode)
+        // Capture the pointer only for scenes that actually steer with mouse motion. Grabbing
+        // it unconditionally hides the cursor, which is right for a first-person camera and
+        // wrong for anything the player clicks on - a tactical game cannot be played without a
+        // visible pointer. Escape still releases capture when it is taken.
+        if (!_playableMode && SceneBindsMouseLook(_runtimeWorld))
         {
             SetMouseCapture(true);
         }
+    }
+
+    /// <summary>
+    /// True when any authored input action map binds a mouse-motion axis, which is how the
+    /// runtime projects mouse look. Checked against the authored bindings rather than a
+    /// hard-coded genre assumption, so a scene decides for itself whether it wants the pointer.
+    /// </summary>
+    private static bool SceneBindsMouseLook(RekallAgeRuntimeWorld world)
+    {
+        foreach (var entity in world.Entities)
+        {
+            foreach (var component in entity.Components)
+            {
+                if (!component.Type.Equals("Rekall.InputActionMap", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var bindings = component.Properties.ToJsonString();
+                if (bindings.Contains("mousex", StringComparison.OrdinalIgnoreCase)
+                    || bindings.Contains("mousey", StringComparison.OrdinalIgnoreCase)
+                    || bindings.Contains("deltax", StringComparison.OrdinalIgnoreCase)
+                    || bindings.Contains("deltay", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     public static async ValueTask<RekallAgeVeldridPlayer> CreateAsync(
@@ -1013,6 +1053,16 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
                 beforeFrame?.Invoke(renderedFrames + 1);
                 RenderFrame();
                 renderedFrames++;
+
+                if (_screenshotPath is not null && renderedFrames >= _screenshotFrame)
+                {
+                    CaptureScreenshot(_screenshotPath);
+                    _screenshotPath = null;
+                    if (frameLimit <= 0)
+                    {
+                        break;
+                    }
+                }
             }
 
             _device.WaitForIdle();
@@ -1021,6 +1071,107 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         catch (Exception exception) when (exception is not RekallAgePlayerSessionRunException)
         {
             throw new RekallAgePlayerSessionRunException(renderedFrames, exception);
+        }
+    }
+
+    /// <summary>
+    /// Writes the presented frame to a PNG. The interactive player and the Vulkan capture
+    /// command render through two separate implementations, and without a way to see what the
+    /// player actually produced the only available check was "it starts and holds a frame
+    /// rate" - which is how an HDR bloom regression reached the screen while the capture path
+    /// still looked correct. This makes the two paths comparable.
+    /// </summary>
+    private void CaptureScreenshot(string path)
+    {
+        _device.WaitForIdle();
+        var width = (uint)Math.Max(1, _window.Width);
+        var height = (uint)Math.Max(1, _window.Height);
+        Texture? color = null;
+        Texture? depth = null;
+        Framebuffer? framebuffer = null;
+        Texture? staging = null;
+        try
+        {
+            // Re-run the present pass into an offscreen LDR target rather than reading the
+            // swapchain, so the screenshot is the finished presented image - bloom, tone
+            // mapping and all - not the raw HDR scene buffer.
+            // The present pipeline was created against the swapchain's output description, so
+            // this target has to match it - same colour format, and a depth attachment if the
+            // swapchain has one - or Veldrid rejects the pipeline/framebuffer pairing.
+            var swapchain = _device.SwapchainFramebuffer;
+            var colorFormat = swapchain.ColorTargets[0].Target.Format;
+            color = _factory.CreateTexture(TextureDescription.Texture2D(
+                width, height, mipLevels: 1, arrayLayers: 1,
+                colorFormat,
+                TextureUsage.RenderTarget | TextureUsage.Sampled));
+            if (swapchain.DepthTarget is { } swapchainDepth)
+            {
+                depth = _factory.CreateTexture(TextureDescription.Texture2D(
+                    width, height, mipLevels: 1, arrayLayers: 1,
+                    swapchainDepth.Target.Format,
+                    TextureUsage.DepthStencil));
+            }
+
+            framebuffer = _factory.CreateFramebuffer(new FramebufferDescription(depth, color));
+            staging = _factory.CreateTexture(TextureDescription.Texture2D(
+                width, height, mipLevels: 1, arrayLayers: 1,
+                colorFormat,
+                TextureUsage.Staging));
+
+            using var commands = _factory.CreateCommandList();
+            commands.Begin();
+            _presentPassAdapter.Record(
+                commands,
+                framebuffer,
+                _presentPipeline,
+                _sceneTarget.ResourceSet,
+                _postProcessSet,
+                (int)width,
+                (int)height,
+                new RgbaFloat(0.08f, 0.10f, 0.14f, 1f));
+            commands.CopyTexture(color, staging);
+            commands.End();
+            _device.SubmitCommands(commands);
+            _device.WaitForIdle();
+
+            var map = _device.Map<byte>(staging, MapMode.Read);
+            try
+            {
+                var bgra = colorFormat is PixelFormat.B8_G8_R8_A8_UNorm
+                    or PixelFormat.B8_G8_R8_A8_UNorm_SRgb;
+                var pixels = new byte[width * height * 4];
+                for (var i = 0; i < pixels.Length; i += 4)
+                {
+                    // The PNG writer expects RGBA; swapchains are commonly BGRA.
+                    pixels[i + 0] = bgra ? map[i + 2] : map[i + 0];
+                    pixels[i + 1] = map[i + 1];
+                    pixels[i + 2] = bgra ? map[i + 0] : map[i + 2];
+                    pixels[i + 3] = 255;
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+                RekallAgePngWriter
+                    .WriteRgbaAsync(path, (int)width, (int)height, pixels, CancellationToken.None)
+                    .AsTask()
+                    .GetAwaiter()
+                    .GetResult();
+                PlayerLog.Write($"Wrote player screenshot {path} ({width}x{height}).");
+            }
+            finally
+            {
+                _device.Unmap(staging);
+            }
+        }
+        catch (Exception exception)
+        {
+            PlayerLog.Write($"Player screenshot failed: {exception.Message}");
+        }
+        finally
+        {
+            staging?.Dispose();
+            framebuffer?.Dispose();
+            depth?.Dispose();
+            color?.Dispose();
         }
     }
 
@@ -1095,7 +1246,10 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         foreach (var mouseEvent in snapshot.MouseEvents)
         {
             var button = mouseEvent.MouseButton.ToString();
-            if (mouseEvent.Down && !_mouseCaptured)
+            // Re-capturing on click is only correct for scenes that steer with mouse motion.
+            // For a click-to-select scene it would swallow the pointer on the player's very
+            // first interaction, which is the opposite of what the click was for.
+            if (mouseEvent.Down && !_mouseCaptured && SceneBindsMouseLook(_runtimeWorld))
             {
                 SetMouseCapture(true);
             }
@@ -1926,6 +2080,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             }
         }
 
+        // Downsample the finished scene so the present pass can read a smooth, wide bloom
+        // from the coarse levels instead of gathering a wide radius from mip 0.
+        _commands.GenerateMipmaps(_sceneTarget.Color);
         _presentPassAdapter.Record(
             _commands,
             _device.SwapchainFramebuffer,
@@ -2668,13 +2825,23 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         var inverseViewProjection = Matrix4x4.Invert(viewProjection, out var inverse)
             ? inverse
             : Matrix4x4.Identity;
+        // EnvironmentParameters.w was a colour-grade present/absent flag that no shader ever
+        // read. It now carries lens-dirt strength, reusing an already-spare slot rather than
+        // growing this uniform - the same approach ShadowFactors.y/.z take in the scene shader.
+        var lensDirtStrength = stack is { Enabled: true }
+            ? (float)Math.Clamp(
+                stack.Passes.FirstOrDefault(pass =>
+                    pass.Type.Equals("lensDirt", StringComparison.OrdinalIgnoreCase))?.Intensity ?? 0,
+                0,
+                4)
+            : 0f;
         var environmentParameters = environment is null
-            ? new Vector4(0, 11.2f, 0, 0)
+            ? new Vector4(0, 11.2f, 0, lensDirtStrength)
             : new Vector4(
                 (float)Math.Clamp(environment.Exposure, -8, 8),
                 (float)Math.Clamp(environment.WhitePoint, 0.1, 64),
                 environment.ToneMapper.Equals("agx", StringComparison.OrdinalIgnoreCase) ? 1 : 0,
-                environment.ColorGradeAssetId is null ? 0 : 1);
+                lensDirtStrength);
         var screenParameters = new Vector4(
             Math.Max(1, width),
             Math.Max(1, height),
@@ -3193,13 +3360,25 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         sceneSupersampleFactor = Math.Clamp(sceneSupersampleFactor, 1, 4);
         var width = checked((uint)Math.Max(1, displayWidth * sceneSupersampleFactor));
         var height = checked((uint)Math.Max(1, displayHeight * sceneSupersampleFactor));
+        // Floating-point HDR scene target. The scene pass writes linear radiance and the
+        // present pass tone maps, so highlights survive to be bloomed and graded rather than
+        // being clamped to 1.0 at the end of the scene shader. The LDR target this replaced is
+        // why the interactive path could not implement AgX or a white point at all.
+        // A mip chain on the scene colour target is what makes a wide bloom smooth. Gathering
+        // a wide radius from mip 0 with a handful of taps produces visibly separate copies of
+        // each bright pixel; sampling a downsampled level instead means every tap already
+        // averages many pixels, which is how the Vulkan capture path's bloom pyramid behaves.
+        var bloomMipLevels = (uint)Math.Clamp(
+            (int)Math.Log2(Math.Max(1, Math.Min(width, height))) - 1,
+            1,
+            6);
         var color = factory.CreateTexture(TextureDescription.Texture2D(
             width,
             height,
-            mipLevels: 1,
+            bloomMipLevels,
             arrayLayers: 1,
-            PixelFormat.R8_G8_B8_A8_UNorm,
-            TextureUsage.RenderTarget | TextureUsage.Sampled));
+            PixelFormat.R16_G16_B16_A16_Float,
+            TextureUsage.RenderTarget | TextureUsage.Sampled | TextureUsage.GenerateMipmaps));
         var depth = factory.CreateTexture(TextureDescription.Texture2D(
             width,
             height,
@@ -3216,7 +3395,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             ComparisonKind.Never,
             maximumAnisotropy: 1,
             minimumLod: 0,
-            maximumLod: 0,
+            maximumLod: bloomMipLevels,
             lodBias: 0,
             borderColor: SamplerBorderColor.TransparentBlack));
         var resourceSet = factory.CreateResourceSet(new ResourceSetDescription(
@@ -4623,12 +4802,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             }
             color = applySurfaceAerialPerspective(color, fsin_WorldPosition, light);
             color = applyInteractiveFog(color, fsin_WorldPosition, light);
-            // Exposure belongs in linear scene light. Applying it after this curve in the
-            // presentation pass operated on gamma-encoded LDR values and effectively
-            // tone-mapped the frame twice, flattening authored warm/cool separation.
-            color *= exp2(Frame.EnvironmentParameters.y);
-            vec3 mapped = vec3(1.0) - exp(-max(color, vec3(0.0)) * 1.15);
-            vec3 lit = pow(mapped, vec3(1.0 / 2.2));
+            // The scene target is a floating-point HDR buffer, so this pass writes linear
+            // radiance and leaves exposure, tone mapping and gamma to the present pass -
+            // matching the Vulkan capture path, which tone maps at present too. Doing it here
+            // instead forced the present pass to work on gamma-encoded LDR values, which is
+            // why the interactive path could not implement AgX or a white point at all.
+            vec3 lit = max(color, vec3(0.0));
             float surfaceAlpha = hasAtmosphereData() ? fsin_Color.a : fsin_Color.a * textureColor.a;
             // Draw.ShadowFactors.y/.z are repurposed as AlphaCutoff and an "is this a mask-mode
             // draw" flag, rather than adding new fields to this shared uniform struct. A masked
@@ -4686,32 +4865,90 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             return dot(color, vec3(0.299, 0.587, 0.114));
         }
 
+        // Kept byte-identical to agxCurve in Shaders/rekall_tonemap.frag so the interactive
+        // player and the Vulkan capture path apply the same display transform. If one of these
+        // changes, the other must change with it.
+        vec3 agxCurve(vec3 value)
+        {
+            value = max(value, vec3(0.0));
+            vec3 logValue = clamp((log2(max(value, vec3(1e-6))) + 10.0) / 16.5, 0.0, 1.0);
+            vec3 sigmoid = logValue * logValue * (3.0 - 2.0 * logValue);
+            return sigmoid * sigmoid * (3.0 - 2.0 * sigmoid);
+        }
+
+        float dirtHash(vec2 p)
+        {
+            return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        }
+
+        float dirtNoise(vec2 p)
+        {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            vec2 u = f * f * (3.0 - 2.0 * f);
+            return mix(mix(dirtHash(i), dirtHash(i + vec2(1.0, 0.0)), u.x),
+                       mix(dirtHash(i + vec2(0.0, 1.0)), dirtHash(i + vec2(1.0, 1.0)), u.x), u.y);
+        }
+
+        float dirtFbm(vec2 p, int octaves)
+        {
+            const mat2 turn = mat2(0.8, -0.6, 0.6, 0.8);
+            float total = 0.0;
+            float amp = 0.5;
+            float norm = 0.0;
+            for (int i = 0; i < octaves; ++i)
+            {
+                total += dirtNoise(p) * amp;
+                norm += amp;
+                p = turn * p * 2.03 + 19.7;
+                amp *= 0.5;
+            }
+            return total / max(norm, 0.0001);
+        }
+
+        float lensDirtMask(vec2 uv)
+        {
+            vec2 centred = uv - 0.5;
+            vec2 aspect = vec2(textureSize(sampler2D(SceneTexture, SceneSampler), 0));
+            vec2 p = vec2(centred.x * (aspect.x / max(aspect.y, 1.0)), centred.y);
+            float smudge = smoothstep(0.46, 0.78, dirtFbm(p * 3.4, 5));
+            float speck = smoothstep(0.70, 0.86, dirtFbm(p * 26.0 + 41.7, 3));
+            float ang = atan(p.y, p.x);
+            float streak = smoothstep(0.52, 0.84, dirtFbm(vec2(ang * 1.7, length(p) * 4.5) + 7.1, 4)) * 0.5;
+            float edgeBias = 0.30 + 0.70 * smoothstep(0.05, 0.70, length(centred));
+            return clamp((smudge * 0.55 + speck * 0.35 + streak) * edgeBias, 0.0, 1.0);
+        }
+
         vec3 brightPass(vec3 color)
         {
             float brightness = max(max(color.r, color.g), color.b);
             float threshold = PostProcessParameters.x;
-            float knee = smoothstep(threshold, 1.0, brightness);
-            return color * knee;
+            // Keep only the amount by which this pixel exceeds the threshold, scaled back onto
+            // its own hue. The previous smoothstep(threshold, 1.0, brightness) knee was written
+            // for an LDR scene target: on the floating-point target it saturates to 1.0 for any
+            // value above 1, so it returned the pixel at full strength and bloom became a set of
+            // offset copies of the scene rather than a glow.
+            float excess = max(brightness - threshold, 0.0);
+            return color * (excess / max(brightness, 0.0001));
         }
 
         vec3 sampleBloom(vec2 uv, vec2 texel)
         {
-            vec3 bloom = brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv).rgb) * 0.22;
-            vec2 radius1 = texel * 1.5 * PostProcessParameters.z;
-            vec2 radius2 = texel * 3.0 * PostProcessParameters.z;
-            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(radius1.x, 0.0)).rgb) * 0.085;
-            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv - vec2(radius1.x, 0.0)).rgb) * 0.085;
-            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(0.0, radius1.y)).rgb) * 0.085;
-            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv - vec2(0.0, radius1.y)).rgb) * 0.085;
-            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(radius1.x, radius1.y)).rgb) * 0.0525;
-            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(-radius1.x, radius1.y)).rgb) * 0.0525;
-            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(radius1.x, -radius1.y)).rgb) * 0.0525;
-            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv - vec2(radius1.x, radius1.y)).rgb) * 0.0525;
-            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(radius2.x, 0.0)).rgb) * 0.03;
-            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv - vec2(radius2.x, 0.0)).rgb) * 0.03;
-            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv + vec2(0.0, radius2.y)).rgb) * 0.03;
-            bloom += brightPass(texture(sampler2D(SceneTexture, SceneSampler), uv - vec2(0.0, radius2.y)).rgb) * 0.03;
-            return bloom;
+            // One centred tap per downsampled level, weighted so the coarse levels supply the
+            // wide falloff. Offset taps are deliberately absent: on a mip chain each tap is
+            // already an average of many pixels, so a ring of them only stamps the sampling
+            // pattern into the image - the diamond clusters that appeared around bright drives.
+            vec3 bloom = vec3(0.0);
+            float weight = 0.0;
+            for (int level = 1; level <= 5; ++level)
+            {
+                float lod = float(level);
+                float levelWeight = 1.0 / float(level);
+                bloom += brightPass(textureLod(sampler2D(SceneTexture, SceneSampler), uv, lod).rgb) * levelWeight;
+                weight += levelWeight;
+            }
+
+            return bloom / max(weight, 0.0001);
         }
 
         float resolveAmbientOcclusion(vec2 uv, vec2 texel)
@@ -4766,11 +5003,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
 
         vec4 resolveFxaa(vec2 texel)
         {
-            vec4 center = texture(sampler2D(SceneTexture, SceneSampler), fsin_UV);
-            vec3 nw = texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(-1.0, -1.0)).rgb;
-            vec3 ne = texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(1.0, -1.0)).rgb;
-            vec3 sw = texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(-1.0, 1.0)).rgb;
-            vec3 se = texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(1.0, 1.0)).rgb;
+            vec4 center = textureLod(sampler2D(SceneTexture, SceneSampler), fsin_UV, 0.0);
+            vec3 nw = textureLod(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(-1.0, -1.0), 0.0).rgb;
+            vec3 ne = textureLod(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(1.0, -1.0), 0.0).rgb;
+            vec3 sw = textureLod(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(-1.0, 1.0), 0.0).rgb;
+            vec3 se = textureLod(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(1.0, 1.0), 0.0).rgb;
             float lumaCenter = luma(center.rgb);
             float lumaNw = luma(nw);
             float lumaNe = luma(ne);
@@ -4807,14 +5044,31 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec4 resolved = resolveFxaa(texel);
             vec3 bloom = sampleBloom(fsin_UV, texel);
             float ambientOcclusion = resolveAmbientOcclusion(fsin_UV, texel);
-            // The scene target is already single-tone-mapped and gamma encoded. Keep
-            // presentation effects bounded in that display space until the interactive
-            // path moves to a floating-point HDR target; do not apply exposure/tonemap twice.
-            vec3 color = clamp(
-                resolved.rgb * ambientOcclusion + bloom * PostProcessParameters.y * PostProcessParameters.w,
-                vec3(0.0),
-                vec3(1.0));
-            fsout_Color = vec4(color, resolved.a);
+
+            // The scene target is now linear HDR, so this pass owns the whole display
+            // transform - matching the Vulkan capture path's tone-map pass. Bloom is added in
+            // linear light before exposure, exactly as it is there.
+            vec3 hdr = resolved.rgb * ambientOcclusion
+                + bloom * PostProcessParameters.y * PostProcessParameters.w;
+
+            if (EnvironmentParameters.w > 0.5)
+            {
+                hdr *= 1.0 + lensDirtMask(fsin_UV) * EnvironmentParameters.w * 0.6;
+            }
+
+            hdr *= exp2(EnvironmentParameters.x);
+            // 11.2 is the conventional neutral scene-white reference; an authored white point
+            // moves highlight placement without crushing midtones.
+            hdr *= 11.2 / max(EnvironmentParameters.y, 0.0001);
+
+            // EnvironmentParameters.z selects AgX; anything else keeps the exponential curve
+            // this path used before, so scenes that never asked for AgX are unchanged.
+            vec3 graded = EnvironmentParameters.z > 0.5
+                ? agxCurve(hdr)
+                : vec3(1.0) - exp(-max(hdr, vec3(0.0)) * 1.15);
+
+            vec3 color = pow(max(graded, vec3(0.0)), vec3(1.0 / 2.2));
+            fsout_Color = vec4(clamp(color, 0.0, 1.0), resolved.a);
         }
         """;
 
@@ -5114,6 +5368,19 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             Texture.Dispose();
         }
     }
+}
+
+/// <summary>
+/// Diagnostic screenshot request for the interactive player, set from the command line.
+///
+/// Kept as a small holder rather than threaded through the session factory and player
+/// constructor: it is a diagnostic hook, not part of the player's authored configuration.
+/// </summary>
+internal static class RekallAgePlayerScreenshotRequest
+{
+    public static string? Path { get; set; }
+
+    public static int Frame { get; set; } = 1;
 }
 
 internal static class PlayerLog

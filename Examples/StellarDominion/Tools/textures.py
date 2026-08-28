@@ -55,10 +55,21 @@ def lerp3(a, b, t):
     return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
 
 
+def _cyl(lon, turns):
+    """Longitude mapped onto a circle so noise sampled from it wraps seamlessly.
+
+    Sampling noise directly from a 0..1 longitude leaves u=0 and u=1 uncorrelated,
+    which shows up on the rendered globe as a hard vertical seam down one side.
+    """
+    a = lon * 2.0 * math.pi
+    return math.cos(a) * turns, math.sin(a) * turns
+
+
 def gas_giant(width=2048, height=1024, seed=7):
     """Banded gas giant. Latitude drives the palette; turbulence warps the band
     boundaries so they meander like real Jovian belts rather than sitting in
-    perfect stripes."""
+    perfect stripes. All longitude-varying noise is sampled on a cylinder so the
+    equirectangular map wraps without a seam."""
     palette = [
         (0.29, 0.20, 0.14), (0.71, 0.56, 0.38), (0.42, 0.29, 0.20),
         (0.85, 0.74, 0.56), (0.55, 0.39, 0.26), (0.78, 0.65, 0.47),
@@ -71,14 +82,17 @@ def gas_giant(width=2048, height=1024, seed=7):
         for i in range(width):
             lon = i / (width - 1)
             # Warp latitude by turbulence, then quantise into soft bands.
-            warp = (fbm(lon * 14.0, lat * 26.0, seed, 5) - 0.5) * 0.10
-            warp += (fbm(lon * 3.0, lat * 7.0, seed + 11, 4) - 0.5) * 0.05
+            cx, cy = _cyl(lon, 4.0)
+            warp = (fbm(cx + 8.0, cy + lat * 26.0, seed, 5) - 0.5) * 0.10
+            cx2, cy2 = _cyl(lon, 1.5)
+            warp += (fbm(cx2 + 3.0, cy2 + lat * 7.0, seed + 11, 4) - 0.5) * 0.05
             band = (lat + warp) * len(palette) * 1.35
             k = int(band) % len(palette)
             k2 = (k + 1) % len(palette)
             base = lerp3(palette[k], palette[k2], min(1.0, (band - int(band)) * 1.6))
             # Fine turbulence for storm texture.
-            detail = fbm(lon * 40.0, lat * 80.0, seed + 3, 4)
+            dx, dy = _cyl(lon, 13.0)
+            detail = fbm(dx + 20.0, dy + lat * 80.0, seed + 3, 4)
             base = tuple(c * (0.86 + 0.28 * detail) for c in base)
             # Polar darkening.
             polar = abs(lat - 0.5) * 2.0
@@ -95,8 +109,10 @@ def rocky_moon(width=1024, height=512, seed=41):
         row = bytearray()
         for i in range(width):
             lon = i / (width - 1)
-            n = fbm(lon * 18.0, lat * 18.0, seed, 6)
-            craters = fbm(lon * 55.0, lat * 55.0, seed + 5, 3)
+            mx, my = _cyl(lon, 6.0)
+            n = fbm(mx + 5.0, my + lat * 18.0, seed, 6)
+            kx, ky = _cyl(lon, 17.0)
+            craters = fbm(kx + 30.0, ky + lat * 55.0, seed + 5, 3)
             v = 0.34 + 0.34 * n - 0.16 * (craters ** 3)
             tint = (v * 1.02, v * 0.98, v * 0.93)
             row += bytes(max(0, min(255, int(c * 255))) for c in tint)

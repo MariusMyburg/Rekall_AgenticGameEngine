@@ -482,6 +482,87 @@ It does need a real design though — caching it requires change detection on a
 world that each system rebuilds wholesale — so it deserves its own brainstorm
 rather than an opportunistic patch.
 
+---
+
+# Architectural round: results
+
+Four further changes, each measured and each verified byte-identical on a captured
+MidnightRider frame (`sha256 44687062876888ad…`).
+
+## What changed
+
+**1. Idle systems skip their pass.** Every system ran each fixed step regardless
+of scene contents, rebuilding the whole entity array and allocating a new world
+record — `KeplerOrbitSystem` rebuilding 5,000 entities in a scene with no orbits.
+Eight hot systems now guard on component presence. Each guard is chosen so the
+skipped pass is provably a no-op; the collider check matches loosely on purpose,
+since an unexpected match only declines to skip while a missed match would
+wrongly skip real work.
+
+**2. The guards' own scan is memoized.** With a guard on eight systems, the
+O(entities × components) scan became measurable in its own right — Bepu still
+cost 2.57% of the frame on a scene it was correctly skipping. The world's
+distinct component types are now computed once and memoized on the world
+instance. Keying on instance identity cannot go stale: any system that changes
+the world returns a new record, which misses and rebuilds.
+
+**3. The camel/pascal property probe is memoized.** Properties are probed
+camelCase-first with a pascal-case fallback, and that fallback — taken on every
+*miss*, the common case — built a fresh string each time. Fixed in the two call
+sites the profile implicates. The same probe is duplicated in ~14 other systems,
+left alone deliberately to avoid churn without measured benefit.
+
+**4. Renderer components resolve in one pass.** `BuildRenderables` resolved ~20
+optional components with 20 separate `FirstOrDefault` scans per renderable. Now
+one switch pass, with `??=` preserving "first match wins".
+
+## Measured
+
+| scene | fps at session start | after geometry + O(n²) fixes | **now** |
+|---|---|---|---|
+| MidnightRider (46) | ~180 | ~650 | **645** |
+| `Cubes500` | 273 | 262 | **251** |
+| `Cubes2000` | 73 | 159 | **235** |
+| `Cubes5000` | **6** | 21 | **47** |
+
+`Cubes5000` frame build fell 50.70 ms → **9.73 ms**; simulation 89.61 ms →
+**8.03 ms** per frame.
+
+Normalized per fixed step, so the steps-per-frame feedback loop is excluded,
+simulation genuinely improved this round (unlike the `FindEntity` change):
+
+| scene | sim/step before this round | sim/step now |
+|---|---|---|
+| `Cubes2000` | 3.42 ms | **2.23 ms** |
+| `Cubes5000` | 8.96 ms | **6.29 ms** |
+
+## One regression caught, and what it revealed
+
+Gating the trigger and collision systems silently reordered *other* systems'
+events, caught by `RuntimeAnimationStateGraphTests`. Those two systems were
+re-sorting the entire accumulated event list into canonical order
+(frame, entity, type, handler) every step as a side effect — so event ordering
+was contingent on whether the scene happened to contain a collider.
+
+That ordering is now explicit in `RekallAgeRuntimeEventOrdering`, applied on the
+skip path too, and returns the world untouched when already ordered. The guards
+exposed a latent coupling rather than creating one.
+
+## Remaining, in order
+
+1. **`RekallAgeRuntimeProjectionBuilder.Project` — ~10%**, still the largest
+   single item in simulation and the one that runs in *every* scene. It rebuilds
+   ~28 subsystem lists from every entity each step regardless of what changed.
+   Caching it needs change detection on a world that systems rebuild wholesale —
+   a real design question, not a patch. This is the recommended next piece.
+2. **`RekallAgeCollisionEventSystem` has an O(n²) broadphase** over collider
+   bodies. Invisible in these scenes because they carry no colliders, and
+   invisible in MidnightRider because it has few — but it is the same defect
+   class as the `FindEntity` scan and will bite a collider-heavy scene. No
+   spatial partitioning exists.
+3. The remaining per-system tail (XR pose, audio, pointer, input action) is
+   ~2% each and needs the same per-system correctness proof for less return.
+
 ## Still not the bottleneck: the renderer
 
 At 5000 draw calls, `submit` is **1.04 ms**. Draw submission remains a rounding

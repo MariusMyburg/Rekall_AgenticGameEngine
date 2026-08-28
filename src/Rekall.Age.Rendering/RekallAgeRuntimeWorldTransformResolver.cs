@@ -29,6 +29,13 @@ internal sealed class RekallAgeRuntimeWorldTransformResolver
 
     public IReadOnlyList<RekallAgeRuntimeViewportObservation> Observations => _observations;
 
+    /// <summary>
+    /// Entities indexed by id. Exposed so callers that already hold a resolver can look an
+    /// entity up in O(1) instead of rescanning <c>world.Entities</c>: a linear scan per
+    /// renderable is O(entities x renderables), which dominates the frame on large scenes.
+    /// </summary>
+    public IReadOnlyDictionary<string, RekallAgeRuntimeEntity> EntitiesById => _entities;
+
     public RekallAgeRuntimeTransform Resolve(string entityId)
     {
         if (!_entities.TryGetValue(entityId, out var entity))

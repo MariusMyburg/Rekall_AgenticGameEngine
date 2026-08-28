@@ -418,7 +418,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
 
         foreach (var mesh in world.Subsystems.Rendering.Meshes)
         {
-            var entity = FindEntity(world, mesh.EntityId);
+            var entity = FindEntity(transformResolver, mesh.EntityId);
             var transform = transformResolver.Resolve(mesh.EntityId);
             var meshRendererComponent = entity?.Components.FirstOrDefault(component =>
                 component.Type is "Rekall.MeshRenderer" or "Rekall.MeshSet");
@@ -1265,9 +1265,16 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         return Math.Clamp(Math.Max(x, Math.Max(y, z)) * 0.0125, 0.015, 0.08);
     }
 
-    private static RekallAgeRuntimeEntity? FindEntity(RekallAgeRuntimeWorld world, string entityId)
+    /// <summary>
+    /// Resolves an entity by id through the transform resolver's existing index rather than
+    /// rescanning <c>world.Entities</c>. This runs once per mesh renderable, so a linear scan
+    /// here is O(entities x renderables) and dominates the frame on large scenes.
+    /// </summary>
+    private static RekallAgeRuntimeEntity? FindEntity(
+        RekallAgeRuntimeWorldTransformResolver transformResolver,
+        string entityId)
     {
-        return world.Entities.FirstOrDefault(entity => entity.Id.Equals(entityId, StringComparison.Ordinal));
+        return transformResolver.EntitiesById.GetValueOrDefault(entityId);
     }
 
     private static RekallAgeRuntimeTransform FindOrbitParentTransform(

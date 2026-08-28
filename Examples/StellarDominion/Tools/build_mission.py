@@ -34,7 +34,7 @@ ROOT = "F:/Dev/Rekall_AGE/Examples/StellarDominion"
 TEX_GAS = "asset_tex-gasgiant_821048d2"
 TEX_MOON = "asset_tex-moon_79224562"
 TEX_RINGS = "asset_tex-rings_f9640733"
-TEX_ENVIRONMENT = "asset_stellar-environment_ce1b6a4f"
+TEX_ENVIRONMENT = "asset_stellar-environment_66687061"
 
 # Broadside, not down-lane. Looking along the transit lane put every hull nose-on, so
 # a 90-unit dreadnought presented its 12-unit beam and read as a speck. From the side

@@ -7,6 +7,76 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class VulkanHighFidelityCaptureTests
 {
     [Fact]
+    public async Task AuthoredEnvironmentImageRendersBehindSceneGeometry()
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera", "Camera", "Camera3D", true, 0, 0, -4,
+            FieldOfViewDegrees: 55, ClearColor: "#000000");
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Environment Background", 0, 0, 96, 64, camera, [camera],
+            [new RekallAgeRuntimeViewportRenderable(
+                "subject", "Subject", "mesh", "rekall.primitive.cube", 0, 0, 1, 0,
+                Variant: "rekall.geometry.cube", ScaleX: 0.6, ScaleY: 0.6, ScaleZ: 0.6,
+                MaterialColor: "#808080")],
+            0, new(false, 0), [])
+        {
+            Environment = new RekallAgeRuntimeViewportEnvironment(
+                "environment", "Environment", "asset_environment", 1, 0, "agx", 11.2, null, "color")
+            {
+                AmbientSkyColor = "#000000",
+                AmbientGroundColor = "#000000"
+            }
+        };
+        frame = frame with
+        {
+            ResolvedQualityPlan = new RekallAgeRenderQualityProfileResolver().Resolve(
+                new RekallAgeRenderQualityIntent("High", Bloom: false),
+                RekallAgeRenderingDeviceCapabilities.DesktopBaseline("native-test"),
+                frame.Width,
+                frame.Height),
+            PostProcessStack = new RekallAgeRuntimeViewportPostProcessStack(
+                "post", "Tone Map", true,
+                [new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")])
+        };
+        var environmentPixels = new byte[64 * 32 * 4];
+        for (var y = 0; y < 32; y++)
+        {
+            for (var x = 0; x < 64; x++)
+            {
+                var offset = (y * 64 + x) * 4;
+                environmentPixels[offset] = checked((byte)(x * 4));
+                environmentPixels[offset + 1] = checked((byte)(y * 8));
+                environmentPixels[offset + 2] = checked((byte)(24 + x * 2));
+                environmentPixels[offset + 3] = 255;
+            }
+        }
+
+        var assets = RekallAgeRuntimeViewportAssetSet.Empty with
+        {
+            Images = new Dictionary<string, RekallAgeRgbaImage>(StringComparer.Ordinal)
+            {
+                ["asset_environment"] = new(64, 32, environmentPixels)
+            }
+        };
+        var output = TestPaths.CreateTempDirectory();
+
+        var result = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            frame, assets, output, "discrete-gpu", CancellationToken.None);
+        Assert.True(result.Captured, string.Join(Environment.NewLine, result.Errors));
+        Assert.NotNull(result.HighFidelityFrame);
+        var image = await RekallAgePngReader.ReadRgbaAsync(result.OutputPath, CancellationToken.None);
+        var brightness = Enumerable.Range(0, image.Width * image.Height)
+            .Select(pixel => PixelBrightness(image.Rgba, pixel))
+            .ToArray();
+        Assert.True(brightness.Max() > 20, $"Maximum background brightness was {brightness.Max()}.");
+        var distinctColors = Enumerable.Range(0, image.Width * image.Height)
+            .Select(pixel => (image.Rgba[pixel * 4], image.Rgba[pixel * 4 + 1], image.Rgba[pixel * 4 + 2]))
+            .Distinct()
+            .Count();
+        Assert.True(distinctColors > 8, $"Observed only {distinctColors} background colors.");
+    }
+
+    [Fact]
     public async Task AuthoredEnvironmentImageChangesMetallicSurfaceLighting()
     {
         var camera = new RekallAgeRuntimeViewportCamera(

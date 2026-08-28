@@ -10,7 +10,7 @@
   ],
   "entities": [
     {
-      "id": "ent_b2d72e1668a446ddb61dc72bc1392b2b",
+      "id": "ent_8d06dec5355247a48fed548eab578f5d",
       "name": "Button Return",
       "tags": [
         "menu",
@@ -53,7 +53,7 @@
       "locked": false
     },
     {
-      "id": "ent_7515b75ab4154e86a306a13cd70c42f4",
+      "id": "ent_0c0e2245a5f04a5faaa8e1d56fcb02fe",
       "name": "Camera",
       "tags": [
         "camera"
@@ -112,7 +112,7 @@
       "locked": false
     },
     {
-      "id": "ent_d7f50d8c1cd148d894e107e8e236d29c",
+      "id": "ent_9a7c5a9dc5f4487eb37bd35ff34a72db",
       "name": "Campaign Store",
       "tags": [
         "flow"
@@ -149,7 +149,7 @@
       "locked": false
     },
     {
-      "id": "ent_b51a48d0743549b19ab3335ab7371993",
+      "id": "ent_998e0793e5d54e9781898c0f9d2809bc",
       "name": "Convoy Warm Fill",
       "tags": [
         "light"
@@ -179,7 +179,7 @@
       "locked": false
     },
     {
-      "id": "ent_8d0f53cb9d0c4e3f9c6d2492882626c5",
+      "id": "ent_b85d29bf39784a34be4b1bf28d3bda5f",
       "name": "Debrief Canvas",
       "tags": [
         "ui"
@@ -203,7 +203,7 @@
       "locked": false
     },
     {
-      "id": "ent_d10e43dce3524f0f998a786330b2ad20",
+      "id": "ent_a1f1cfa82e14407885fcafc574330dfb",
       "name": "Debrief Headline",
       "tags": [
         "ui"
@@ -235,7 +235,7 @@
       "locked": false
     },
     {
-      "id": "ent_06845940d2e0406eb421539254724226",
+      "id": "ent_1dd2f65d6afd4a21b7c6623f9183fcde",
       "name": "Debrief Text",
       "tags": [
         "ui"
@@ -266,7 +266,7 @@
       "locked": false
     },
     {
-      "id": "ent_3aec2293d37c4edc94d6f708d2670b48",
+      "id": "ent_ec81ce34e73346429f3a4adf81ae7b62",
       "name": "Environment",
       "tags": [
         "environment"
@@ -277,7 +277,7 @@
           "properties": {
             "backgroundPolicy": "color",
             "backgroundColor": "#000000",
-            "skyAsset": "asset_stellar-environment_ce1b6a4f",
+            "skyAsset": "asset_stellar-environment_66687061",
             "toneMapper": "agx",
             "exposure": -0.1,
             "whitePoint": 11.2,
@@ -322,7 +322,7 @@
       "locked": false
     },
     {
-      "id": "ent_30a0cd5dee3e4799aed08e140c3d4591",
+      "id": "ent_7b6ec2241cbb41e0ba1c1d67e9004db0",
       "name": "Fade Curtain",
       "tags": [
         "ui"
@@ -352,7 +352,7 @@
       "locked": false
     },
     {
-      "id": "ent_85d8a74f34e54550b71b0537214dad71",
+      "id": "ent_16c1c39e339e49f9912be4bb24e7f7e0",
       "name": "Kell",
       "tags": [
         "planet"
@@ -384,7 +384,7 @@
       "locked": false
     },
     {
-      "id": "ent_113e617b8e264a96a6366b36a0130d39",
+      "id": "ent_d9464b80711442a9a1b83b2ad41291a1",
       "name": "Long Watch Fill",
       "tags": [
         "light"
@@ -414,7 +414,7 @@
       "locked": false
     },
     {
-      "id": "ent_be627af61040429aa1f62e4468766f83",
+      "id": "ent_2c8a569ddf90499e954bd421b2af59c5",
       "name": "Meridian",
       "tags": [
         "planet"
@@ -481,7 +481,7 @@
       "locked": false
     },
     {
-      "id": "ent_a5be0bc710dc496e8c397ea51470ff75",
+      "id": "ent_a947a0585b1e4e86b96461e2dd88fa3f",
       "name": "Meridian Bounce",
       "tags": [
         "light"
@@ -511,7 +511,7 @@
       "locked": false
     },
     {
-      "id": "ent_b1b0f0c120934338960539adac6e784b",
+      "id": "ent_13ecaa23ce13410eb3fc3c036397a93e",
       "name": "Post",
       "tags": [
         "post"
@@ -556,7 +556,7 @@
       "locked": false
     },
     {
-      "id": "ent_2bb65c579d0847648da677731ccde728",
+      "id": "ent_4b151465dccf4369b557164bdfe17746",
       "name": "Shell",
       "tags": [
         "flow"
@@ -594,7 +594,7 @@
       "locked": false
     },
     {
-      "id": "ent_f11ae887789247f780d8bc4d27c72cc7",
+      "id": "ent_e64699fcb32a4b14899f3a7540844639",
       "name": "Starfield",
       "tags": [
         "backdrop"
@@ -624,7 +624,7 @@
       "locked": false
     },
     {
-      "id": "ent_5ea4cddc41ff41688c374c0944337246",
+      "id": "ent_3c20a75b322a44feb5c9e2a8df0a5a47",
       "name": "Sun Disc",
       "tags": [
         "light"
@@ -672,7 +672,7 @@
       "locked": false
     },
     {
-      "id": "ent_5c0fd96dbe6f45ceaa72b9b1d49e60f4",
+      "id": "ent_3e0723d52c314bdbacaa676f4b5fcd4c",
       "name": "Sun Light",
       "tags": [
         "light"
@@ -703,7 +703,7 @@
       "locked": false
     },
     {
-      "id": "ent_e14eaaae3635484ebb243bbe4b16d20a",
+      "id": "ent_240713634da2410b8ae4af2e9c2b249a",
       "name": "Vigil Fill",
       "tags": [
         "light"

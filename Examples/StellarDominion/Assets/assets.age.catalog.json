@@ -40,13 +40,13 @@
       "modelAssetMetadata": null
     },
     {
-      "id": "asset_stellar-environment_ce1b6a4f",
+      "id": "asset_stellar-environment_66687061",
       "name": "stellar-environment",
       "displayName": "Stellar Environment",
       "kind": "texture",
       "sourcePath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Tools\\tex_stellar-environment.png",
-      "importedPath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Assets\\texture\\asset_stellar-environment_ce1b6a4f.png",
-      "contentHash": "ce1b6a4ffe7f74cc2e1941f2e1076fd0ed26148fafa1594d630757e55dd7d1ef",
+      "importedPath": "F:\\Dev\\Rekall_AGE\\Examples\\StellarDominion\\Assets\\texture\\asset_stellar-environment_66687061.png",
+      "contentHash": "66687061bbcdf58631ce380f41034382146876c9c1e2f213bfd2a88d65aa103d",
       "glbMetadata": null,
       "textureMetadata": {
         "container": "png",

@@ -691,6 +691,21 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 }
 
                 CreatePipeline(state, frame, target, shaders);
+                if (state.EnvironmentTexture is not null)
+                {
+                    var environmentShaders = new RekallAgeVulkanShaderCompiler().CompileEnvironmentBackgroundPipeline();
+                    if (!environmentShaders.Compiled)
+                    {
+                        foreach (var error in environmentShaders.Errors)
+                        {
+                            errors.Add(error);
+                        }
+
+                        return Unavailable(frame, string.Empty, "Silk.NET Vulkan", state.SelectedDevice, assets, meshes.Count, 0, 0, [], errors);
+                    }
+
+                    CreateEnvironmentBackgroundPipeline(state, frame, target, environmentShaders);
+                }
                 if (highFidelityPlan?.ShadowPlan.Enabled == true)
                 {
                     CreateShadowPipeline(state, highFidelityPlan.ShadowPlan, errors);
@@ -3986,6 +4001,117 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             }
         }
 
+        private static void CreateEnvironmentBackgroundPipeline(
+            VulkanState state,
+            RekallAgeRuntimeViewportFrame frame,
+            RekallAgeVulkanSceneRenderTarget target,
+            RekallAgeVulkanSceneShaderCompilationResult shaders)
+        {
+            fixed (byte* vertexCode = shaders.Vertex.Spirv)
+            fixed (byte* fragmentCode = shaders.Fragment.Spirv)
+            {
+                state.EnvironmentBackgroundVertexShader = CreateShaderModule(state, vertexCode, shaders.Vertex.Spirv.Length);
+                state.EnvironmentBackgroundFragmentShader = CreateShaderModule(state, fragmentCode, shaders.Fragment.Spirv.Length);
+            }
+
+            var entry = "main\0"u8.ToArray();
+            fixed (byte* entryName = entry)
+            {
+                var stages = stackalloc PipelineShaderStageCreateInfo[]
+                {
+                    new() { SType = StructureType.PipelineShaderStageCreateInfo, Stage = ShaderStageFlags.VertexBit, Module = state.EnvironmentBackgroundVertexShader, PName = entryName },
+                    new() { SType = StructureType.PipelineShaderStageCreateInfo, Stage = ShaderStageFlags.FragmentBit, Module = state.EnvironmentBackgroundFragmentShader, PName = entryName }
+                };
+                var vertexInput = new PipelineVertexInputStateCreateInfo { SType = StructureType.PipelineVertexInputStateCreateInfo };
+                var inputAssembly = new PipelineInputAssemblyStateCreateInfo
+                {
+                    SType = StructureType.PipelineInputAssemblyStateCreateInfo,
+                    Topology = PrimitiveTopology.TriangleList
+                };
+                var cameraRect = RekallAgeRuntimeViewportCameraRect.FromFrame(frame);
+                var renderScaleX = (double)target.Width / Math.Max(1, frame.Width);
+                var renderScaleY = (double)target.Height / Math.Max(1, frame.Height);
+                var renderX = checked((int)Math.Round(cameraRect.X * renderScaleX, MidpointRounding.AwayFromZero));
+                var renderY = checked((int)Math.Round(cameraRect.Y * renderScaleY, MidpointRounding.AwayFromZero));
+                var renderWidth = checked((uint)Math.Max(1, Math.Round(cameraRect.Width * renderScaleX, MidpointRounding.AwayFromZero)));
+                var renderHeight = checked((uint)Math.Max(1, Math.Round(cameraRect.Height * renderScaleY, MidpointRounding.AwayFromZero)));
+                var viewport = new Viewport(renderX, renderY, renderWidth, renderHeight, 0, 1);
+                var scissor = new Rect2D(new Offset2D(renderX, renderY), new Extent2D(renderWidth, renderHeight));
+                var viewportState = new PipelineViewportStateCreateInfo
+                {
+                    SType = StructureType.PipelineViewportStateCreateInfo,
+                    ViewportCount = 1,
+                    PViewports = &viewport,
+                    ScissorCount = 1,
+                    PScissors = &scissor
+                };
+                var rasterization = new PipelineRasterizationStateCreateInfo
+                {
+                    SType = StructureType.PipelineRasterizationStateCreateInfo,
+                    PolygonMode = PolygonMode.Fill,
+                    CullMode = CullModeFlags.None,
+                    FrontFace = FrontFace.Clockwise,
+                    LineWidth = 1
+                };
+                var multisample = new PipelineMultisampleStateCreateInfo
+                {
+                    SType = StructureType.PipelineMultisampleStateCreateInfo,
+                    RasterizationSamples = SampleCountFlags.Count1Bit
+                };
+                var depth = new PipelineDepthStencilStateCreateInfo
+                {
+                    SType = StructureType.PipelineDepthStencilStateCreateInfo,
+                    DepthTestEnable = false,
+                    DepthWriteEnable = false
+                };
+                var blendAttachment = new PipelineColorBlendAttachmentState
+                {
+                    BlendEnable = false,
+                    ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit | ColorComponentFlags.ABit
+                };
+                var blend = new PipelineColorBlendStateCreateInfo
+                {
+                    SType = StructureType.PipelineColorBlendStateCreateInfo,
+                    AttachmentCount = 1,
+                    PAttachments = &blendAttachment
+                };
+                var frameLayout = state.DescriptorSetLayout;
+                var pushRange = new PushConstantRange(
+                    ShaderStageFlags.FragmentBit,
+                    0,
+                    (uint)Marshal.SizeOf<EnvironmentBackgroundPushConstants>());
+                var layoutInfo = new PipelineLayoutCreateInfo
+                {
+                    SType = StructureType.PipelineLayoutCreateInfo,
+                    SetLayoutCount = 1,
+                    PSetLayouts = &frameLayout,
+                    PushConstantRangeCount = 1,
+                    PPushConstantRanges = &pushRange
+                };
+                ThrowIfFailed(state.Vk.CreatePipelineLayout(
+                    state.Device, &layoutInfo, null, out state.EnvironmentBackgroundPipelineLayout),
+                    "vkCreatePipelineLayout environment background");
+                var pipelineInfo = new GraphicsPipelineCreateInfo
+                {
+                    SType = StructureType.GraphicsPipelineCreateInfo,
+                    StageCount = 2,
+                    PStages = stages,
+                    PVertexInputState = &vertexInput,
+                    PInputAssemblyState = &inputAssembly,
+                    PViewportState = &viewportState,
+                    PRasterizationState = &rasterization,
+                    PMultisampleState = &multisample,
+                    PDepthStencilState = &depth,
+                    PColorBlendState = &blend,
+                    Layout = state.EnvironmentBackgroundPipelineLayout,
+                    RenderPass = state.RenderPass
+                };
+                ThrowIfFailed(state.Vk.CreateGraphicsPipelines(
+                    state.Device, default, 1, &pipelineInfo, null, out state.EnvironmentBackgroundPipeline),
+                    "vkCreateGraphicsPipelines environment background");
+            }
+        }
+
         private static void CreateProjectPipelines(
             VulkanState state,
             RekallAgeRuntimeViewportFrame frame,
@@ -4401,6 +4527,41 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             };
             gpuFrameQuery?.BeginPass(state.CommandBuffer, "opaque-hdr");
             state.Vk.CmdBeginRenderPass(state.CommandBuffer, &scenePass, SubpassContents.Inline);
+            if (state.EnvironmentBackgroundPipeline.Handle != 0)
+            {
+                state.Vk.CmdBindPipeline(
+                    state.CommandBuffer,
+                    PipelineBindPoint.Graphics,
+                    state.EnvironmentBackgroundPipeline);
+                var environmentSet = state.FrameDescriptorSets[0];
+                state.Vk.CmdBindDescriptorSets(
+                    state.CommandBuffer,
+                    PipelineBindPoint.Graphics,
+                    state.EnvironmentBackgroundPipelineLayout,
+                    0,
+                    1,
+                    &environmentSet,
+                    0,
+                    null);
+                var environmentCamera = highFidelityPlan.EffectiveCamera;
+                var environmentParameters = new EnvironmentBackgroundPushConstants(
+                    new Vector4(environmentCamera.Forward, 0),
+                    new Vector4(environmentCamera.Right, 0),
+                    new Vector4(environmentCamera.Up, 0),
+                    new Vector4(
+                        environmentCamera.TangentOrHalfHeight,
+                        environmentCamera.Aspect,
+                        environmentCamera.Orthographic ? 1 : 0,
+                        0));
+                state.Vk.CmdPushConstants(
+                    state.CommandBuffer,
+                    state.EnvironmentBackgroundPipelineLayout,
+                    ShaderStageFlags.FragmentBit,
+                    0,
+                    (uint)Marshal.SizeOf<EnvironmentBackgroundPushConstants>(),
+                    &environmentParameters);
+                state.Vk.CmdDraw(state.CommandBuffer, 3, 1, 0, 0);
+            }
             var vertexBuffer = state.VertexBuffer;
             var vertexOffset = 0UL;
             state.Vk.CmdBindVertexBuffers(state.CommandBuffer, 0, 1, &vertexBuffer, &vertexOffset);
@@ -6361,6 +6522,13 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             float SourceHeight);
 
         [StructLayout(LayoutKind.Sequential)]
+        private readonly record struct EnvironmentBackgroundPushConstants(
+            Vector4 CameraForward,
+            Vector4 CameraRight,
+            Vector4 CameraUp,
+            Vector4 Projection);
+
+        [StructLayout(LayoutKind.Sequential)]
         private readonly record struct SsaoPushConstants(
             Vector4 TexelRadiusStrength,
             Vector4 DepthProjection,
@@ -6862,6 +7030,10 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public Pipeline TransparentPipeline;
             public ShaderModule VertexShader;
             public ShaderModule FragmentShader;
+            public PipelineLayout EnvironmentBackgroundPipelineLayout;
+            public Pipeline EnvironmentBackgroundPipeline;
+            public ShaderModule EnvironmentBackgroundVertexShader;
+            public ShaderModule EnvironmentBackgroundFragmentShader;
             public Sampler ShadowSampler;
             public PipelineLayout ShadowPipelineLayout;
             public Pipeline ShadowPipeline;
@@ -6952,6 +7124,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     {
                         projectPipeline.Dispose(Vk, Device);
                     }
+
+                    if (EnvironmentBackgroundPipeline.Handle != 0) Vk.DestroyPipeline(Device, EnvironmentBackgroundPipeline, null);
+                    if (EnvironmentBackgroundPipelineLayout.Handle != 0) Vk.DestroyPipelineLayout(Device, EnvironmentBackgroundPipelineLayout, null);
+                    if (EnvironmentBackgroundFragmentShader.Handle != 0) Vk.DestroyShaderModule(Device, EnvironmentBackgroundFragmentShader, null);
+                    if (EnvironmentBackgroundVertexShader.Handle != 0) Vk.DestroyShaderModule(Device, EnvironmentBackgroundVertexShader, null);
 
                     if (ShadowPipeline.Handle != 0) Vk.DestroyPipeline(Device, ShadowPipeline, null);
                     if (ShadowPipelineLayout.Handle != 0) Vk.DestroyPipelineLayout(Device, ShadowPipelineLayout, null);

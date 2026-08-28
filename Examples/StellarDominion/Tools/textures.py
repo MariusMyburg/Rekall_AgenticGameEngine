@@ -152,18 +152,28 @@ def deep_space_environment(width=2048, height=1024, seed=20260829):
         for i in range(width):
             u = i / (width - 1)
             cx, cy = _cyl(u, 2.4)
-            cloud = fbm(cx + 11.0, cy + v * 8.0, seed, 4)
+            cloud = fbm(cx + 11.0, cy + v * 8.0, seed, 6)
+            fx, fy = _cyl(u, 14.0)
+            fine = fbm(fx + 37.0, fy + v * 72.0, seed + 101, 4)
+            filaments = math.exp(-abs(fine - 0.52) * 22.0)
             ridge = math.exp(-((v - (0.52 + 0.10 * math.sin(u * math.pi * 2.0 + 0.8))) / 0.16) ** 2)
-            dust = max(0.0, cloud - 0.43) * ridge
-            base = [0.006 + dust * 0.055, 0.009 + dust * 0.075, 0.017 + dust * 0.13]
+            dust = max(0.0, cloud - 0.46) * ridge * (0.34 + 0.66 * filaments)
+            grain = (fine - 0.5) * 0.0025
+            base = [0.0025 + dust * 0.045 + grain,
+                    0.0040 + dust * 0.064 + grain,
+                    0.0090 + dust * 0.115 + grain * 1.4]
 
             star = _hash(i, j, seed + 17)
-            if star > 0.9987:
-                energy = ((star - 0.9987) / 0.0013) ** 2
+            if star > 0.99992:
+                energy = ((star - 0.99992) / 0.00008) ** 2
                 warmth = _hash(i, j, seed + 31)
                 star_color = lerp3((0.62, 0.76, 1.0), (1.0, 0.82, 0.58), warmth)
                 for channel in range(3):
-                    base[channel] += star_color[channel] * (0.35 + energy * 0.65)
+                    base[channel] += star_color[channel] * (0.30 + energy * 1.20)
+            elif star > 0.99955:
+                energy = (star - 0.99955) / 0.00037
+                for channel in range(3):
+                    base[channel] += (0.055 + energy * 0.085)
 
             # Wrapped longitude distance keeps the source seamless at u=0/1.
             du = abs(u - 0.71)

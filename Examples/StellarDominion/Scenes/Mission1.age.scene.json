@@ -10,7 +10,7 @@
   ],
   "entities": [
     {
-      "id": "ent_0569f36144504fc7add7086e77dc03f6",
+      "id": "ent_7f1dc3b3cedd4d79a574a41fe8579790",
       "name": "Ardent Dominion",
       "tags": [
         "capital",
@@ -124488,7 +124488,7 @@
       "locked": false
     },
     {
-      "id": "ent_bcd4e2848a4847a79f59360f39e4cc9f",
+      "id": "ent_4194933f64334db3b57fb7cfe04069e7",
       "name": "Ardent Dominion Drive",
       "tags": [
         "drive",
@@ -129587,7 +129587,7 @@
       "locked": false
     },
     {
-      "id": "ent_5a418aec70af4dab817325d73f059503",
+      "id": "ent_31657819393347719505a30635073fd1",
       "name": "Ardent Dominion Fighter 1",
       "tags": [
         "fighter",
@@ -142777,7 +142777,7 @@
       "locked": false
     },
     {
-      "id": "ent_73b619dac81040baaca41b6ae64f890b",
+      "id": "ent_6eb2b87487114779bcb14ddac33beaf2",
       "name": "Ardent Dominion Fighter 2",
       "tags": [
         "fighter",
@@ -155967,7 +155967,7 @@
       "locked": false
     },
     {
-      "id": "ent_fb00156c53894575bb0a0d08f5eb2dcd",
+      "id": "ent_a9e91abdf37e453394f0d4e19ab5a3aa",
       "name": "Ardent Dominion Fighter 3",
       "tags": [
         "fighter",
@@ -169157,7 +169157,7 @@
       "locked": false
     },
     {
-      "id": "ent_8018c2d644054be999b9403bcd8a2bf4",
+      "id": "ent_a0ec9c68a54146ff927575235b74702a",
       "name": "Ardent Dominion Fighter 4",
       "tags": [
         "fighter",
@@ -182347,7 +182347,7 @@
       "locked": false
     },
     {
-      "id": "ent_b8ffa72121704fa38a94885568af2802",
+      "id": "ent_62131dac912f45bdb595d4462665a7a9",
       "name": "Ardent Dominion Fighter 5",
       "tags": [
         "fighter",
@@ -195537,7 +195537,7 @@
       "locked": false
     },
     {
-      "id": "ent_dda109850a2d4d159d4b8c216a867fb3",
+      "id": "ent_5c1b85852add4b42bb35e18a5a2b1cec",
       "name": "Ardent Dominion Fighter 6",
       "tags": [
         "fighter",
@@ -208727,7 +208727,7 @@
       "locked": false
     },
     {
-      "id": "ent_24cd0a5e3119466dbd7c39357f6da952",
+      "id": "ent_58c514bba89843a2a564a341980bc9a1",
       "name": "Camera",
       "tags": [
         "camera"
@@ -208786,7 +208786,7 @@
       "locked": false
     },
     {
-      "id": "ent_f32e6f818ce143f0b807e8e303b44fc8",
+      "id": "ent_399bf287002a461fb3e86a851a9c3a45",
       "name": "Choir Node Ashen",
       "tags": [
         "hostile",
@@ -265932,7 +265932,7 @@
       "locked": false
     },
     {
-      "id": "ent_3dd84fcec77b4f78bd4ecdce48f8101d",
+      "id": "ent_32afae9b931447b18478b55947c498ff",
       "name": "Choir Node Ashen Drive",
       "tags": [
         "drive",
@@ -269769,7 +269769,7 @@
       "locked": false
     },
     {
-      "id": "ent_d2ebe9e332d1460c8fbd7c84e052c0ff",
+      "id": "ent_20172b728dff46b28be58058d333c7e6",
       "name": "Choir Node Hymn",
       "tags": [
         "hostile",
@@ -326915,7 +326915,7 @@
       "locked": false
     },
     {
-      "id": "ent_d859a477c63448018ae377699b6b0e5d",
+      "id": "ent_d5aeab1037684ddfad2345abc446236f",
       "name": "Choir Node Hymn Drive",
       "tags": [
         "drive",
@@ -330752,7 +330752,7 @@
       "locked": false
     },
     {
-      "id": "ent_35dff786746b4fafa92a8952d019dcee",
+      "id": "ent_52405c48f72b417e9353df96e8df432f",
       "name": "Choir Node Salt",
       "tags": [
         "hostile",
@@ -387898,7 +387898,7 @@
       "locked": false
     },
     {
-      "id": "ent_b883dd2a045c456eacad0a0b32e783da",
+      "id": "ent_cc77f800ce9b4112bf33083868e4fa51",
       "name": "Choir Node Salt Drive",
       "tags": [
         "drive",
@@ -391735,7 +391735,7 @@
       "locked": false
     },
     {
-      "id": "ent_540b9af709484a70ac4d68cdadf74988",
+      "id": "ent_6f3cf4a260bb47b3a811cb4e8d510689",
       "name": "Controls Hint",
       "tags": [
         "ui"
@@ -391766,7 +391766,7 @@
       "locked": false
     },
     {
-      "id": "ent_e61954c7fc1a420d8a62d5af10b45df2",
+      "id": "ent_35c424cd651b4ff4ac5890b0efdf05e1",
       "name": "Convoy Warm Fill",
       "tags": [
         "light"
@@ -391796,7 +391796,7 @@
       "locked": false
     },
     {
-      "id": "ent_00e3b8e552004840b80a0fea15a0c48d",
+      "id": "ent_2c9f10127ef44ed9996eb9161fe977c4",
       "name": "Environment",
       "tags": [
         "environment"
@@ -391807,7 +391807,7 @@
           "properties": {
             "backgroundPolicy": "color",
             "backgroundColor": "#000000",
-            "skyAsset": "asset_stellar-environment_ce1b6a4f",
+            "skyAsset": "asset_stellar-environment_66687061",
             "toneMapper": "agx",
             "exposure": -0.1,
             "whitePoint": 11.2,
@@ -391852,7 +391852,7 @@
       "locked": false
     },
     {
-      "id": "ent_ca662f972f80472e91c44f8a7adaac03",
+      "id": "ent_4580d42a9ca5441e8d9a78efec1d40dd",
       "name": "Fade Curtain",
       "tags": [
         "ui"
@@ -391882,7 +391882,7 @@
       "locked": false
     },
     {
-      "id": "ent_4387dff1b4bc4ad3b71d51d806f6a5b3",
+      "id": "ent_f1da641c7f164fa7a3c105aae2c93a68",
       "name": "Kell",
       "tags": [
         "planet"
@@ -391914,7 +391914,7 @@
       "locked": false
     },
     {
-      "id": "ent_a0303620bcb94e928e724c5a15427018",
+      "id": "ent_b2713733b43b457b882f5eec6f05872e",
       "name": "Long Watch",
       "tags": [
         "capital",
@@ -449060,7 +449060,7 @@
       "locked": false
     },
     {
-      "id": "ent_42ca69af34654bb3acdae3f80fdcc518",
+      "id": "ent_05a4914541544fee8f11d06f4177e5a0",
       "name": "Long Watch Drive",
       "tags": [
         "drive",
@@ -452897,7 +452897,7 @@
       "locked": false
     },
     {
-      "id": "ent_3930028011304667adb5795043ef6c56",
+      "id": "ent_df8ad897ab0e41fcaa83cc319d155f97",
       "name": "Long Watch Fighter 1",
       "tags": [
         "fighter",
@@ -466087,7 +466087,7 @@
       "locked": false
     },
     {
-      "id": "ent_f3c1f1905c8e409f9a3ba5d1d6a05094",
+      "id": "ent_45215a12243e40afafb5e1001d7d1a55",
       "name": "Long Watch Fighter 2",
       "tags": [
         "fighter",
@@ -479277,7 +479277,7 @@
       "locked": false
     },
     {
-      "id": "ent_9ed94293e1e64c868f1189a98eb7c1bf",
+      "id": "ent_aca297f62c524009afd89920ecfaa5dd",
       "name": "Long Watch Fighter 3",
       "tags": [
         "fighter",
@@ -492467,7 +492467,7 @@
       "locked": false
     },
     {
-      "id": "ent_1aa8a579c4e648fcab8a059ca8cc5fcc",
+      "id": "ent_55c93537a80d4bf1a004e328c7b4b8ce",
       "name": "Long Watch Fighter 4",
       "tags": [
         "fighter",
@@ -505657,7 +505657,7 @@
       "locked": false
     },
     {
-      "id": "ent_06f00969b58f498c8c690a7cc18595ca",
+      "id": "ent_88cb980139c64d31933839c5e4de59bd",
       "name": "Long Watch Fill",
       "tags": [
         "light"
@@ -505687,7 +505687,7 @@
       "locked": false
     },
     {
-      "id": "ent_b3bbf448b826415a98640896ed383e06",
+      "id": "ent_4b4d38b4b4154ef1a4ce542069da1ade",
       "name": "Meridian",
       "tags": [
         "planet"
@@ -505754,7 +505754,7 @@
       "locked": false
     },
     {
-      "id": "ent_7ee69cb824aa438a860856b68a7e55ce",
+      "id": "ent_284d3b05e27e4f3a93f1d23be144f51f",
       "name": "Meridian Bounce",
       "tags": [
         "light"
@@ -505784,7 +505784,7 @@
       "locked": false
     },
     {
-      "id": "ent_4e490f91aa804b05bdb8e14aa00ca9e7",
+      "id": "ent_5e70754077df4dc4a68422f937f741f0",
       "name": "Objective Panel",
       "tags": [
         "ui"
@@ -505817,7 +505817,7 @@
       "locked": false
     },
     {
-      "id": "ent_fafb820c6d5f4165b533c059df9e8055",
+      "id": "ent_85741002b46b4cb8b3930df53b101e52",
       "name": "Post",
       "tags": [
         "post"
@@ -505862,7 +505862,7 @@
       "locked": false
     },
     {
-      "id": "ent_761a774b7e764a2fb81c89482c9ae7d7",
+      "id": "ent_96392c2282044bf88b0a8430eca48243",
       "name": "Shell",
       "tags": [
         "flow"
@@ -505936,7 +505936,7 @@
       "locked": false
     },
     {
-      "id": "ent_51bb43f1e1884d8195fdf5a723c48fc9",
+      "id": "ent_478cdee1a0414801bbea0f7921498b09",
       "name": "Skimmer Anneal",
       "tags": [
         "civilian",
@@ -563071,7 +563071,7 @@
       "locked": false
     },
     {
-      "id": "ent_33f0d01af6f84aa8b27a32a700fa384a",
+      "id": "ent_60703789a5784cd39a2589a0bbf126fb",
       "name": "Skimmer Anneal Drive",
       "tags": [
         "drive",
@@ -565646,7 +565646,7 @@
       "locked": false
     },
     {
-      "id": "ent_5b594c9449d641fe95f932384e121f43",
+      "id": "ent_ff7c3a6fe97d40b4866a7f4fb4465d27",
       "name": "Skimmer Ferrous",
       "tags": [
         "civilian",
@@ -622781,7 +622781,7 @@
       "locked": false
     },
     {
-      "id": "ent_e80a64fc3b4b400380b4326872d31290",
+      "id": "ent_47579fa49e814715be0c6e868b5189f9",
       "name": "Skimmer Ferrous Drive",
       "tags": [
         "drive",
@@ -625356,7 +625356,7 @@
       "locked": false
     },
     {
-      "id": "ent_0ab958f2984f440393017f7e6f8e0ab6",
+      "id": "ent_579231db972d447d857c8114dda3119e",
       "name": "Starfield",
       "tags": [
         "backdrop"
@@ -625386,7 +625386,7 @@
       "locked": false
     },
     {
-      "id": "ent_cba6dc9f7f014213b1564e17b7f0e8e4",
+      "id": "ent_cfb246d406bb42e3ac3606a8ef1a3525",
       "name": "Sun Disc",
       "tags": [
         "light"
@@ -625434,7 +625434,7 @@
       "locked": false
     },
     {
-      "id": "ent_ea42fc6171a249f7821268da1a812cdc",
+      "id": "ent_153e7eb8fc3d4cf593e911600b1bec6a",
       "name": "Sun Light",
       "tags": [
         "light"
@@ -625465,7 +625465,7 @@
       "locked": false
     },
     {
-      "id": "ent_f7214ceb7ab942c88d0ace4c330f1977",
+      "id": "ent_49d1f1d987f84d6e9187373bf75d54d8",
       "name": "Tactical HUD",
       "tags": [
         "ui"
@@ -625498,7 +625498,7 @@
       "locked": false
     },
     {
-      "id": "ent_a1faa3865fd34c84bb8f151fd02b5ec2",
+      "id": "ent_6a9e3c87c29a48eb80d7cb9611a50336",
       "name": "Unit Panel",
       "tags": [
         "ui"
@@ -625531,7 +625531,7 @@
       "locked": false
     },
     {
-      "id": "ent_cc0d095da5c94edabf8cd358b53859cc",
+      "id": "ent_8d92f11777684e1d9addaff61c39f3f7",
       "name": "Vigil Fill",
       "tags": [
         "light"
@@ -625561,7 +625561,7 @@
       "locked": false
     },
     {
-      "id": "ent_b6bfbc193caf42ecad1bd6b252be35bb",
+      "id": "ent_0279756f4eac49deb780b1e52aa8acb3",
       "name": "Vigil of Kell",
       "tags": [
         "capital",
@@ -682707,7 +682707,7 @@
       "locked": false
     },
     {
-      "id": "ent_a64113331bc049de8840e4cbc556d634",
+      "id": "ent_488f661181514240b6f58f4f740d3bc5",
       "name": "Vigil of Kell Drive",
       "tags": [
         "drive",
@@ -686544,7 +686544,7 @@
       "locked": false
     },
     {
-      "id": "ent_5eb73957bd49489496c44ca1888d0610",
+      "id": "ent_73bd403fa82d4932baaf3502d46b0ce9",
       "name": "Vigil of Kell Fighter 1",
       "tags": [
         "fighter",
@@ -699734,7 +699734,7 @@
       "locked": false
     },
     {
-      "id": "ent_6710fedce8b34e9b8e26f852d4d84745",
+      "id": "ent_ce1b0c2dc6584685972358ff69345c8d",
       "name": "Vigil of Kell Fighter 2",
       "tags": [
         "fighter",
@@ -712924,7 +712924,7 @@
       "locked": false
     },
     {
-      "id": "ent_8757fd32c419469fbd2a41c6e77956be",
+      "id": "ent_48e502606a324d429e155a62ead477fa",
       "name": "Vigil of Kell Fighter 3",
       "tags": [
         "fighter",
@@ -726114,7 +726114,7 @@
       "locked": false
     },
     {
-      "id": "ent_6980f29ce0934a5d919fde31ea472064",
+      "id": "ent_c5eae093c4fe4b82a3e9334c2e0a211f",
       "name": "Vigil of Kell Fighter 4",
       "tags": [
         "fighter",

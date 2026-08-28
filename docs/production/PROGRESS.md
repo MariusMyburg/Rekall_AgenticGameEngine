@@ -8,6 +8,38 @@ Last verified: 2026-08-29 Africa/Johannesburg
 
 Branch: `master`
 
+## 2026-08-29 — Camera-aware environment background pass
+
+Authored environment images now render as a true renderer-owned background
+behind opaque geometry in native Vulkan and through the interactive Windows
+player's depth-aware presentation path. The implementation uses the existing
+`Environment3D.skyAsset` contract, preserves projects without a sky image, and
+does not require a giant inverted sphere or any game-specific scene geometry.
+Both paths decode the authored sRGB panorama to linear radiance before the
+scene display transform; this fixed the first washed-out gray integration.
+
+Stellar Dominion's deterministic environment was regenerated with darker
+space, substantially fewer bright stars, finer turbulent dust, and filament
+structure. Fresh native and interactive 1920x1080 evidence is retained at
+`Examples/StellarDominion/Captures/environment-background-1920x1080.png` and
+`Examples/StellarDominion/Captures/interactive-environment-background-1920x1080.png`.
+The native frame resolves High quality on the RTX 5090 with 42 draws, three
+dispatches, 13,312 distinct colors, no missing/unsupported assets, mean
+luminance 0.022, and standard deviation 0.080. The live Windows player was
+relaunched from the same scene and remains open.
+
+The refreshed Windows package and consolidated audit also pass: ready, 421
+files, zero missing key artifacts, run exit code 0, nonblank informative proof
+frame, and only the known full-viewport HUD coverage advisory. The full mission
+probe matrix, beam tracking, and weapon audio were rerun after the scene asset
+mutation and all passed.
+
+Visual inspection is improved but still deliberately not called the ceiling:
+the ships need substantially stronger hero-asset geometry/material response,
+the native and interactive lighting exposure still differ visibly, the
+panorama needs better prefiltering and subtler star reconstruction, and the
+tactical combat loop needs authored abilities and more consequential effects.
+
 ## 2026-08-29 — Authored environment IBL and scalable texture filtering
 
 AGE now resolves an authored `Environment3D.skyAsset` as a first-class scene

@@ -92,3 +92,12 @@
 - Windows playable package and consolidated package audit: ready, 397 files, zero missing key artifacts, run exit code 0, nonblank informative capture.
 - Stable proof frame: `Examples/StellarDominion/Captures/environment-ibl-1920x1080.png`.
 - Remaining ceiling work is explicitly carried forward in `docs/production/PROGRESS.md`; this tranche does not claim final photorealism.
+
+## Follow-on ceiling result
+
+The highest-priority remaining item from this tranche—the renderer-owned
+environment background—was implemented immediately afterward in both native
+Vulkan and the interactive Windows player. It has its own focused
+camera/background regression and current native/interactive proof frames; the
+remaining items are hero asset quality, renderer parity, prefiltering/temporal
+stability, and richer tactical gameplay/effects.

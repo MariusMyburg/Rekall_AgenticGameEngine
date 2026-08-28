@@ -699,7 +699,9 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             new ResourceLayoutElementDescription("SceneDepthTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
             new ResourceLayoutElementDescription("SceneDepthSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
         var postProcessLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
-            new ResourceLayoutElementDescription("PostProcessUniform", ResourceKind.UniformBuffer, ShaderStages.Fragment)));
+            new ResourceLayoutElementDescription("PostProcessUniform", ResourceKind.UniformBuffer, ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("EnvironmentTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
+            new ResourceLayoutElementDescription("EnvironmentSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
         var hudTextureLayout = factory.CreateResourceLayout(new ResourceLayoutDescription(
             new ResourceLayoutElementDescription("SurfaceTexture", ResourceKind.TextureReadOnly, ShaderStages.Fragment),
             new ResourceLayoutElementDescription("SurfaceSampler", ResourceKind.Sampler, ShaderStages.Fragment)));
@@ -799,7 +801,6 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             directionalShadowFrameLayout,
             directionalShadowFrameUniformBuffer));
         var drawSet = factory.CreateResourceSet(new ResourceSetDescription(drawLayout, drawUniformBuffer));
-        var postProcessSet = factory.CreateResourceSet(new ResourceSetDescription(postProcessLayout, postProcessUniformBuffer));
         PlayerLog.Write("Creating texture resources.");
         var whiteTexture = CreateTextureBinding(
             device,
@@ -863,6 +864,11 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             && textures.TryGetValue(baseFrame.Environment.SkyAssetId, out var authoredEnvironment)
                 ? authoredEnvironment
                 : whiteTexture;
+        var postProcessSet = factory.CreateResourceSet(new ResourceSetDescription(
+            postProcessLayout,
+            postProcessUniformBuffer,
+            environmentTexture.Texture,
+            environmentTexture.Sampler));
         var frameSet = factory.CreateResourceSet(new ResourceSetDescription(
             frameLayout,
             frameUniformBuffer,
@@ -5157,12 +5163,38 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             vec4 CameraPosition;
             vec4 EnvironmentParameters;
         };
+        layout(set = 1, binding = 1) uniform texture2D EnvironmentTexture;
+        layout(set = 1, binding = 2) uniform sampler EnvironmentSampler;
 
         layout(location = 0) out vec4 fsout_Color;
 
         float luma(vec3 color)
         {
             return dot(color, vec3(0.299, 0.587, 0.114));
+        }
+
+        vec2 directionToEnvironmentUv(vec3 direction)
+        {
+            const float pi = 3.14159265358979323846;
+            direction = normalize(direction);
+            return vec2(
+                atan(direction.z, direction.x) / (2.0 * pi) + 0.5,
+                acos(clamp(direction.y, -1.0, 1.0)) / pi);
+        }
+
+        vec3 environmentBackground(vec2 uv)
+        {
+            vec2 ndc = uv * 2.0 - 1.0;
+            vec4 nearH = InverseViewProjection * vec4(ndc, 0.0, 1.0);
+            vec4 farH = InverseViewProjection * vec4(ndc, 1.0, 1.0);
+            vec3 nearWorld = nearH.xyz / max(abs(nearH.w), 0.000001);
+            vec3 farWorld = farH.xyz / max(abs(farH.w), 0.000001);
+            vec3 ray = normalize(farWorld - nearWorld);
+            vec3 encoded = textureLod(
+                sampler2D(EnvironmentTexture, EnvironmentSampler),
+                directionToEnvironmentUv(ray),
+                0.0).rgb;
+            return pow(max(encoded, vec3(0.0)), vec3(2.2));
         }
 
         // Kept byte-identical to agxCurve in Shaders/rekall_tonemap.frag so the interactive
@@ -5342,6 +5374,12 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         {
             vec2 texel = 1.0 / vec2(textureSize(sampler2D(SceneTexture, SceneSampler), 0));
             vec4 resolved = resolveFxaa(texel);
+            float sceneDepth = texture(sampler2D(SceneDepthTexture, SceneDepthSampler), fsin_UV).r;
+            if (sceneDepth >= 0.99999
+                && textureSize(sampler2D(EnvironmentTexture, EnvironmentSampler), 0).x > 1)
+            {
+                resolved.rgb = environmentBackground(fsin_UV);
+            }
             vec3 bloom = sampleBloom(fsin_UV, texel);
             float ambientOcclusion = resolveAmbientOcclusion(fsin_UV, texel);
 

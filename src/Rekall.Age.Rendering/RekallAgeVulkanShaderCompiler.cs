@@ -95,6 +95,31 @@ public sealed class RekallAgeVulkanShaderCompiler
             errors);
     }
 
+    public RekallAgeVulkanSceneShaderCompilationResult CompileEnvironmentBackgroundPipeline()
+    {
+        var errors = new List<string>();
+        RekallAgeVulkanCompiledShader vertex;
+        try
+        {
+            vertex = CompileSource(FullscreenVertexSource, "rekall_environment_background.vert", RekallAgeVulkanShaderStage.Vertex);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            errors.Add($"Vulkan environment background vertex shader failed to compile: {ex.Message}");
+            vertex = new RekallAgeVulkanCompiledShader(RekallAgeVulkanShaderStage.Vertex, "rekall_environment_background.vert", []);
+        }
+
+        var fragment = CompileShader(
+            Path.Combine("Shaders", "rekall_environment_background.frag"),
+            RekallAgeVulkanShaderStage.Fragment,
+            errors);
+        return new RekallAgeVulkanSceneShaderCompilationResult(
+            errors.Count == 0 && vertex.Spirv.Length > 0 && fragment.Spirv.Length > 0,
+            vertex,
+            fragment,
+            errors);
+    }
+
     public string ResolveShaderPath(string path)
     {
         if (Path.IsPathRooted(path) && File.Exists(path))

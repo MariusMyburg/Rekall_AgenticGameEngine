@@ -421,48 +421,66 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
         {
             var entity = FindEntity(transformResolver, mesh.EntityId);
             var transform = transformResolver.Resolve(mesh.EntityId);
-            var meshRendererComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type is "Rekall.MeshRenderer" or "Rekall.MeshSet");
-            var planetComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.PlanetRenderer", StringComparison.Ordinal));
-            var cloudLayerComponents = entity?.Components
-                .Where(component => component.Type.Equals("Rekall.CloudLayerRenderer", StringComparison.Ordinal))
-                .ToArray() ?? [];
+            // One pass over the entity's components instead of twenty FirstOrDefault scans.
+            // This runs per renderable, so the old shape was O(20 x components) per renderable
+            // and was the largest single cost in frame build on large scenes. Assigning with
+            // "??=" during a forward scan keeps FirstOrDefault's "first match wins" semantics,
+            // and the cloud-layer list preserves component order the same way Where(...) did.
+            RekallAgeRuntimeComponent? meshRendererComponent = null;
+            RekallAgeRuntimeComponent? planetComponent = null;
+            RekallAgeRuntimeComponent? atmosphereComponent = null;
+            RekallAgeRuntimeComponent? materialComponent = null;
+            RekallAgeRuntimeComponent? proceduralMaterialComponent = null;
+            RekallAgeRuntimeComponent? virtualGeometryComponent = null;
+            RekallAgeRuntimeComponent? geometry = null;
+            RekallAgeRuntimeComponent? geometryMeshComponent = null;
+            RekallAgeRuntimeComponent? meshAssetReferenceComponent = null;
+            RekallAgeRuntimeComponent? modelAssetReferenceComponent = null;
+            RekallAgeRuntimeComponent? lineSegmentsComponent = null;
+            RekallAgeRuntimeComponent? orbitComponent = null;
+            RekallAgeRuntimeComponent? orbitPathComponent = null;
+            RekallAgeRuntimeComponent? ringComponent = null;
+            RekallAgeRuntimeComponent? starfieldComponent = null;
+            RekallAgeRuntimeComponent? grassComponent = null;
+            RekallAgeRuntimeComponent? markerComponent = null;
+            RekallAgeRuntimeComponent? haloComponent = null;
+            RekallAgeRuntimeComponent? textLabelComponent = null;
+            List<RekallAgeRuntimeComponent>? cloudLayerComponentList = null;
+            if (entity is not null)
+            {
+                foreach (var component in entity.Components)
+                {
+                    switch (component.Type)
+                    {
+                        case "Rekall.MeshRenderer":
+                        case "Rekall.MeshSet": meshRendererComponent ??= component; break;
+                        case "Rekall.PlanetRenderer": planetComponent ??= component; break;
+                        case "Rekall.CloudLayerRenderer": (cloudLayerComponentList ??= []).Add(component); break;
+                        case "Rekall.AtmosphereRenderer": atmosphereComponent ??= component; break;
+                        case "Rekall.Material": materialComponent ??= component; break;
+                        case "Rekall.ProceduralMaterial": proceduralMaterialComponent ??= component; break;
+                        case "Rekall.VirtualGeometry": virtualGeometryComponent ??= component; break;
+                        case "Rekall.GeometryPrimitive": geometry ??= component; break;
+                        case "Rekall.GeometryMesh": geometryMeshComponent ??= component; break;
+                        case "Rekall.MeshAssetReference": meshAssetReferenceComponent ??= component; break;
+                        case "Rekall.ModelAssetReference": modelAssetReferenceComponent ??= component; break;
+                        case "Rekall.LineSegments": lineSegmentsComponent ??= component; break;
+                        case "Rekall.KeplerOrbit": orbitComponent ??= component; break;
+                        case "Rekall.OrbitPathRenderer": orbitPathComponent ??= component; break;
+                        case "Rekall.RingRenderer": ringComponent ??= component; break;
+                        case "Rekall.StarfieldRenderer": starfieldComponent ??= component; break;
+                        case "Rekall.GrassRenderer": grassComponent ??= component; break;
+                        case "Rekall.MarkerRenderer": markerComponent ??= component; break;
+                        case "Rekall.HaloRenderer": haloComponent ??= component; break;
+                        case "Rekall.TextLabelRenderer": textLabelComponent ??= component; break;
+                    }
+                }
+            }
+
+            var cloudLayerComponents = cloudLayerComponentList is null
+                ? []
+                : cloudLayerComponentList.ToArray();
             var cloudLayers = ExpandCloudLayerComponents(cloudLayerComponents);
-            var atmosphereComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.AtmosphereRenderer", StringComparison.Ordinal));
-            var materialComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.Material", StringComparison.Ordinal));
-            var proceduralMaterialComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.ProceduralMaterial", StringComparison.Ordinal));
-            var virtualGeometryComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.VirtualGeometry", StringComparison.Ordinal));
-            var geometry = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.GeometryPrimitive", StringComparison.Ordinal));
-            var geometryMeshComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.GeometryMesh", StringComparison.Ordinal));
-            var meshAssetReferenceComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.MeshAssetReference", StringComparison.Ordinal));
-            var modelAssetReferenceComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.ModelAssetReference", StringComparison.Ordinal));
-            var lineSegmentsComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.LineSegments", StringComparison.Ordinal));
-            var orbitComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.KeplerOrbit", StringComparison.Ordinal));
-            var orbitPathComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.OrbitPathRenderer", StringComparison.Ordinal));
-            var ringComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.RingRenderer", StringComparison.Ordinal));
-            var starfieldComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.StarfieldRenderer", StringComparison.Ordinal));
-            var grassComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.GrassRenderer", StringComparison.Ordinal));
-            var markerComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.MarkerRenderer", StringComparison.Ordinal));
-            var haloComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.HaloRenderer", StringComparison.Ordinal));
-            var textLabelComponent = entity?.Components.FirstOrDefault(component =>
-                component.Type.Equals("Rekall.TextLabelRenderer", StringComparison.Ordinal));
             var lodSelection = SelectLod(entity, activeCamera, transform);
             var isOrbitPathRenderable = mesh.Variant?.Equals("rekall.orbit.path", StringComparison.OrdinalIgnoreCase) == true;
             var isRingRenderable = mesh.Variant?.Equals("rekall.planet.ring", StringComparison.OrdinalIgnoreCase) == true;

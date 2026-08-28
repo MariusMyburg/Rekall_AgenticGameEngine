@@ -148,6 +148,19 @@ def space():
                                     "pitch": CAM_PITCH, "yaw": CAM_YAW, "roll": 0}),
             ("Rekall.Camera3D", {"active": True, "fieldOfView": 62,
                                  "nearClip": 0.2, "farClip": 40000}),
+            # The transform above is only the opening pose. CameraSystem derives it from
+            # the pivot/yaw/pitch/distance below every step, and frames the fleet on the
+            # first one, so the numbers here stop mattering as soon as the scene runs.
+            ("Game.Modules.FleetRules.TacticalCamera", {
+                "enabled": True,
+                "pivotX": 10, "pivotY": 0, "pivotZ": 200,
+                "distance": 420, "yaw": CAM_YAW, "pitch": CAM_PITCH,
+                "minimumDistance": 40, "maximumDistance": 2400,
+                "minimumPitch": -12, "maximumPitch": 82,
+                "orbitDegreesPerPixel": 0.35,
+                "panUnitsPerSecond": 260, "zoomStep": 0.12,
+                "frameOnStart": True,
+            }),
         ]),
     ]
 
@@ -380,7 +393,7 @@ entities.append(e("Controls Hint", ["ui"], [
     ("Rekall.Transform3D", {}),
     ("Rekall.UiElement", {
         "x": 36, "y": 946, "width": 1020, "height": 56,
-        "text": "LEFT CLICK select    RIGHT CLICK move, or engage what is under the cursor",
+        "text": "LEFT CLICK select   RIGHT CLICK move / engage   MIDDLE DRAG orbit   WASD pan   WHEEL zoom   SPACE frame all",
         "backgroundColor": "#00000000", "foregroundColor": "#6f96b4",
         "fontSize": 17, "fontFamily": "Consolas",
     }),

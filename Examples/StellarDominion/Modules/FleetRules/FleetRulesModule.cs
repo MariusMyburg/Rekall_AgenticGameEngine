@@ -34,6 +34,8 @@ public sealed class FleetRulesModule : RekallAgeModule
         builder.RegisterRuntimeSystem<DebriefSystem>();
         builder.RegisterComponent<Ordnance>();
         builder.RegisterRuntimeSystem<OrdnanceSystem>();
+        builder.RegisterComponent<TacticalCamera>();
+        builder.RegisterRuntimeSystem<CameraSystem>();
     }
 }
 

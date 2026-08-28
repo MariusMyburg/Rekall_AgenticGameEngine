@@ -167,6 +167,27 @@ def case_defeat(scene, by_name):
     return "defeat", scene, checks, 1200
 
 
+def case_camera(scene, by_name):
+    """The camera derives its own pose and frames the fleet on the first step.
+
+    Worth pinning headlessly because the authored transform in the blueprint is only a
+    seed - if the system stopped running, the scene would still look plausible and
+    nothing else here would notice.
+    """
+    checks = [
+        # The framing latch must clear, or it would re-frame every step and fight the player.
+        assertion("Camera", "component.property", "equals", False,
+                  "TacticalCamera", "frameOnStart"),
+        # Framing has to actually move the camera off the pose authored in the blueprint.
+        {"entityName": "Camera", "subject": "delta.position3d.z",
+         "operator": "not-equals", "expected": 0},
+        # And it must sit back far enough to hold the whole engagement.
+        assertion("Camera", "component.property", "greater-than", 300,
+                  "TacticalCamera", "distance"),
+    ]
+    return "camera", scene, checks, 120
+
+
 def case_quiet(scene, by_name):
     """No orders given. Nothing should happen, and nothing should be declared."""
     checks = [
@@ -215,7 +236,7 @@ def main():
         m.call("initialize", {"protocolVersion": "2024-11-05", "capabilities": {},
                               "clientInfo": {"name": "verify", "version": "1"}})
 
-        for build in (case_quiet, case_victory, case_missiles, case_defeat, case_debrief):
+        for build in (case_quiet, case_camera, case_victory, case_missiles, case_defeat, case_debrief):
             scene, by_name = load(
                 "Debrief" if build is case_debrief else "Mission1")
             label, scene, checks, frames = build(scene, by_name)

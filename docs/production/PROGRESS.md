@@ -8,6 +8,51 @@ Last verified: 2026-08-29 Africa/Johannesburg
 
 Branch: `master`
 
+## 2026-08-29 — Stellar Dominion tactical-combat ceiling checkpoint
+
+Stellar Dominion now has a complete agent-authored tactical ability slice. A
+scene-owned semantic input map exposes `fleet.shield-pulse` on Q,
+`fleet.overcharge` on E, and briefing advance on Enter. The Fleet Rules module
+owns inspectable singleton cooldowns and per-vessel active durations, advances
+them from runtime delta time, validates the current friendly selection, updates
+the HUD, and spawns only ordinary AGE line, particle, light, material, and audio
+entities. Shield Pulse restores bounded shields; Overcharge temporarily raises
+damage by 65% and shortens weapon cycles to 62%; invalid selections remain safe
+and explain themselves in the HUD.
+
+Combat presentation gained blue-white hull-hugging overcharge filaments,
+three-axis shield pulses, layered destruction ruptures, low spatial hull-break
+reports, and separate emissive service/navigation lighting on every authored
+vessel. The latter originally repeated thousands of small beveled boxes and
+inflated generated Mission1 to 30.7 MB; replacing those boxes with generic
+emissive line segments cut the compact blueprint to 7.7 MB while preserving the
+visible lighting language. The attachment rule now keeps both drives and lights
+on ordered capitals and orbiting fighters and hides them with destroyed hulls.
+
+The player-facing loop reaches interaction sooner: briefing cards advance every
+five seconds or immediately with Enter, the ability/cooldown HUD no longer
+overlaps the controls strip at 1080p, and a closer combat composition keeps
+authored hull detail readable. The retained hardware-Vulkan proof is
+`Examples/StellarDominion/Captures/combat-showcase-1920x1080.png`; it captures
+the real mission rules in a deterministic close engagement at Epic quality on
+the RTX 5090 with 74 renderables and 68 draws.
+
+Executable evidence is green after the final module and scene mutations:
+Shield Pulse and Overcharge each pass strict semantic-input assertions on both
+singleton cooldown and per-vessel agent-owned state; the moving-owner beam and
+spatial WAV report probes pass; and quiet, camera, briefing, victory, missile,
+defeat, and debrief cases pass 40 assertions across their intended frame spans.
+The refreshed Windows package contains `Play.exe`/`Play.bat`; consolidated audit
+passes with 474 files, zero missing artifacts, run exit code 0, nonblank and
+informative capture, and only the known full-canvas coverage advisory.
+
+This is the current verified authored ceiling, not a claim of film-grade
+photorealism. Pixel review still shows the remaining decisive gap: compiled
+high-resolution hero assets with authored texture sets and animation, temporal
+antialiasing/upscaling, richer volumetrics and debris, and strict first-capture
+GPU/UI warm-up determinism. Those are now more valuable than adding further
+ability variants to this mission.
+
 ## 2026-08-29 — Camera-aware environment background pass
 
 Authored environment images now render as a true renderer-owned background

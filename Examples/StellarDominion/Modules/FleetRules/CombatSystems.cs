@@ -321,7 +321,10 @@ public sealed class CombatSystem : IRekallAgeRuntimeModuleSystem
                 var range = entity.ComponentNumber(WeaponType, "range", 70);
                 if (CombatRules.Distance(entity, target) <= range)
                 {
-                    var shot = entity.ComponentNumber(WeaponType, "damage", 90);
+                    var overcharged = entity.ComponentNumber(
+                        TacticalAbilitySystem.StatusType, "overchargeRemaining") > 0;
+                    var shot = entity.ComponentNumber(WeaponType, "damage", 90)
+                        * (overcharged ? 1.65 : 1.0);
                     var colour = OrdnanceColour(entity);
                     var muzzle = entity.Transform.Position3D;
 
@@ -364,7 +367,9 @@ public sealed class CombatSystem : IRekallAgeRuntimeModuleSystem
                             hostile ? 0.9 : 1.0));
                     }
 
-                    cooldown = Math.Max(0.05, entity.ComponentNumber(WeaponType, "cycleSeconds", 1.6));
+                    cooldown = Math.Max(0.05,
+                        entity.ComponentNumber(WeaponType, "cycleSeconds", 1.6)
+                        * (overcharged ? 0.62 : 1.0));
                 }
             }
 
@@ -412,6 +417,21 @@ public sealed class CombatSystem : IRekallAgeRuntimeModuleSystem
                         .WithComponentBoolean(OrderSystem.SelectableType, "enabled", false))
                         with { Visible = false };
                     wrecked.Add(next.Name);
+                    // A loss must be legible without reading the HUD. Layered flashes share
+                    // the generic ordnance lifetime path, while the heavy impact report gives
+                    // the destruction physical weight at tactical camera distances.
+                    var at = next.Transform.Position3D;
+                    spawned.Add(OrdnanceFactory.Flash(
+                        $"ord_wreck_core_{stamp}_{sequence++}", at, "#ff7a36"));
+                    spawned.Add(OrdnanceFactory.Flash(
+                        $"ord_wreck_port_{stamp}_{sequence++}",
+                        new RekallAgeRuntimeVector3(at.X - 4, at.Y + 2, at.Z - 3), "#ffbf62"));
+                    spawned.Add(OrdnanceFactory.Flash(
+                        $"ord_wreck_starboard_{stamp}_{sequence++}",
+                        new RekallAgeRuntimeVector3(at.X + 5, at.Y - 1, at.Z + 4), "#ff493d"));
+                    spawned.Add(OrdnanceFactory.AudioReport(
+                        $"ord_audio_wreck_{stamp}_{sequence++}", "Hull Rupture", at,
+                        OrdnanceFactory.HeavyImpactClip, 2.8, 0.82, 0.68));
                 }
             }
 
@@ -425,9 +445,12 @@ public sealed class CombatSystem : IRekallAgeRuntimeModuleSystem
             for (var index = 0; index < entities.Count; index++)
             {
                 var candidate = entities[index];
+                var visualSuffix = candidate.Name.EndsWith(" Drive", StringComparison.Ordinal)
+                    ? " Drive"
+                    : candidate.Name.EndsWith(" Lights", StringComparison.Ordinal) ? " Lights" : string.Empty;
                 if (candidate.Visible
-                    && candidate.Name.EndsWith(" Drive", StringComparison.Ordinal)
-                    && wrecked.Contains(candidate.Name[..^" Drive".Length]))
+                    && visualSuffix.Length > 0
+                    && wrecked.Contains(candidate.Name[..^visualSuffix.Length]))
                 {
                     entities[index] = candidate with { Visible = false };
                 }
@@ -564,6 +587,13 @@ public sealed class MissionSystem : IRekallAgeRuntimeModuleSystem
         if (phase == "briefing")
         {
             phaseElapsed += context.DeltaTime.TotalSeconds;
+            // The briefing teaches controls, but it must never imprison a returning player.
+            // Enter is a semantic action authored by the scene, so remapping remains an input
+            // concern and this mission rule only decides what the action means.
+            if (world.WasInputActionPressed("mission.advance-briefing"))
+            {
+                phaseElapsed = (Math.Floor(phaseElapsed / perLine) + 1) * perLine;
+            }
             var index = (int)(phaseElapsed / perLine);
             if (briefing.Count == 0 || index >= briefing.Count)
             {

@@ -15,6 +15,8 @@ public sealed class FleetRulesModule : RekallAgeModule, IRekallAgePlayableModule
         builder.RegisterComponent<Escort>();
         builder.RegisterComponent<Selectable>();
         builder.RegisterComponent<FleetCommand>();
+        builder.RegisterComponent<TacticalAbilities>();
+        builder.RegisterComponent<TacticalStatus>();
         builder.RegisterRuntimeSystem<FleetSystem>();
         builder.RegisterComponent<ShellTransition>();
         builder.RegisterComponent<MenuAction>();
@@ -29,6 +31,7 @@ public sealed class FleetRulesModule : RekallAgeModule, IRekallAgePlayableModule
         builder.RegisterComponent<Order>();
         builder.RegisterComponent<MissionState>();
         builder.RegisterRuntimeSystem<ChoirAiSystem>();
+        builder.RegisterRuntimeSystem<TacticalAbilitySystem>();
         builder.RegisterRuntimeSystem<OrderSystem>();
         builder.RegisterRuntimeSystem<CombatSystem>();
         builder.RegisterRuntimeSystem<MissionSystem>();
@@ -189,8 +192,11 @@ public sealed class FleetSystem : IRekallAgeRuntimeModuleSystem
             // Drive blocks share their hull's name plus " Drive" and simply track it - pose and
             // all. Position alone leaves the plume pointing whichever way the hull was authored
             // facing, which is wrong the moment the ship comes about.
-            if (entity.Name.EndsWith(" Drive", StringComparison.Ordinal)
-                && leaders.TryGetValue(entity.Name[..^" Drive".Length], out var hull))
+            var attachmentSuffix = entity.Name.EndsWith(" Drive", StringComparison.Ordinal)
+                ? " Drive"
+                : entity.Name.EndsWith(" Lights", StringComparison.Ordinal) ? " Lights" : string.Empty;
+            if (attachmentSuffix.Length > 0
+                && leaders.TryGetValue(entity.Name[..^attachmentSuffix.Length], out var hull))
             {
                 entities.Add(entity
                     .WithPosition3D(new RekallAgeRuntimeVector3(hull.X, hull.Y, hull.Z))
@@ -243,9 +249,11 @@ public sealed class FleetSystem : IRekallAgeRuntimeModuleSystem
             var headingDegrees = Math.Atan2(-sin, cos * Math.Cos(inclination)) * 180.0 / Math.PI;
             var bank = Math.Clamp(angularSpeed * 0.45, -55, 55);
 
-            entities.Add(entity
+            var escorted = entity
                 .WithPosition3D(position)
-                .WithRotation3D(new RekallAgeRuntimeVector3(0, headingDegrees + 90, bank)));
+                .WithRotation3D(new RekallAgeRuntimeVector3(0, headingDegrees + 90, bank));
+            entities.Add(escorted);
+            leaders[entity.Name] = (position.X, position.Y, position.Z, headingDegrees + 90);
         }
 
         return ValueTask.FromResult(world with { Entities = entities });

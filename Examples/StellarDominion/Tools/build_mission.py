@@ -114,8 +114,8 @@ def space():
             ("Rekall.Environment3D", {
                 "backgroundPolicy": "color", "backgroundColor": "#000000",
                 "skyAsset": TEX_ENVIRONMENT,
-                "toneMapper": "agx", "exposure": -0.10, "whitePoint": 11.2,
-                "ambientEnergy": 2.4, "ambientSkyColor": "#7890a8",
+                "toneMapper": "agx", "exposure": 0.02, "whitePoint": 11.2,
+                "ambientEnergy": 3.0, "ambientSkyColor": "#8199b2",
                 "ambientGroundColor": "#26313d",
             }),
             ("Rekall.ShadowSettings", {
@@ -147,7 +147,7 @@ def space():
         e("Sun Light", ["light"], [
             ("Rekall.Transform3D", {"x": SUN[0], "y": SUN[1], "z": SUN[2],
                                     "pitch": SUN_PITCH, "yaw": SUN_YAW, "roll": 0}),
-            ("Rekall.DirectionalLight", {"intensity": 4.8, "color": "#fff2dc"}),
+            ("Rekall.DirectionalLight", {"intensity": 5.6, "color": "#fff2dc"}),
         ]),
         e("Sun Disc", ["light"], [
             ("Rekall.Transform3D", {"x": SUN[0], "y": SUN[1], "z": SUN[2],
@@ -256,9 +256,14 @@ dread_d = ships.drive(90, 12.0, nozzles=4)
 cru_d = ships.drive(52, 7.6, nozzles=3)
 choir_d = ships.drive(46, 9.6, nozzles=3, tint=(1.0, 0.32, 0.42))
 tank_d = ships.drive(62, 12.0, nozzles=2, tint=(1.0, 0.72, 0.42))
+dread_l = ships.running_lights(90, 12.0, count=44, seed=111)
+cru_l = ships.running_lights(52, 7.6, count=30, seed=121)
+choir_l = ships.running_lights(46, 9.6, count=26, seed=131, tint=(1.0, 0.20, 0.32))
+tank_l = ships.running_lights(62, 12.0, count=24, seed=141, tint=(1.0, 0.62, 0.28))
+fighter_l = ships.running_lights(3.4, 0.95, count=4, seed=151)
 
 
-def warship(name, side, pos, yaw, mesh, drive, stats, weapon, order_speed,
+def warship(name, side, pos, yaw, mesh, drive, lights, stats, weapon, order_speed,
             hull_color, drive_colors, story_critical=False, tags=("ship",)):
     """A hull that can be selected, ordered, shot at and lost.
 
@@ -291,6 +296,9 @@ def warship(name, side, pos, yaw, mesh, drive, stats, weapon, order_speed,
             "shields": shields, "shieldsMax": shields_max,
             "crew": crew, "selectRadius": radius,
         }),
+        ("Game.Modules.FleetRules.TacticalStatus", {
+            "shieldPulseVisualSeconds": 0, "overchargeRemaining": 0,
+        }),
     ] + ([("Game.Modules.FleetRules.Weapon", {
         "enabled": True, "range": weapon[0], "damage": weapon[1],
         "cycleSeconds": weapon[2], "cooldown": 0, "kind": "beam",
@@ -304,6 +312,15 @@ def warship(name, side, pos, yaw, mesh, drive, stats, weapon, order_speed,
                                  "receiveShadows": False}),
         drive_material(*drive_colors),
     ]))
+    light_colour = "#ff3f5e" if side == "choir" else ("#ffad58" if side == "civilian" else "#9de4ff")
+    out.append(e(f"{name} Lights", ["ship", "running-lights"], [
+        ("Rekall.Transform3D", {"x": pos[0], "y": pos[1], "z": pos[2],
+                                "pitch": 0, "yaw": yaw, "roll": 0}),
+        ("Rekall.LineSegments", {"segments": lights, "thickness": 0.55,
+                                 "color": light_colour + "e8"}),
+        ("Rekall.Material", {"baseColor": light_colour, "emissiveColor": light_colour,
+                             "emissiveStrength": 8.0, "roughnessFactor": 0.55}),
+    ]))
     return out
 
 
@@ -312,7 +329,7 @@ entities = space()
 # --- The Compact squadron --------------------------------------------------
 # (unitClass, role, hull, hullMax, shields, shieldsMax, crew, selectRadius)
 entities += warship(
-    "Ardent Dominion", "compact", (0, 0, 120), 0, (dread_v, dread_i), (dread_d),
+    "Ardent Dominion", "compact", (0, 0, 120), 0, (dread_v, dread_i), (dread_d), dread_l,
     ("Dominion-class Dreadnought", "Fleet flagship",
      8400, 8400, 6000, 6000, 2140, 48),
     weapon=(115, 260, 2.4), order_speed=11,
@@ -320,7 +337,7 @@ entities += warship(
     story_critical=True, tags=("ship", "capital"))
 
 entities += warship(
-    "Vigil of Kell", "compact", (-78, 0, 186), 0, (cru_v, cru_i), (cru_d),
+    "Vigil of Kell", "compact", (-78, 0, 186), 0, (cru_v, cru_i), (cru_d), cru_l,
     ("Kell-pattern Cruiser", "Screening element",
      3600, 3600, 2400, 2400, 620, 30),
     weapon=(98, 120, 1.6), order_speed=16,
@@ -328,7 +345,7 @@ entities += warship(
     tags=("ship", "capital"))
 
 entities += warship(
-    "Long Watch", "compact", (84, 0, 62), 0, (cru_v, cru_i), (cru_d),
+    "Long Watch", "compact", (84, 0, 62), 0, (cru_v, cru_i), (cru_d), cru_l,
     ("Kell-pattern Cruiser", "Picket / early warning",
      3600, 3600, 2400, 2400, 604, 30),
     weapon=(98, 120, 1.6), order_speed=16,
@@ -340,7 +357,7 @@ entities += warship(
 # be the reason the lane matters, not to be a second health bar to babysit.
 for index, (name, x) in enumerate((("Skimmer Ferrous", -46), ("Skimmer Anneal", 38))):
     entities += warship(
-        name, "civilian", (x, 0, -70 - index * 60), 0, (tank_v, tank_i), (tank_d),
+        name, "civilian", (x, 0, -70 - index * 60), 0, (tank_v, tank_i), (tank_d), tank_l,
         ("Combine Bulk Tanker", "Fuel convoy", 1200, 1200, 0, 1, 44, 36),
         weapon=None, order_speed=6,
         hull_color="#6d6152", drive_colors=("#ffd9a8", "#ff9d4a", 2.2),
@@ -391,6 +408,21 @@ for leader, count, radius in WINGS:
                 "shields": 90, "shieldsMax": 90,
                 "crew": 1, "selectRadius": 4.2,
             }),
+            ("Game.Modules.FleetRules.TacticalStatus", {
+                "shieldPulseVisualSeconds": 0, "overchargeRemaining": 0,
+            }),
+        ]))
+        entities.append(e(f"{leader} Fighter {k + 1} Lights", ["ship", "running-lights"], [
+            ("Rekall.Transform3D", {
+                "x": leader_pos["x"] + math.cos(a) * radius,
+                "y": leader_pos["y"] + math.sin(a) * radius * 0.35,
+                "z": leader_pos["z"] + math.sin(a) * radius,
+                "pitch": 0, "yaw": math.degrees(a), "roll": 0,
+            }),
+            ("Rekall.LineSegments", {"segments": fighter_l, "thickness": 0.26,
+                                     "color": "#9de4ffe8"}),
+            ("Rekall.Material", {"baseColor": "#9de4ff", "emissiveColor": "#9de4ff",
+                                 "emissiveStrength": 10.0, "roughnessFactor": 0.5}),
         ]))
 
 # --- The Hollow Choir picket -----------------------------------------------
@@ -399,7 +431,7 @@ CHOIR = [("Choir Node Ashen", -96, 830), ("Choir Node Salt", 18, 880),
          ("Choir Node Hymn", 120, 815)]
 for name, x, z in CHOIR:
     entities += warship(
-        name, "choir", (x, 0, z), 180, (choir_v, choir_i), (choir_d),
+        name, "choir", (x, 0, z), 180, (choir_v, choir_i), (choir_d), choir_l,
         ("Choir Picket Node", "Standing interdiction", 900, 900, 400, 400, 0, 28),
         weapon=(90, 70, 2.0), order_speed=10,
         hull_color="#3a2028", drive_colors=("#ffb9c8", "#ff3f5e", 5.0),
@@ -424,7 +456,7 @@ entities.append(e("Shell", ["flow"], [
         # lines have run, which is the difference between a battle and an ambush.
         "phase": "briefing",
         "phaseElapsed": 0,
-        "briefingSecondsPerLine": 8,
+        "briefingSecondsPerLine": 5,
         "briefingLines": [
             "Fuel convoy Skimmer Ferrous and Skimmer Anneal are yours to see through.\n"
             "They are slow, they are unarmed, and the Reach does not have others.",
@@ -463,6 +495,20 @@ entities.append(e("Tactical HUD", ["ui"], [
         "enabled": True, "selectedEntityId": "", "selectedName": "",
         "panelEntityName": "Unit Panel",
     }),
+    ("Game.Modules.FleetRules.TacticalAbilities", {
+        "enabled": True,
+        "shieldPulseCooldown": 0, "shieldPulseCooldownSeconds": 12,
+        "overchargeCooldown": 0, "overchargeCooldownSeconds": 16,
+        "panelEntityName": "Ability Panel", "lastResult": "Tactical grid ready",
+    }),
+    ("Rekall.InputActionMap", {
+        "active": True,
+        "actions": [
+            {"name": "fleet.shield-pulse", "key": "Q"},
+            {"name": "fleet.overcharge", "key": "E"},
+            {"name": "mission.advance-briefing", "key": "Enter"},
+        ],
+    }),
 ]))
 
 entities.append(e("Objective Panel", ["ui"], [
@@ -490,9 +536,20 @@ entities.append(e("Unit Panel", ["ui"], [
 entities.append(e("Controls Hint", ["ui"], [
     ("Rekall.Transform3D", {}),
     ("Rekall.UiElement", {
-        "x": 36, "y": 946, "width": 1020, "height": 56,
-        "text": "LEFT CLICK select   RIGHT CLICK move / engage   MIDDLE DRAG orbit   WASD pan   WHEEL zoom   SPACE frame all",
+        "x": 36, "y": 1014, "width": 1500, "height": 40,
+        "text": "LEFT CLICK select   RIGHT CLICK move / engage   Q shield pulse   E overcharge   ENTER briefing   MIDDLE DRAG orbit   WASD pan   WHEEL zoom",
         "backgroundColor": "#00000000", "foregroundColor": "#6f96b4",
+        "fontSize": 17, "fontFamily": "Consolas",
+    }),
+]))
+
+entities.append(e("Ability Panel", ["ui"], [
+    ("Rekall.Transform3D", {}),
+    ("Rekall.UiElement", {
+        "x": 620, "y": 930, "width": 900, "height": 72,
+        "text": "[Q] SHIELD PULSE  READY    [E] OVERCHARGE  READY\nTactical grid ready",
+        "backgroundColor": "#07111bd8", "foregroundColor": "#9ddfff",
+        "borderColor": "#28678c", "borderWidth": 1.25,
         "fontSize": 17, "fontFamily": "Consolas",
     }),
 ]))

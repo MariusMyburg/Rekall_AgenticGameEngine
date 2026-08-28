@@ -401,3 +401,40 @@ def drive(length, beam, nozzles=3, seed=5, tint=(0.70, 0.86, 1.0)):
                   (r, r), (r * 0.5, r * 0.5), 1.0, sides=8, cx=cx, cy=cy)
         m.cap(z0 - length * 0.035, (r * 0.5, r * 0.5), 1.0, sides=8, cx=cx, cy=cy, flip=True)
     return m.result()
+
+
+def running_lights(length, beam, count=28, seed=101, tint=(0.62, 0.88, 1.0)):
+    """Separate emissive hull furniture for windows, formation lamps and sensor strips.
+
+    Hull PBR and emissive surfaces need different materials, so these details intentionally
+    live in a companion mesh which the authored fleet system locks to the vessel pose. The
+    lamps are raised slightly above the armour and arranged in broken, asymmetric runs: a
+    continuous neon stripe reads like a toy, while sparse service lighting suggests scale.
+    """
+    rng = random.Random(seed)
+    B = beam / 2
+    segments = []
+
+    def segment(x0, y0, z0, x1, y1, z1):
+        segments.append({"fromX": round(x0, 4), "fromY": round(y0, 4), "fromZ": round(z0, 4),
+                         "toX": round(x1, 4), "toY": round(y1, 4), "toZ": round(z1, 4)})
+
+    # Dorsal bridge and flank windows. Keep the centre dark so the bridge is not a glowing box.
+    for index in range(count):
+        z = rng.uniform(-length * 0.34, length * 0.30)
+        side = -1 if index % 2 == 0 else 1
+        lamp_length = rng.uniform(0.18, 0.50)
+        if index % 4 == 0:
+            x = side * B * rng.uniform(0.18, 0.48)
+            y = B * rng.uniform(0.60, 0.86)
+        else:
+            x = side * B * rng.uniform(0.76, 0.94)
+            y = rng.uniform(-B * 0.18, B * 0.28)
+        segment(x, y, z - lamp_length / 2, x, y, z + lamp_length / 2)
+
+    # Navigation lamps are larger, sparse and colour-neutral in this mesh so bloom catches them.
+    for side in (-1, 1):
+        for z in (-length * 0.24, length * 0.04, length * 0.28):
+            segment(side * B * 0.98, B * 0.04, z - B * 0.06,
+                    side * B * 0.98, B * 0.04, z + B * 0.06)
+    return segments

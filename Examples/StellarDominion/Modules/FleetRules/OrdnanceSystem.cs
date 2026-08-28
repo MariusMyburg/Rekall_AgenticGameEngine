@@ -399,6 +399,92 @@ internal static class OrdnanceFactory
                 clip, gain, 6000, pitch));
     }
 
+    /// <summary>
+    /// A short-lived three-axis energy cage with a light, particle front and low synthetic
+    /// report. It is an ordinary runtime entity, so the same lifetime/fade path as a weapon
+    /// trail removes it without adding an engine-specific ability concept.
+    /// </summary>
+    public static RekallAgeRuntimeEntity AbilityPulse(
+        string id,
+        RekallAgeRuntimeVector3 at,
+        string colour,
+        bool overcharge)
+    {
+        const int steps = 40;
+        var segments = new JsonArray();
+        var radius = overcharge ? 7.0 : 18.0;
+        if (overcharge)
+        {
+            // Broken helical filaments hug the hull. Complete luminous circles looked like a
+            // game icon; intermittent plasma crawls like stressed machinery instead.
+            for (var index = 0; index < 64; index++)
+            {
+                if (index % 5 == 0)
+                {
+                    continue;
+                }
+
+                var t = index / 63.0;
+                var z = (t - 0.5) * 42.0;
+                var a = index * 2.399963;
+                var b = a + 0.23 + (0.09 * Math.Sin(index * 1.7));
+                var r0 = radius * (0.78 + (0.22 * Math.Sin(index * 0.91)));
+                var r1 = radius * (0.78 + (0.22 * Math.Sin((index + 1) * 0.91)));
+                segments.Add(Segment(
+                    new RekallAgeRuntimeVector3(Math.Cos(a) * r0, Math.Sin(a) * r0, z),
+                    new RekallAgeRuntimeVector3(Math.Cos(b) * r1, Math.Sin(b) * r1, z + 1.1)));
+            }
+        }
+        else
+        {
+            for (var axis = 0; axis < 3; axis++)
+            {
+                for (var index = 0; index < steps; index++)
+                {
+                    var a = Math.PI * 2 * index / steps;
+                    var b = Math.PI * 2 * (index + 1) / steps;
+                    RekallAgeRuntimeVector3 Point(double angle) => axis switch
+                    {
+                        0 => new RekallAgeRuntimeVector3(Math.Cos(angle) * radius, Math.Sin(angle) * radius, 0),
+                        1 => new RekallAgeRuntimeVector3(0, Math.Cos(angle) * radius, Math.Sin(angle) * radius),
+                        _ => new RekallAgeRuntimeVector3(Math.Cos(angle) * radius, 0, Math.Sin(angle) * radius),
+                    };
+                    segments.Add(Segment(Point(a), Point(b)));
+                }
+            }
+        }
+
+        return Base(id, overcharge ? "Overcharge Envelope" : "Shield Pulse", at, 1)
+            .UpsertComponent("Rekall.LineSegments", Props(
+                ("segments", segments), ("thickness", overcharge ? 0.42 : 1.8),
+                ("color", colour + (overcharge ? "a8" : "f0"))))
+            .UpsertComponent("Rekall.Material", Props(
+                ("baseColor", colour), ("emissiveColor", colour), ("emissiveStrength", 16.0)))
+            .UpsertComponent("Rekall.PointLight", Props(
+                ("color", colour), ("intensity", overcharge ? 20.0 : 28.0),
+                ("range", overcharge ? 34.0 : 48.0), ("castShadows", false)))
+            .UpsertComponent("Rekall.ParticleEmitter3D", Props(
+                ("role", overcharge ? "overcharge" : "shield-pulse"), ("enabled", true),
+                ("simulationSpace", "world"), ("capacity", 180.0), ("spawnRate", 320.0),
+                ("lifetime", 0.9), ("seed", overcharge ? 810.0 : 504.0),
+                ("velocityDirection", new JsonObject { ["x"] = 0, ["y"] = 1, ["z"] = 0 }),
+                ("velocityConeDegrees", 180.0), ("minimumSpeed", 5.0), ("maximumSpeed", 32.0),
+                ("gravity", new JsonObject { ["x"] = 0, ["y"] = 0, ["z"] = 0 }),
+                ("drag", 1.1), ("drawMode", "quad"), ("lit", false),
+                ("emissiveIntensity", 9.0), ("softParticleFade", 0.8),
+                ("blendMode", "add"), ("priority", 115.0), ("visibilityDistance", 5000.0)))
+            .UpsertComponent("Rekall.AudioEmitter", Emitter(overcharge ? 0.52 : 0.62, 6000))
+            .UpsertComponent("Rekall.ProceduralAudioClip", Props(
+                ("waveform", overcharge ? "saw" : "sine"), ("durationSeconds", 1.1),
+                ("startFrequency", overcharge ? 58.0 : 90.0),
+                ("endFrequency", overcharge ? 210.0 : 42.0),
+                ("sweep", "exponential"), ("attack", 0.015), ("decay", 0.22),
+                ("sustain", 0.52), ("release", 0.5), ("noiseMix", overcharge ? 0.32 : 0.14),
+                ("harmonics", overcharge ? 4.0 : 2.0), ("amplitude", 0.55), ("seed", 408.0)))
+            .UpsertComponent(OrdnanceType, Props(
+                ("kind", "trail"), ("life", 0.0), ("maxLife", overcharge ? 1.4 : 1.15)));
+    }
+
     /// <summary>Adds this step's travel to a trail and drops the oldest segment.</summary>
     public static RekallAgeRuntimeEntity ExtendTrail(
         RekallAgeRuntimeEntity trail,

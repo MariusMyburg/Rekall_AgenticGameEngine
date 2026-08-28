@@ -148,7 +148,7 @@ def case_missiles(scene, by_name):
     for entity in scene["entities"]:
         if component(entity, "Weapon") and "Fighter" not in entity["name"]:
             component(entity, "Weapon")["enabled"] = False
-        if "Fighter" in entity["name"]:
+        if "Fighter" in entity["name"] and component(entity, "Order") is not None:
             order = component(entity, "Order")
             order["kind"] = "attack"
             order["targetId"] = target["id"]

@@ -10,7 +10,40 @@
   ],
   "entities": [
     {
-      "id": "ent_7f1dc3b3cedd4d79a574a41fe8579790",
+      "id": "ent_19b107873d5f437088cd0071abdf8d17",
+      "name": "Ability Panel",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {}
+        },
+        {
+          "type": "Rekall.UiElement",
+          "properties": {
+            "x": 620,
+            "y": 930,
+            "width": 900,
+            "height": 72,
+            "text": "[Q] SHIELD PULSE  READY    [E] OVERCHARGE  READY\nTactical grid ready",
+            "backgroundColor": "#07111bd8",
+            "foregroundColor": "#9ddfff",
+            "borderColor": "#28678c",
+            "borderWidth": 1.25,
+            "fontSize": 17,
+            "fontFamily": "Consolas"
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_2a9fc8276f8340fe859d9f5326def74d",
       "name": "Ardent Dominion",
       "tags": [
         "capital",
@@ -48,6 +81,13 @@
             "shieldsMax": 6000,
             "crew": 2140,
             "selectRadius": 48
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -124488,7 +124528,7 @@
       "locked": false
     },
     {
-      "id": "ent_4194933f64334db3b57fb7cfe04069e7",
+      "id": "ent_32a749c3f73d49a1bf37db0eca88aaa3",
       "name": "Ardent Dominion Drive",
       "tags": [
         "drive",
@@ -129587,7 +129627,7 @@
       "locked": false
     },
     {
-      "id": "ent_31657819393347719505a30635073fd1",
+      "id": "ent_c52cfe95347841938a0f7e46f2b1deaa",
       "name": "Ardent Dominion Fighter 1",
       "tags": [
         "fighter",
@@ -129636,6 +129676,13 @@
             "shieldsMax": 90,
             "crew": 1,
             "selectRadius": 4.2
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -142777,7 +142824,130 @@
       "locked": false
     },
     {
-      "id": "ent_6eb2b87487114779bcb14ddac33beaf2",
+      "id": "ent_2a0abd9c2a2f4048a210f66bad8ede22",
+      "name": "Ardent Dominion Fighter 1 Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.221,
+                "fromY": 0.3631,
+                "fromZ": 0.1561,
+                "toX": -0.221,
+                "toY": 0.3631,
+                "toZ": 0.6069
+              },
+              {
+                "fromX": 0.4395,
+                "fromY": 0.0399,
+                "fromZ": -0.9565,
+                "toX": 0.4395,
+                "toY": 0.0399,
+                "toZ": -0.465
+              },
+              {
+                "fromX": -0.4001,
+                "fromY": 0.0908,
+                "fromZ": -0.3337,
+                "toX": -0.4001,
+                "toY": 0.0908,
+                "toZ": 0.0295
+              },
+              {
+                "fromX": 0.4106,
+                "fromY": 0.0365,
+                "fromZ": 0.2284,
+                "toX": 0.4106,
+                "toY": 0.0365,
+                "toZ": 0.6221
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              }
+            ],
+            "thickness": 0.26,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 10.0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 27.0,
+            "y": 0.0,
+            "z": 120.0,
+            "pitch": 0,
+            "yaw": 0.0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_b2c22bfc5c4d494990c9a7a8c88784c6",
       "name": "Ardent Dominion Fighter 2",
       "tags": [
         "fighter",
@@ -142826,6 +142996,13 @@
             "shieldsMax": 90,
             "crew": 1,
             "selectRadius": 4.2
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -155967,7 +156144,130 @@
       "locked": false
     },
     {
-      "id": "ent_a9e91abdf37e453394f0d4e19ab5a3aa",
+      "id": "ent_f930619ce1f14a8a93051558c7a52a91",
+      "name": "Ardent Dominion Fighter 2 Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.221,
+                "fromY": 0.3631,
+                "fromZ": 0.1561,
+                "toX": -0.221,
+                "toY": 0.3631,
+                "toZ": 0.6069
+              },
+              {
+                "fromX": 0.4395,
+                "fromY": 0.0399,
+                "fromZ": -0.9565,
+                "toX": 0.4395,
+                "toY": 0.0399,
+                "toZ": -0.465
+              },
+              {
+                "fromX": -0.4001,
+                "fromY": 0.0908,
+                "fromZ": -0.3337,
+                "toX": -0.4001,
+                "toY": 0.0908,
+                "toZ": 0.0295
+              },
+              {
+                "fromX": 0.4106,
+                "fromY": 0.0365,
+                "fromZ": 0.2284,
+                "toX": 0.4106,
+                "toY": 0.0365,
+                "toZ": 0.6221
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              }
+            ],
+            "thickness": 0.26,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 10.0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 13.500000000000004,
+            "y": 8.183940065762943,
+            "z": 143.38268590217984,
+            "pitch": 0,
+            "yaw": 59.99999999999999,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_1c7cae27fdc34fea8bea0fde27a71da4",
       "name": "Ardent Dominion Fighter 3",
       "tags": [
         "fighter",
@@ -156016,6 +156316,13 @@
             "shieldsMax": 90,
             "crew": 1,
             "selectRadius": 4.2
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -169157,7 +169464,130 @@
       "locked": false
     },
     {
-      "id": "ent_a0ec9c68a54146ff927575235b74702a",
+      "id": "ent_25fa39ce9bc24737ae42f079cb7e5d55",
+      "name": "Ardent Dominion Fighter 3 Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.221,
+                "fromY": 0.3631,
+                "fromZ": 0.1561,
+                "toX": -0.221,
+                "toY": 0.3631,
+                "toZ": 0.6069
+              },
+              {
+                "fromX": 0.4395,
+                "fromY": 0.0399,
+                "fromZ": -0.9565,
+                "toX": 0.4395,
+                "toY": 0.0399,
+                "toZ": -0.465
+              },
+              {
+                "fromX": -0.4001,
+                "fromY": 0.0908,
+                "fromZ": -0.3337,
+                "toX": -0.4001,
+                "toY": 0.0908,
+                "toZ": 0.0295
+              },
+              {
+                "fromX": 0.4106,
+                "fromY": 0.0365,
+                "fromZ": 0.2284,
+                "toX": 0.4106,
+                "toY": 0.0365,
+                "toZ": 0.6221
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              }
+            ],
+            "thickness": 0.26,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 10.0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -13.499999999999995,
+            "y": 8.183940065762945,
+            "z": 143.38268590217984,
+            "pitch": 0,
+            "yaw": 119.99999999999999,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_d0ddc0b86acf4b4c8e94d2fe11ba0a02",
       "name": "Ardent Dominion Fighter 4",
       "tags": [
         "fighter",
@@ -169206,6 +169636,13 @@
             "shieldsMax": 90,
             "crew": 1,
             "selectRadius": 4.2
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -182347,7 +182784,130 @@
       "locked": false
     },
     {
-      "id": "ent_62131dac912f45bdb595d4462665a7a9",
+      "id": "ent_0579827dd1f7477fa829f094b8f3117a",
+      "name": "Ardent Dominion Fighter 4 Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.221,
+                "fromY": 0.3631,
+                "fromZ": 0.1561,
+                "toX": -0.221,
+                "toY": 0.3631,
+                "toZ": 0.6069
+              },
+              {
+                "fromX": 0.4395,
+                "fromY": 0.0399,
+                "fromZ": -0.9565,
+                "toX": 0.4395,
+                "toY": 0.0399,
+                "toZ": -0.465
+              },
+              {
+                "fromX": -0.4001,
+                "fromY": 0.0908,
+                "fromZ": -0.3337,
+                "toX": -0.4001,
+                "toY": 0.0908,
+                "toZ": 0.0295
+              },
+              {
+                "fromX": 0.4106,
+                "fromY": 0.0365,
+                "fromZ": 0.2284,
+                "toX": 0.4106,
+                "toY": 0.0365,
+                "toZ": 0.6221
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              }
+            ],
+            "thickness": 0.26,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 10.0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -27.0,
+            "y": 1.1572912251942488e-15,
+            "z": 120.0,
+            "pitch": 0,
+            "yaw": 180.0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_13a7a7fbc43f4de484c2d8acc76e15d4",
       "name": "Ardent Dominion Fighter 5",
       "tags": [
         "fighter",
@@ -182396,6 +182956,13 @@
             "shieldsMax": 90,
             "crew": 1,
             "selectRadius": 4.2
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -195537,7 +196104,130 @@
       "locked": false
     },
     {
-      "id": "ent_5c1b85852add4b42bb35e18a5a2b1cec",
+      "id": "ent_63c2b5cd49ae4e31ad4c42ad9c167e1e",
+      "name": "Ardent Dominion Fighter 5 Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.221,
+                "fromY": 0.3631,
+                "fromZ": 0.1561,
+                "toX": -0.221,
+                "toY": 0.3631,
+                "toZ": 0.6069
+              },
+              {
+                "fromX": 0.4395,
+                "fromY": 0.0399,
+                "fromZ": -0.9565,
+                "toX": 0.4395,
+                "toY": 0.0399,
+                "toZ": -0.465
+              },
+              {
+                "fromX": -0.4001,
+                "fromY": 0.0908,
+                "fromZ": -0.3337,
+                "toX": -0.4001,
+                "toY": 0.0908,
+                "toZ": 0.0295
+              },
+              {
+                "fromX": 0.4106,
+                "fromY": 0.0365,
+                "fromZ": 0.2284,
+                "toX": 0.4106,
+                "toY": 0.0365,
+                "toZ": 0.6221
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              }
+            ],
+            "thickness": 0.26,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 10.0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -13.500000000000012,
+            "y": -8.183940065762943,
+            "z": 96.61731409782016,
+            "pitch": 0,
+            "yaw": 239.99999999999997,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_3ac4b1310e4d45c791fb9512d47fb894",
       "name": "Ardent Dominion Fighter 6",
       "tags": [
         "fighter",
@@ -195586,6 +196276,13 @@
             "shieldsMax": 90,
             "crew": 1,
             "selectRadius": 4.2
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -208727,7 +209424,573 @@
       "locked": false
     },
     {
-      "id": "ent_58c514bba89843a2a564a341980bc9a1",
+      "id": "ent_1c71fa8702a44e9fb22f6a2cc7f7bb1c",
+      "name": "Ardent Dominion Fighter 6 Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.221,
+                "fromY": 0.3631,
+                "fromZ": 0.1561,
+                "toX": -0.221,
+                "toY": 0.3631,
+                "toZ": 0.6069
+              },
+              {
+                "fromX": 0.4395,
+                "fromY": 0.0399,
+                "fromZ": -0.9565,
+                "toX": 0.4395,
+                "toY": 0.0399,
+                "toZ": -0.465
+              },
+              {
+                "fromX": -0.4001,
+                "fromY": 0.0908,
+                "fromZ": -0.3337,
+                "toX": -0.4001,
+                "toY": 0.0908,
+                "toZ": 0.0295
+              },
+              {
+                "fromX": 0.4106,
+                "fromY": 0.0365,
+                "fromZ": 0.2284,
+                "toX": 0.4106,
+                "toY": 0.0365,
+                "toZ": 0.6221
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              }
+            ],
+            "thickness": 0.26,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 10.0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 13.500000000000004,
+            "y": -8.183940065762943,
+            "z": 96.61731409782016,
+            "pitch": 0,
+            "yaw": 300.0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_2c1c9a033fec4626b92ce1d530355568",
+      "name": "Ardent Dominion Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -2.7765,
+                "fromY": 4.3705,
+                "fromZ": 16.921,
+                "toX": -2.7765,
+                "toY": 4.3705,
+                "toZ": 17.1691
+              },
+              {
+                "fromX": 4.7432,
+                "fromY": -0.5456,
+                "fromZ": -7.8877,
+                "toX": 4.7432,
+                "toY": -0.5456,
+                "toZ": -7.5102
+              },
+              {
+                "fromX": -5.2841,
+                "fromY": 0.0688,
+                "fromZ": -6.44,
+                "toX": -5.2841,
+                "toY": 0.0688,
+                "toZ": -6.1865
+              },
+              {
+                "fromX": 4.7985,
+                "fromY": 0.8967,
+                "fromZ": -8.6428,
+                "toX": 4.7985,
+                "toY": 0.8967,
+                "toZ": -8.3739
+              },
+              {
+                "fromX": -2.5273,
+                "fromY": 4.0885,
+                "fromZ": 21.241,
+                "toX": -2.5273,
+                "toY": 4.0885,
+                "toZ": 21.533
+              },
+              {
+                "fromX": 5.1742,
+                "fromY": 0.0445,
+                "fromZ": 13.0714,
+                "toX": 5.1742,
+                "toY": 0.0445,
+                "toZ": 13.3278
+              },
+              {
+                "fromX": -4.6764,
+                "fromY": -0.8059,
+                "fromZ": 19.3531,
+                "toX": -4.6764,
+                "toY": -0.8059,
+                "toZ": 19.7767
+              },
+              {
+                "fromX": 4.8169,
+                "fromY": 1.5451,
+                "fromZ": -4.2261,
+                "toX": 4.8169,
+                "toY": 1.5451,
+                "toZ": -3.9772
+              },
+              {
+                "fromX": -1.12,
+                "fromY": 4.5781,
+                "fromZ": 23.4889,
+                "toX": -1.12,
+                "toY": 4.5781,
+                "toZ": 23.6745
+              },
+              {
+                "fromX": 5.3084,
+                "fromY": 0.961,
+                "fromZ": 23.7502,
+                "toX": 5.3084,
+                "toY": 0.961,
+                "toZ": 24.2145
+              },
+              {
+                "fromX": -5.4854,
+                "fromY": -0.7832,
+                "fromZ": -2.957,
+                "toX": -5.4854,
+                "toY": -0.7832,
+                "toZ": -2.6203
+              },
+              {
+                "fromX": 4.7282,
+                "fromY": 1.0464,
+                "fromZ": 8.4985,
+                "toX": 4.7282,
+                "toY": 1.0464,
+                "toZ": 8.9087
+              },
+              {
+                "fromX": -2.4552,
+                "fromY": 4.3113,
+                "fromZ": -21.1369,
+                "toX": -2.4552,
+                "toY": 4.3113,
+                "toZ": -20.6471
+              },
+              {
+                "fromX": 4.9564,
+                "fromY": -0.5167,
+                "fromZ": 2.7907,
+                "toX": 4.9564,
+                "toY": -0.5167,
+                "toZ": 3.2823
+              },
+              {
+                "fromX": -4.7285,
+                "fromY": 1.0291,
+                "fromZ": 8.8819,
+                "toX": -4.7285,
+                "toY": 1.0291,
+                "toZ": 9.3509
+              },
+              {
+                "fromX": 5.0754,
+                "fromY": 1.5434,
+                "fromZ": -8.4044,
+                "toX": 5.0754,
+                "toY": 1.5434,
+                "toZ": -8.0044
+              },
+              {
+                "fromX": -2.813,
+                "fromY": 3.8007,
+                "fromZ": 2.3353,
+                "toX": -2.813,
+                "toY": 3.8007,
+                "toZ": 2.8247
+              },
+              {
+                "fromX": 4.715,
+                "fromY": 0.5147,
+                "fromZ": 23.2235,
+                "toX": 4.715,
+                "toY": 0.5147,
+                "toZ": 23.6462
+              },
+              {
+                "fromX": -4.6221,
+                "fromY": -0.0782,
+                "fromZ": -15.0493,
+                "toX": -4.6221,
+                "toY": -0.0782,
+                "toZ": -14.8541
+              },
+              {
+                "fromX": 5.1926,
+                "fromY": 1.3298,
+                "fromZ": 19.6511,
+                "toX": 5.1926,
+                "toY": 1.3298,
+                "toZ": 19.8544
+              },
+              {
+                "fromX": -2.1483,
+                "fromY": 4.7878,
+                "fromZ": -9.8926,
+                "toX": -2.1483,
+                "toY": 4.7878,
+                "toZ": -9.4827
+              },
+              {
+                "fromX": 4.9911,
+                "fromY": -0.4937,
+                "fromZ": -3.1087,
+                "toX": 4.9911,
+                "toY": -0.4937,
+                "toZ": -2.6146
+              },
+              {
+                "fromX": -4.6874,
+                "fromY": 1.5171,
+                "fromZ": -23.7329,
+                "toX": -4.6874,
+                "toY": 1.5171,
+                "toZ": -23.4706
+              },
+              {
+                "fromX": 5.3918,
+                "fromY": 0.216,
+                "fromZ": -23.1561,
+                "toX": 5.3918,
+                "toY": 0.216,
+                "toZ": -22.7071
+              },
+              {
+                "fromX": -2.7643,
+                "fromY": 4.2459,
+                "fromZ": -27.7921,
+                "toX": -2.7643,
+                "toY": 4.2459,
+                "toZ": -27.5473
+              },
+              {
+                "fromX": 4.611,
+                "fromY": -0.0858,
+                "fromZ": 14.2933,
+                "toX": 4.611,
+                "toY": -0.0858,
+                "toZ": 14.5132
+              },
+              {
+                "fromX": -5.2517,
+                "fromY": 0.5134,
+                "fromZ": -10.5335,
+                "toX": -5.2517,
+                "toY": 0.5134,
+                "toZ": -10.2878
+              },
+              {
+                "fromX": 5.0038,
+                "fromY": -0.3387,
+                "fromZ": 1.517,
+                "toX": 5.0038,
+                "toY": -0.3387,
+                "toZ": 1.798
+              },
+              {
+                "fromX": -2.2511,
+                "fromY": 5.1024,
+                "fromZ": 1.0764,
+                "toX": -2.2511,
+                "toY": 5.1024,
+                "toZ": 1.3807
+              },
+              {
+                "fromX": 4.6631,
+                "fromY": 1.2093,
+                "fromZ": -12.162,
+                "toX": 4.6631,
+                "toY": 1.2093,
+                "toZ": -11.7924
+              },
+              {
+                "fromX": -5.1662,
+                "fromY": -0.7622,
+                "fromZ": -0.1396,
+                "toX": -5.1662,
+                "toY": -0.7622,
+                "toZ": 0.2302
+              },
+              {
+                "fromX": 4.7685,
+                "fromY": 0.2559,
+                "fromZ": 19.8824,
+                "toX": 4.7685,
+                "toY": 0.2559,
+                "toZ": 20.066
+              },
+              {
+                "fromX": -2.7039,
+                "fromY": 4.1304,
+                "fromZ": 22.3734,
+                "toX": -2.7039,
+                "toY": 4.1304,
+                "toZ": 22.7772
+              },
+              {
+                "fromX": 4.813,
+                "fromY": -0.8218,
+                "fromZ": 0.9516,
+                "toX": 4.813,
+                "toY": -0.8218,
+                "toZ": 1.3236
+              },
+              {
+                "fromX": -4.568,
+                "fromY": -0.5911,
+                "fromZ": -11.1103,
+                "toX": -4.568,
+                "toY": -0.5911,
+                "toZ": -10.9024
+              },
+              {
+                "fromX": 5.37,
+                "fromY": 0.5055,
+                "fromZ": 18.7853,
+                "toX": 5.37,
+                "toY": 0.5055,
+                "toZ": 19.1616
+              },
+              {
+                "fromX": -1.6994,
+                "fromY": 4.0071,
+                "fromZ": -3.0614,
+                "toX": -1.6994,
+                "toY": 4.0071,
+                "toZ": -2.597
+              },
+              {
+                "fromX": 4.5794,
+                "fromY": -0.3303,
+                "fromZ": -14.0292,
+                "toX": 4.5794,
+                "toY": -0.3303,
+                "toZ": -13.8255
+              },
+              {
+                "fromX": -5.075,
+                "fromY": -0.2817,
+                "fromZ": 5.7942,
+                "toX": -5.075,
+                "toY": -0.2817,
+                "toZ": 6.037
+              },
+              {
+                "fromX": 5.0469,
+                "fromY": 0.9836,
+                "fromZ": 12.5794,
+                "toX": 5.0469,
+                "toY": 0.9836,
+                "toZ": 12.8359
+              },
+              {
+                "fromX": -1.1075,
+                "fromY": 4.3289,
+                "fromZ": 10.62,
+                "toX": -1.1075,
+                "toY": 4.3289,
+                "toZ": 11.087
+              },
+              {
+                "fromX": 4.829,
+                "fromY": 1.1407,
+                "fromZ": -19.8158,
+                "toX": 4.829,
+                "toY": 1.1407,
+                "toZ": -19.3507
+              },
+              {
+                "fromX": -5.4202,
+                "fromY": 1.2983,
+                "fromZ": -1.0351,
+                "toX": -5.4202,
+                "toY": 1.2983,
+                "toZ": -0.6093
+              },
+              {
+                "fromX": 5.2882,
+                "fromY": 1.4532,
+                "fromZ": 20.3835,
+                "toX": 5.2882,
+                "toY": 1.4532,
+                "toZ": 20.6928
+              },
+              {
+                "fromX": -5.88,
+                "fromY": 0.24,
+                "fromZ": -21.96,
+                "toX": -5.88,
+                "toY": 0.24,
+                "toZ": -21.24
+              },
+              {
+                "fromX": -5.88,
+                "fromY": 0.24,
+                "fromZ": 3.24,
+                "toX": -5.88,
+                "toY": 0.24,
+                "toZ": 3.96
+              },
+              {
+                "fromX": -5.88,
+                "fromY": 0.24,
+                "fromZ": 24.84,
+                "toX": -5.88,
+                "toY": 0.24,
+                "toZ": 25.56
+              },
+              {
+                "fromX": 5.88,
+                "fromY": 0.24,
+                "fromZ": -21.96,
+                "toX": 5.88,
+                "toY": 0.24,
+                "toZ": -21.24
+              },
+              {
+                "fromX": 5.88,
+                "fromY": 0.24,
+                "fromZ": 3.24,
+                "toX": 5.88,
+                "toY": 0.24,
+                "toZ": 3.96
+              },
+              {
+                "fromX": 5.88,
+                "fromY": 0.24,
+                "fromZ": 24.84,
+                "toX": 5.88,
+                "toY": 0.24,
+                "toZ": 25.56
+              }
+            ],
+            "thickness": 0.55,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 8.0,
+            "roughnessFactor": 0.55
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 0,
+            "y": 0,
+            "z": 120,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_36b879da6e2642738a7e772f18424e37",
       "name": "Camera",
       "tags": [
         "camera"
@@ -208786,7 +210049,7 @@
       "locked": false
     },
     {
-      "id": "ent_399bf287002a461fb3e86a851a9c3a45",
+      "id": "ent_b6df818f8a274af7bd25ed562deddf2b",
       "name": "Choir Node Ashen",
       "tags": [
         "hostile",
@@ -208824,6 +210087,13 @@
             "shieldsMax": 400,
             "crew": 0,
             "selectRadius": 28
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -265932,7 +267202,7 @@
       "locked": false
     },
     {
-      "id": "ent_32afae9b931447b18478b55947c498ff",
+      "id": "ent_7b703bbc562641068ba0817a0766ae66",
       "name": "Choir Node Ashen Drive",
       "tags": [
         "drive",
@@ -269769,7 +271039,306 @@
       "locked": false
     },
     {
-      "id": "ent_20172b728dff46b28be58058d333c7e6",
+      "id": "ent_5570cab796e844b68deb0c9b6a31949f",
+      "name": "Choir Node Ashen Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.9901,
+                "fromY": 3.238,
+                "fromZ": -6.5668,
+                "toX": -0.9901,
+                "toY": 3.238,
+                "toZ": -6.1404
+              },
+              {
+                "fromX": 3.9488,
+                "fromY": 0.4472,
+                "fromZ": -4.3778,
+                "toX": 3.9488,
+                "toY": 0.4472,
+                "toZ": -3.9112
+              },
+              {
+                "fromX": -4.2521,
+                "fromY": 0.3571,
+                "fromZ": -12.8038,
+                "toX": -4.2521,
+                "toY": 0.3571,
+                "toZ": -12.5688
+              },
+              {
+                "fromX": 4.0705,
+                "fromY": -0.4213,
+                "fromZ": 5.4073,
+                "toX": 4.0705,
+                "toY": -0.4213,
+                "toZ": 5.7287
+              },
+              {
+                "fromX": -1.1057,
+                "fromY": 3.4424,
+                "fromZ": -9.1612,
+                "toX": -1.1057,
+                "toY": 3.4424,
+                "toZ": -8.9649
+              },
+              {
+                "fromX": 4.2034,
+                "fromY": 0.9367,
+                "fromZ": 1.574,
+                "toX": 4.2034,
+                "toY": 0.9367,
+                "toZ": 1.99
+              },
+              {
+                "fromX": -4.4151,
+                "fromY": 0.233,
+                "fromZ": 5.9732,
+                "toX": -4.4151,
+                "toY": 0.233,
+                "toZ": 6.156
+              },
+              {
+                "fromX": 3.7805,
+                "fromY": -0.7183,
+                "fromZ": -2.9189,
+                "toX": 3.7805,
+                "toY": -0.7183,
+                "toZ": -2.7109
+              },
+              {
+                "fromX": -1.4016,
+                "fromY": 3.8524,
+                "fromZ": -13.1448,
+                "toX": -1.4016,
+                "toY": 3.8524,
+                "toZ": -12.713
+              },
+              {
+                "fromX": 3.8255,
+                "fromY": -0.513,
+                "fromZ": 13.1541,
+                "toX": 3.8255,
+                "toY": -0.513,
+                "toZ": 13.5334
+              },
+              {
+                "fromX": -3.9386,
+                "fromY": 1.2456,
+                "fromZ": 12.5944,
+                "toX": -3.9386,
+                "toY": 1.2456,
+                "toZ": 12.932
+              },
+              {
+                "fromX": 3.6567,
+                "fromY": 0.1012,
+                "fromZ": -10.8805,
+                "toX": 3.6567,
+                "toY": 0.1012,
+                "toZ": -10.4196
+              },
+              {
+                "fromX": -1.5182,
+                "fromY": 3.5882,
+                "fromZ": -5.9884,
+                "toX": -1.5182,
+                "toY": 3.5882,
+                "toZ": -5.497
+              },
+              {
+                "fromX": 4.3661,
+                "fromY": 0.9398,
+                "fromZ": 7.9322,
+                "toX": 4.3661,
+                "toY": 0.9398,
+                "toZ": 8.3131
+              },
+              {
+                "fromX": -3.9997,
+                "fromY": 0.0042,
+                "fromZ": -13.7721,
+                "toX": -3.9997,
+                "toY": 0.0042,
+                "toZ": -13.5479
+              },
+              {
+                "fromX": 4.5006,
+                "fromY": 0.9282,
+                "fromZ": 8.3265,
+                "toX": 4.5006,
+                "toY": 0.9282,
+                "toZ": 8.552
+              },
+              {
+                "fromX": -1.9896,
+                "fromY": 3.7616,
+                "fromZ": 3.3742,
+                "toX": -1.9896,
+                "toY": 3.7616,
+                "toZ": 3.6371
+              },
+              {
+                "fromX": 4.3294,
+                "fromY": -0.4149,
+                "fromZ": 9.6247,
+                "toX": 4.3294,
+                "toY": -0.4149,
+                "toZ": 9.9017
+              },
+              {
+                "fromX": -3.8747,
+                "fromY": 1.2253,
+                "fromZ": -2.4039,
+                "toX": -3.8747,
+                "toY": 1.2253,
+                "toZ": -2.1799
+              },
+              {
+                "fromX": 4.208,
+                "fromY": -0.8535,
+                "fromZ": 13.6544,
+                "toX": 4.208,
+                "toY": -0.8535,
+                "toZ": 13.8841
+              },
+              {
+                "fromX": -1.1964,
+                "fromY": 2.935,
+                "fromZ": -5.2085,
+                "toX": -1.1964,
+                "toY": 2.935,
+                "toZ": -4.8881
+              },
+              {
+                "fromX": 3.8219,
+                "fromY": -0.0439,
+                "fromZ": 3.8696,
+                "toX": 3.8219,
+                "toY": -0.0439,
+                "toZ": 4.3375
+              },
+              {
+                "fromX": -4.2547,
+                "fromY": -0.163,
+                "fromZ": 6.0704,
+                "toX": -4.2547,
+                "toY": -0.163,
+                "toZ": 6.4795
+              },
+              {
+                "fromX": 4.3446,
+                "fromY": 0.5204,
+                "fromZ": 12.0522,
+                "toX": 4.3446,
+                "toY": 0.5204,
+                "toZ": 12.4864
+              },
+              {
+                "fromX": -1.7173,
+                "fromY": 3.5012,
+                "fromZ": -10.8043,
+                "toX": -1.7173,
+                "toY": 3.5012,
+                "toZ": -10.3215
+              },
+              {
+                "fromX": 3.7855,
+                "fromY": -0.4644,
+                "fromZ": 4.1331,
+                "toX": 3.7855,
+                "toY": -0.4644,
+                "toZ": 4.5607
+              },
+              {
+                "fromX": -4.704,
+                "fromY": 0.192,
+                "fromZ": -11.328,
+                "toX": -4.704,
+                "toY": 0.192,
+                "toZ": -10.752
+              },
+              {
+                "fromX": -4.704,
+                "fromY": 0.192,
+                "fromZ": 1.552,
+                "toX": -4.704,
+                "toY": 0.192,
+                "toZ": 2.128
+              },
+              {
+                "fromX": -4.704,
+                "fromY": 0.192,
+                "fromZ": 12.592,
+                "toX": -4.704,
+                "toY": 0.192,
+                "toZ": 13.168
+              },
+              {
+                "fromX": 4.704,
+                "fromY": 0.192,
+                "fromZ": -11.328,
+                "toX": 4.704,
+                "toY": 0.192,
+                "toZ": -10.752
+              },
+              {
+                "fromX": 4.704,
+                "fromY": 0.192,
+                "fromZ": 1.552,
+                "toX": 4.704,
+                "toY": 0.192,
+                "toZ": 2.128
+              },
+              {
+                "fromX": 4.704,
+                "fromY": 0.192,
+                "fromZ": 12.592,
+                "toX": 4.704,
+                "toY": 0.192,
+                "toZ": 13.168
+              }
+            ],
+            "thickness": 0.55,
+            "color": "#ff3f5ee8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#ff3f5e",
+            "emissiveColor": "#ff3f5e",
+            "emissiveStrength": 8.0,
+            "roughnessFactor": 0.55
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -96,
+            "y": 0,
+            "z": 830,
+            "pitch": 0,
+            "yaw": 180,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_2222063acb67421e837ba0eb8d54a0a6",
       "name": "Choir Node Hymn",
       "tags": [
         "hostile",
@@ -269807,6 +271376,13 @@
             "shieldsMax": 400,
             "crew": 0,
             "selectRadius": 28
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -326915,7 +328491,7 @@
       "locked": false
     },
     {
-      "id": "ent_d5aeab1037684ddfad2345abc446236f",
+      "id": "ent_e8a09badb2b64483a0a0b0a14f49583e",
       "name": "Choir Node Hymn Drive",
       "tags": [
         "drive",
@@ -330752,7 +332328,306 @@
       "locked": false
     },
     {
-      "id": "ent_52405c48f72b417e9353df96e8df432f",
+      "id": "ent_3dfbfa5203894daeb10b0d70ccaec3a3",
+      "name": "Choir Node Hymn Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.9901,
+                "fromY": 3.238,
+                "fromZ": -6.5668,
+                "toX": -0.9901,
+                "toY": 3.238,
+                "toZ": -6.1404
+              },
+              {
+                "fromX": 3.9488,
+                "fromY": 0.4472,
+                "fromZ": -4.3778,
+                "toX": 3.9488,
+                "toY": 0.4472,
+                "toZ": -3.9112
+              },
+              {
+                "fromX": -4.2521,
+                "fromY": 0.3571,
+                "fromZ": -12.8038,
+                "toX": -4.2521,
+                "toY": 0.3571,
+                "toZ": -12.5688
+              },
+              {
+                "fromX": 4.0705,
+                "fromY": -0.4213,
+                "fromZ": 5.4073,
+                "toX": 4.0705,
+                "toY": -0.4213,
+                "toZ": 5.7287
+              },
+              {
+                "fromX": -1.1057,
+                "fromY": 3.4424,
+                "fromZ": -9.1612,
+                "toX": -1.1057,
+                "toY": 3.4424,
+                "toZ": -8.9649
+              },
+              {
+                "fromX": 4.2034,
+                "fromY": 0.9367,
+                "fromZ": 1.574,
+                "toX": 4.2034,
+                "toY": 0.9367,
+                "toZ": 1.99
+              },
+              {
+                "fromX": -4.4151,
+                "fromY": 0.233,
+                "fromZ": 5.9732,
+                "toX": -4.4151,
+                "toY": 0.233,
+                "toZ": 6.156
+              },
+              {
+                "fromX": 3.7805,
+                "fromY": -0.7183,
+                "fromZ": -2.9189,
+                "toX": 3.7805,
+                "toY": -0.7183,
+                "toZ": -2.7109
+              },
+              {
+                "fromX": -1.4016,
+                "fromY": 3.8524,
+                "fromZ": -13.1448,
+                "toX": -1.4016,
+                "toY": 3.8524,
+                "toZ": -12.713
+              },
+              {
+                "fromX": 3.8255,
+                "fromY": -0.513,
+                "fromZ": 13.1541,
+                "toX": 3.8255,
+                "toY": -0.513,
+                "toZ": 13.5334
+              },
+              {
+                "fromX": -3.9386,
+                "fromY": 1.2456,
+                "fromZ": 12.5944,
+                "toX": -3.9386,
+                "toY": 1.2456,
+                "toZ": 12.932
+              },
+              {
+                "fromX": 3.6567,
+                "fromY": 0.1012,
+                "fromZ": -10.8805,
+                "toX": 3.6567,
+                "toY": 0.1012,
+                "toZ": -10.4196
+              },
+              {
+                "fromX": -1.5182,
+                "fromY": 3.5882,
+                "fromZ": -5.9884,
+                "toX": -1.5182,
+                "toY": 3.5882,
+                "toZ": -5.497
+              },
+              {
+                "fromX": 4.3661,
+                "fromY": 0.9398,
+                "fromZ": 7.9322,
+                "toX": 4.3661,
+                "toY": 0.9398,
+                "toZ": 8.3131
+              },
+              {
+                "fromX": -3.9997,
+                "fromY": 0.0042,
+                "fromZ": -13.7721,
+                "toX": -3.9997,
+                "toY": 0.0042,
+                "toZ": -13.5479
+              },
+              {
+                "fromX": 4.5006,
+                "fromY": 0.9282,
+                "fromZ": 8.3265,
+                "toX": 4.5006,
+                "toY": 0.9282,
+                "toZ": 8.552
+              },
+              {
+                "fromX": -1.9896,
+                "fromY": 3.7616,
+                "fromZ": 3.3742,
+                "toX": -1.9896,
+                "toY": 3.7616,
+                "toZ": 3.6371
+              },
+              {
+                "fromX": 4.3294,
+                "fromY": -0.4149,
+                "fromZ": 9.6247,
+                "toX": 4.3294,
+                "toY": -0.4149,
+                "toZ": 9.9017
+              },
+              {
+                "fromX": -3.8747,
+                "fromY": 1.2253,
+                "fromZ": -2.4039,
+                "toX": -3.8747,
+                "toY": 1.2253,
+                "toZ": -2.1799
+              },
+              {
+                "fromX": 4.208,
+                "fromY": -0.8535,
+                "fromZ": 13.6544,
+                "toX": 4.208,
+                "toY": -0.8535,
+                "toZ": 13.8841
+              },
+              {
+                "fromX": -1.1964,
+                "fromY": 2.935,
+                "fromZ": -5.2085,
+                "toX": -1.1964,
+                "toY": 2.935,
+                "toZ": -4.8881
+              },
+              {
+                "fromX": 3.8219,
+                "fromY": -0.0439,
+                "fromZ": 3.8696,
+                "toX": 3.8219,
+                "toY": -0.0439,
+                "toZ": 4.3375
+              },
+              {
+                "fromX": -4.2547,
+                "fromY": -0.163,
+                "fromZ": 6.0704,
+                "toX": -4.2547,
+                "toY": -0.163,
+                "toZ": 6.4795
+              },
+              {
+                "fromX": 4.3446,
+                "fromY": 0.5204,
+                "fromZ": 12.0522,
+                "toX": 4.3446,
+                "toY": 0.5204,
+                "toZ": 12.4864
+              },
+              {
+                "fromX": -1.7173,
+                "fromY": 3.5012,
+                "fromZ": -10.8043,
+                "toX": -1.7173,
+                "toY": 3.5012,
+                "toZ": -10.3215
+              },
+              {
+                "fromX": 3.7855,
+                "fromY": -0.4644,
+                "fromZ": 4.1331,
+                "toX": 3.7855,
+                "toY": -0.4644,
+                "toZ": 4.5607
+              },
+              {
+                "fromX": -4.704,
+                "fromY": 0.192,
+                "fromZ": -11.328,
+                "toX": -4.704,
+                "toY": 0.192,
+                "toZ": -10.752
+              },
+              {
+                "fromX": -4.704,
+                "fromY": 0.192,
+                "fromZ": 1.552,
+                "toX": -4.704,
+                "toY": 0.192,
+                "toZ": 2.128
+              },
+              {
+                "fromX": -4.704,
+                "fromY": 0.192,
+                "fromZ": 12.592,
+                "toX": -4.704,
+                "toY": 0.192,
+                "toZ": 13.168
+              },
+              {
+                "fromX": 4.704,
+                "fromY": 0.192,
+                "fromZ": -11.328,
+                "toX": 4.704,
+                "toY": 0.192,
+                "toZ": -10.752
+              },
+              {
+                "fromX": 4.704,
+                "fromY": 0.192,
+                "fromZ": 1.552,
+                "toX": 4.704,
+                "toY": 0.192,
+                "toZ": 2.128
+              },
+              {
+                "fromX": 4.704,
+                "fromY": 0.192,
+                "fromZ": 12.592,
+                "toX": 4.704,
+                "toY": 0.192,
+                "toZ": 13.168
+              }
+            ],
+            "thickness": 0.55,
+            "color": "#ff3f5ee8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#ff3f5e",
+            "emissiveColor": "#ff3f5e",
+            "emissiveStrength": 8.0,
+            "roughnessFactor": 0.55
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 120,
+            "y": 0,
+            "z": 815,
+            "pitch": 0,
+            "yaw": 180,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e571287983ae48f3a4dff98d8f07371d",
       "name": "Choir Node Salt",
       "tags": [
         "hostile",
@@ -330790,6 +332665,13 @@
             "shieldsMax": 400,
             "crew": 0,
             "selectRadius": 28
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -387898,7 +389780,7 @@
       "locked": false
     },
     {
-      "id": "ent_cc77f800ce9b4112bf33083868e4fa51",
+      "id": "ent_9144e7314ae34730b5de76b174f8e72e",
       "name": "Choir Node Salt Drive",
       "tags": [
         "drive",
@@ -391735,7 +393617,306 @@
       "locked": false
     },
     {
-      "id": "ent_6f3cf4a260bb47b3a811cb4e8d510689",
+      "id": "ent_c69fea79aa2b470c8a1f7f69762d41ec",
+      "name": "Choir Node Salt Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.9901,
+                "fromY": 3.238,
+                "fromZ": -6.5668,
+                "toX": -0.9901,
+                "toY": 3.238,
+                "toZ": -6.1404
+              },
+              {
+                "fromX": 3.9488,
+                "fromY": 0.4472,
+                "fromZ": -4.3778,
+                "toX": 3.9488,
+                "toY": 0.4472,
+                "toZ": -3.9112
+              },
+              {
+                "fromX": -4.2521,
+                "fromY": 0.3571,
+                "fromZ": -12.8038,
+                "toX": -4.2521,
+                "toY": 0.3571,
+                "toZ": -12.5688
+              },
+              {
+                "fromX": 4.0705,
+                "fromY": -0.4213,
+                "fromZ": 5.4073,
+                "toX": 4.0705,
+                "toY": -0.4213,
+                "toZ": 5.7287
+              },
+              {
+                "fromX": -1.1057,
+                "fromY": 3.4424,
+                "fromZ": -9.1612,
+                "toX": -1.1057,
+                "toY": 3.4424,
+                "toZ": -8.9649
+              },
+              {
+                "fromX": 4.2034,
+                "fromY": 0.9367,
+                "fromZ": 1.574,
+                "toX": 4.2034,
+                "toY": 0.9367,
+                "toZ": 1.99
+              },
+              {
+                "fromX": -4.4151,
+                "fromY": 0.233,
+                "fromZ": 5.9732,
+                "toX": -4.4151,
+                "toY": 0.233,
+                "toZ": 6.156
+              },
+              {
+                "fromX": 3.7805,
+                "fromY": -0.7183,
+                "fromZ": -2.9189,
+                "toX": 3.7805,
+                "toY": -0.7183,
+                "toZ": -2.7109
+              },
+              {
+                "fromX": -1.4016,
+                "fromY": 3.8524,
+                "fromZ": -13.1448,
+                "toX": -1.4016,
+                "toY": 3.8524,
+                "toZ": -12.713
+              },
+              {
+                "fromX": 3.8255,
+                "fromY": -0.513,
+                "fromZ": 13.1541,
+                "toX": 3.8255,
+                "toY": -0.513,
+                "toZ": 13.5334
+              },
+              {
+                "fromX": -3.9386,
+                "fromY": 1.2456,
+                "fromZ": 12.5944,
+                "toX": -3.9386,
+                "toY": 1.2456,
+                "toZ": 12.932
+              },
+              {
+                "fromX": 3.6567,
+                "fromY": 0.1012,
+                "fromZ": -10.8805,
+                "toX": 3.6567,
+                "toY": 0.1012,
+                "toZ": -10.4196
+              },
+              {
+                "fromX": -1.5182,
+                "fromY": 3.5882,
+                "fromZ": -5.9884,
+                "toX": -1.5182,
+                "toY": 3.5882,
+                "toZ": -5.497
+              },
+              {
+                "fromX": 4.3661,
+                "fromY": 0.9398,
+                "fromZ": 7.9322,
+                "toX": 4.3661,
+                "toY": 0.9398,
+                "toZ": 8.3131
+              },
+              {
+                "fromX": -3.9997,
+                "fromY": 0.0042,
+                "fromZ": -13.7721,
+                "toX": -3.9997,
+                "toY": 0.0042,
+                "toZ": -13.5479
+              },
+              {
+                "fromX": 4.5006,
+                "fromY": 0.9282,
+                "fromZ": 8.3265,
+                "toX": 4.5006,
+                "toY": 0.9282,
+                "toZ": 8.552
+              },
+              {
+                "fromX": -1.9896,
+                "fromY": 3.7616,
+                "fromZ": 3.3742,
+                "toX": -1.9896,
+                "toY": 3.7616,
+                "toZ": 3.6371
+              },
+              {
+                "fromX": 4.3294,
+                "fromY": -0.4149,
+                "fromZ": 9.6247,
+                "toX": 4.3294,
+                "toY": -0.4149,
+                "toZ": 9.9017
+              },
+              {
+                "fromX": -3.8747,
+                "fromY": 1.2253,
+                "fromZ": -2.4039,
+                "toX": -3.8747,
+                "toY": 1.2253,
+                "toZ": -2.1799
+              },
+              {
+                "fromX": 4.208,
+                "fromY": -0.8535,
+                "fromZ": 13.6544,
+                "toX": 4.208,
+                "toY": -0.8535,
+                "toZ": 13.8841
+              },
+              {
+                "fromX": -1.1964,
+                "fromY": 2.935,
+                "fromZ": -5.2085,
+                "toX": -1.1964,
+                "toY": 2.935,
+                "toZ": -4.8881
+              },
+              {
+                "fromX": 3.8219,
+                "fromY": -0.0439,
+                "fromZ": 3.8696,
+                "toX": 3.8219,
+                "toY": -0.0439,
+                "toZ": 4.3375
+              },
+              {
+                "fromX": -4.2547,
+                "fromY": -0.163,
+                "fromZ": 6.0704,
+                "toX": -4.2547,
+                "toY": -0.163,
+                "toZ": 6.4795
+              },
+              {
+                "fromX": 4.3446,
+                "fromY": 0.5204,
+                "fromZ": 12.0522,
+                "toX": 4.3446,
+                "toY": 0.5204,
+                "toZ": 12.4864
+              },
+              {
+                "fromX": -1.7173,
+                "fromY": 3.5012,
+                "fromZ": -10.8043,
+                "toX": -1.7173,
+                "toY": 3.5012,
+                "toZ": -10.3215
+              },
+              {
+                "fromX": 3.7855,
+                "fromY": -0.4644,
+                "fromZ": 4.1331,
+                "toX": 3.7855,
+                "toY": -0.4644,
+                "toZ": 4.5607
+              },
+              {
+                "fromX": -4.704,
+                "fromY": 0.192,
+                "fromZ": -11.328,
+                "toX": -4.704,
+                "toY": 0.192,
+                "toZ": -10.752
+              },
+              {
+                "fromX": -4.704,
+                "fromY": 0.192,
+                "fromZ": 1.552,
+                "toX": -4.704,
+                "toY": 0.192,
+                "toZ": 2.128
+              },
+              {
+                "fromX": -4.704,
+                "fromY": 0.192,
+                "fromZ": 12.592,
+                "toX": -4.704,
+                "toY": 0.192,
+                "toZ": 13.168
+              },
+              {
+                "fromX": 4.704,
+                "fromY": 0.192,
+                "fromZ": -11.328,
+                "toX": 4.704,
+                "toY": 0.192,
+                "toZ": -10.752
+              },
+              {
+                "fromX": 4.704,
+                "fromY": 0.192,
+                "fromZ": 1.552,
+                "toX": 4.704,
+                "toY": 0.192,
+                "toZ": 2.128
+              },
+              {
+                "fromX": 4.704,
+                "fromY": 0.192,
+                "fromZ": 12.592,
+                "toX": 4.704,
+                "toY": 0.192,
+                "toZ": 13.168
+              }
+            ],
+            "thickness": 0.55,
+            "color": "#ff3f5ee8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#ff3f5e",
+            "emissiveColor": "#ff3f5e",
+            "emissiveStrength": 8.0,
+            "roughnessFactor": 0.55
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 18,
+            "y": 0,
+            "z": 880,
+            "pitch": 0,
+            "yaw": 180,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e215d49f5a9244678b7ea47a6d045137",
       "name": "Controls Hint",
       "tags": [
         "ui"
@@ -391749,10 +393930,10 @@
           "type": "Rekall.UiElement",
           "properties": {
             "x": 36,
-            "y": 946,
-            "width": 1020,
-            "height": 56,
-            "text": "LEFT CLICK select   RIGHT CLICK move / engage   MIDDLE DRAG orbit   WASD pan   WHEEL zoom   SPACE frame all",
+            "y": 1014,
+            "width": 1500,
+            "height": 40,
+            "text": "LEFT CLICK select   RIGHT CLICK move / engage   Q shield pulse   E overcharge   ENTER briefing   MIDDLE DRAG orbit   WASD pan   WHEEL zoom",
             "backgroundColor": "#00000000",
             "foregroundColor": "#6f96b4",
             "fontSize": 17,
@@ -391766,7 +393947,7 @@
       "locked": false
     },
     {
-      "id": "ent_35c424cd651b4ff4ac5890b0efdf05e1",
+      "id": "ent_45c8e1dc6cf34d6b939f6cda55762b26",
       "name": "Convoy Warm Fill",
       "tags": [
         "light"
@@ -391796,7 +393977,7 @@
       "locked": false
     },
     {
-      "id": "ent_2c9f10127ef44ed9996eb9161fe977c4",
+      "id": "ent_58bafb989b0f41cd96bbb52415e801c6",
       "name": "Environment",
       "tags": [
         "environment"
@@ -391809,10 +393990,10 @@
             "backgroundColor": "#000000",
             "skyAsset": "asset_stellar-environment_66687061",
             "toneMapper": "agx",
-            "exposure": -0.1,
+            "exposure": 0.02,
             "whitePoint": 11.2,
-            "ambientEnergy": 2.4,
-            "ambientSkyColor": "#7890a8",
+            "ambientEnergy": 3.0,
+            "ambientSkyColor": "#8199b2",
             "ambientGroundColor": "#26313d"
           }
         },
@@ -391852,7 +394033,7 @@
       "locked": false
     },
     {
-      "id": "ent_4580d42a9ca5441e8d9a78efec1d40dd",
+      "id": "ent_c403a99220f2446d94454aa19a43aff0",
       "name": "Fade Curtain",
       "tags": [
         "ui"
@@ -391882,7 +394063,7 @@
       "locked": false
     },
     {
-      "id": "ent_f1da641c7f164fa7a3c105aae2c93a68",
+      "id": "ent_48c8cab6e6b64ef6b1a0181e5d32b512",
       "name": "Kell",
       "tags": [
         "planet"
@@ -391914,7 +394095,7 @@
       "locked": false
     },
     {
-      "id": "ent_b2713733b43b457b882f5eec6f05872e",
+      "id": "ent_ed493adc0dfa43a88969fc8f47699963",
       "name": "Long Watch",
       "tags": [
         "capital",
@@ -391952,6 +394133,13 @@
             "shieldsMax": 2400,
             "crew": 604,
             "selectRadius": 30
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -449060,7 +451248,7 @@
       "locked": false
     },
     {
-      "id": "ent_05a4914541544fee8f11d06f4177e5a0",
+      "id": "ent_7ba22d9c903845c9b6d0f42fc473aaed",
       "name": "Long Watch Drive",
       "tags": [
         "drive",
@@ -452897,7 +455085,7 @@
       "locked": false
     },
     {
-      "id": "ent_df8ad897ab0e41fcaa83cc319d155f97",
+      "id": "ent_0b86645575d44306b76e2826c650d829",
       "name": "Long Watch Fighter 1",
       "tags": [
         "fighter",
@@ -452946,6 +455134,13 @@
             "shieldsMax": 90,
             "crew": 1,
             "selectRadius": 4.2
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -466087,7 +468282,130 @@
       "locked": false
     },
     {
-      "id": "ent_45215a12243e40afafb5e1001d7d1a55",
+      "id": "ent_1a56246f14a641169eb934bc877b369c",
+      "name": "Long Watch Fighter 1 Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.221,
+                "fromY": 0.3631,
+                "fromZ": 0.1561,
+                "toX": -0.221,
+                "toY": 0.3631,
+                "toZ": 0.6069
+              },
+              {
+                "fromX": 0.4395,
+                "fromY": 0.0399,
+                "fromZ": -0.9565,
+                "toX": 0.4395,
+                "toY": 0.0399,
+                "toZ": -0.465
+              },
+              {
+                "fromX": -0.4001,
+                "fromY": 0.0908,
+                "fromZ": -0.3337,
+                "toX": -0.4001,
+                "toY": 0.0908,
+                "toZ": 0.0295
+              },
+              {
+                "fromX": 0.4106,
+                "fromY": 0.0365,
+                "fromZ": 0.2284,
+                "toX": 0.4106,
+                "toY": 0.0365,
+                "toZ": 0.6221
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              }
+            ],
+            "thickness": 0.26,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 10.0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 101.0,
+            "y": 0.0,
+            "z": 62.0,
+            "pitch": 0,
+            "yaw": 0.0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_a29c1df384e04ab89c027bfa2cb09ae8",
       "name": "Long Watch Fighter 2",
       "tags": [
         "fighter",
@@ -466136,6 +468454,13 @@
             "shieldsMax": 90,
             "crew": 1,
             "selectRadius": 4.2
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -479277,7 +481602,130 @@
       "locked": false
     },
     {
-      "id": "ent_aca297f62c524009afd89920ecfaa5dd",
+      "id": "ent_6865bf842f4a46d186ec8169881ffad7",
+      "name": "Long Watch Fighter 2 Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.221,
+                "fromY": 0.3631,
+                "fromZ": 0.1561,
+                "toX": -0.221,
+                "toY": 0.3631,
+                "toZ": 0.6069
+              },
+              {
+                "fromX": 0.4395,
+                "fromY": 0.0399,
+                "fromZ": -0.9565,
+                "toX": 0.4395,
+                "toY": 0.0399,
+                "toZ": -0.465
+              },
+              {
+                "fromX": -0.4001,
+                "fromY": 0.0908,
+                "fromZ": -0.3337,
+                "toX": -0.4001,
+                "toY": 0.0908,
+                "toZ": 0.0295
+              },
+              {
+                "fromX": 0.4106,
+                "fromY": 0.0365,
+                "fromZ": 0.2284,
+                "toX": 0.4106,
+                "toY": 0.0365,
+                "toZ": 0.6221
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              }
+            ],
+            "thickness": 0.26,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 10.0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 84.0,
+            "y": 5.949999999999999,
+            "z": 79.0,
+            "pitch": 0,
+            "yaw": 90.0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_64299586783a40d898883d7e29adcb19",
       "name": "Long Watch Fighter 3",
       "tags": [
         "fighter",
@@ -479326,6 +481774,13 @@
             "shieldsMax": 90,
             "crew": 1,
             "selectRadius": 4.2
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -492467,7 +494922,130 @@
       "locked": false
     },
     {
-      "id": "ent_55c93537a80d4bf1a004e328c7b4b8ce",
+      "id": "ent_3bda6c5daa884d89a6e601afbb362713",
+      "name": "Long Watch Fighter 3 Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.221,
+                "fromY": 0.3631,
+                "fromZ": 0.1561,
+                "toX": -0.221,
+                "toY": 0.3631,
+                "toZ": 0.6069
+              },
+              {
+                "fromX": 0.4395,
+                "fromY": 0.0399,
+                "fromZ": -0.9565,
+                "toX": 0.4395,
+                "toY": 0.0399,
+                "toZ": -0.465
+              },
+              {
+                "fromX": -0.4001,
+                "fromY": 0.0908,
+                "fromZ": -0.3337,
+                "toX": -0.4001,
+                "toY": 0.0908,
+                "toZ": 0.0295
+              },
+              {
+                "fromX": 0.4106,
+                "fromY": 0.0365,
+                "fromZ": 0.2284,
+                "toX": 0.4106,
+                "toY": 0.0365,
+                "toZ": 0.6221
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              }
+            ],
+            "thickness": 0.26,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 10.0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 67.0,
+            "y": 7.286648454926751e-16,
+            "z": 62.0,
+            "pitch": 0,
+            "yaw": 180.0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_aef4154c7c5445b79730aba986a36ca4",
       "name": "Long Watch Fighter 4",
       "tags": [
         "fighter",
@@ -492516,6 +495094,13 @@
             "shieldsMax": 90,
             "crew": 1,
             "selectRadius": 4.2
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -505657,7 +508242,130 @@
       "locked": false
     },
     {
-      "id": "ent_88cb980139c64d31933839c5e4de59bd",
+      "id": "ent_de27312d94d243de9ec115ec8a0ea5c9",
+      "name": "Long Watch Fighter 4 Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.221,
+                "fromY": 0.3631,
+                "fromZ": 0.1561,
+                "toX": -0.221,
+                "toY": 0.3631,
+                "toZ": 0.6069
+              },
+              {
+                "fromX": 0.4395,
+                "fromY": 0.0399,
+                "fromZ": -0.9565,
+                "toX": 0.4395,
+                "toY": 0.0399,
+                "toZ": -0.465
+              },
+              {
+                "fromX": -0.4001,
+                "fromY": 0.0908,
+                "fromZ": -0.3337,
+                "toX": -0.4001,
+                "toY": 0.0908,
+                "toZ": 0.0295
+              },
+              {
+                "fromX": 0.4106,
+                "fromY": 0.0365,
+                "fromZ": 0.2284,
+                "toX": 0.4106,
+                "toY": 0.0365,
+                "toZ": 0.6221
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              }
+            ],
+            "thickness": 0.26,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 10.0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 84.0,
+            "y": -5.949999999999999,
+            "z": 45.0,
+            "pitch": 0,
+            "yaw": 270.0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_00d7c38c64984c1a9622b3ad071e5dd2",
       "name": "Long Watch Fill",
       "tags": [
         "light"
@@ -505687,7 +508395,338 @@
       "locked": false
     },
     {
-      "id": "ent_4b4d38b4b4154ef1a4ce542069da1ade",
+      "id": "ent_7717eec16eca4516968a24319044198f",
+      "name": "Long Watch Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -1.1374,
+                "fromY": 3.1837,
+                "fromZ": -14.958,
+                "toX": -1.1374,
+                "toY": 3.1837,
+                "toZ": -14.5912
+              },
+              {
+                "fromX": 3.5297,
+                "fromY": -0.1846,
+                "fromZ": 2.5963,
+                "toX": 3.5297,
+                "toY": -0.1846,
+                "toZ": 2.9435
+              },
+              {
+                "fromX": -3.3504,
+                "fromY": 1.0092,
+                "fromZ": 10.4036,
+                "toX": -3.3504,
+                "toY": 1.0092,
+                "toZ": 10.7187
+              },
+              {
+                "fromX": 3.439,
+                "fromY": -0.6414,
+                "fromZ": 8.9821,
+                "toX": 3.439,
+                "toY": -0.6414,
+                "toZ": 9.3556
+              },
+              {
+                "fromX": -1.5424,
+                "fromY": 2.7257,
+                "fromZ": -3.6436,
+                "toX": -1.5424,
+                "toY": 2.7257,
+                "toZ": -3.1885
+              },
+              {
+                "fromX": 3.1819,
+                "fromY": -0.4822,
+                "fromZ": -10.1932,
+                "toX": 3.1819,
+                "toY": -0.4822,
+                "toZ": -9.9021
+              },
+              {
+                "fromX": -3.2503,
+                "fromY": -0.3658,
+                "fromZ": 13.3063,
+                "toX": -3.2503,
+                "toY": -0.3658,
+                "toZ": 13.6936
+              },
+              {
+                "fromX": 2.9875,
+                "fromY": -0.0994,
+                "fromZ": -7.1048,
+                "toX": 2.9875,
+                "toY": -0.0994,
+                "toZ": -6.7928
+              },
+              {
+                "fromX": -1.7182,
+                "fromY": 2.2888,
+                "fromZ": -5.7024,
+                "toX": -1.7182,
+                "toY": 2.2888,
+                "toZ": -5.2868
+              },
+              {
+                "fromX": 2.8948,
+                "fromY": -0.2327,
+                "fromZ": -13.3581,
+                "toX": 2.8948,
+                "toY": -0.2327,
+                "toZ": -12.9044
+              },
+              {
+                "fromX": -3.0366,
+                "fromY": 0.633,
+                "fromZ": 0.8967,
+                "toX": -3.0366,
+                "toY": 0.633,
+                "toZ": 1.2471
+              },
+              {
+                "fromX": 3.375,
+                "fromY": -0.0255,
+                "fromZ": 5.9413,
+                "toX": 3.375,
+                "toY": -0.0255,
+                "toZ": 6.1231
+              },
+              {
+                "fromX": -1.4262,
+                "fromY": 3.0726,
+                "fromZ": -1.4701,
+                "toX": -1.4262,
+                "toY": 3.0726,
+                "toZ": -1.1055
+              },
+              {
+                "fromX": 3.0284,
+                "fromY": -0.3656,
+                "fromZ": -11.7834,
+                "toX": 3.0284,
+                "toY": -0.3656,
+                "toZ": -11.5423
+              },
+              {
+                "fromX": -3.1362,
+                "fromY": 0.5176,
+                "fromZ": 8.3531,
+                "toX": -3.1362,
+                "toY": 0.5176,
+                "toZ": 8.8081
+              },
+              {
+                "fromX": 3.4148,
+                "fromY": 0.3333,
+                "fromZ": 8.4398,
+                "toX": 3.4148,
+                "toY": 0.3333,
+                "toZ": 8.8956
+              },
+              {
+                "fromX": -1.3616,
+                "fromY": 2.5478,
+                "fromZ": 8.7648,
+                "toX": -1.3616,
+                "toY": 2.5478,
+                "toZ": 9.0488
+              },
+              {
+                "fromX": 3.2282,
+                "fromY": -0.6812,
+                "fromZ": -4.3635,
+                "toX": 3.2282,
+                "toY": -0.6812,
+                "toZ": -4.0621
+              },
+              {
+                "fromX": -3.51,
+                "fromY": 0.5558,
+                "fromZ": -3.2967,
+                "toX": -3.51,
+                "toY": 0.5558,
+                "toZ": -2.9576
+              },
+              {
+                "fromX": 3.4051,
+                "fromY": -0.5381,
+                "fromZ": -12.8101,
+                "toX": 3.4051,
+                "toY": -0.5381,
+                "toZ": -12.5044
+              },
+              {
+                "fromX": -1.4524,
+                "fromY": 2.8385,
+                "fromZ": 10.9804,
+                "toX": -1.4524,
+                "toY": 2.8385,
+                "toZ": 11.1755
+              },
+              {
+                "fromX": 3.0993,
+                "fromY": -0.3699,
+                "fromZ": 14.054,
+                "toX": 3.0993,
+                "toY": -0.3699,
+                "toZ": 14.3523
+              },
+              {
+                "fromX": -3.2839,
+                "fromY": -0.1971,
+                "fromZ": -8.5841,
+                "toX": -3.2839,
+                "toY": -0.1971,
+                "toZ": -8.3026
+              },
+              {
+                "fromX": 2.9349,
+                "fromY": 0.987,
+                "fromZ": -11.9255,
+                "toX": 2.9349,
+                "toY": 0.987,
+                "toZ": -11.4682
+              },
+              {
+                "fromX": -1.5214,
+                "fromY": 3.2235,
+                "fromZ": -9.2928,
+                "toX": -1.5214,
+                "toY": 3.2235,
+                "toZ": -8.868
+              },
+              {
+                "fromX": 3.4079,
+                "fromY": 1.0104,
+                "fromZ": 7.8692,
+                "toX": 3.4079,
+                "toY": 1.0104,
+                "toZ": 8.052
+              },
+              {
+                "fromX": -2.9205,
+                "fromY": -0.6455,
+                "fromZ": 8.3759,
+                "toX": -2.9205,
+                "toY": -0.6455,
+                "toZ": 8.7221
+              },
+              {
+                "fromX": 2.9941,
+                "fromY": 0.2963,
+                "fromZ": -9.695,
+                "toX": 2.9941,
+                "toY": 0.2963,
+                "toZ": -9.284
+              },
+              {
+                "fromX": -1.5155,
+                "fromY": 3.071,
+                "fromZ": 7.1475,
+                "toX": -1.5155,
+                "toY": 3.071,
+                "toZ": 7.509
+              },
+              {
+                "fromX": 3.3404,
+                "fromY": 0.3203,
+                "fromZ": 6.321,
+                "toX": 3.3404,
+                "toY": 0.3203,
+                "toZ": 6.5031
+              },
+              {
+                "fromX": -3.724,
+                "fromY": 0.152,
+                "fromZ": -12.708,
+                "toX": -3.724,
+                "toY": 0.152,
+                "toZ": -12.252
+              },
+              {
+                "fromX": -3.724,
+                "fromY": 0.152,
+                "fromZ": 1.852,
+                "toX": -3.724,
+                "toY": 0.152,
+                "toZ": 2.308
+              },
+              {
+                "fromX": -3.724,
+                "fromY": 0.152,
+                "fromZ": 14.332,
+                "toX": -3.724,
+                "toY": 0.152,
+                "toZ": 14.788
+              },
+              {
+                "fromX": 3.724,
+                "fromY": 0.152,
+                "fromZ": -12.708,
+                "toX": 3.724,
+                "toY": 0.152,
+                "toZ": -12.252
+              },
+              {
+                "fromX": 3.724,
+                "fromY": 0.152,
+                "fromZ": 1.852,
+                "toX": 3.724,
+                "toY": 0.152,
+                "toZ": 2.308
+              },
+              {
+                "fromX": 3.724,
+                "fromY": 0.152,
+                "fromZ": 14.332,
+                "toX": 3.724,
+                "toY": 0.152,
+                "toZ": 14.788
+              }
+            ],
+            "thickness": 0.55,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 8.0,
+            "roughnessFactor": 0.55
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 84,
+            "y": 0,
+            "z": 62,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_7c8ac3d54fdb4fd69fcaa575c7bc3f1f",
       "name": "Meridian",
       "tags": [
         "planet"
@@ -505754,7 +508793,7 @@
       "locked": false
     },
     {
-      "id": "ent_284d3b05e27e4f3a93f1d23be144f51f",
+      "id": "ent_6162542bb2014c4ba00bd98b34bbf6af",
       "name": "Meridian Bounce",
       "tags": [
         "light"
@@ -505784,7 +508823,7 @@
       "locked": false
     },
     {
-      "id": "ent_5e70754077df4dc4a68422f937f741f0",
+      "id": "ent_e2aa9e0b30f14c4fbad81cb00a74257a",
       "name": "Objective Panel",
       "tags": [
         "ui"
@@ -505817,7 +508856,7 @@
       "locked": false
     },
     {
-      "id": "ent_85741002b46b4cb8b3930df53b101e52",
+      "id": "ent_d6fb6076c7744da58c8b011248d26f54",
       "name": "Post",
       "tags": [
         "post"
@@ -505862,7 +508901,7 @@
       "locked": false
     },
     {
-      "id": "ent_96392c2282044bf88b0a8430eca48243",
+      "id": "ent_689e24b7a29d42a58aea23eb09feb3a1",
       "name": "Shell",
       "tags": [
         "flow"
@@ -505877,7 +508916,7 @@
             "engaged": false,
             "phase": "briefing",
             "phaseElapsed": 0,
-            "briefingSecondsPerLine": 8,
+            "briefingSecondsPerLine": 5,
             "briefingLines": [
               "Fuel convoy Skimmer Ferrous and Skimmer Anneal are yours to see through.\nThey are slow, they are unarmed, and the Reach does not have others.",
               "LEFT CLICK any vessel to bring up its readout.\nStart with the Ardent Dominion - the big one. She is the flagship.",
@@ -505936,7 +508975,7 @@
       "locked": false
     },
     {
-      "id": "ent_478cdee1a0414801bbea0f7921498b09",
+      "id": "ent_3075057e812b46049bc03e8e881e7d2c",
       "name": "Skimmer Anneal",
       "tags": [
         "civilian",
@@ -505974,6 +509013,13 @@
             "shieldsMax": 1,
             "crew": 44,
             "selectRadius": 36
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -563071,7 +566117,7 @@
       "locked": false
     },
     {
-      "id": "ent_60703789a5784cd39a2589a0bbf126fb",
+      "id": "ent_1844f12d55244c9b8ddd7ca1280da60e",
       "name": "Skimmer Anneal Drive",
       "tags": [
         "drive",
@@ -565646,7 +568692,290 @@
       "locked": false
     },
     {
-      "id": "ent_ff7c3a6fe97d40b4866a7f4fb4465d27",
+      "id": "ent_0055001150394a3f8bfb69c4f5715bef",
+      "name": "Skimmer Anneal Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -2.4914,
+                "fromY": 3.8767,
+                "fromZ": -0.6475,
+                "toX": -2.4914,
+                "toY": 3.8767,
+                "toZ": -0.4579
+              },
+              {
+                "fromX": 4.8505,
+                "fromY": 0.469,
+                "fromZ": 6.5166,
+                "toX": 4.8505,
+                "toY": 0.469,
+                "toZ": 6.6971
+              },
+              {
+                "fromX": -5.004,
+                "fromY": -0.3389,
+                "fromZ": 5.8781,
+                "toX": -5.004,
+                "toY": -0.3389,
+                "toZ": 6.346
+              },
+              {
+                "fromX": 5.4385,
+                "fromY": -0.5705,
+                "fromZ": -7.4715,
+                "toX": 5.4385,
+                "toY": -0.5705,
+                "toZ": -7.054
+              },
+              {
+                "fromX": -1.4838,
+                "fromY": 4.765,
+                "fromZ": 7.7821,
+                "toX": -1.4838,
+                "toY": 4.765,
+                "toZ": 8.0772
+              },
+              {
+                "fromX": 4.8422,
+                "fromY": -0.336,
+                "fromZ": -11.1683,
+                "toX": 4.8422,
+                "toY": -0.336,
+                "toZ": -10.8154
+              },
+              {
+                "fromX": -5.4223,
+                "fromY": 0.9982,
+                "fromZ": -14.765,
+                "toX": -5.4223,
+                "toY": 0.9982,
+                "toZ": -14.315
+              },
+              {
+                "fromX": 5.1386,
+                "fromY": 0.6749,
+                "fromZ": 5.1632,
+                "toX": 5.1386,
+                "toY": 0.6749,
+                "toZ": 5.5199
+              },
+              {
+                "fromX": -1.5915,
+                "fromY": 4.1059,
+                "fromZ": -3.8247,
+                "toX": -1.5915,
+                "toY": 4.1059,
+                "toZ": -3.6126
+              },
+              {
+                "fromX": 5.0639,
+                "fromY": 0.0201,
+                "fromZ": 3.5069,
+                "toX": 5.0639,
+                "toY": 0.0201,
+                "toZ": 3.9566
+              },
+              {
+                "fromX": -5.3028,
+                "fromY": 0.3723,
+                "fromZ": -6.9785,
+                "toX": -5.3028,
+                "toY": 0.3723,
+                "toZ": -6.614
+              },
+              {
+                "fromX": 4.6083,
+                "fromY": -0.2085,
+                "fromZ": -10.7397,
+                "toX": 4.6083,
+                "toY": -0.2085,
+                "toZ": -10.2935
+              },
+              {
+                "fromX": -2.186,
+                "fromY": 4.6179,
+                "fromZ": -20.6239,
+                "toX": -2.186,
+                "toY": 4.6179,
+                "toZ": -20.3581
+              },
+              {
+                "fromX": 5.2163,
+                "fromY": 0.8302,
+                "fromZ": -8.6045,
+                "toX": 5.2163,
+                "toY": 0.8302,
+                "toZ": -8.3191
+              },
+              {
+                "fromX": -5.0686,
+                "fromY": 0.1142,
+                "fromZ": -19.7025,
+                "toX": -5.0686,
+                "toY": 0.1142,
+                "toZ": -19.2973
+              },
+              {
+                "fromX": 5.1643,
+                "fromY": -0.7001,
+                "fromZ": -0.328,
+                "toX": 5.1643,
+                "toY": -0.7001,
+                "toZ": -0.0902
+              },
+              {
+                "fromX": -2.2092,
+                "fromY": 4.1962,
+                "fromZ": 6.1461,
+                "toX": -2.2092,
+                "toY": 4.1962,
+                "toZ": 6.6346
+              },
+              {
+                "fromX": 5.443,
+                "fromY": 0.6686,
+                "fromZ": 11.099,
+                "toX": 5.443,
+                "toY": 0.6686,
+                "toZ": 11.5703
+              },
+              {
+                "fromX": -5.5961,
+                "fromY": -0.0452,
+                "fromZ": -7.5845,
+                "toX": -5.5961,
+                "toY": -0.0452,
+                "toZ": -7.3081
+              },
+              {
+                "fromX": 4.8974,
+                "fromY": 1.5181,
+                "fromZ": -10.5839,
+                "toX": 4.8974,
+                "toY": 1.5181,
+                "toZ": -10.1828
+              },
+              {
+                "fromX": -2.3161,
+                "fromY": 4.5498,
+                "fromZ": 2.6721,
+                "toX": -2.3161,
+                "toY": 4.5498,
+                "toZ": 2.9023
+              },
+              {
+                "fromX": 5.3934,
+                "fromY": -0.9341,
+                "fromZ": -18.1132,
+                "toX": 5.3934,
+                "toY": -0.9341,
+                "toZ": -17.7564
+              },
+              {
+                "fromX": -4.9974,
+                "fromY": 1.6645,
+                "fromZ": 17.8201,
+                "toX": -4.9974,
+                "toY": 1.6645,
+                "toZ": 18.2788
+              },
+              {
+                "fromX": 4.5918,
+                "fromY": 0.6103,
+                "fromZ": 16.0297,
+                "toX": 4.5918,
+                "toY": 0.6103,
+                "toZ": 16.217
+              },
+              {
+                "fromX": -5.88,
+                "fromY": 0.24,
+                "fromZ": -15.24,
+                "toX": -5.88,
+                "toY": 0.24,
+                "toZ": -14.52
+              },
+              {
+                "fromX": -5.88,
+                "fromY": 0.24,
+                "fromZ": 2.12,
+                "toX": -5.88,
+                "toY": 0.24,
+                "toZ": 2.84
+              },
+              {
+                "fromX": -5.88,
+                "fromY": 0.24,
+                "fromZ": 17.0,
+                "toX": -5.88,
+                "toY": 0.24,
+                "toZ": 17.72
+              },
+              {
+                "fromX": 5.88,
+                "fromY": 0.24,
+                "fromZ": -15.24,
+                "toX": 5.88,
+                "toY": 0.24,
+                "toZ": -14.52
+              },
+              {
+                "fromX": 5.88,
+                "fromY": 0.24,
+                "fromZ": 2.12,
+                "toX": 5.88,
+                "toY": 0.24,
+                "toZ": 2.84
+              },
+              {
+                "fromX": 5.88,
+                "fromY": 0.24,
+                "fromZ": 17.0,
+                "toX": 5.88,
+                "toY": 0.24,
+                "toZ": 17.72
+              }
+            ],
+            "thickness": 0.55,
+            "color": "#ffad58e8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#ffad58",
+            "emissiveColor": "#ffad58",
+            "emissiveStrength": 8.0,
+            "roughnessFactor": 0.55
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": 38,
+            "y": 0,
+            "z": -130,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_7faf098b7bd74d30959ebfa7bccfbe14",
       "name": "Skimmer Ferrous",
       "tags": [
         "civilian",
@@ -565684,6 +569013,13 @@
             "shieldsMax": 1,
             "crew": 44,
             "selectRadius": 36
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -622781,7 +626117,7 @@
       "locked": false
     },
     {
-      "id": "ent_47579fa49e814715be0c6e868b5189f9",
+      "id": "ent_c4c23b4090f14038a551c735b6da226d",
       "name": "Skimmer Ferrous Drive",
       "tags": [
         "drive",
@@ -625356,7 +628692,290 @@
       "locked": false
     },
     {
-      "id": "ent_579231db972d447d857c8114dda3119e",
+      "id": "ent_73c1709390c5434e97d9e9416b87135c",
+      "name": "Skimmer Ferrous Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -2.4914,
+                "fromY": 3.8767,
+                "fromZ": -0.6475,
+                "toX": -2.4914,
+                "toY": 3.8767,
+                "toZ": -0.4579
+              },
+              {
+                "fromX": 4.8505,
+                "fromY": 0.469,
+                "fromZ": 6.5166,
+                "toX": 4.8505,
+                "toY": 0.469,
+                "toZ": 6.6971
+              },
+              {
+                "fromX": -5.004,
+                "fromY": -0.3389,
+                "fromZ": 5.8781,
+                "toX": -5.004,
+                "toY": -0.3389,
+                "toZ": 6.346
+              },
+              {
+                "fromX": 5.4385,
+                "fromY": -0.5705,
+                "fromZ": -7.4715,
+                "toX": 5.4385,
+                "toY": -0.5705,
+                "toZ": -7.054
+              },
+              {
+                "fromX": -1.4838,
+                "fromY": 4.765,
+                "fromZ": 7.7821,
+                "toX": -1.4838,
+                "toY": 4.765,
+                "toZ": 8.0772
+              },
+              {
+                "fromX": 4.8422,
+                "fromY": -0.336,
+                "fromZ": -11.1683,
+                "toX": 4.8422,
+                "toY": -0.336,
+                "toZ": -10.8154
+              },
+              {
+                "fromX": -5.4223,
+                "fromY": 0.9982,
+                "fromZ": -14.765,
+                "toX": -5.4223,
+                "toY": 0.9982,
+                "toZ": -14.315
+              },
+              {
+                "fromX": 5.1386,
+                "fromY": 0.6749,
+                "fromZ": 5.1632,
+                "toX": 5.1386,
+                "toY": 0.6749,
+                "toZ": 5.5199
+              },
+              {
+                "fromX": -1.5915,
+                "fromY": 4.1059,
+                "fromZ": -3.8247,
+                "toX": -1.5915,
+                "toY": 4.1059,
+                "toZ": -3.6126
+              },
+              {
+                "fromX": 5.0639,
+                "fromY": 0.0201,
+                "fromZ": 3.5069,
+                "toX": 5.0639,
+                "toY": 0.0201,
+                "toZ": 3.9566
+              },
+              {
+                "fromX": -5.3028,
+                "fromY": 0.3723,
+                "fromZ": -6.9785,
+                "toX": -5.3028,
+                "toY": 0.3723,
+                "toZ": -6.614
+              },
+              {
+                "fromX": 4.6083,
+                "fromY": -0.2085,
+                "fromZ": -10.7397,
+                "toX": 4.6083,
+                "toY": -0.2085,
+                "toZ": -10.2935
+              },
+              {
+                "fromX": -2.186,
+                "fromY": 4.6179,
+                "fromZ": -20.6239,
+                "toX": -2.186,
+                "toY": 4.6179,
+                "toZ": -20.3581
+              },
+              {
+                "fromX": 5.2163,
+                "fromY": 0.8302,
+                "fromZ": -8.6045,
+                "toX": 5.2163,
+                "toY": 0.8302,
+                "toZ": -8.3191
+              },
+              {
+                "fromX": -5.0686,
+                "fromY": 0.1142,
+                "fromZ": -19.7025,
+                "toX": -5.0686,
+                "toY": 0.1142,
+                "toZ": -19.2973
+              },
+              {
+                "fromX": 5.1643,
+                "fromY": -0.7001,
+                "fromZ": -0.328,
+                "toX": 5.1643,
+                "toY": -0.7001,
+                "toZ": -0.0902
+              },
+              {
+                "fromX": -2.2092,
+                "fromY": 4.1962,
+                "fromZ": 6.1461,
+                "toX": -2.2092,
+                "toY": 4.1962,
+                "toZ": 6.6346
+              },
+              {
+                "fromX": 5.443,
+                "fromY": 0.6686,
+                "fromZ": 11.099,
+                "toX": 5.443,
+                "toY": 0.6686,
+                "toZ": 11.5703
+              },
+              {
+                "fromX": -5.5961,
+                "fromY": -0.0452,
+                "fromZ": -7.5845,
+                "toX": -5.5961,
+                "toY": -0.0452,
+                "toZ": -7.3081
+              },
+              {
+                "fromX": 4.8974,
+                "fromY": 1.5181,
+                "fromZ": -10.5839,
+                "toX": 4.8974,
+                "toY": 1.5181,
+                "toZ": -10.1828
+              },
+              {
+                "fromX": -2.3161,
+                "fromY": 4.5498,
+                "fromZ": 2.6721,
+                "toX": -2.3161,
+                "toY": 4.5498,
+                "toZ": 2.9023
+              },
+              {
+                "fromX": 5.3934,
+                "fromY": -0.9341,
+                "fromZ": -18.1132,
+                "toX": 5.3934,
+                "toY": -0.9341,
+                "toZ": -17.7564
+              },
+              {
+                "fromX": -4.9974,
+                "fromY": 1.6645,
+                "fromZ": 17.8201,
+                "toX": -4.9974,
+                "toY": 1.6645,
+                "toZ": 18.2788
+              },
+              {
+                "fromX": 4.5918,
+                "fromY": 0.6103,
+                "fromZ": 16.0297,
+                "toX": 4.5918,
+                "toY": 0.6103,
+                "toZ": 16.217
+              },
+              {
+                "fromX": -5.88,
+                "fromY": 0.24,
+                "fromZ": -15.24,
+                "toX": -5.88,
+                "toY": 0.24,
+                "toZ": -14.52
+              },
+              {
+                "fromX": -5.88,
+                "fromY": 0.24,
+                "fromZ": 2.12,
+                "toX": -5.88,
+                "toY": 0.24,
+                "toZ": 2.84
+              },
+              {
+                "fromX": -5.88,
+                "fromY": 0.24,
+                "fromZ": 17.0,
+                "toX": -5.88,
+                "toY": 0.24,
+                "toZ": 17.72
+              },
+              {
+                "fromX": 5.88,
+                "fromY": 0.24,
+                "fromZ": -15.24,
+                "toX": 5.88,
+                "toY": 0.24,
+                "toZ": -14.52
+              },
+              {
+                "fromX": 5.88,
+                "fromY": 0.24,
+                "fromZ": 2.12,
+                "toX": 5.88,
+                "toY": 0.24,
+                "toZ": 2.84
+              },
+              {
+                "fromX": 5.88,
+                "fromY": 0.24,
+                "fromZ": 17.0,
+                "toX": 5.88,
+                "toY": 0.24,
+                "toZ": 17.72
+              }
+            ],
+            "thickness": 0.55,
+            "color": "#ffad58e8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#ffad58",
+            "emissiveColor": "#ffad58",
+            "emissiveStrength": 8.0,
+            "roughnessFactor": 0.55
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -46,
+            "y": 0,
+            "z": -70,
+            "pitch": 0,
+            "yaw": 0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_7b8d1de7499241ed8b5d5c95c06d70d9",
       "name": "Starfield",
       "tags": [
         "backdrop"
@@ -625386,7 +629005,7 @@
       "locked": false
     },
     {
-      "id": "ent_cfb246d406bb42e3ac3606a8ef1a3525",
+      "id": "ent_9dea2240cea249fe81d5aaf8d93fdb03",
       "name": "Sun Disc",
       "tags": [
         "light"
@@ -625434,7 +629053,7 @@
       "locked": false
     },
     {
-      "id": "ent_153e7eb8fc3d4cf593e911600b1bec6a",
+      "id": "ent_52df2541e1434cda954fcaadbd0996a8",
       "name": "Sun Light",
       "tags": [
         "light"
@@ -625443,7 +629062,7 @@
         {
           "type": "Rekall.DirectionalLight",
           "properties": {
-            "intensity": 4.8,
+            "intensity": 5.6,
             "color": "#fff2dc"
           }
         },
@@ -625465,7 +629084,7 @@
       "locked": false
     },
     {
-      "id": "ent_49d1f1d987f84d6e9187373bf75d54d8",
+      "id": "ent_daaf473be161430495b1c2e0cceebadf",
       "name": "Tactical HUD",
       "tags": [
         "ui"
@@ -625478,6 +629097,38 @@
             "selectedEntityId": "",
             "selectedName": "",
             "panelEntityName": "Unit Panel"
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalAbilities",
+          "properties": {
+            "enabled": true,
+            "shieldPulseCooldown": 0,
+            "shieldPulseCooldownSeconds": 12,
+            "overchargeCooldown": 0,
+            "overchargeCooldownSeconds": 16,
+            "panelEntityName": "Ability Panel",
+            "lastResult": "Tactical grid ready"
+          }
+        },
+        {
+          "type": "Rekall.InputActionMap",
+          "properties": {
+            "active": true,
+            "actions": [
+              {
+                "name": "fleet.shield-pulse",
+                "key": "Q"
+              },
+              {
+                "name": "fleet.overcharge",
+                "key": "E"
+              },
+              {
+                "name": "mission.advance-briefing",
+                "key": "Enter"
+              }
+            ]
           }
         },
         {
@@ -625498,7 +629149,7 @@
       "locked": false
     },
     {
-      "id": "ent_6a9e3c87c29a48eb80d7cb9611a50336",
+      "id": "ent_394cdce6e8664f5f83534d6009036502",
       "name": "Unit Panel",
       "tags": [
         "ui"
@@ -625531,7 +629182,7 @@
       "locked": false
     },
     {
-      "id": "ent_8d92f11777684e1d9addaff61c39f3f7",
+      "id": "ent_1d2627f27592436c8b998dfbd21814ce",
       "name": "Vigil Fill",
       "tags": [
         "light"
@@ -625561,7 +629212,7 @@
       "locked": false
     },
     {
-      "id": "ent_0279756f4eac49deb780b1e52aa8acb3",
+      "id": "ent_6641389d988a41b694964539c06ccbde",
       "name": "Vigil of Kell",
       "tags": [
         "capital",
@@ -625599,6 +629250,13 @@
             "shieldsMax": 2400,
             "crew": 620,
             "selectRadius": 30
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -682707,7 +686365,7 @@
       "locked": false
     },
     {
-      "id": "ent_488f661181514240b6f58f4f740d3bc5",
+      "id": "ent_9086bc59f1e6403ba46722d495d4baee",
       "name": "Vigil of Kell Drive",
       "tags": [
         "drive",
@@ -686544,7 +690202,7 @@
       "locked": false
     },
     {
-      "id": "ent_73bd403fa82d4932baaf3502d46b0ce9",
+      "id": "ent_4de291c1a4d24473a8d226280a1947be",
       "name": "Vigil of Kell Fighter 1",
       "tags": [
         "fighter",
@@ -686593,6 +690251,13 @@
             "shieldsMax": 90,
             "crew": 1,
             "selectRadius": 4.2
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -699734,7 +703399,130 @@
       "locked": false
     },
     {
-      "id": "ent_ce1b0c2dc6584685972358ff69345c8d",
+      "id": "ent_01cbd49c8e7b4b3ca9cf499323f3fa2e",
+      "name": "Vigil of Kell Fighter 1 Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.221,
+                "fromY": 0.3631,
+                "fromZ": 0.1561,
+                "toX": -0.221,
+                "toY": 0.3631,
+                "toZ": 0.6069
+              },
+              {
+                "fromX": 0.4395,
+                "fromY": 0.0399,
+                "fromZ": -0.9565,
+                "toX": 0.4395,
+                "toY": 0.0399,
+                "toZ": -0.465
+              },
+              {
+                "fromX": -0.4001,
+                "fromY": 0.0908,
+                "fromZ": -0.3337,
+                "toX": -0.4001,
+                "toY": 0.0908,
+                "toZ": 0.0295
+              },
+              {
+                "fromX": 0.4106,
+                "fromY": 0.0365,
+                "fromZ": 0.2284,
+                "toX": 0.4106,
+                "toY": 0.0365,
+                "toZ": 0.6221
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              }
+            ],
+            "thickness": 0.26,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 10.0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -61.0,
+            "y": 0.0,
+            "z": 186.0,
+            "pitch": 0,
+            "yaw": 0.0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_8cd9b7e72dd44c8e86eb95061de1adf8",
       "name": "Vigil of Kell Fighter 2",
       "tags": [
         "fighter",
@@ -699783,6 +703571,13 @@
             "shieldsMax": 90,
             "crew": 1,
             "selectRadius": 4.2
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -712924,7 +716719,130 @@
       "locked": false
     },
     {
-      "id": "ent_48e502606a324d429e155a62ead477fa",
+      "id": "ent_7fe09bf0d4974ed0bfb6397332265032",
+      "name": "Vigil of Kell Fighter 2 Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.221,
+                "fromY": 0.3631,
+                "fromZ": 0.1561,
+                "toX": -0.221,
+                "toY": 0.3631,
+                "toZ": 0.6069
+              },
+              {
+                "fromX": 0.4395,
+                "fromY": 0.0399,
+                "fromZ": -0.9565,
+                "toX": 0.4395,
+                "toY": 0.0399,
+                "toZ": -0.465
+              },
+              {
+                "fromX": -0.4001,
+                "fromY": 0.0908,
+                "fromZ": -0.3337,
+                "toX": -0.4001,
+                "toY": 0.0908,
+                "toZ": 0.0295
+              },
+              {
+                "fromX": 0.4106,
+                "fromY": 0.0365,
+                "fromZ": 0.2284,
+                "toX": 0.4106,
+                "toY": 0.0365,
+                "toZ": 0.6221
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              }
+            ],
+            "thickness": 0.26,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 10.0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -78.0,
+            "y": 5.949999999999999,
+            "z": 203.0,
+            "pitch": 0,
+            "yaw": 90.0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_04249fcea3dd4c8c9a1b8edbf9e6fa06",
       "name": "Vigil of Kell Fighter 3",
       "tags": [
         "fighter",
@@ -712973,6 +716891,13 @@
             "shieldsMax": 90,
             "crew": 1,
             "selectRadius": 4.2
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -726114,7 +730039,130 @@
       "locked": false
     },
     {
-      "id": "ent_c5eae093c4fe4b82a3e9334c2e0a211f",
+      "id": "ent_6f9c4449c3d24c4b8747c89349cafc76",
+      "name": "Vigil of Kell Fighter 3 Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.221,
+                "fromY": 0.3631,
+                "fromZ": 0.1561,
+                "toX": -0.221,
+                "toY": 0.3631,
+                "toZ": 0.6069
+              },
+              {
+                "fromX": 0.4395,
+                "fromY": 0.0399,
+                "fromZ": -0.9565,
+                "toX": 0.4395,
+                "toY": 0.0399,
+                "toZ": -0.465
+              },
+              {
+                "fromX": -0.4001,
+                "fromY": 0.0908,
+                "fromZ": -0.3337,
+                "toX": -0.4001,
+                "toY": 0.0908,
+                "toZ": 0.0295
+              },
+              {
+                "fromX": 0.4106,
+                "fromY": 0.0365,
+                "fromZ": 0.2284,
+                "toX": 0.4106,
+                "toY": 0.0365,
+                "toZ": 0.6221
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              }
+            ],
+            "thickness": 0.26,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 10.0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -95.0,
+            "y": 7.286648454926751e-16,
+            "z": 186.0,
+            "pitch": 0,
+            "yaw": 180.0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_b1ec786da8b8404eb204a18e1b894c03",
       "name": "Vigil of Kell Fighter 4",
       "tags": [
         "fighter",
@@ -726163,6 +730211,13 @@
             "shieldsMax": 90,
             "crew": 1,
             "selectRadius": 4.2
+          }
+        },
+        {
+          "type": "Game.Modules.FleetRules.TacticalStatus",
+          "properties": {
+            "shieldPulseVisualSeconds": 0,
+            "overchargeRemaining": 0
           }
         },
         {
@@ -739294,6 +743349,460 @@
             "z": 169.0,
             "pitch": 0,
             "yaw": 270.0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_d12be18d15944e218ed9fdb03005baa7",
+      "name": "Vigil of Kell Fighter 4 Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -0.221,
+                "fromY": 0.3631,
+                "fromZ": 0.1561,
+                "toX": -0.221,
+                "toY": 0.3631,
+                "toZ": 0.6069
+              },
+              {
+                "fromX": 0.4395,
+                "fromY": 0.0399,
+                "fromZ": -0.9565,
+                "toX": 0.4395,
+                "toY": 0.0399,
+                "toZ": -0.465
+              },
+              {
+                "fromX": -0.4001,
+                "fromY": 0.0908,
+                "fromZ": -0.3337,
+                "toX": -0.4001,
+                "toY": 0.0908,
+                "toZ": 0.0295
+              },
+              {
+                "fromX": 0.4106,
+                "fromY": 0.0365,
+                "fromZ": 0.2284,
+                "toX": 0.4106,
+                "toY": 0.0365,
+                "toZ": 0.6221
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": -0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": -0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": -0.8445,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": -0.7875
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.1075,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.1645
+              },
+              {
+                "fromX": 0.4655,
+                "fromY": 0.019,
+                "fromZ": 0.9235,
+                "toX": 0.4655,
+                "toY": 0.019,
+                "toZ": 0.9805
+              }
+            ],
+            "thickness": 0.26,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 10.0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -78.0,
+            "y": -5.949999999999999,
+            "z": 169.0,
+            "pitch": 0,
+            "yaw": 270.0,
+            "roll": 0
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_621d917b5415494b814fc2a1434bf76c",
+      "name": "Vigil of Kell Lights",
+      "tags": [
+        "running-lights",
+        "ship"
+      ],
+      "components": [
+        {
+          "type": "Rekall.LineSegments",
+          "properties": {
+            "segments": [
+              {
+                "fromX": -1.1374,
+                "fromY": 3.1837,
+                "fromZ": -14.958,
+                "toX": -1.1374,
+                "toY": 3.1837,
+                "toZ": -14.5912
+              },
+              {
+                "fromX": 3.5297,
+                "fromY": -0.1846,
+                "fromZ": 2.5963,
+                "toX": 3.5297,
+                "toY": -0.1846,
+                "toZ": 2.9435
+              },
+              {
+                "fromX": -3.3504,
+                "fromY": 1.0092,
+                "fromZ": 10.4036,
+                "toX": -3.3504,
+                "toY": 1.0092,
+                "toZ": 10.7187
+              },
+              {
+                "fromX": 3.439,
+                "fromY": -0.6414,
+                "fromZ": 8.9821,
+                "toX": 3.439,
+                "toY": -0.6414,
+                "toZ": 9.3556
+              },
+              {
+                "fromX": -1.5424,
+                "fromY": 2.7257,
+                "fromZ": -3.6436,
+                "toX": -1.5424,
+                "toY": 2.7257,
+                "toZ": -3.1885
+              },
+              {
+                "fromX": 3.1819,
+                "fromY": -0.4822,
+                "fromZ": -10.1932,
+                "toX": 3.1819,
+                "toY": -0.4822,
+                "toZ": -9.9021
+              },
+              {
+                "fromX": -3.2503,
+                "fromY": -0.3658,
+                "fromZ": 13.3063,
+                "toX": -3.2503,
+                "toY": -0.3658,
+                "toZ": 13.6936
+              },
+              {
+                "fromX": 2.9875,
+                "fromY": -0.0994,
+                "fromZ": -7.1048,
+                "toX": 2.9875,
+                "toY": -0.0994,
+                "toZ": -6.7928
+              },
+              {
+                "fromX": -1.7182,
+                "fromY": 2.2888,
+                "fromZ": -5.7024,
+                "toX": -1.7182,
+                "toY": 2.2888,
+                "toZ": -5.2868
+              },
+              {
+                "fromX": 2.8948,
+                "fromY": -0.2327,
+                "fromZ": -13.3581,
+                "toX": 2.8948,
+                "toY": -0.2327,
+                "toZ": -12.9044
+              },
+              {
+                "fromX": -3.0366,
+                "fromY": 0.633,
+                "fromZ": 0.8967,
+                "toX": -3.0366,
+                "toY": 0.633,
+                "toZ": 1.2471
+              },
+              {
+                "fromX": 3.375,
+                "fromY": -0.0255,
+                "fromZ": 5.9413,
+                "toX": 3.375,
+                "toY": -0.0255,
+                "toZ": 6.1231
+              },
+              {
+                "fromX": -1.4262,
+                "fromY": 3.0726,
+                "fromZ": -1.4701,
+                "toX": -1.4262,
+                "toY": 3.0726,
+                "toZ": -1.1055
+              },
+              {
+                "fromX": 3.0284,
+                "fromY": -0.3656,
+                "fromZ": -11.7834,
+                "toX": 3.0284,
+                "toY": -0.3656,
+                "toZ": -11.5423
+              },
+              {
+                "fromX": -3.1362,
+                "fromY": 0.5176,
+                "fromZ": 8.3531,
+                "toX": -3.1362,
+                "toY": 0.5176,
+                "toZ": 8.8081
+              },
+              {
+                "fromX": 3.4148,
+                "fromY": 0.3333,
+                "fromZ": 8.4398,
+                "toX": 3.4148,
+                "toY": 0.3333,
+                "toZ": 8.8956
+              },
+              {
+                "fromX": -1.3616,
+                "fromY": 2.5478,
+                "fromZ": 8.7648,
+                "toX": -1.3616,
+                "toY": 2.5478,
+                "toZ": 9.0488
+              },
+              {
+                "fromX": 3.2282,
+                "fromY": -0.6812,
+                "fromZ": -4.3635,
+                "toX": 3.2282,
+                "toY": -0.6812,
+                "toZ": -4.0621
+              },
+              {
+                "fromX": -3.51,
+                "fromY": 0.5558,
+                "fromZ": -3.2967,
+                "toX": -3.51,
+                "toY": 0.5558,
+                "toZ": -2.9576
+              },
+              {
+                "fromX": 3.4051,
+                "fromY": -0.5381,
+                "fromZ": -12.8101,
+                "toX": 3.4051,
+                "toY": -0.5381,
+                "toZ": -12.5044
+              },
+              {
+                "fromX": -1.4524,
+                "fromY": 2.8385,
+                "fromZ": 10.9804,
+                "toX": -1.4524,
+                "toY": 2.8385,
+                "toZ": 11.1755
+              },
+              {
+                "fromX": 3.0993,
+                "fromY": -0.3699,
+                "fromZ": 14.054,
+                "toX": 3.0993,
+                "toY": -0.3699,
+                "toZ": 14.3523
+              },
+              {
+                "fromX": -3.2839,
+                "fromY": -0.1971,
+                "fromZ": -8.5841,
+                "toX": -3.2839,
+                "toY": -0.1971,
+                "toZ": -8.3026
+              },
+              {
+                "fromX": 2.9349,
+                "fromY": 0.987,
+                "fromZ": -11.9255,
+                "toX": 2.9349,
+                "toY": 0.987,
+                "toZ": -11.4682
+              },
+              {
+                "fromX": -1.5214,
+                "fromY": 3.2235,
+                "fromZ": -9.2928,
+                "toX": -1.5214,
+                "toY": 3.2235,
+                "toZ": -8.868
+              },
+              {
+                "fromX": 3.4079,
+                "fromY": 1.0104,
+                "fromZ": 7.8692,
+                "toX": 3.4079,
+                "toY": 1.0104,
+                "toZ": 8.052
+              },
+              {
+                "fromX": -2.9205,
+                "fromY": -0.6455,
+                "fromZ": 8.3759,
+                "toX": -2.9205,
+                "toY": -0.6455,
+                "toZ": 8.7221
+              },
+              {
+                "fromX": 2.9941,
+                "fromY": 0.2963,
+                "fromZ": -9.695,
+                "toX": 2.9941,
+                "toY": 0.2963,
+                "toZ": -9.284
+              },
+              {
+                "fromX": -1.5155,
+                "fromY": 3.071,
+                "fromZ": 7.1475,
+                "toX": -1.5155,
+                "toY": 3.071,
+                "toZ": 7.509
+              },
+              {
+                "fromX": 3.3404,
+                "fromY": 0.3203,
+                "fromZ": 6.321,
+                "toX": 3.3404,
+                "toY": 0.3203,
+                "toZ": 6.5031
+              },
+              {
+                "fromX": -3.724,
+                "fromY": 0.152,
+                "fromZ": -12.708,
+                "toX": -3.724,
+                "toY": 0.152,
+                "toZ": -12.252
+              },
+              {
+                "fromX": -3.724,
+                "fromY": 0.152,
+                "fromZ": 1.852,
+                "toX": -3.724,
+                "toY": 0.152,
+                "toZ": 2.308
+              },
+              {
+                "fromX": -3.724,
+                "fromY": 0.152,
+                "fromZ": 14.332,
+                "toX": -3.724,
+                "toY": 0.152,
+                "toZ": 14.788
+              },
+              {
+                "fromX": 3.724,
+                "fromY": 0.152,
+                "fromZ": -12.708,
+                "toX": 3.724,
+                "toY": 0.152,
+                "toZ": -12.252
+              },
+              {
+                "fromX": 3.724,
+                "fromY": 0.152,
+                "fromZ": 1.852,
+                "toX": 3.724,
+                "toY": 0.152,
+                "toZ": 2.308
+              },
+              {
+                "fromX": 3.724,
+                "fromY": 0.152,
+                "fromZ": 14.332,
+                "toX": 3.724,
+                "toY": 0.152,
+                "toZ": 14.788
+              }
+            ],
+            "thickness": 0.55,
+            "color": "#9de4ffe8"
+          }
+        },
+        {
+          "type": "Rekall.Material",
+          "properties": {
+            "baseColor": "#9de4ff",
+            "emissiveColor": "#9de4ff",
+            "emissiveStrength": 8.0,
+            "roughnessFactor": 0.55
+          }
+        },
+        {
+          "type": "Rekall.Transform3D",
+          "properties": {
+            "x": -78,
+            "y": 0,
+            "z": 186,
+            "pitch": 0,
+            "yaw": 0,
             "roll": 0
           }
         }

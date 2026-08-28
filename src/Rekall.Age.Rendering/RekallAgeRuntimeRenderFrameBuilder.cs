@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using Rekall.Age.Core.Rendering;
 using Rekall.Age.Rendering.Abstractions;
@@ -1852,10 +1853,43 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
 
     private readonly record struct GlyphStroke(int FromX, int FromY, int ToX, int ToY);
 
+    /// <summary>
+    /// Parsed authored geometry, memoized on the component's <see cref="JsonObject"/>
+    /// identity. Re-reading vertices and indices out of JSON every frame was the single
+    /// largest cost in the interactive player, and returning a fresh instance each time
+    /// also defeated the identity-keyed memo in <see cref="RekallAgeRuntimeGeometrySignature"/>,
+    /// so the geometry cache key was rehashed from scratch under a lock every frame.
+    ///
+    /// Keying on identity is self-invalidating: the runtime carries untouched components
+    /// through by reference, while every mutation path clones the properties first (see
+    /// the SDK's UpdateComponent), so a changed component is a different object and misses.
+    /// </summary>
+    private static readonly ConditionalWeakTable<JsonObject, ParsedGeometryMeshBox> GeometryMeshCache = new();
+
     private static RekallAgeRuntimeViewportGeometryMesh? ReadGeometryMesh(RekallAgeRuntimeComponent? component)
     {
-        if (component is null
-            || !component.Properties.TryGetPropertyValue("vertices", out var verticesNode)
+        if (component is null)
+        {
+            return null;
+        }
+
+        // Deliberately TryGetValue-then-add rather than GetValue(key, factory): the hit
+        // path is the common one and this keeps it lock-free and allocation-free.
+        if (GeometryMeshCache.TryGetValue(component.Properties, out var cached))
+        {
+            return cached.Mesh;
+        }
+
+        var parsed = ParseGeometryMesh(component);
+        GeometryMeshCache.AddOrUpdate(component.Properties, new ParsedGeometryMeshBox(parsed));
+        return parsed;
+    }
+
+    private sealed record ParsedGeometryMeshBox(RekallAgeRuntimeViewportGeometryMesh? Mesh);
+
+    private static RekallAgeRuntimeViewportGeometryMesh? ParseGeometryMesh(RekallAgeRuntimeComponent component)
+    {
+        if (!component.Properties.TryGetPropertyValue("vertices", out var verticesNode)
             || verticesNode is not JsonArray verticesArray
             || !component.Properties.TryGetPropertyValue("indices", out var indicesNode)
             || indicesNode is not JsonArray indicesArray)

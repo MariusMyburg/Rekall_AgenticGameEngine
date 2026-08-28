@@ -1,7 +1,8 @@
 # Runtime performance investigation — where the frame actually goes
 
 Date: 2026-08-28
-Status: Findings only. No engine code was changed by this investigation.
+Status: Findings, plus recommendation 1 implemented and verified.
+See "Outcome of recommendation 1" at the end.
 
 ## Summary
 
@@ -267,3 +268,76 @@ dotnet-trace collect --format Speedscope --providers Microsoft-DotNETCore-Sample
 Caveat: `--debug-hud` is required to enable `RecordFrameProfile`, and it adds
 its own ~5% (collider debug renderables + HUD texture upload). Numbers here are
 therefore slightly pessimistic relative to a shipping frame.
+
+---
+
+# Outcome of recommendation 1
+
+Implemented: `ReadGeometryMesh` now memoizes parsed geometry in a
+`ConditionalWeakTable<JsonObject, …>` keyed on the component's properties
+object. Covered by `RuntimeGeometryMeshReuseTests`.
+
+Verified safe before writing it: `RekallAgeRuntimeModuleSdk.UpdateComponent`
+(`:532`) calls `.Properties.DeepClone()` before handing properties to a mutator,
+so every SDK mutation path yields a *new* `JsonObject`. A changed component
+therefore misses the cache and is re-read. No manual invalidation exists or is
+needed.
+
+## Measured result
+
+Same scene and command as above (MidnightRider, 1280×720, vsync off):
+
+| Bucket | before | after |
+|---|---|---|
+| `simulation` | 3.00 | 0.47 – 1.03 |
+| `frameBuild` | 1.90 | **0.29** |
+| `packet` | 0.43 | **0.18** |
+| `ui` | 0.08 | 0.01 |
+| `submit` | 0.24 | 0.21 |
+| **total** | **~5.65 ms** | **~1.75 ms** |
+
+**FPS: ~180 → ~640–710.**
+
+In the sampling profile, `ReadGeometryMesh` and everything under it
+(`CreateGeometryVertices`, `InferNormals`, `ReadNumber`) is **gone entirely** —
+it does not appear in the trace at all. `RenderFrameBuilder.Build` fell from
+35.95% to 19.09% of `RenderFrame`.
+
+## The `simulation` drop is an artifact — do not credit it to this change
+
+The per-frame `simulation` bucket fell from 3.00 ms to ~0.7 ms, but **no
+simulation work got faster.** Normalizing against wall time:
+
+- before: 40.77% of 4335 ms, over 5757 ms wall = **30.7% of wall**
+- after: 41.97% of 3861 ms, over 5284 ms wall = **30.7% of wall**
+
+Identical. `AdvanceToAsync` runs fixed-size steps to catch up to the wall clock,
+so it performs a fixed amount of work *per second*, not per frame. Shorter
+frames simply mean fewer steps per frame. This is exactly the per-step /
+per-frame confusion flagged in recommendation 2, now confirmed empirically:
+**simulation does not limit frame rate — it consumes a constant ~31% of CPU.**
+
+The genuine saving is `frameBuild` + `packet`: **2.33 ms → 0.47 ms per frame.**
+
+## What is left, and one correction
+
+`CreateGeometryCacheKey` only fell from 9.98% to 6.75%, and
+`Monitor.Enter_Slowpath` is still 6.55%. The residual is **not** from meshes —
+it is `BuildColliderDebugRenderables` rebuilding wire capsules every frame,
+which produces fresh `LineSegments` objects that miss the identity-keyed
+signature memo. That path is `--debug-hud`-only and does not exist in a shipping
+frame, so it is an artifact of the measurement setup rather than a real cost.
+Worth fixing only if the debug HUD's own overhead becomes a problem.
+
+Remaining shares of `RenderFrame` after the change: simulation 42%,
+frame build 19% (about half of it debug-HUD collider wireframes),
+packet 13%, present 12%, draw submission 4.7%.
+
+Revised priorities:
+
+1. ~~Memoize parsed geometry~~ — done.
+2. The simulation is now the dominant cost, but it is a constant ~31% of CPU
+   rather than a per-frame tax. Optimizing it raises the CPU ceiling for
+   heavier scenes; it will not raise FPS on a scene this light.
+3. Recommendations 3–5 and the deferred renderer work are unchanged, and are
+   even less urgent now: draw submission is 4.7% of a frame that is 3× shorter.

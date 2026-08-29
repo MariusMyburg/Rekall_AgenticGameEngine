@@ -62,18 +62,17 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
             vscodeLaunchPath,
             "configurations",
             "name",
-            "Rekall AGE: Play Game",
-            JsonSerializer.SerializeToNode(CreateVsCodeLaunchConfiguration(playerPath, projectRoot, sceneName))!,
             "0.2.0",
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            ("Rekall AGE: Play Game", JsonSerializer.SerializeToNode(CreateVsCodeLaunchConfiguration(playerPath, projectRoot, sceneName))!)).ConfigureAwait(false);
         var vscodeTasks = await MergeNamedArrayAsync(
             vscodeTasksPath,
             "tasks",
             "label",
-            "Rekall AGE: Build Modules",
-            JsonSerializer.SerializeToNode(CreateVsCodeTask(cliPath, projectRoot))!,
             "2.0.0",
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            ("Rekall AGE: Refresh Module SDK", JsonSerializer.SerializeToNode(CreateVsCodeSdkTask(cliPath, projectRoot))!),
+            ("Rekall AGE: Build Modules", JsonSerializer.SerializeToNode(CreateVsCodeTask(cliPath, projectRoot))!)).ConfigureAwait(false);
 
         await WriteAsync(debugProjectPath, CreateDebugProject(cliPath, projectRoot, ideRoot, moduleFiles), cancellationToken).ConfigureAwait(false);
         await WriteAsync(programPath, CreateDebugProgram(), cancellationToken).ConfigureAwait(false);
@@ -155,7 +154,18 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
         command = cliPath,
         args = new[] { "build", "modules", projectRoot },
         options = new { cwd = projectRoot },
-        problemMatcher = "$msCompile"
+        problemMatcher = "$msCompile",
+        dependsOn = new[] { "Rekall AGE: Refresh Module SDK" }
+    };
+
+    private static object CreateVsCodeSdkTask(string cliPath, string projectRoot) => new
+    {
+        label = "Rekall AGE: Refresh Module SDK",
+        type = "process",
+        command = cliPath,
+        args = new[] { "module", "install-sdk", projectRoot },
+        options = new { cwd = projectRoot },
+        problemMatcher = Array.Empty<string>()
     };
 
     private static string CreateSolution(
@@ -174,6 +184,7 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
         string debugProjectDirectory,
         IEnumerable<string> moduleFiles)
     {
+        var installCommand = SecurityElement.Escape($"\"{cliPath}\" module install-sdk \"{projectRoot}\"");
         var command = SecurityElement.Escape($"\"{cliPath}\" build modules \"{projectRoot}\"");
         var linkedFiles = string.Concat(moduleFiles.Select(path =>
         {
@@ -196,6 +207,7 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
               <ItemGroup>
             {linkedFiles}  </ItemGroup>
               <Target Name="BuildRekallModules" BeforeTargets="Build">
+                <Exec Command="{installCommand}" />
                 <Exec Command="{command}" />
               </Target>
             </Project>
@@ -215,10 +227,9 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
         string path,
         string arrayName,
         string identityName,
-        string identityValue,
-        JsonNode generatedItem,
         string defaultVersion,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        params (string IdentityValue, JsonNode GeneratedItem)[] generatedItems)
     {
         JsonObject document;
         if (File.Exists(path))
@@ -236,14 +247,18 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
 
         var items = document[arrayName] as JsonArray ?? new JsonArray();
         document[arrayName] = items;
+        var identities = generatedItems.Select(item => item.IdentityValue).ToHashSet(StringComparer.Ordinal);
         for (var index = items.Count - 1; index >= 0; index--)
         {
-            if (items[index]?[identityName]?.GetValue<string>() == identityValue)
+            if (items[index]?[identityName]?.GetValue<string>() is { } identity && identities.Contains(identity))
             {
                 items.RemoveAt(index);
             }
         }
-        items.Add(generatedItem);
+        foreach (var generatedItem in generatedItems)
+        {
+            items.Add(generatedItem.GeneratedItem);
+        }
         return document.ToJsonString(JsonOptions) + Environment.NewLine;
     }
 

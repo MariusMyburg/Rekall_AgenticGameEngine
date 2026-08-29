@@ -46,6 +46,7 @@ public sealed class ProjectDevelopmentWorkspaceTests
         Assert.DoesNotContain("Modules\\PlayerMotion\\PlayerMotion.csproj", firstSolution, StringComparison.Ordinal);
         var debugProject = await File.ReadAllTextAsync(first.DebugProjectPath);
         Assert.Contains("DisableFastUpToDateCheck", debugProject, StringComparison.Ordinal);
+        Assert.Contains("module install-sdk", debugProject, StringComparison.Ordinal);
         Assert.Contains("build modules", debugProject, StringComparison.Ordinal);
         Assert.Contains(Path.GetFullPath(cliPath), debugProject, StringComparison.Ordinal);
         Assert.Contains("Game Modules\\OrchardRules\\OrchardRulesModule.cs", debugProject, StringComparison.Ordinal);
@@ -73,10 +74,17 @@ public sealed class ProjectDevelopmentWorkspaceTests
             configuration.GetProperty("args").EnumerateArray().Select(item => item.GetString()!).ToArray());
 
         using var tasks = JsonDocument.Parse(await File.ReadAllTextAsync(first.VsCodeTasksPath));
-        var task = Assert.Single(tasks.RootElement.GetProperty("tasks").EnumerateArray());
+        var taskItems = tasks.RootElement.GetProperty("tasks").EnumerateArray().ToArray();
+        var sdkTask = Assert.Single(taskItems, item => item.GetProperty("label").GetString() == "Rekall AGE: Refresh Module SDK");
+        Assert.Equal(Path.GetFullPath(cliPath), sdkTask.GetProperty("command").GetString());
+        Assert.Equal(["module", "install-sdk", Path.GetFullPath(root)],
+            sdkTask.GetProperty("args").EnumerateArray().Select(item => item.GetString()!).ToArray());
+        var task = Assert.Single(taskItems, item => item.GetProperty("label").GetString() == "Rekall AGE: Build Modules");
         Assert.Equal(Path.GetFullPath(cliPath), task.GetProperty("command").GetString());
         Assert.Equal(["build", "modules", Path.GetFullPath(root)],
             task.GetProperty("args").EnumerateArray().Select(item => item.GetString()!).ToArray());
+        Assert.Equal(["Rekall AGE: Refresh Module SDK"],
+            task.GetProperty("dependsOn").EnumerateArray().Select(item => item.GetString()!).ToArray());
     }
 
     [Fact]
@@ -109,7 +117,7 @@ public sealed class ProjectDevelopmentWorkspaceTests
         Assert.Equal(["My Tool", "Rekall AGE: Play Game"],
             launch.RootElement.GetProperty("configurations").EnumerateArray().Select(item => item.GetProperty("name").GetString()!).ToArray());
         using var tasks = JsonDocument.Parse(await File.ReadAllTextAsync(result.VsCodeTasksPath));
-        Assert.Equal(["My Build", "Rekall AGE: Build Modules"],
+        Assert.Equal(["My Build", "Rekall AGE: Refresh Module SDK", "Rekall AGE: Build Modules"],
             tasks.RootElement.GetProperty("tasks").EnumerateArray().Select(item => item.GetProperty("label").GetString()!).ToArray());
     }
 

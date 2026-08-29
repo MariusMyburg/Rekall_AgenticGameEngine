@@ -114,6 +114,18 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
     private string? _debugBackendText;
     private bool _assetInvalidated;
     private bool _disposed;
+    private bool _disposalComplete;
+
+    public bool IsDisposalComplete
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _disposalComplete;
+            }
+        }
+    }
 
     public RekallAgeVeldridVulkanPresentationSession(
         RekallAgeWin32RenderSurfaceDescriptor surface,
@@ -732,8 +744,17 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
             }
 
             cleanup.Add(new("graphics-device-idle", _device.WaitForIdle));
-            RekallAgeBestEffortCleanup.RunInReverse(cleanup, _log);
-            return ValueTask.CompletedTask;
+            try
+            {
+                RekallAgeBestEffortCleanup.RunInReverse(cleanup, _log);
+                return ValueTask.CompletedTask;
+            }
+            finally
+            {
+                // RunInReverse attempts every registration before it can throw. This is a
+                // terminal cleanup guarantee, not an inference from cleared managed fields.
+                _disposalComplete = true;
+            }
         }
     }
 

@@ -104,6 +104,7 @@ internal sealed class RekallAgeStudioVulkanViewportPresenter :
     private string? _sessionProjectRoot;
     private bool _assetsInvalidated;
     private bool _shadersInvalidated;
+    private bool _sessionCleanupRequired;
     private bool _disposeStarted;
     private bool _disposalComplete;
 
@@ -223,6 +224,25 @@ internal sealed class RekallAgeStudioVulkanViewportPresenter :
                     frame,
                     $"The Studio Vulkan surface resized from {frame.Width}x{frame.Height} to "
                     + $"{_metrics.PixelWidth}x{_metrics.PixelHeight} before presentation.");
+            }
+
+            if (_sessionCleanupRequired)
+            {
+                try
+                {
+                    await DisposeSessionAsync();
+                }
+                catch (Exception cleanupException) when (_session is not null)
+                {
+                    return Unavailable(
+                        frame,
+                        "The previous Vulkan session has not completed native cleanup.",
+                        cleanupException);
+                }
+                catch (Exception cleanupException)
+                {
+                    Log.Warning(cleanupException, "Abandoned Studio Vulkan session completed cleanup with diagnostics.");
+                }
             }
 
             try
@@ -345,7 +365,7 @@ internal sealed class RekallAgeStudioVulkanViewportPresenter :
                 (failures ??= []).Add(exception);
             }
 
-            if (_surface is not null)
+            if (_session is null && _surface is not null)
             {
                 try
                 {
@@ -386,14 +406,46 @@ internal sealed class RekallAgeStudioVulkanViewportPresenter :
     private async ValueTask DisposeSessionAsync()
     {
         if (_session is null) return;
+        var session = _session;
+        Exception? failure = null;
         try
         {
-            await _session.DisposeAsync();
+            await session.DisposeAsync();
         }
-        finally
+        catch (Exception exception)
+        {
+            failure = exception;
+        }
+
+        bool completed;
+        try
+        {
+            completed = session.IsDisposalComplete;
+        }
+        catch (Exception exception)
+        {
+            completed = false;
+            failure = failure is null
+                ? exception
+                : new AggregateException("Vulkan session cleanup state could not be established.", failure, exception);
+        }
+
+        if (completed)
         {
             _session = null;
             _sessionProjectRoot = null;
+            _sessionCleanupRequired = false;
+        }
+        else
+        {
+            _sessionCleanupRequired = true;
+            failure ??= new InvalidOperationException(
+                "Vulkan presentation session returned from disposal without proving terminal native cleanup.");
+        }
+
+        if (failure is not null)
+        {
+            throw failure;
         }
     }
 

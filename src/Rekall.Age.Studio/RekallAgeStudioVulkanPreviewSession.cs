@@ -262,6 +262,50 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
         }
     }
 
+    public async ValueTask<RekallAgeStudioPreviewFrame?> RefreshExternalDependenciesAsync(
+        int width,
+        int height,
+        CancellationToken cancellationToken)
+    {
+        if (width is < 1 or > MaximumWidth) throw new ArgumentOutOfRangeException(nameof(width));
+        if (height is < 1 or > MaximumHeight) throw new ArgumentOutOfRangeException(nameof(height));
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            ThrowIfDisposed();
+            if (_world is null || _assets is null || _projectRoot is null)
+            {
+                throw new InvalidOperationException("Studio preview must be reset before it can refresh dependencies.");
+            }
+
+            var change = await ApplyExternalDependencyChangesAsync(cancellationToken);
+            if (change == RekallAgeStudioViewportDependencyChange.None) return null;
+
+            var viewportFrame = _frameBuilder.Build(_world, width, height, debugOverlay: false);
+            if (_assetsDirty)
+            {
+                _assets = await _resolveAssets(_projectRoot, viewportFrame, cancellationToken);
+                _assetRevision = checked(_assetRevision + 1);
+                _assetsDirty = false;
+            }
+
+            _width = width;
+            _height = height;
+            return await PresentAsync(
+                _world,
+                viewportFrame,
+                _assets,
+                _projectRoot,
+                _sceneRevision,
+                _assetRevision,
+                cancellationToken);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async ValueTask InvalidateAssetsAsync(CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
@@ -357,9 +401,10 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
             RekallAgeStudioViewportInteractionBuilder.Build(viewportFrame, world.Entities));
     }
 
-    private async ValueTask ApplyExternalDependencyChangesAsync(CancellationToken cancellationToken)
+    private async ValueTask<RekallAgeStudioViewportDependencyChange> ApplyExternalDependencyChangesAsync(
+        CancellationToken cancellationToken)
     {
-        if (_dependencyMonitor is null) return;
+        if (_dependencyMonitor is null) return RekallAgeStudioViewportDependencyChange.None;
         var change = await _dependencyMonitor.PollAsync(cancellationToken);
         if ((change & RekallAgeStudioViewportDependencyChange.Assets) != 0)
         {
@@ -370,6 +415,7 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
         {
             await _presenter.InvalidateShadersAsync(cancellationToken);
         }
+        return change;
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);

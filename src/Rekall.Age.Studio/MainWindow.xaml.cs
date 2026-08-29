@@ -91,12 +91,29 @@ public partial class MainWindow : Window
     {
         try
         {
-            if (_viewportRecovery.TryBeginAutomaticRetry(DateTimeOffset.UtcNow)
-                && SceneVulkanViewportHost.Metrics.IsPresentable)
+            if (_viewModel.Mode == RekallAgeStudioMode.Play)
             {
-                await _viewModel.PresentViewportAtHostSizeAsync(SceneVulkanViewportHost.Metrics);
+                await _viewModel.AdvanceLivePreviewAsync();
+                return;
             }
-            await _viewModel.AdvanceLivePreviewAsync();
+
+            var metrics = SceneVulkanViewportHost.Metrics;
+            switch (_viewportRecovery.SelectTickAction(
+                        _viewModel.HasProject,
+                        _viewModel.ViewportAvailable,
+                        _viewModel.IsSimulating,
+                        DateTimeOffset.UtcNow))
+            {
+                case RekallAgeStudioViewportTickAction.RecoverPresentation when metrics.IsPresentable:
+                    await _viewModel.PresentViewportAtHostSizeAsync(metrics);
+                    break;
+                case RekallAgeStudioViewportTickAction.RefreshEditDependencies:
+                    await _viewModel.RefreshEditViewportDependenciesAsync(metrics);
+                    break;
+                case RekallAgeStudioViewportTickAction.AdvanceSimulation:
+                    await _viewModel.AdvanceLivePreviewAsync();
+                    break;
+            }
         }
         catch (Exception exception)
         {

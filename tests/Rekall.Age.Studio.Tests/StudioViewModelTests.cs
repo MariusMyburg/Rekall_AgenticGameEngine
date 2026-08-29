@@ -1858,6 +1858,40 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task MainWindowEditTickRefreshesOnePendingExternalDependencyChangeOnlyOnce()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-edit-dependency-tick-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Edit Dependency Tick Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+
+            await viewModel.RefreshEditViewportDependenciesAsync(preview.Metrics);
+            await viewModel.RefreshEditViewportDependenciesAsync(preview.Metrics);
+            preview.QueueExternalDependencyChange();
+            await viewModel.RefreshEditViewportDependenciesAsync(preview.Metrics);
+            await viewModel.RefreshEditViewportDependenciesAsync(preview.Metrics);
+
+            Assert.Equal(RekallAgeStudioMode.Edit, viewModel.Mode);
+            Assert.Equal(4, preview.ExternalDependencyPollCount);
+            Assert.Equal(1, preview.ExternalDependencyPresentationCount);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task PausedSimulationSuppressesAutomaticTicksAndSingleStepAdvancesExactlyOneFrame()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-step-" + Guid.NewGuid().ToString("N"));
@@ -2941,11 +2975,14 @@ public sealed class StudioViewModelTests
         public int ResetCount { get; private set; }
         public int StepCount { get; private set; }
         public int PresentCurrentCount { get; private set; }
+        public int ExternalDependencyPollCount { get; private set; }
+        public int ExternalDependencyPresentationCount { get; private set; }
         public RekallAgeStudioViewportMetrics Metrics { get; } = new(800, 450, 800, 450, true);
         public List<(int Width, int Height)> ResetSizes { get; } = [];
         public List<RekallAgeStudioViewportPickRegion> Regions { get; } = [];
         public bool IsDisposed { get; private set; }
         public bool ReturnUnavailable { get; set; }
+        private bool _externalDependencyChangePending;
 
         public ValueTask<RekallAgeStudioPreviewFrame> ResetAsync(
             string projectRoot,
@@ -2984,6 +3021,25 @@ public sealed class StudioViewModelTests
             return ValueTask.FromResult(CreateFrame(_frame));
         }
 
+        public ValueTask<RekallAgeStudioPreviewFrame?> RefreshExternalDependenciesAsync(
+            int width,
+            int height,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ExternalDependencyPollCount++;
+            if (!_externalDependencyChangePending)
+            {
+                return ValueTask.FromResult<RekallAgeStudioPreviewFrame?>(null);
+            }
+
+            _externalDependencyChangePending = false;
+            ExternalDependencyPresentationCount++;
+            _width = width;
+            _height = height;
+            return ValueTask.FromResult<RekallAgeStudioPreviewFrame?>(CreateFrame(_frame));
+        }
+
         public ValueTask DisposeAsync()
         {
             IsDisposed = true;
@@ -3018,6 +3074,8 @@ public sealed class StudioViewModelTests
             ?? Task.CompletedTask;
 
         public void ReleaseDispose() => _disposeBlocked?.TrySetResult();
+
+        public void QueueExternalDependencyChange() => _externalDependencyChangePending = true;
 
         private async ValueTask<RekallAgeStudioPreviewFrame> AwaitBlockedResetAsync(
             TaskCompletionSource blockedReset,

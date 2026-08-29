@@ -4,6 +4,14 @@ internal readonly record struct RekallAgeStudioViewportVisualState(
     bool PresentationSurfaceVisible,
     bool PlaceholderVisible);
 
+internal enum RekallAgeStudioViewportTickAction
+{
+    None,
+    RecoverPresentation,
+    RefreshEditDependencies,
+    AdvanceSimulation
+}
+
 /// <summary>
 /// Owns the World viewport's unavailable/retry policy independently of WPF property-change
 /// notifications. In particular, an initial false value is still an explicit visual state.
@@ -50,5 +58,24 @@ internal sealed class RekallAgeStudioViewportRecoveryState
         if (!_retryPending || now < _nextRetryAt) return false;
         _nextRetryAt = now + _retryInterval;
         return true;
+    }
+
+    internal RekallAgeStudioViewportTickAction SelectTickAction(
+        bool hasProject,
+        bool viewportAvailable,
+        bool isSimulating,
+        DateTimeOffset now)
+    {
+        if (!hasProject) return RekallAgeStudioViewportTickAction.None;
+        if (!viewportAvailable)
+        {
+            return TryBeginAutomaticRetry(now)
+                ? RekallAgeStudioViewportTickAction.RecoverPresentation
+                : RekallAgeStudioViewportTickAction.None;
+        }
+
+        return isSimulating
+            ? RekallAgeStudioViewportTickAction.AdvanceSimulation
+            : RekallAgeStudioViewportTickAction.RefreshEditDependencies;
     }
 }

@@ -22,6 +22,12 @@ internal interface IRekallAgeStudioPreviewSession : IAsyncDisposable
         ValueTask.FromException<RekallAgeStudioPreviewFrame>(
             new InvalidOperationException("Studio preview must be reset before it can present."));
 
+    ValueTask<RekallAgeStudioPreviewFrame?> RefreshExternalDependenciesAsync(
+        int width,
+        int height,
+        CancellationToken cancellationToken) =>
+        ValueTask.FromResult<RekallAgeStudioPreviewFrame?>(null);
+
     ValueTask ClearAsync(CancellationToken cancellationToken);
 
     ValueTask InvalidateAssetsAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;

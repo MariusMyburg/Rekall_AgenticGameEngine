@@ -6,6 +6,12 @@ namespace Rekall.Age.Rendering.Windows;
 
 public interface IRekallAgeVulkanPresentationSession : IAsyncDisposable
 {
+    /// <summary>
+    /// True only after disposal has attempted every owned native-resource cleanup action.
+    /// A disposal call may report an aggregate failure and still establish this terminal state.
+    /// </summary>
+    bool IsDisposalComplete { get; }
+
     RekallAgeVulkanNativeDeviceInfo DeviceInfo =>
         throw new NotSupportedException("This presentation session does not expose native Vulkan device metadata.");
 

@@ -4329,6 +4329,37 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
     }
 
+    internal async Task RefreshEditViewportDependenciesAsync(RekallAgeStudioViewportMetrics metrics)
+    {
+        if (Mode != RekallAgeStudioMode.Edit || !ViewportAvailable || !metrics.IsPresentable
+            || IsBusy || !IsLiveViewportEnabled || _session.ProjectRoot is null || _session.SceneName is null
+            || Interlocked.Exchange(ref _previewAdvancing, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var frame = await _previewSession.RefreshExternalDependenciesAsync(
+                metrics.PixelWidth,
+                metrics.PixelHeight,
+                _lifecycleCancellation.Token);
+            if (frame is not null) ApplyPreviewFrame(frame);
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception) when (exception is IOException or InvalidOperationException or ArgumentException)
+        {
+            StatusText = $"Viewport dependency refresh failed: {exception.Message}";
+            Replace(ValidationLines, [$"error: REKALL_STUDIO_PREVIEW_FAILED - {exception.Message}"]);
+        }
+        finally
+        {
+            Volatile.Write(ref _previewAdvancing, 0);
+        }
+    }
+
     private bool TryGetPreviewMetrics(out RekallAgeStudioViewportMetrics metrics)
     {
         metrics = _previewSession.Metrics;

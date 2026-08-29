@@ -201,9 +201,9 @@ public sealed class StudioVulkanViewportHostTests
     }
 
     [Fact]
-    public async Task ThrowingSessionDisposalFinishesSurfaceCleanupBeforeHwndCanBeDestroyed()
+    public async Task IncompleteSessionDisposalRetainsCleanupObligationAndBlocksHwndUntilRetryCompletes()
     {
-        var session = new ThrowingDisposePresentationSession();
+        var session = new IncompleteThenTerminalPresentationSession();
         var presenter = new RekallAgeStudioVulkanViewportPresenter((_, _, _, _, _) => session);
         var native = new RecordingNativeWindow();
         var core = new RekallAgeVulkanViewportHostCore(native, presenter);
@@ -216,11 +216,45 @@ public sealed class StudioVulkanViewportHostTests
             PresentationContext(),
             CancellationToken.None);
 
-        var failure = await Assert.ThrowsAsync<AggregateException>(
+        var firstFailure = await Assert.ThrowsAsync<AggregateException>(
             () => core.DisposePresenterAsync().AsTask());
 
-        Assert.Contains(failure.InnerExceptions, error => error.Message == "session dispose failed");
+        Assert.Contains(firstFailure.InnerExceptions, error => error.Message == "session cleanup interrupted");
         Assert.Equal(1, session.DisposeCount);
+        Assert.False(session.IsDisposalComplete);
+        Assert.False(presenter.IsDisposalComplete);
+        Assert.Throws<InvalidOperationException>(() => core.DestroyWindow(child));
+
+        var terminalFailure = await Assert.ThrowsAsync<AggregateException>(
+            () => core.DisposePresenterAsync().AsTask());
+
+        Assert.Contains("terminal cleanup issue", terminalFailure.ToString(), StringComparison.Ordinal);
+        Assert.Equal(2, session.DisposeCount);
+        Assert.True(session.IsDisposalComplete);
+        Assert.True(presenter.IsDisposalComplete);
+        core.DestroyWindow(child);
+        Assert.Equal(1, native.DestroyCount);
+    }
+
+    [Fact]
+    public async Task AggregateAfterProvenTerminalSessionCleanupAllowsHwndDestruction()
+    {
+        var session = new TerminalThrowingPresentationSession();
+        var presenter = new RekallAgeStudioVulkanViewportPresenter((_, _, _, _, _) => session);
+        var native = new RecordingNativeWindow();
+        var core = new RekallAgeVulkanViewportHostCore(native, presenter);
+        var child = core.BuildWindow(new IntPtr(17));
+        core.QueueResize(320, 180, 1, 1, isVisible: true);
+        await core.ApplyPendingResizeAsync(CancellationToken.None);
+        await presenter.PresentAsync(
+            ViewportFrame(),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            PresentationContext(),
+            CancellationToken.None);
+
+        await Assert.ThrowsAsync<AggregateException>(() => core.DisposePresenterAsync().AsTask());
+
+        Assert.True(session.IsDisposalComplete);
         Assert.True(presenter.IsDisposalComplete);
         core.DestroyWindow(child);
         Assert.Equal(1, native.DestroyCount);
@@ -322,6 +356,87 @@ public sealed class StudioVulkanViewportHostTests
         await presenter.DisposeAsync();
     }
 
+    [Fact]
+    public async Task MainWindowSimulationTickUsesRecoveryCadenceBeforeResumingAdvance()
+    {
+        var sessionCount = 0;
+        var presenter = new RekallAgeStudioVulkanViewportPresenter((_, _, _, _, _) =>
+        {
+            sessionCount++;
+            return sessionCount < 3
+                ? new DeviceLossPresentationSession()
+                : new RecordingInvalidationPresentationSession();
+        });
+        presenter.AttachSurface(new IntPtr(23));
+        await presenter.ResizeAsync(
+            new RekallAgeStudioViewportMetrics(320, 180, 320, 180, true),
+            () => (320, 180),
+            CancellationToken.None);
+        var recovery = new RekallAgeStudioViewportRecoveryState(TimeSpan.FromSeconds(1));
+        var now = new DateTimeOffset(2026, 8, 29, 10, 0, 0, TimeSpan.Zero);
+
+        var initial = await presenter.PresentAsync(
+            ViewportFrame(),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            PresentationContext(),
+            CancellationToken.None);
+        recovery.Synchronize(hasProject: true, initial.PresentedFrame, now);
+
+        Assert.Equal(
+            RekallAgeStudioViewportTickAction.RecoverPresentation,
+            recovery.SelectTickAction(true, viewportAvailable: false, isSimulating: true, now));
+        var retry = await presenter.PresentAsync(
+            ViewportFrame(),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            PresentationContext(),
+            CancellationToken.None);
+        recovery.Synchronize(hasProject: true, retry.PresentedFrame, now);
+
+        Assert.Equal(
+            RekallAgeStudioViewportTickAction.None,
+            recovery.SelectTickAction(
+                true,
+                viewportAvailable: false,
+                isSimulating: true,
+                now + TimeSpan.FromMilliseconds(16)));
+        Assert.Equal(
+            RekallAgeStudioViewportTickAction.None,
+            recovery.SelectTickAction(
+                true,
+                viewportAvailable: false,
+                isSimulating: true,
+                now + TimeSpan.FromMilliseconds(999)));
+        Assert.Equal(2, sessionCount);
+
+        Assert.Equal(
+            RekallAgeStudioViewportTickAction.RecoverPresentation,
+            recovery.SelectTickAction(
+                true,
+                viewportAvailable: false,
+                isSimulating: true,
+                now + TimeSpan.FromSeconds(1)));
+        var recovered = await presenter.PresentAsync(
+            ViewportFrame(),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            PresentationContext(),
+            CancellationToken.None);
+        recovery.Synchronize(
+            hasProject: true,
+            recovered.PresentedFrame,
+            now + TimeSpan.FromSeconds(1));
+
+        Assert.True(recovered.PresentedFrame);
+        Assert.Equal(3, sessionCount);
+        Assert.Equal(
+            RekallAgeStudioViewportTickAction.AdvanceSimulation,
+            recovery.SelectTickAction(
+                true,
+                viewportAvailable: true,
+                isSimulating: true,
+                now + TimeSpan.FromSeconds(1) + TimeSpan.FromMilliseconds(16)));
+        await presenter.DisposeAsync();
+    }
+
     private static IntPtr MakeLParam(short x, short y) =>
         new(unchecked((int)((ushort)x | ((uint)(ushort)y << 16))));
 
@@ -348,9 +463,11 @@ public sealed class StudioVulkanViewportHostTests
         1,
         1);
 
-    private sealed class ThrowingDisposePresentationSession : IRekallAgeVulkanPresentationSession
+    private sealed class IncompleteThenTerminalPresentationSession : IRekallAgeVulkanPresentationSession
     {
         public int DisposeCount { get; private set; }
+
+        public bool IsDisposalComplete { get; private set; }
 
         public ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
             RekallAgeVulkanSceneSubmission submission,
@@ -360,7 +477,31 @@ public sealed class StudioVulkanViewportHostTests
         public ValueTask DisposeAsync()
         {
             DisposeCount++;
-            return ValueTask.FromException(new InvalidOperationException("session dispose failed"));
+            if (DisposeCount == 1)
+            {
+                return ValueTask.FromException(new InvalidOperationException("session cleanup interrupted"));
+            }
+
+            IsDisposalComplete = true;
+            return ValueTask.FromException(
+                new AggregateException("terminal cleanup issue", new InvalidOperationException("native cleanup issue")));
+        }
+    }
+
+    private sealed class TerminalThrowingPresentationSession : IRekallAgeVulkanPresentationSession
+    {
+        public bool IsDisposalComplete { get; private set; }
+
+        public ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
+            RekallAgeVulkanSceneSubmission submission,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(RekallAgeVulkanPresentationFrame.Presented(submission.Frame, "test-gpu"));
+
+        public ValueTask DisposeAsync()
+        {
+            IsDisposalComplete = true;
+            return ValueTask.FromException(
+                new AggregateException("terminal cleanup issue", new InvalidOperationException("native cleanup issue")));
         }
     }
 
@@ -381,12 +522,20 @@ public sealed class StudioVulkanViewportHostTests
             return RekallAgeVulkanPresentationFrame.Presented(submission.Frame, "test-gpu");
         }
 
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public bool IsDisposalComplete { get; private set; }
+
+        public ValueTask DisposeAsync()
+        {
+            IsDisposalComplete = true;
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class RecordingInvalidationPresentationSession : IRekallAgeVulkanPresentationSession
     {
         public int ShaderInvalidationCount { get; private set; }
+
+        public bool IsDisposalComplete { get; private set; }
 
         public ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
             RekallAgeVulkanSceneSubmission submission,
@@ -400,19 +549,29 @@ public sealed class StudioVulkanViewportHostTests
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public ValueTask DisposeAsync()
+        {
+            IsDisposalComplete = true;
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class DeviceLossPresentationSession : IRekallAgeVulkanPresentationSession
     {
+        public bool IsDisposalComplete { get; private set; }
+
         public ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
             RekallAgeVulkanSceneSubmission submission,
             CancellationToken cancellationToken) =>
             ValueTask.FromException<RekallAgeVulkanPresentationFrame>(
                 new InvalidOperationException("VK_ERROR_DEVICE_LOST: simulated device lost"));
 
-        public ValueTask DisposeAsync() =>
-            ValueTask.FromException(new InvalidOperationException("device-loss session cleanup failed"));
+        public ValueTask DisposeAsync()
+        {
+            IsDisposalComplete = true;
+            return ValueTask.FromException(
+                new AggregateException("device-loss session cleanup failed", new InvalidOperationException("native issue")));
+        }
     }
 
     private sealed class RecordingSurfaceController(List<string> order) : IRekallAgeVulkanViewportSurfaceController

@@ -123,6 +123,50 @@ public sealed class StudioPreviewSessionTests
     }
 
     [Fact]
+    public async Task EditDependencyRefreshPresentsOnlyOnceForOneExternalAssetAndShaderChange()
+    {
+        var root = TemporaryRoot("studio-preview-edit-dependencies");
+        try
+        {
+            await SaveSceneAsync(root, RekallAgeSceneDocument.Create("Main", ["world"]));
+            var presenter = new RecordingViewportPresenter();
+            var monitor = new RecordingDependencyMonitor();
+            var resolveCount = 0;
+            await using var preview = new RekallAgeStudioVulkanPreviewSession(
+                presenter,
+                (_, _, _) =>
+                {
+                    resolveCount++;
+                    return ValueTask.FromResult(RekallAgeRuntimeViewportAssetSet.Empty with { });
+                },
+                _ => monitor);
+            await preview.ResetAsync(root, "Main", 320, 180, CancellationToken.None);
+
+            var firstStable = await preview.RefreshExternalDependenciesAsync(320, 180, CancellationToken.None);
+            var secondStable = await preview.RefreshExternalDependenciesAsync(320, 180, CancellationToken.None);
+            monitor.Enqueue(
+                RekallAgeStudioViewportDependencyChange.Assets
+                | RekallAgeStudioViewportDependencyChange.Shaders);
+            var changed = await preview.RefreshExternalDependenciesAsync(320, 180, CancellationToken.None);
+            var stableAfterChange = await preview.RefreshExternalDependenciesAsync(320, 180, CancellationToken.None);
+
+            Assert.Null(firstStable);
+            Assert.Null(secondStable);
+            Assert.NotNull(changed);
+            Assert.Null(stableAfterChange);
+            Assert.Equal(1, presenter.AssetInvalidationCount);
+            Assert.Equal(1, presenter.ShaderInvalidationCount);
+            Assert.Equal(2, resolveCount);
+            Assert.Equal(2, presenter.Presentations.Count);
+            Assert.Equal(2, presenter.Presentations[1].Context.AssetRevision);
+        }
+        finally
+        {
+            DeleteRoot(root);
+        }
+    }
+
+    [Fact]
     public async Task ExternalShaderDependencyChangeSignalsTheInjectedPresenterOnce()
     {
         var root = TemporaryRoot("studio-preview-external-shaders");

@@ -271,7 +271,13 @@ public sealed class VulkanPresentationContractTests
     {
         public RekallAgeWin32RenderSurfaceDescriptor LastSurface { get; private set; }
 
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public bool IsDisposalComplete { get; private set; }
+
+        public ValueTask DisposeAsync()
+        {
+            IsDisposalComplete = true;
+            return ValueTask.CompletedTask;
+        }
 
         public RekallAgeVulkanNativeDeviceInfo DeviceInfo { get; } = new(
             "Test GPU",

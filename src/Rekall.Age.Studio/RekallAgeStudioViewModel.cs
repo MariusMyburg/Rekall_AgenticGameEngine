@@ -251,7 +251,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly List<RekallAgeLanguageModelToolExecution> _lastAgentToolExecutions = [];
     internal bool TreatGauntletAsTerminalSuccess { get; set; }
 
-    internal int? AgentMaxTurns { get; set; }
+    internal int? AgentMaxTurns { get; set; } = 64;
 
     public RekallAgeStudioViewModel()
         : this(
@@ -779,6 +779,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             if (candidate.Length > 0 && !LanguageModels.Contains(candidate, StringComparer.Ordinal)) return;
             if (Set(ref _selectedLanguageModel, candidate))
             {
+                if (candidate.Length > 0)
+                {
+                    ProviderDisplayStatus = $"Using {candidate} with {SelectedLanguageModelProvider.DisplayName}.";
+                }
                 OnPropertyChanged(nameof(HasUsableLanguageModel));
                 RefreshCommands();
             }
@@ -3066,6 +3070,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            var reload = await _session.ReloadAsync(CancellationToken.None);
+            if (reload.Ok && _session.Model is not null) ApplyModel(_session.Model);
             StatusText = "AI authoring cancelled.";
             AppendAgentLine("cancelled by user");
         }

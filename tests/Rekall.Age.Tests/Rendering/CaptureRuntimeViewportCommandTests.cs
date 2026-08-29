@@ -592,6 +592,56 @@ public sealed class CaptureRuntimeViewportCommandTests
     }
 
     [Fact]
+    public async Task CaptureRuntimeViewportCommandReportsTextOccludedByALaterOpaquePanel()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["ReferenceWidth"] = 200, ["ReferenceHeight"] = 100 }));
+        var instructions = RekallAgeEntityDocument.Create("Instructions", ["ui"]) with { ParentId = canvas.Id };
+        instructions = instructions.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Label",
+            new JsonObject
+            {
+                ["X"] = 10,
+                ["Y"] = 10,
+                ["Width"] = 160,
+                ["Height"] = 24,
+                ["Text"] = "MOVE WITH A AND D"
+            }));
+        var latePanel = RekallAgeEntityDocument.Create("Late Panel", ["ui"]) with { ParentId = canvas.Id };
+        latePanel = latePanel.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Panel",
+            new JsonObject
+            {
+                ["X"] = 0,
+                ["Y"] = 0,
+                ["Width"] = 180,
+                ["Height"] = 50,
+                ["BackgroundColor"] = "#080818"
+            }));
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["ui"])
+                .AddEntity(canvas)
+                .AddEntity(instructions)
+                .AddEntity(latePanel),
+            CancellationToken.None);
+
+        var result = await new CaptureRuntimeViewportCommand().ExecuteAsync(
+            new CaptureRuntimeViewportRequest(root, "Main", 1, Path.Combine(root, "Viewport"), 200, 100, false),
+            new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("ui occlusion diagnostics"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains("REKALL_VIEWPORT_UI_TEXT_OCCLUDED", result.Value.LayoutDiagnostics.WarningCodes);
+        Assert.Contains(result.Value.LayoutDiagnostics.AuthoringHints, hint =>
+            hint.Contains("Instructions", StringComparison.Ordinal)
+            && hint.Contains("Late Panel", StringComparison.Ordinal)
+            && hint.Contains("draw order", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task CaptureRuntimeViewportCommandUsesElementBoundsForTextClippingDiagnostics()
     {
         var root = TestPaths.CreateTempDirectory();

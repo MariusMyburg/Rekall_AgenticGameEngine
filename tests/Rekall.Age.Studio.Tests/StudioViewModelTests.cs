@@ -369,6 +369,35 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task SelectingADiscoveredModelClearsAStaleFallbackWarning()
+    {
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            httpClientFactory: () => new HttpClient(new ProviderLifecycleHandler(
+                blockOllamaChat: false,
+                ollamaModels: ["dolphin-llama3:latest", "qwen3.8:27b"]), disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+
+        await ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
+        Assert.Contains("Configured default", viewModel.ProviderDisplayStatus, StringComparison.Ordinal);
+
+        viewModel.SelectedLanguageModel = "qwen3.8:27b";
+
+        Assert.DoesNotContain("Configured default", viewModel.ProviderDisplayStatus, StringComparison.Ordinal);
+        Assert.Equal("Using qwen3.8:27b with Local Ollama.", viewModel.ProviderDisplayStatus);
+    }
+
+    [Fact]
+    public async Task InteractiveStudioUsesABoundedAuthoringTurnLimit()
+    {
+        await using var viewModel = new RekallAgeStudioViewModel();
+
+        Assert.Equal(64, viewModel.AgentMaxTurns);
+    }
+
+    [Fact]
     public async Task RapidProviderSwitchDoesNotPublishStaleModelsWhenTheFinalProviderFails()
     {
         var initialOllama = new ProviderLifecycleHandler(blockOllamaChat: false);
@@ -2160,6 +2189,38 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task CancellingAuthoringReloadsMutationsAlreadyWrittenByTheAgent()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-cancel-reload-" + Guid.NewGuid().ToString("N"));
+        var model = new MutateThenBlockModel(root);
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                model);
+            viewModel.ProjectPathInput = root;
+            viewModel.ProjectNameInput = "Cancel Reload";
+            viewModel.SceneNameInput = "Main";
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.AgentTaskInput = "Add the authored marker, then wait.";
+
+            var run = ExecuteAsync(viewModel.RunAgentCommand);
+            await model.WaitForBlockingTurnAsync();
+            Assert.DoesNotContain(viewModel.EntityNodes, entity => entity.Name == "Authored Marker");
+
+            await ExecuteAsync(viewModel.CancelAgentCommand);
+            await run;
+
+            Assert.Contains(viewModel.EntityNodes, entity => entity.Name == "Authored Marker");
+            Assert.Equal("AI authoring cancelled.", viewModel.StatusText);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task HeadlessAutomationContinuesAnExistingStudioProject()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-existing-" + Guid.NewGuid().ToString("N"));
@@ -2722,5 +2783,61 @@ public sealed class StudioViewModelTests
                 "tool_calls",
                 new RekallAgeLanguageModelUsage(1, 1, 1)));
         }
+    }
+
+    private sealed class MutateThenBlockModel(string projectRoot) : IRekallAgeLanguageModelClient
+    {
+        private readonly TaskCompletionSource _blockingTurnStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _calls;
+
+        public string ProviderId => "deterministic";
+
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>([]);
+
+        public async ValueTask<RekallAgeLanguageModelResponse> ChatAsync(
+            RekallAgeLanguageModelRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref _calls) == 1)
+            {
+                return new RekallAgeLanguageModelResponse(
+                    ProviderId,
+                    request.Model,
+                    string.Empty,
+                    string.Empty,
+                    [new RekallAgeLanguageModelToolCall(
+                        "rekall.scene.apply_blueprint",
+                        new JsonObject
+                        {
+                            ["projectRoot"] = projectRoot,
+                            ["sceneName"] = "Main",
+                            ["clearExisting"] = false,
+                            ["entities"] = new JsonArray
+                            {
+                                new JsonObject
+                                {
+                                    ["name"] = "Authored Marker",
+                                    ["components"] = new JsonArray
+                                    {
+                                        new JsonObject
+                                        {
+                                            ["type"] = "Rekall.Transform3D",
+                                            ["properties"] = new JsonObject { ["X"] = 1 }
+                                        }
+                                    }
+                                }
+                            }
+                        })],
+                    "tool_calls",
+                    new RekallAgeLanguageModelUsage(1, 1, 1));
+            }
+
+            _blockingTurnStarted.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("The cancelled blocking turn unexpectedly resumed.");
+        }
+
+        public Task WaitForBlockingTurnAsync() => _blockingTurnStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
     }
 }

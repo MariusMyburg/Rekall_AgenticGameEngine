@@ -916,6 +916,71 @@ public sealed class CaptureRuntimeViewportCommand
                 }
             }
         }
+
+        for (var textIndex = 0; textIndex < uiRenderables.Length; textIndex++)
+        {
+            var textRenderable = uiRenderables[textIndex];
+            if (string.IsNullOrEmpty(textRenderable.UiVisual?.Text))
+            {
+                continue;
+            }
+
+            var text = CalculateVisibleTextGeometry(
+                frame,
+                textRenderable.UiVisual!,
+                ResolveFont(textRenderable.UiVisual!, assets));
+            if (text.VisibleArea == 0)
+            {
+                continue;
+            }
+
+            for (var laterIndex = textIndex + 1; laterIndex < uiRenderables.Length; laterIndex++)
+            {
+                var later = uiRenderables[laterIndex];
+                var laterVisual = later.UiVisual!;
+                if (!IsOpaqueUiOccluder(laterVisual))
+                {
+                    continue;
+                }
+
+                var occluderLeft = Math.Max(0, Math.Max(laterVisual.X, laterVisual.ClipX));
+                var occluderTop = Math.Max(0, Math.Max(laterVisual.Y, laterVisual.ClipY));
+                var occluderRight = Math.Min(frame.Width, Math.Min(
+                    laterVisual.X + laterVisual.Width,
+                    laterVisual.ClipX + laterVisual.ClipWidth));
+                var occluderBottom = Math.Min(frame.Height, Math.Min(
+                    laterVisual.Y + laterVisual.Height,
+                    laterVisual.ClipY + laterVisual.ClipHeight));
+                var overlapWidth = IntersectionLength(text.X, text.X + text.Width, occluderLeft, occluderRight);
+                var overlapHeight = IntersectionLength(text.Y, text.Y + text.Height, occluderTop, occluderBottom);
+                var overlapArea = (long)overlapWidth * overlapHeight;
+                if (overlapArea * 2 < text.VisibleArea)
+                {
+                    continue;
+                }
+
+                warnings.Add("REKALL_VIEWPORT_UI_TEXT_OCCLUDED");
+                if (hints.Count < maximumHints)
+                {
+                    var percent = (int)Math.Round(overlapArea * 100d / text.VisibleArea);
+                    hints.Add($"UI text on '{textRenderable.EntityName}' is {percent}% covered by later-drawn opaque UI element '{later.EntityName}'; correct their draw order, canvas layer, or hierarchy so the background renders behind the text, then recapture.");
+                }
+                break;
+            }
+        }
+    }
+
+    private static bool IsOpaqueUiOccluder(RekallAgeRuntimeViewportUiVisual visual)
+    {
+        if (visual.Width <= 0 || visual.Height <= 0
+            || string.IsNullOrWhiteSpace(visual.BackgroundColor)
+            || visual.BackgroundColor.Equals("transparent", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var color = visual.BackgroundColor.Trim();
+        return color.Length != 9 || color[0] != '#' || !color.AsSpan(1, 2).Equals("00", StringComparison.OrdinalIgnoreCase);
     }
 
     private static long CalculateUiCoverageArea(

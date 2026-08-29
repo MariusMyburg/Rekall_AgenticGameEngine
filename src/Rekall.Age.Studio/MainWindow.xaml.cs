@@ -15,6 +15,8 @@ public partial class MainWindow : Window
     private readonly RekallAgeStudioViewModel _viewModel;
     private readonly IRekallAgeStudioLayoutStore _layoutStore = new RekallAgeStudioLayoutStore();
     private readonly DispatcherTimer _previewTimer;
+    private readonly RekallAgeStudioViewportRecoveryState _viewportRecovery =
+        new(TimeSpan.FromSeconds(1));
     private RekallAgeStudioLayout _layout = RekallAgeStudioLayout.Default;
     private bool _shutdownComplete;
     private bool _meshTransformDragging;
@@ -47,6 +49,7 @@ public partial class MainWindow : Window
         };
         _previewTimer.Tick += OnPreviewTick;
         Loaded += OnLoaded;
+        ApplyViewportAvailabilityVisual();
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -65,6 +68,7 @@ public partial class MainWindow : Window
             {
                 await _viewModel.PresentViewportAtHostSizeAsync(SceneVulkanViewportHost.Metrics);
             }
+            ApplyViewportAvailabilityVisual();
             _hadProject = _viewModel.HasProject;
             _initializing = false;
             _previewTimer.Start();
@@ -87,6 +91,11 @@ public partial class MainWindow : Window
     {
         try
         {
+            if (_viewportRecovery.TryBeginAutomaticRetry(DateTimeOffset.UtcNow)
+                && SceneVulkanViewportHost.Metrics.IsPresentable)
+            {
+                await _viewModel.PresentViewportAtHostSizeAsync(SceneVulkanViewportHost.Metrics);
+            }
             await _viewModel.AdvanceLivePreviewAsync();
         }
         catch (Exception exception)
@@ -123,10 +132,7 @@ public partial class MainWindow : Window
         ModelingWorkspaceHost.Visibility = modeling ? Visibility.Visible : Visibility.Collapsed;
         ProjectBar.Visibility = modeling ? Visibility.Collapsed : Visibility.Visible;
         MainToolbar.Visibility = world ? Visibility.Visible : Visibility.Collapsed;
-        if (world && _viewModel.HasProject && !_viewModel.ViewportAvailable)
-        {
-            PrepareViewportHost();
-        }
+        if (world) ApplyViewportAvailabilityVisual();
         if (modeling && refreshModeling)
         {
             if (_viewModel.RefreshMeshAssetsCommand.CanExecute(null)) _viewModel.RefreshMeshAssetsCommand.Execute(null);
@@ -347,13 +353,11 @@ public partial class MainWindow : Window
         {
             if (!_initializing && !_hadProject && _viewModel.HasProject) SelectWorkspace("Author");
             _hadProject = _viewModel.HasProject;
-            if (_viewModel.HasProject) PrepareViewportHost();
-            else ShowVulkanUnavailablePlaceholder();
+            ApplyViewportAvailabilityVisual();
         }
         if (e.PropertyName == nameof(RekallAgeStudioViewModel.ViewportAvailable))
         {
-            if (_viewModel.ViewportAvailable) PrepareViewportHost();
-            else ShowVulkanUnavailablePlaceholder();
+            ApplyViewportAvailabilityVisual();
         }
     }
 
@@ -381,16 +385,20 @@ public partial class MainWindow : Window
         _ => 0
     };
 
-    private void PrepareViewportHost()
+    private void ApplyViewportAvailabilityVisual()
     {
-        VulkanUnavailablePlaceholder.Visibility = Visibility.Collapsed;
+        var visual = _viewportRecovery.Synchronize(
+            _viewModel.HasProject,
+            _viewModel.ViewportAvailable,
+            DateTimeOffset.UtcNow);
+        // Keep the HwndHost participating in layout so its last positive physical metrics
+        // remain available for automatic Vulkan session recreation. Only the native child
+        // is hidden while WPF displays the diagnostic placeholder.
         SceneVulkanViewportHost.Visibility = Visibility.Visible;
-    }
-
-    private void ShowVulkanUnavailablePlaceholder()
-    {
-        SceneVulkanViewportHost.Visibility = Visibility.Collapsed;
-        VulkanUnavailablePlaceholder.Visibility = Visibility.Visible;
+        SceneVulkanViewportHost.SetPresentationVisible(visual.PresentationSurfaceVisible);
+        VulkanUnavailablePlaceholder.Visibility = visual.PlaceholderVisible
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void OnMeshViewportMouseDown(object sender, MouseButtonEventArgs e)

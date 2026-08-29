@@ -160,7 +160,7 @@
                     <Grid Grid.Row="1">
                         <local:RekallAgeVulkanViewportHost x:Name="SceneVulkanViewportHost"
                             Cursor="Cross" ToolTip="Select scene entities directly through the Vulkan viewport." />
-                        <StackPanel x:Name="VulkanUnavailablePlaceholder" Visibility="Collapsed"
+                        <StackPanel x:Name="VulkanUnavailablePlaceholder"
                                     HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
                             <TextBlock Text="AGE" Foreground="#33404D" FontSize="34" FontWeight="Light" HorizontalAlignment="Center" />
                             <TextBlock Text="Vulkan is unavailable" Foreground="#E28A8A" FontWeight="SemiBold"

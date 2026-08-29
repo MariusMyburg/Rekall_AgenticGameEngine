@@ -4544,7 +4544,6 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (!TryGetPreviewMetrics(out var metrics)) return;
         try
         {
-            await _previewSession.InvalidateAssetsAsync(_lifecycleCancellation.Token);
             ApplyPreviewFrame(await _previewSession.ResetAsync(
                 _session.ProjectRoot,
                 _session.SceneName,

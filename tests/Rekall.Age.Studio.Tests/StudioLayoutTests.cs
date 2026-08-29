@@ -27,6 +27,10 @@ public sealed class StudioLayoutTests
         var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
 
         Assert.Contains("x:Name=\"VulkanUnavailablePlaceholder\"", window, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "x:Name=\"VulkanUnavailablePlaceholder\" Visibility=\"Collapsed\"",
+            window,
+            StringComparison.Ordinal);
         Assert.Contains("ViewportUnavailableReason", window, StringComparison.Ordinal);
         Assert.Contains("ViewportBackendLabel", window, StringComparison.Ordinal);
         Assert.Contains("Vulkan is unavailable", window, StringComparison.OrdinalIgnoreCase);

@@ -70,6 +70,8 @@ internal interface IRekallAgeVulkanViewportSurfaceController : IAsyncDisposable
 
     bool IsDisposed { get; }
 
+    bool IsDisposalComplete { get; }
+
     void AttachSurface(IntPtr hwnd);
 
     ValueTask<RekallAgeStudioViewportMetrics> ResizeAsync(
@@ -102,7 +104,8 @@ internal sealed class RekallAgeStudioVulkanViewportPresenter :
     private string? _sessionProjectRoot;
     private bool _assetsInvalidated;
     private bool _shadersInvalidated;
-    private bool _disposed;
+    private bool _disposeStarted;
+    private bool _disposalComplete;
 
     internal RekallAgeStudioVulkanViewportPresenter()
         : this((surface, options, frame, assets, assetRevision) =>
@@ -129,11 +132,13 @@ internal sealed class RekallAgeStudioVulkanViewportPresenter :
 
     public RekallAgeStudioViewportMetrics Metrics => _metrics;
 
-    public bool IsDisposed => _disposed;
+    public bool IsDisposed => _disposalComplete;
+
+    public bool IsDisposalComplete => _disposalComplete;
 
     public void AttachSurface(IntPtr hwnd)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposalStarted();
         if (_surface is not null)
         {
             throw new InvalidOperationException("The Studio Vulkan presenter already has a child surface.");
@@ -274,8 +279,19 @@ internal sealed class RekallAgeStudioVulkanViewportPresenter :
             catch (Exception exception)
             {
                 Log.Warning(exception, "Studio Vulkan presentation session became unavailable.");
-                await DisposeSessionAsync();
-                return Unavailable(frame, exception.Message, exception);
+                Exception diagnostic = exception;
+                try
+                {
+                    await DisposeSessionAsync();
+                }
+                catch (Exception cleanupException)
+                {
+                    diagnostic = new AggregateException(
+                        "Vulkan presentation failed and its abandoned session reported a cleanup failure.",
+                        exception,
+                        cleanupException);
+                }
+                return Unavailable(frame, exception.Message, diagnostic);
             }
         }
         finally
@@ -317,11 +333,38 @@ internal sealed class RekallAgeStudioVulkanViewportPresenter :
         await _gate.WaitAsync();
         try
         {
-            if (_disposed) return;
-            _disposed = true;
-            await DisposeSessionAsync();
-            _surface?.Dispose();
-            _surface = null;
+            if (_disposalComplete) return;
+            _disposeStarted = true;
+            List<Exception>? failures = null;
+            try
+            {
+                await DisposeSessionAsync();
+            }
+            catch (Exception exception)
+            {
+                (failures ??= []).Add(exception);
+            }
+
+            if (_surface is not null)
+            {
+                try
+                {
+                    _surface.Dispose();
+                    _surface = null;
+                }
+                catch (Exception exception)
+                {
+                    (failures ??= []).Add(exception);
+                }
+            }
+
+            _disposalComplete = _session is null && _surface is null;
+            if (failures is { Count: > 0 })
+            {
+                throw new AggregateException(
+                    "Studio Vulkan presenter cleanup reported one or more failures.",
+                    failures);
+            }
         }
         finally
         {
@@ -354,7 +397,9 @@ internal sealed class RekallAgeStudioVulkanViewportPresenter :
         }
     }
 
-    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
+    private void ThrowIfDisposed() => ThrowIfDisposalStarted();
+
+    private void ThrowIfDisposalStarted() => ObjectDisposedException.ThrowIf(_disposeStarted, this);
 }
 
 internal enum RekallAgeStudioViewportPointerKind
@@ -444,6 +489,7 @@ internal sealed class RekallAgeVulkanViewportHostCore
     private IntPtr _child;
     private RekallAgeStudioViewportMetrics? _pendingMetrics;
     private bool _messageHandlerAttached;
+    private bool _presentationVisible = true;
     private bool _destroyed;
 
     internal RekallAgeVulkanViewportHostCore(
@@ -516,7 +562,7 @@ internal sealed class RekallAgeVulkanViewportHostCore
         }
 
         if (pending is not { } requested || _child == IntPtr.Zero || _destroyed) return;
-        _native.SetVisible(_child, requested.IsPresentable);
+        _native.SetVisible(_child, requested.IsPresentable && _presentationVisible);
         RekallAgeStudioViewportMetrics coherent;
         if (!requested.IsPresentable)
         {
@@ -536,6 +582,13 @@ internal sealed class RekallAgeVulkanViewportHostCore
         }
 
         MetricsChanged?.Invoke(this, coherent);
+    }
+
+    internal void SetPresentationVisible(bool visible)
+    {
+        _presentationVisible = visible;
+        if (_child == IntPtr.Zero || _destroyed) return;
+        _native.SetVisible(_child, visible && Metrics.IsPresentable);
     }
 
     internal bool ProcessWindowMessage(int message, IntPtr wParam, IntPtr lParam)
@@ -599,7 +652,7 @@ internal sealed class RekallAgeVulkanViewportHostCore
             throw new InvalidOperationException("WPF requested destruction of an unexpected Studio Vulkan HWND.");
         }
 
-        if (!_surface.IsDisposed)
+        if (!_surface.IsDisposalComplete)
         {
             throw new InvalidOperationException(
                 "The Studio Vulkan presenter must be drained and disposed before its child HWND is destroyed.");
@@ -706,6 +759,8 @@ internal sealed class RekallAgeVulkanViewportHost : HwndHost, IRekallAgeStudioVi
         _surfaceReady.Task.WaitAsync(cancellationToken);
 
     internal void CapturePointer() => _core.CapturePointer();
+
+    internal void SetPresentationVisible(bool visible) => _core.SetPresentationVisible(visible);
 
     protected override HandleRef BuildWindowCore(HandleRef hwndParent)
     {

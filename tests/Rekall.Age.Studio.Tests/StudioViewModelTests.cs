@@ -1816,6 +1816,48 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task MainWindowRetryPathRecoversAnUnavailableViewModelWithoutAWorkspaceTransition()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-vulkan-recovery-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession { ReturnUnavailable = true };
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Recovery Test",
+                SceneNameInput = "Main"
+            };
+            var recovery = new RekallAgeStudioViewportRecoveryState(TimeSpan.FromSeconds(1));
+            var now = new DateTimeOffset(2026, 8, 29, 10, 0, 0, TimeSpan.Zero);
+            await ExecuteAsync(viewModel.CreateCommand);
+            var unavailable = recovery.Synchronize(viewModel.HasProject, viewModel.ViewportAvailable, now);
+
+            preview.ReturnUnavailable = false;
+            Assert.True(recovery.TryBeginAutomaticRetry(now));
+            await viewModel.PresentViewportAtHostSizeAsync(preview.Metrics);
+            var recovered = recovery.Synchronize(
+                viewModel.HasProject,
+                viewModel.ViewportAvailable,
+                now + TimeSpan.FromSeconds(1));
+
+            Assert.False(unavailable.PresentationSurfaceVisible);
+            Assert.True(unavailable.PlaceholderVisible);
+            Assert.True(viewModel.ViewportAvailable);
+            Assert.True(recovered.PresentationSurfaceVisible);
+            Assert.False(recovered.PlaceholderVisible);
+            Assert.Equal(1, preview.PresentCurrentCount);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task PausedSimulationSuppressesAutomaticTicksAndSingleStepAdvancesExactlyOneFrame()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-step-" + Guid.NewGuid().ToString("N"));
@@ -2898,11 +2940,12 @@ public sealed class StudioViewModelTests
         private TaskCompletionSource? _disposeEntered;
         public int ResetCount { get; private set; }
         public int StepCount { get; private set; }
+        public int PresentCurrentCount { get; private set; }
         public RekallAgeStudioViewportMetrics Metrics { get; } = new(800, 450, 800, 450, true);
         public List<(int Width, int Height)> ResetSizes { get; } = [];
         public List<RekallAgeStudioViewportPickRegion> Regions { get; } = [];
         public bool IsDisposed { get; private set; }
-        public bool ReturnUnavailable { get; init; }
+        public bool ReturnUnavailable { get; set; }
 
         public ValueTask<RekallAgeStudioPreviewFrame> ResetAsync(
             string projectRoot,
@@ -2926,6 +2969,18 @@ public sealed class StudioViewModelTests
         {
             StepCount++;
             _frame += frameCount;
+            return ValueTask.FromResult(CreateFrame(_frame));
+        }
+
+        public ValueTask<RekallAgeStudioPreviewFrame> PresentCurrentAsync(
+            int width,
+            int height,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            PresentCurrentCount++;
+            _width = width;
+            _height = height;
             return ValueTask.FromResult(CreateFrame(_frame));
         }
 

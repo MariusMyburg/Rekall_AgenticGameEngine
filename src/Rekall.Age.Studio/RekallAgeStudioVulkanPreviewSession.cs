@@ -3,6 +3,7 @@ using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Windows;
 using Rekall.Age.Runtime;
 using Rekall.Age.Runtime.Abstractions;
+using System.IO;
 
 namespace Rekall.Age.Studio;
 
@@ -31,6 +32,7 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
     private readonly IRekallAgeStudioViewportPresenter _presenter;
     private readonly Func<string, RekallAgeRuntimeViewportFrame, CancellationToken,
         ValueTask<RekallAgeRuntimeViewportAssetSet>> _resolveAssets;
+    private readonly Func<string, IRekallAgeStudioViewportDependencyMonitor> _dependencyMonitorFactory;
     private readonly RekallAgeRuntimeRenderFrameBuilder _frameBuilder = new();
     private RekallAgeRuntimeExecutionLoop? _loop;
     private RekallAgeRuntimeWorld? _world;
@@ -41,13 +43,15 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
     private int _sceneRevision;
     private int _assetRevision;
     private bool _assetsDirty;
+    private IRekallAgeStudioViewportDependencyMonitor? _dependencyMonitor;
     private bool _disposed;
 
     internal RekallAgeStudioVulkanPreviewSession(IRekallAgeStudioViewportPresenter presenter)
         : this(
             presenter,
             (projectRoot, frame, cancellationToken) =>
-                new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(projectRoot, frame, cancellationToken))
+                new RekallAgeRuntimeViewportAssetResolver().ResolveAsync(projectRoot, frame, cancellationToken),
+            projectRoot => new RekallAgeStudioViewportDependencyMonitor(projectRoot))
     {
     }
 
@@ -55,9 +59,23 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
         IRekallAgeStudioViewportPresenter presenter,
         Func<string, RekallAgeRuntimeViewportFrame, CancellationToken,
             ValueTask<RekallAgeRuntimeViewportAssetSet>> resolveAssets)
+        : this(
+            presenter,
+            resolveAssets,
+            projectRoot => new RekallAgeStudioViewportDependencyMonitor(projectRoot))
+    {
+    }
+
+    internal RekallAgeStudioVulkanPreviewSession(
+        IRekallAgeStudioViewportPresenter presenter,
+        Func<string, RekallAgeRuntimeViewportFrame, CancellationToken,
+            ValueTask<RekallAgeRuntimeViewportAssetSet>> resolveAssets,
+        Func<string, IRekallAgeStudioViewportDependencyMonitor> dependencyMonitorFactory)
     {
         _presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
         _resolveAssets = resolveAssets ?? throw new ArgumentNullException(nameof(resolveAssets));
+        _dependencyMonitorFactory = dependencyMonitorFactory
+            ?? throw new ArgumentNullException(nameof(dependencyMonitorFactory));
     }
 
     public RekallAgeStudioViewportMetrics Metrics => _presenter.Metrics;
@@ -79,8 +97,14 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
         {
             ThrowIfDisposed();
             RekallAgeRuntimeExecutionLoop? candidateLoop = null;
+            IRekallAgeStudioViewportDependencyMonitor? candidateMonitor = null;
             try
             {
+                var normalizedProjectRoot = Path.GetFullPath(projectRoot);
+                var replaceMonitor = _dependencyMonitor is null
+                    || !string.Equals(_projectRoot, normalizedProjectRoot, StringComparison.OrdinalIgnoreCase);
+                if (replaceMonitor) candidateMonitor = _dependencyMonitorFactory(normalizedProjectRoot);
+                else await ApplyExternalDependencyChangesAsync(cancellationToken);
                 candidateLoop = RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot);
                 var candidateWorld = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(
                     projectRoot,
@@ -110,6 +134,7 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
                 if (!previewFrame.Presentation.PresentedFrame)
                 {
                     candidateLoop.Dispose();
+                    candidateMonitor?.Dispose();
                     return previewFrame;
                 }
 
@@ -118,18 +143,26 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
                 candidateLoop = null;
                 _world = candidateWorld;
                 _assets = candidateAssets;
-                _projectRoot = projectRoot;
+                _projectRoot = normalizedProjectRoot;
                 _width = width;
                 _height = height;
                 _sceneRevision = candidateSceneRevision;
                 _assetRevision = candidateAssetRevision;
                 _assetsDirty = false;
+                if (replaceMonitor)
+                {
+                    var previousMonitor = _dependencyMonitor;
+                    _dependencyMonitor = candidateMonitor;
+                    candidateMonitor = null;
+                    previousMonitor?.Dispose();
+                }
                 previousLoop?.Dispose();
                 return previewFrame;
             }
             catch
             {
                 candidateLoop?.Dispose();
+                candidateMonitor?.Dispose();
                 throw;
             }
         }
@@ -162,6 +195,7 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
             var width = metrics.IsPresentable ? metrics.PixelWidth : _width;
             var height = metrics.IsPresentable ? metrics.PixelHeight : _height;
             var viewportFrame = _frameBuilder.Build(advancedWorld, width, height, debugOverlay: false);
+            await ApplyExternalDependencyChangesAsync(cancellationToken);
             if (_assetsDirty)
             {
                 _assets = await _resolveAssets(_projectRoot, viewportFrame, cancellationToken);
@@ -204,6 +238,13 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
             }
 
             var viewportFrame = _frameBuilder.Build(_world, width, height, debugOverlay: false);
+            await ApplyExternalDependencyChangesAsync(cancellationToken);
+            if (_assetsDirty)
+            {
+                _assets = await _resolveAssets(_projectRoot, viewportFrame, cancellationToken);
+                _assetRevision = checked(_assetRevision + 1);
+                _assetsDirty = false;
+            }
             _width = width;
             _height = height;
             return await PresentAsync(
@@ -262,6 +303,8 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
             _assets = null;
             _projectRoot = null;
             _assetsDirty = false;
+            _dependencyMonitor?.Dispose();
+            _dependencyMonitor = null;
         }
         finally
         {
@@ -280,6 +323,8 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
             _loop = null;
             _world = null;
             _assets = null;
+            _dependencyMonitor?.Dispose();
+            _dependencyMonitor = null;
             await _presenter.DisposeAsync();
         }
         finally
@@ -310,6 +355,21 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
         return new RekallAgeStudioPreviewFrame(
             presentation,
             RekallAgeStudioViewportInteractionBuilder.Build(viewportFrame, world.Entities));
+    }
+
+    private async ValueTask ApplyExternalDependencyChangesAsync(CancellationToken cancellationToken)
+    {
+        if (_dependencyMonitor is null) return;
+        var change = await _dependencyMonitor.PollAsync(cancellationToken);
+        if ((change & RekallAgeStudioViewportDependencyChange.Assets) != 0)
+        {
+            await _presenter.InvalidateAssetsAsync(cancellationToken);
+            _assetsDirty = true;
+        }
+        if ((change & RekallAgeStudioViewportDependencyChange.Shaders) != 0)
+        {
+            await _presenter.InvalidateShadersAsync(cancellationToken);
+        }
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);

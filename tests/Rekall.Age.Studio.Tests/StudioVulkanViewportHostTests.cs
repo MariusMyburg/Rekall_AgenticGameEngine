@@ -1,9 +1,50 @@
+using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
+using Rekall.Age.Rendering.Windows;
 using Rekall.Age.Studio;
 
 namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioVulkanViewportHostTests
 {
+    [Fact]
+    public void MainWindowAvailabilityStateShowsPlaceholderOnTheFirstUnavailableFrame()
+    {
+        var recovery = new RekallAgeStudioViewportRecoveryState(TimeSpan.FromSeconds(1));
+        var now = new DateTimeOffset(2026, 8, 29, 10, 0, 0, TimeSpan.Zero);
+
+        var visual = recovery.Synchronize(hasProject: true, viewportAvailable: false, now);
+
+        Assert.False(visual.PresentationSurfaceVisible);
+        Assert.True(visual.PlaceholderVisible);
+        Assert.True(recovery.TryBeginAutomaticRetry(now));
+    }
+
+    [Fact]
+    public void MainWindowAvailabilityStateAutomaticallyRetriesDeviceLossAndRestoresTheSurface()
+    {
+        var recovery = new RekallAgeStudioViewportRecoveryState(TimeSpan.FromSeconds(1));
+        var now = new DateTimeOffset(2026, 8, 29, 10, 0, 0, TimeSpan.Zero);
+        Assert.True(recovery.Synchronize(hasProject: true, viewportAvailable: true, now)
+            .PresentationSurfaceVisible);
+
+        var unavailable = recovery.Synchronize(hasProject: true, viewportAvailable: false, now);
+
+        Assert.False(unavailable.PresentationSurfaceVisible);
+        Assert.True(unavailable.PlaceholderVisible);
+        Assert.True(recovery.TryBeginAutomaticRetry(now));
+        Assert.False(recovery.TryBeginAutomaticRetry(now + TimeSpan.FromMilliseconds(500)));
+        Assert.True(recovery.TryBeginAutomaticRetry(now + TimeSpan.FromSeconds(1)));
+
+        var recovered = recovery.Synchronize(
+            hasProject: true,
+            viewportAvailable: true,
+            now + TimeSpan.FromSeconds(1));
+        Assert.True(recovered.PresentationSurfaceVisible);
+        Assert.False(recovered.PlaceholderVisible);
+        Assert.False(recovery.TryBeginAutomaticRetry(now + TimeSpan.FromSeconds(2)));
+    }
+
     [Fact]
     public void DipMetricsRoundToPhysicalPixelsAndZeroSizeSuspendsPresentation()
     {
@@ -50,6 +91,23 @@ public sealed class StudioVulkanViewportHostTests
 
         Assert.Equal([false], native.VisibilityChanges);
         Assert.False(surface.Metrics.IsPresentable);
+    }
+
+    [Fact]
+    public async Task UnavailablePlaceholderHidesOnlyTheNativePresentationAndPreservesRetryMetrics()
+    {
+        var native = new RecordingNativeWindow();
+        var surface = new RecordingSurfaceController(native.Order);
+        var core = new RekallAgeVulkanViewportHostCore(native, surface);
+        core.BuildWindow(new IntPtr(17));
+        core.QueueResize(400, 225, 2, 2, isVisible: true);
+        await core.ApplyPendingResizeAsync(CancellationToken.None);
+
+        core.SetPresentationVisible(false);
+
+        Assert.Equal([true, false], native.VisibilityChanges);
+        Assert.True(surface.Metrics.IsPresentable);
+        Assert.Equal(0, surface.SuspendCount);
     }
 
     [Fact]
@@ -142,11 +200,220 @@ public sealed class StudioVulkanViewportHostTests
         Assert.Equal(1, native.CreateCount);
     }
 
+    [Fact]
+    public async Task ThrowingSessionDisposalFinishesSurfaceCleanupBeforeHwndCanBeDestroyed()
+    {
+        var session = new ThrowingDisposePresentationSession();
+        var presenter = new RekallAgeStudioVulkanViewportPresenter((_, _, _, _, _) => session);
+        var native = new RecordingNativeWindow();
+        var core = new RekallAgeVulkanViewportHostCore(native, presenter);
+        var child = core.BuildWindow(new IntPtr(17));
+        core.QueueResize(320, 180, 1, 1, isVisible: true);
+        await core.ApplyPendingResizeAsync(CancellationToken.None);
+        await presenter.PresentAsync(
+            ViewportFrame(),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            PresentationContext(),
+            CancellationToken.None);
+
+        var failure = await Assert.ThrowsAsync<AggregateException>(
+            () => core.DisposePresenterAsync().AsTask());
+
+        Assert.Contains(failure.InnerExceptions, error => error.Message == "session dispose failed");
+        Assert.Equal(1, session.DisposeCount);
+        Assert.True(presenter.IsDisposalComplete);
+        core.DestroyWindow(child);
+        Assert.Equal(1, native.DestroyCount);
+    }
+
+    [Fact]
+    public async Task PresenterSerializesDisposalBehindAnInFlightPresentation()
+    {
+        var session = new BlockingPresentationSession();
+        var presenter = new RekallAgeStudioVulkanViewportPresenter((_, _, _, _, _) => session);
+        var native = new RecordingNativeWindow();
+        var core = new RekallAgeVulkanViewportHostCore(native, presenter);
+        var child = core.BuildWindow(new IntPtr(17));
+        core.QueueResize(320, 180, 1, 1, isVisible: true);
+        await core.ApplyPendingResizeAsync(CancellationToken.None);
+
+        var present = presenter.PresentAsync(
+            ViewportFrame(),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            PresentationContext(),
+            CancellationToken.None).AsTask();
+        await session.PresentationEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var dispose = core.DisposePresenterAsync().AsTask();
+
+        Assert.False(dispose.IsCompleted);
+        Assert.False(presenter.IsDisposalComplete);
+        Assert.Throws<InvalidOperationException>(() => core.DestroyWindow(child));
+
+        session.ReleasePresentation.TrySetResult();
+        await present;
+        await dispose;
+        Assert.True(presenter.IsDisposalComplete);
+        core.DestroyWindow(child);
+    }
+
+    [Fact]
+    public async Task ShaderInvalidationReachesTheSharedPresentationSessionOnTheNextFrame()
+    {
+        var session = new RecordingInvalidationPresentationSession();
+        var presenter = new RekallAgeStudioVulkanViewportPresenter((_, _, _, _, _) => session);
+        presenter.AttachSurface(new IntPtr(23));
+        await presenter.ResizeAsync(
+            new RekallAgeStudioViewportMetrics(320, 180, 320, 180, true),
+            () => (320, 180),
+            CancellationToken.None);
+        await presenter.PresentAsync(
+            ViewportFrame(),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            PresentationContext(),
+            CancellationToken.None);
+
+        await presenter.InvalidateShadersAsync(CancellationToken.None);
+        await presenter.PresentAsync(
+            ViewportFrame(),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            PresentationContext(),
+            CancellationToken.None);
+
+        Assert.Equal(1, session.ShaderInvalidationCount);
+        await presenter.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task MainWindowRetryRecreatesTheProductionPresenterSessionAfterDeviceLoss()
+    {
+        var sessionCount = 0;
+        var presenter = new RekallAgeStudioVulkanViewportPresenter((_, _, _, _, _) =>
+        {
+            sessionCount++;
+            return sessionCount == 1
+                ? new DeviceLossPresentationSession()
+                : new RecordingInvalidationPresentationSession();
+        });
+        presenter.AttachSurface(new IntPtr(23));
+        await presenter.ResizeAsync(
+            new RekallAgeStudioViewportMetrics(320, 180, 320, 180, true),
+            () => (320, 180),
+            CancellationToken.None);
+        var recovery = new RekallAgeStudioViewportRecoveryState(TimeSpan.FromSeconds(1));
+        var now = new DateTimeOffset(2026, 8, 29, 10, 0, 0, TimeSpan.Zero);
+
+        var unavailable = await presenter.PresentAsync(
+            ViewportFrame(),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            PresentationContext(),
+            CancellationToken.None);
+        recovery.Synchronize(hasProject: true, unavailable.PresentedFrame, now);
+        Assert.True(recovery.TryBeginAutomaticRetry(now));
+        var recovered = await presenter.PresentAsync(
+            ViewportFrame(),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            PresentationContext(),
+            CancellationToken.None);
+
+        Assert.False(unavailable.PresentedFrame);
+        Assert.Contains("device lost", unavailable.FailureReason, StringComparison.OrdinalIgnoreCase);
+        Assert.True(recovered.PresentedFrame);
+        Assert.Equal(2, sessionCount);
+        await presenter.DisposeAsync();
+    }
+
     private static IntPtr MakeLParam(short x, short y) =>
         new(unchecked((int)((ushort)x | ((uint)(ushort)y << 16))));
 
     private static IntPtr MakeWParam(ushort low, short high) =>
         new(unchecked((int)(low | ((uint)(ushort)high << 16))));
+
+    private static RekallAgeRuntimeViewportFrame ViewportFrame() => new(
+        "Main",
+        0,
+        0,
+        320,
+        180,
+        null,
+        [],
+        [],
+        0,
+        new RekallAgeRuntimeViewportOverlay(false, 0),
+        []);
+
+    private static RekallAgeStudioPresentationContext PresentationContext() => new(
+        "C:\\Project",
+        [],
+        0,
+        1,
+        1);
+
+    private sealed class ThrowingDisposePresentationSession : IRekallAgeVulkanPresentationSession
+    {
+        public int DisposeCount { get; private set; }
+
+        public ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
+            RekallAgeVulkanSceneSubmission submission,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(RekallAgeVulkanPresentationFrame.Presented(submission.Frame, "test-gpu"));
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            return ValueTask.FromException(new InvalidOperationException("session dispose failed"));
+        }
+    }
+
+    private sealed class BlockingPresentationSession : IRekallAgeVulkanPresentationSession
+    {
+        public TaskCompletionSource PresentationEntered { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource ReleasePresentation { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
+            RekallAgeVulkanSceneSubmission submission,
+            CancellationToken cancellationToken)
+        {
+            PresentationEntered.TrySetResult();
+            await ReleasePresentation.Task.WaitAsync(cancellationToken);
+            return RekallAgeVulkanPresentationFrame.Presented(submission.Frame, "test-gpu");
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class RecordingInvalidationPresentationSession : IRekallAgeVulkanPresentationSession
+    {
+        public int ShaderInvalidationCount { get; private set; }
+
+        public ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
+            RekallAgeVulkanSceneSubmission submission,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(RekallAgeVulkanPresentationFrame.Presented(submission.Frame, "test-gpu"));
+
+        public ValueTask InvalidateShadersAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ShaderInvalidationCount++;
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class DeviceLossPresentationSession : IRekallAgeVulkanPresentationSession
+    {
+        public ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
+            RekallAgeVulkanSceneSubmission submission,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromException<RekallAgeVulkanPresentationFrame>(
+                new InvalidOperationException("VK_ERROR_DEVICE_LOST: simulated device lost"));
+
+        public ValueTask DisposeAsync() =>
+            ValueTask.FromException(new InvalidOperationException("device-loss session cleanup failed"));
+    }
 
     private sealed class RecordingSurfaceController(List<string> order) : IRekallAgeVulkanViewportSurfaceController
     {
@@ -154,7 +421,11 @@ public sealed class StudioVulkanViewportHostTests
 
         public bool IsDisposed { get; private set; }
 
+        public bool IsDisposalComplete => IsDisposed;
+
         public int DisposeCount { get; private set; }
+
+        public int SuspendCount { get; private set; }
 
         public void AttachSurface(IntPtr hwnd) => Assert.NotEqual(IntPtr.Zero, hwnd);
 
@@ -172,6 +443,7 @@ public sealed class StudioVulkanViewportHostTests
         public ValueTask SuspendAsync(RekallAgeStudioViewportMetrics metrics, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            SuspendCount++;
             Metrics = metrics;
             return ValueTask.CompletedTask;
         }

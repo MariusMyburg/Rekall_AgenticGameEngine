@@ -74,6 +74,8 @@ public sealed class RekallAgeWorkbenchSession
 
     public bool CanRedo => _redoTransactions.Count > 0;
 
+    public static bool IsSafeNameSegment(string? value) => RekallAgeSceneStore.IsValidSceneName(value);
+
     public async ValueTask<RekallAgeWorkbenchOperationResult> CreateProjectAsync(
         string projectRoot,
         string projectName,
@@ -348,6 +350,30 @@ public sealed class RekallAgeWorkbenchSession
                 _undoTransactions.Push(targetId);
             }
             return restored.Result;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async ValueTask<RekallAgeWorkbenchOperationResult> OpenAsync(
+        string projectRoot,
+        CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var fullRoot = Path.GetFullPath(projectRoot);
+            var sceneNames = new RekallAgeSceneStore().ListSceneNames(fullRoot);
+            var sceneName = sceneNames.FirstOrDefault(name => name.Equals("Main", StringComparison.OrdinalIgnoreCase))
+                ?? sceneNames.FirstOrDefault();
+            return sceneName is null
+                ? Failure(
+                    "REKALL_WORKBENCH_PROJECT_HAS_NO_SCENES",
+                    "The selected project does not contain an authored scene.",
+                    fullRoot)
+                : await OpenCoreAsync(fullRoot, sceneName, cancellationToken).ConfigureAwait(false);
         }
         finally
         {

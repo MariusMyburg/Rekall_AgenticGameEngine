@@ -28,12 +28,30 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
     public RekallAgeRuntimeViewportRgbaFrame RenderRgba(
         RekallAgeRuntimeViewportFrame frame,
         RekallAgeRuntimeViewportAssetSet assets)
+        => RenderRgba(frame, assets, 1);
+
+    public RekallAgeRuntimeViewportRgbaFrame RenderRgba(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets,
+        int supersampleFactor)
     {
-        var pixels = new byte[frame.Width * frame.Height * 4];
-        FillBackground(frame, pixels);
+        supersampleFactor = RekallAgeInteractiveAntialiasing.ResolveSupersampleFactor(supersampleFactor);
+        var renderFrame = supersampleFactor == 1
+            ? frame
+            : ScalePixelSpaceContent(frame, supersampleFactor);
+        var renderPixels = new byte[renderFrame.Width * renderFrame.Height * 4];
+        FillBackground(renderFrame, renderPixels);
 
-        var (assetBackedCount, fallbackCount) = RenderFrameContent(frame, assets, pixels);
+        var (assetBackedCount, fallbackCount) = RenderFrameContent(renderFrame, assets, renderPixels);
 
+        var pixels = RekallAgeInteractiveAntialiasing.ResolveRgba(
+            renderPixels,
+            renderFrame.Width,
+            renderFrame.Height,
+            supersampleFactor);
+
+        // Debug diagnostics are intentionally drawn at the requested output resolution.
+        // Their fixed pixel metrics remain legible and do not become part of the scene AA pass.
         if (frame.DebugOverlay.Enabled)
         {
             DrawDebugOverlay(frame, pixels);
@@ -55,6 +73,52 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
                 issue.Code.Equals("REKALL_RENDER_ASSET_UNSUPPORTED", StringComparison.Ordinal)
                 || issue.Code.Equals("REKALL_RENDER_FONT_UNSUPPORTED", StringComparison.Ordinal)),
             IsNonBlank(pixels));
+    }
+
+    private static RekallAgeRuntimeViewportFrame ScalePixelSpaceContent(
+        RekallAgeRuntimeViewportFrame frame,
+        int factor)
+    {
+        static int Scale(int value, int scale) => checked(value * scale);
+
+        RekallAgeRuntimeViewportUiVisual ScaleUiVisual(RekallAgeRuntimeViewportUiVisual visual) =>
+            visual with
+            {
+                X = Scale(visual.X, factor),
+                Y = Scale(visual.Y, factor),
+                Width = Scale(visual.Width, factor),
+                Height = Scale(visual.Height, factor),
+                ClipX = Scale(visual.ClipX, factor),
+                ClipY = Scale(visual.ClipY, factor),
+                ClipWidth = Scale(visual.ClipWidth, factor),
+                ClipHeight = Scale(visual.ClipHeight, factor),
+                BorderWidth = Scale(visual.BorderWidth, factor),
+                FontSize = Scale(visual.FontSize, factor)
+            };
+
+        RekallAgeRuntimeViewportRenderable ScaleRenderable(RekallAgeRuntimeViewportRenderable renderable) =>
+            renderable.UiVisual is null
+                ? renderable
+                : renderable with { UiVisual = ScaleUiVisual(renderable.UiVisual) };
+
+        RekallAgeRuntimeViewportCameraView ScaleCameraView(RekallAgeRuntimeViewportCameraView view) =>
+            view with
+            {
+                PixelRect = new RekallAgeRuntimeViewportCameraRect(
+                    Scale(view.PixelRect.X, factor),
+                    Scale(view.PixelRect.Y, factor),
+                    Scale(view.PixelRect.Width, factor),
+                    Scale(view.PixelRect.Height, factor)),
+                Renderables = view.Renderables.Select(ScaleRenderable).ToArray()
+            };
+
+        return frame with
+        {
+            Width = Scale(frame.Width, factor),
+            Height = Scale(frame.Height, factor),
+            Renderables = frame.Renderables.Select(ScaleRenderable).ToArray(),
+            CameraViews = frame.CameraViews.Select(ScaleCameraView).ToArray()
+        };
     }
 
     public async ValueTask<RekallAgeRuntimeViewportCapture> CaptureAsync(

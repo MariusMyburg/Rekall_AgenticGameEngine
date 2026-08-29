@@ -395,6 +395,38 @@ public sealed class RuntimeUiTests
     }
 
     [Fact]
+    public async Task SupersampledSoftwareRenderingPreservesPixelSpaceUiLayout()
+    {
+        var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["referenceWidth"] = 4, ["referenceHeight"] = 4 }));
+        var panel = RekallAgeEntityDocument.Create("Panel", ["ui"]) with { ParentId = canvas.Id };
+        panel = panel.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Panel",
+            new JsonObject
+            {
+                ["x"] = 1,
+                ["y"] = 1,
+                ["width"] = 2,
+                ["height"] = 2,
+                ["backgroundColor"] = "#ff3300"
+            }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "ui"])
+            .AddEntity(canvas)
+            .AddEntity(panel);
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(new RekallAgeRuntimeWorldBuilder().Build(scene), 1, CancellationToken.None);
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(result.World, 4, 4, debugOverlay: false);
+        var renderer = new RekallAgeRuntimeSoftwareRenderer();
+
+        var oneSample = renderer.RenderRgba(frame, RekallAgeRuntimeViewportAssetSet.Empty, 1);
+        var fourSamples = renderer.RenderRgba(frame, RekallAgeRuntimeViewportAssetSet.Empty, 2);
+
+        Assert.Equal(oneSample.Rgba, fourSamples.Rgba);
+    }
+
+    [Fact]
     public async Task UiSystemLaysOutAndSoftwareRendererDrawsAuthoredButton()
     {
         var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])

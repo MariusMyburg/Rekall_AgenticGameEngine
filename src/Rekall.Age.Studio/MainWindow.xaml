@@ -9,33 +9,29 @@
         <Border x:Name="ProjectBar" DockPanel.Dock="Top" Background="{StaticResource ChromeBackground}" Padding="12,9" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="260" />
-                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="180" />
-                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="280" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="150" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="Project" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <Grid Grid.Column="1" Margin="0,0,8,0">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                    <TextBox Text="{Binding ProjectPathInput, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="{Binding ProjectPathInput}" />
-                    <Button x:Name="BrowseProjectButton" Grid.Column="1" Content="Browse…" Click="OnBrowseProjectClick"
-                            Padding="8,4" Margin="5,0,0,0" ToolTip="Choose a project folder" />
-                </Grid>
-                <TextBlock Grid.Column="2" Text="Name" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <TextBox Grid.Column="3" Text="{Binding ProjectNameInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0" />
-                <TextBlock Grid.Column="4" Text="Scene" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <ComboBox Grid.Column="5" ItemsSource="{Binding SceneNames}" SelectedItem="{Binding SceneNameInput}"
-                          IsEditable="True" />
-                <StackPanel Grid.Column="6" Orientation="Horizontal" Margin="6,0">
-                    <Button x:Name="CreateProjectButton" Content="Create" Command="{Binding CreateCommand}"
+                <TextBlock Text="Project" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{StaticResource MutedText}" />
+                <TextBlock Grid.Column="1" Text="{Binding ProjectContextText}"
+                           ToolTip="{Binding ProjectPathInput}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                           FontWeight="SemiBold" Margin="0,0,12,0" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,12,0">
+                    <Button x:Name="CreateProjectButton" Content="Create Project…" Click="OnCreateProjectClick"
                             ToolTip="Create a new AGE project" />
-                    <Button x:Name="OpenProjectButton" Content="Open" Command="{Binding OpenCommand}"
-                            ToolTip="Open the selected project" />
+                    <Button x:Name="OpenProjectButton" Content="Open Project…" Click="OnOpenProjectClick"
+                            ToolTip="Choose and open an existing AGE project" />
+                </StackPanel>
+                <TextBlock Grid.Column="3" Text="Scene" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{StaticResource MutedText}" />
+                <ComboBox Grid.Column="4" ItemsSource="{Binding SceneNames}" SelectedItem="{Binding SceneNameInput}"
+                          IsEditable="True" />
+                <StackPanel Grid.Column="5" Orientation="Horizontal" Margin="6,0">
                     <Button Content="Switch" Command="{Binding SwitchSceneCommand}" Padding="8,2" />
                 </StackPanel>
-                <StackPanel Grid.Column="7" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <StackPanel Grid.Column="6" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Border CornerRadius="10" BorderBrush="{StaticResource Accent}" BorderThickness="1" Padding="9,3" Margin="8,0">
                         <TextBlock Text="{Binding ModeLabel}" Foreground="{StaticResource Accent}" FontWeight="SemiBold" FontSize="11" />
                     </Border>

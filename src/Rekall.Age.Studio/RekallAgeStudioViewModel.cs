@@ -687,9 +687,18 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         get => _projectPathInput;
         set
         {
-            if (Set(ref _projectPathInput, value)) RefreshCommands();
+            if (Set(ref _projectPathInput, value))
+            {
+                OnPropertyChanged(nameof(ProjectContextText));
+                RefreshCommands();
+            }
         }
     }
+
+    public string ProjectContextText => _currentModel?.Project.Name
+        ?? (string.IsNullOrWhiteSpace(ProjectPathInput)
+            ? "No project open"
+            : Path.GetFileName(Path.TrimEndingDirectorySeparator(ProjectPathInput)));
 
     public string ProjectNameInput
     {
@@ -2431,6 +2440,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         () => _session.OpenAsync(ProjectPathInput, NormalizeSceneName(), CancellationToken.None).AsTask(),
         refreshPreviewAfter: true);
 
+    internal Task OpenProjectAsync(string projectRoot)
+    {
+        ProjectPathInput = projectRoot;
+        return RunAsync(
+            () => _session.OpenAsync(projectRoot, CancellationToken.None).AsTask(),
+            refreshPreviewAfter: true);
+    }
+
     private Task CreateFromInputsAsync() => RunAsync(
         () => _session.CreateProjectAsync(
             ProjectPathInput,
@@ -4023,14 +4040,18 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _currentModel = model;
         OnPropertyChanged(nameof(SelectedEntityId));
         OnPropertyChanged(nameof(HasProject));
+        OnPropertyChanged(nameof(ProjectContextText));
         OnPropertyChanged(nameof(HasInspectorSelection));
         OnPropertyChanged(nameof(CanEditSelectedLinkedModel));
+        // Populate the choices before assigning the selected value. Replacing an
+        // ItemsSource first prevents WPF's editable ComboBox from writing a
+        // transient null selection back into SceneNameInput during model refreshes.
+        Replace(SceneNames, model.Project.Scenes.Select(scene => scene.Name));
         SceneNameInput = model.Scene.Name;
         Replace(EntityNodes, model.Scene.RootEntities);
         var selectedNode = SelectedEntityNode();
         EntityNameInput = selectedNode?.Name ?? string.Empty;
         ParentEntityIdInput = selectedNode?.ParentId ?? string.Empty;
-        Replace(SceneNames, model.Project.Scenes.Select(scene => scene.Name));
         Replace(InspectorLines, model.Inspector.Components.SelectMany(component =>
             new[] { $"{component.DisplayName} ({component.Type})" }.Concat(component.Properties
                 .Where(property => property.IsDefined)

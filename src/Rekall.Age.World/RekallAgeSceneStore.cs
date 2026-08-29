@@ -118,14 +118,19 @@ public sealed class RekallAgeSceneStore
             .ToArray();
     }
 
+    public static bool IsValidSceneName(string? sceneName)
+    {
+        if (string.IsNullOrWhiteSpace(sceneName)) return false;
+        return !Path.IsPathRooted(sceneName)
+            && sceneName is not "." and not ".."
+            && sceneName.IndexOfAny(Path.GetInvalidFileNameChars()) < 0
+            && !sceneName.Contains(Path.DirectorySeparatorChar)
+            && !sceneName.Contains(Path.AltDirectorySeparatorChar);
+    }
+
     private static void ValidateSceneName(string sceneName)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sceneName);
-        if (Path.IsPathRooted(sceneName) ||
-            sceneName is "." or ".." ||
-            sceneName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
-            sceneName.Contains(Path.DirectorySeparatorChar) ||
-            sceneName.Contains(Path.AltDirectorySeparatorChar))
+        if (!IsValidSceneName(sceneName))
         {
             throw new ArgumentException("Scene name must be a single safe file-name segment.", nameof(sceneName));
         }

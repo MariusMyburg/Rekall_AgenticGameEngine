@@ -143,15 +143,31 @@ public partial class MainWindow : Window
         };
     }
 
-    private void OnBrowseProjectClick(object sender, RoutedEventArgs e)
+    private async void OnCreateProjectClick(object sender, RoutedEventArgs e)
+    {
+        var initialParent = Directory.Exists(_viewModel.ProjectPathInput)
+            ? Directory.GetParent(_viewModel.ProjectPathInput)?.FullName ?? _viewModel.ProjectPathInput
+            : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        var dialog = new CreateProjectDialog(initialParent) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.Request is null) return;
+
+        _viewModel.ProjectPathInput = dialog.Request.ProjectRoot;
+        _viewModel.ProjectNameInput = dialog.Request.ProjectName;
+        _viewModel.SceneNameInput = dialog.Request.SceneName;
+        await ((RekallAgeAsyncCommand)_viewModel.CreateCommand).ExecuteAsync(null);
+    }
+
+    private async void OnOpenProjectClick(object sender, RoutedEventArgs e)
     {
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Title = "Choose a Rekall AGE project folder",
+            Title = "Open a Rekall AGE project",
             Multiselect = false
         };
         if (Directory.Exists(_viewModel.ProjectPathInput)) dialog.InitialDirectory = _viewModel.ProjectPathInput;
-        if (dialog.ShowDialog(this) == true) _viewModel.ProjectPathInput = dialog.FolderName;
+        if (dialog.ShowDialog(this) != true) return;
+
+        await _viewModel.OpenProjectAsync(dialog.FolderName);
     }
 
     private void ApplyLayout(RekallAgeStudioLayout layout)

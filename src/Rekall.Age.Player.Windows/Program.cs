@@ -212,7 +212,8 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private const int HudMargin = 16;
     private const int PlayableWidth = 960;
     private const int PlayableHeight = 540;
-    public const int DefaultSceneSupersampleFactor = 1;
+    public static int DefaultSceneSupersampleFactor =>
+        RekallAgeInteractiveAntialiasing.DefaultSupersampleFactor;
     public const int DefaultOpenXrPlayableEyeWidth = 1600;
     public const int DefaultOpenXrPlayableEyeHeight = 1600;
 

@@ -207,7 +207,10 @@ internal sealed class RekallAgeStudioPreviewSession : IRekallAgeStudioPreviewSes
             projectRoot,
             frame,
             cancellationToken).ConfigureAwait(false);
-        var rendered = new RekallAgeRuntimeSoftwareRenderer().RenderRgba(frame, assets);
+        var rendered = new RekallAgeRuntimeSoftwareRenderer().RenderRgba(
+            frame,
+            assets,
+            RekallAgeInteractiveAntialiasing.DefaultSupersampleFactor);
         var bgra = new byte[rendered.Rgba.Length];
         for (var index = 0; index < rendered.Rgba.Length; index += 4)
         {

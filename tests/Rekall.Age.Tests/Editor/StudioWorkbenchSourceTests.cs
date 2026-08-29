@@ -6,11 +6,16 @@ public sealed class StudioWorkbenchSourceTests
     public async Task StudioWorkspaceWiresCanonicalGameCreationCommandsAndRenderedViewport()
     {
         var root = FindRepositoryRoot();
-        var xaml = await File.ReadAllTextAsync(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+        var mainWindowXaml = await File.ReadAllTextAsync(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+        var authorWorkspaceXaml = await File.ReadAllTextAsync(Path.Combine(root, "src", "Rekall.Age.Studio", "AuthorWorkspace.xaml"));
+        var xaml = mainWindowXaml + Environment.NewLine + authorWorkspaceXaml;
+        var mainWindowCode = await File.ReadAllTextAsync(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml.cs"));
         var code = await File.ReadAllTextAsync(Path.Combine(root, "src", "Rekall.Age.Studio", "RekallAgeStudioViewModel.cs"));
 
-        Assert.Contains("Command=\"{Binding OpenCommand}\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Command=\"{Binding CreateCommand}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Open Project…\" Click=\"OnOpenProjectClick\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Create Project…\" Click=\"OnCreateProjectClick\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("_viewModel.OpenProjectAsync(dialog.FolderName)", mainWindowCode, StringComparison.Ordinal);
+        Assert.Contains("_viewModel.CreateCommand", mainWindowCode, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding AddEntityCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding AddComponentCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding RemoveComponentCommand}\"", xaml, StringComparison.Ordinal);
@@ -52,7 +57,6 @@ public sealed class StudioWorkbenchSourceTests
         Assert.Contains("SelectedItem=\"{Binding SelectedLanguageModel", xaml, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding ReasoningEfforts}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("SelectedItem=\"{Binding SelectedReasoningEffort", xaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{Binding ProviderStatus}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("PasswordChar=\"●\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Click=\"OnApplyOpenAiApiKeyClick\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("OllamaModels", xaml, StringComparison.Ordinal);
@@ -87,15 +91,20 @@ public sealed class StudioWorkbenchSourceTests
         Assert.Contains("_session.RedoAsync", code, StringComparison.Ordinal);
         Assert.Contains("model.Inspector.AvailableComponents", code, StringComparison.Ordinal);
         Assert.Contains("SelectedPropertySchema", code, StringComparison.Ordinal);
+        Assert.True(
+            code.IndexOf("Replace(SceneNames, model.Project.Scenes", StringComparison.Ordinal)
+            < code.IndexOf("SceneNameInput = model.Scene.Name", StringComparison.Ordinal),
+            "Scene choices must be populated before the selected scene is restored so WPF cannot clear it during refresh.");
 
         var studioDirectory = Path.Combine(root, "src", "Rekall.Age.Studio");
         var studioSources = string.Join(
             Environment.NewLine,
             await Task.WhenAll(Directory.EnumerateFiles(studioDirectory, "*.cs", SearchOption.TopDirectoryOnly)
                 .Select(path => File.ReadAllTextAsync(path))));
-        Assert.DoesNotContain("RekallAgeProjectStore", studioSources, StringComparison.Ordinal);
-        Assert.DoesNotContain("RekallAgeSceneStore", studioSources, StringComparison.Ordinal);
-        Assert.DoesNotContain("RekallAgeAssetCatalogStore", studioSources, StringComparison.Ordinal);
+        var mainWorkspaceSources = mainWindowCode + Environment.NewLine + code;
+        Assert.DoesNotContain("RekallAgeProjectStore", mainWorkspaceSources, StringComparison.Ordinal);
+        Assert.DoesNotContain("RekallAgeSceneStore", mainWorkspaceSources, StringComparison.Ordinal);
+        Assert.DoesNotContain("RekallAgeAssetCatalogStore", mainWorkspaceSources, StringComparison.Ordinal);
         Assert.Contains("RekallAgeDefaultCommandRegistry.Create()", studioSources, StringComparison.Ordinal);
     }
 

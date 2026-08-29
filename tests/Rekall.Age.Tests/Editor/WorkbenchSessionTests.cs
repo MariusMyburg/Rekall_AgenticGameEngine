@@ -39,6 +39,50 @@ public sealed class WorkbenchSessionTests
     }
 
     [Fact]
+    public async Task SessionOpensAProjectWithoutAssumingItsInitialSceneIsNamedMain()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var authoring = CreateSession();
+        Assert.True((await authoring.CreateProjectAsync(
+            root,
+            "Intro Project",
+            "Intro",
+            ["world"],
+            ["world"],
+            "studio",
+            CancellationToken.None)).Ok);
+        var opening = CreateSession();
+
+        var opened = await opening.OpenAsync(root, CancellationToken.None);
+
+        Assert.True(opened.Ok, opened.Summary);
+        Assert.Equal("Intro", opening.SceneName);
+        Assert.Equal("Intro Project", opening.Model!.Project.Name);
+    }
+
+    [Fact]
+    public async Task SessionReportsAProjectThatHasNoAuthoredScenes()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = CreateRegistry();
+        var context = new RekallAgeCommandContext(
+            "setup",
+            RekallAgeTransaction.Begin("create empty project"),
+            CancellationToken.None);
+        Assert.True((await registry.ExecuteAsync<CreateProjectRequest, CreateProjectResult>(
+            "rekall.project.create",
+            new(root, "Empty Project", ["world"]),
+            context)).Ok);
+        var session = new RekallAgeWorkbenchSession(registry);
+
+        var opened = await session.OpenAsync(root, CancellationToken.None);
+
+        Assert.False(opened.Ok);
+        Assert.Equal("REKALL_WORKBENCH_PROJECT_HAS_NO_SCENES", Assert.Single(opened.Errors).Code);
+        Assert.Null(session.Model);
+    }
+
+    [Fact]
     public async Task SuccessfulCommandRefreshesModelPersistsTransactionAndSupportsSelection()
     {
         var root = TestPaths.CreateTempDirectory();

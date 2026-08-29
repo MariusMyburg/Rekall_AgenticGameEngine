@@ -23,7 +23,7 @@
                     BorderThickness="1" CornerRadius="5" Padding="12,7" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="Project: " Foreground="{StaticResource MutedText}" />
-                    <TextBlock Text="{Binding ProjectNameInput}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding ProjectContextText}" FontWeight="SemiBold" />
                     <TextBlock Text="  ·  Scene: " Foreground="{StaticResource MutedText}" />
                     <TextBlock Text="{Binding SceneNameInput}" FontWeight="SemiBold" />
                 </StackPanel>

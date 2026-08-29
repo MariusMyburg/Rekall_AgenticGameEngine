@@ -894,18 +894,23 @@ internal sealed class RekallAgeVulkanViewportHost : HwndHost, IRekallAgeStudioVi
 
 internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulkanViewportNativeWindow
 {
+    private const string VulkanChildWindowClassName = "RekallAgeStudioVulkanViewportWindow";
+    private const int WmPaint = 0x000F;
+    private const int WmEraseBackground = 0x0014;
     private const int GwlpWndProc = -4;
     private const int WsChild = 0x40000000;
     private const int WsVisible = 0x10000000;
     private const int WsClipChildren = 0x02000000;
     private const int WsClipSiblings = 0x04000000;
-    private const int SsNotify = 0x00000100;
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpNoZOrder = 0x0004;
     private const uint SwpNoMove = 0x0002;
     private const uint SwpNoSize = 0x0001;
     private const uint SwpShowWindow = 0x0040;
     private const uint SwpHideWindow = 0x0080;
+    private static readonly IntPtr ModuleHandle = GetModuleHandleW(null);
+    private static readonly WindowProcedure VulkanChildWindowProcedure = ProcessVulkanChildWindowMessage;
+    private static readonly Lazy<ushort> VulkanChildWindowClass = new(RegisterVulkanChildWindowClass);
     private WindowProcedure? _windowProcedure;
     private Func<int, IntPtr, IntPtr, bool>? _messageHandler;
     private IntPtr _subclassedHwnd;
@@ -913,18 +918,19 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
 
     public IntPtr CreateChild(IntPtr parent)
     {
+        _ = VulkanChildWindowClass.Value;
         var child = CreateWindowExW(
             0,
-            "STATIC",
+            VulkanChildWindowClassName,
             string.Empty,
-            WsChild | WsVisible | WsClipChildren | WsClipSiblings | SsNotify,
+            WsChild | WsVisible | WsClipChildren | WsClipSiblings,
             0,
             0,
             1,
             1,
             parent,
             IntPtr.Zero,
-            IntPtr.Zero,
+            ModuleHandle,
             IntPtr.Zero);
         if (child == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
         return child;
@@ -1041,6 +1047,47 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
             : CallWindowProcW(_originalWindowProcedure, hwnd, message, wParam, lParam);
     }
 
+    private static ushort RegisterVulkanChildWindowClass()
+    {
+        if (ModuleHandle == IntPtr.Zero)
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+
+        var description = new WindowClassEx
+        {
+            Size = checked((uint)Marshal.SizeOf<WindowClassEx>()),
+            WindowProcedure = Marshal.GetFunctionPointerForDelegate(VulkanChildWindowProcedure),
+            Instance = ModuleHandle,
+            BackgroundBrush = IntPtr.Zero,
+            ClassName = VulkanChildWindowClassName
+        };
+        var atom = RegisterClassExW(ref description);
+        if (atom == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
+        return atom;
+    }
+
+    private static IntPtr ProcessVulkanChildWindowMessage(
+        IntPtr hwnd,
+        int message,
+        IntPtr wParam,
+        IntPtr lParam)
+    {
+        if (message == WmEraseBackground)
+        {
+            return new IntPtr(1);
+        }
+
+        if (message == WmPaint)
+        {
+            _ = BeginPaint(hwnd, out var paint);
+            _ = EndPaint(hwnd, ref paint);
+            return IntPtr.Zero;
+        }
+
+        return DefWindowProcW(hwnd, message, wParam, lParam);
+    }
+
     private static IntPtr SetWindowProcedure(IntPtr hwnd, IntPtr windowProcedure) =>
         IntPtr.Size == 8
             ? SetWindowLongPtrW(hwnd, GwlpWndProc, windowProcedure)
@@ -1060,6 +1107,19 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
         IntPtr menu,
         IntPtr instance,
         IntPtr parameter);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr GetModuleHandleW(string? moduleName);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern ushort RegisterClassExW(ref WindowClassEx windowClass);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr BeginPaint(IntPtr hwnd, out PaintStruct paint);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EndPaint(IntPtr hwnd, ref PaintStruct paint);
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
     private static extern IntPtr SetWindowLongPtrW(IntPtr hwnd, int index, IntPtr newValue);
@@ -1132,6 +1192,41 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
     {
         internal int X = x;
         internal int Y = y;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct WindowClassEx
+    {
+        internal uint Size;
+        internal uint Style;
+        internal IntPtr WindowProcedure;
+        internal int ClassExtraBytes;
+        internal int WindowExtraBytes;
+        internal IntPtr Instance;
+        internal IntPtr Icon;
+        internal IntPtr Cursor;
+        internal IntPtr BackgroundBrush;
+        internal string? MenuName;
+        internal string ClassName;
+        internal IntPtr SmallIcon;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PaintStruct
+    {
+        internal IntPtr DeviceContext;
+        internal int Erase;
+        internal Rect PaintRectangle;
+        internal int Restore;
+        internal int IncrementalUpdate;
+        internal uint Reserved0;
+        internal uint Reserved1;
+        internal uint Reserved2;
+        internal uint Reserved3;
+        internal uint Reserved4;
+        internal uint Reserved5;
+        internal uint Reserved6;
+        internal uint Reserved7;
     }
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]

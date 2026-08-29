@@ -2,11 +2,61 @@ using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Windows;
 using Rekall.Age.Studio;
+using System.Runtime.InteropServices;
 
 namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioVulkanViewportHostTests
 {
+    [Fact]
+    public void NativeVulkanChildPaintLeavesThePresentedSurfaceUntouched()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var parent = NativePaintProbe.CreateOffscreenParent();
+        var native = new RekallAgeWin32VulkanViewportNativeWindow();
+        var child = IntPtr.Zero;
+        try
+        {
+            child = native.CreateChild(parent);
+            native.ResizeChild(child, 4, 4);
+
+            NativePaintProbe.PrintClient(child, 0x00332211, out var before, out var after);
+
+            Assert.Equal(before, after);
+        }
+        finally
+        {
+            if (child != IntPtr.Zero) native.DestroyChild(child);
+            NativePaintProbe.Destroy(parent);
+        }
+    }
+
+    [Fact]
+    public void NativeVulkanChildAcknowledgesBackgroundEraseWithoutChangingTheSurface()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+
+        var parent = NativePaintProbe.CreateOffscreenParent();
+        var native = new RekallAgeWin32VulkanViewportNativeWindow();
+        var child = IntPtr.Zero;
+        try
+        {
+            child = native.CreateChild(parent);
+            native.ResizeChild(child, 4, 4);
+
+            var result = NativePaintProbe.EraseBackground(child, 0x00332211, out var before, out var after);
+
+            Assert.Equal(new IntPtr(1), result);
+            Assert.Equal(before, after);
+        }
+        finally
+        {
+            if (child != IntPtr.Zero) native.DestroyChild(child);
+            NativePaintProbe.Destroy(parent);
+        }
+    }
+
     [Fact]
     public void MainWindowAvailabilityStateShowsPlaceholderOnTheFirstUnavailableFrame()
     {
@@ -828,5 +878,140 @@ public sealed class StudioVulkanViewportHostTests
         public void Capture(IntPtr hwnd) => CaptureCount++;
 
         public void ReleaseCapture() => ReleaseCaptureCount++;
+    }
+
+    private static class NativePaintProbe
+    {
+        private const int WsPopup = unchecked((int)0x80000000);
+        private const int WsVisible = 0x10000000;
+
+        internal static IntPtr CreateOffscreenParent()
+        {
+            var hwnd = CreateWindowExW(
+                0,
+                "STATIC",
+                string.Empty,
+                WsPopup | WsVisible,
+                -32000,
+                -32000,
+                8,
+                8,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                IntPtr.Zero);
+            if (hwnd == IntPtr.Zero) throw new InvalidOperationException("Could not create paint-probe parent.");
+            return hwnd;
+        }
+
+        internal static void PrintClient(
+            IntPtr hwnd,
+            uint color,
+            out uint before,
+            out uint after) =>
+            _ = SendToMemorySurface(hwnd, 0x0318, new IntPtr(0x0000000C), color, out before, out after);
+
+        internal static IntPtr EraseBackground(
+            IntPtr hwnd,
+            uint color,
+            out uint before,
+            out uint after) =>
+            SendToMemorySurface(hwnd, 0x0014, IntPtr.Zero, color, out before, out after);
+
+        private static IntPtr SendToMemorySurface(
+            IntPtr hwnd,
+            int message,
+            IntPtr lParam,
+            uint color,
+            out uint before,
+            out uint after)
+        {
+            var screen = GetDC(IntPtr.Zero);
+            if (screen == IntPtr.Zero) throw new InvalidOperationException("Could not acquire paint-probe screen DC.");
+            var dc = CreateCompatibleDC(screen);
+            var bitmap = CreateCompatibleBitmap(screen, 4, 4);
+            _ = ReleaseDC(IntPtr.Zero, screen);
+            if (dc == IntPtr.Zero || bitmap == IntPtr.Zero)
+            {
+                if (dc != IntPtr.Zero) _ = DeleteDC(dc);
+                if (bitmap != IntPtr.Zero) _ = DeleteObject(bitmap);
+                throw new InvalidOperationException("Could not create paint-probe memory surface.");
+            }
+
+            var previous = SelectObject(dc, bitmap);
+            try
+            {
+                if (SetPixel(dc, 1, 1, color) == uint.MaxValue)
+                {
+                    throw new InvalidOperationException("Could not seed paint-probe pixel.");
+                }
+                before = GetPixel(dc, 1, 1);
+                var result = SendMessageW(hwnd, message, dc, lParam);
+                after = GetPixel(dc, 1, 1);
+                return result;
+            }
+            finally
+            {
+                _ = SelectObject(dc, previous);
+                _ = DeleteObject(bitmap);
+                _ = DeleteDC(dc);
+            }
+        }
+
+        internal static void Destroy(IntPtr hwnd)
+        {
+            if (hwnd != IntPtr.Zero) _ = DestroyWindow(hwnd);
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr CreateWindowExW(
+            int extendedStyle,
+            string className,
+            string windowName,
+            int style,
+            int x,
+            int y,
+            int width,
+            int height,
+            IntPtr parent,
+            IntPtr menu,
+            IntPtr instance,
+            IntPtr parameter);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DestroyWindow(IntPtr hwnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr GetDC(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
+        private static extern int ReleaseDC(IntPtr hwnd, IntPtr dc);
+
+        [DllImport("gdi32.dll")]
+        private static extern uint SetPixel(IntPtr dc, int x, int y, uint color);
+
+        [DllImport("gdi32.dll")]
+        private static extern uint GetPixel(IntPtr dc, int x, int y);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        private static extern IntPtr CreateCompatibleDC(IntPtr dc);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        private static extern IntPtr CreateCompatibleBitmap(IntPtr dc, int width, int height);
+
+        [DllImport("gdi32.dll")]
+        private static extern IntPtr SelectObject(IntPtr dc, IntPtr objectHandle);
+
+        [DllImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DeleteObject(IntPtr objectHandle);
+
+        [DllImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DeleteDC(IntPtr dc);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr SendMessageW(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam);
     }
 }

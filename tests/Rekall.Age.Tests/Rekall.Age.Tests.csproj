@@ -36,6 +36,7 @@
     <ProjectReference Include="..\..\src\Rekall.Age.Agent\Rekall.Age.Agent.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.Runtime\Rekall.Age.Runtime.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj" />
+    <ProjectReference Include="..\..\src\Rekall.Age.Rendering.Windows\Rekall.Age.Rendering.Windows.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.Workflows\Rekall.Age.Workflows.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.Mcp\Rekall.Age.Mcp.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.Assets\Rekall.Age.Assets.csproj" />

@@ -2,39 +2,6 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
-      "coverlet.collector": {
-        "type": "Direct",
-        "requested": "[6.0.4, )",
-        "resolved": "6.0.4",
-        "contentHash": "lkhqpF8Pu2Y7IiN7OntbsTtdbpR1syMsm2F3IgX6ootA4ffRqWL5jF7XipHuZQTdVuWG/gVAAcf8mjk8Tz0xPg=="
-      },
-      "Microsoft.NET.Test.Sdk": {
-        "type": "Direct",
-        "requested": "[17.14.1, )",
-        "resolved": "17.14.1",
-        "contentHash": "HJKqKOE+vshXra2aEHpi2TlxYX7Z9VFYkr+E5rwEvHC8eIXiyO+K9kNm8vmNom3e2rA56WqxU+/N9NJlLGXsJQ==",
-        "dependencies": {
-          "Microsoft.CodeCoverage": "17.14.1",
-          "Microsoft.TestPlatform.TestHost": "17.14.1"
-        }
-      },
-      "xunit": {
-        "type": "Direct",
-        "requested": "[2.9.3, )",
-        "resolved": "2.9.3",
-        "contentHash": "TlXQBinK35LpOPKHAqbLY4xlEen9TBafjs0V5KnA4wZsoQLQJiirCR4CbIXvOH8NzkW4YeJKP5P/Bnrodm0h9Q==",
-        "dependencies": {
-          "xunit.analyzers": "1.18.0",
-          "xunit.assert": "2.9.3",
-          "xunit.core": "[2.9.3]"
-        }
-      },
-      "xunit.runner.visualstudio": {
-        "type": "Direct",
-        "requested": "[3.1.4, )",
-        "resolved": "3.1.4",
-        "contentHash": "5mj99LvCqrq3CNi06xYdyIAXOEh+5b33F2nErCzI5zWiDdLHXiPXEWFSUAF8zlIv0ZWqjZNCwHTQeAPYbF3pCg=="
-      },
       "BepuPhysics": {
         "type": "Transitive",
         "resolved": "2.4.0",
@@ -48,11 +15,6 @@
         "resolved": "2.4.0",
         "contentHash": "KNMxkzKLHAvV7jRtErxs3rPv71fHToqo/WN96HlT6iomWuwL97tohEbt0B1WA8A6sO5t6PP+qF08d4T9A8k2uA=="
       },
-      "Microsoft.CodeCoverage": {
-        "type": "Transitive",
-        "resolved": "17.14.1",
-        "contentHash": "pmTrhfFIoplzFVbhVwUquT+77CbGH+h4/3mBpdmIlYtBi9nAB+kKI6dN3A/nV4DFi3wLLx/BlHIPK+MkbQ6Tpg=="
-      },
       "Microsoft.DotNet.PlatformAbstractions": {
         "type": "Transitive",
         "resolved": "3.1.6",
@@ -63,29 +25,10 @@
         "resolved": "9.0.9",
         "contentHash": "fNGvKct2De8ghm0Bpfq0iWthtzIWabgOTi+gJhNOPhNJIowXNEUE2eZNW/zNCzrHVA3PXg2yZ+3cWZndC2IqYA=="
       },
-      "Microsoft.TestPlatform.ObjectModel": {
-        "type": "Transitive",
-        "resolved": "17.14.1",
-        "contentHash": "xTP1W6Mi6SWmuxd3a+jj9G9UoC850WGwZUps1Wah9r1ZxgXhdJfj1QqDLJkFjHDCvN42qDL2Ps5KjQYWUU0zcQ=="
-      },
-      "Microsoft.TestPlatform.TestHost": {
-        "type": "Transitive",
-        "resolved": "17.14.1",
-        "contentHash": "d78LPzGKkJwsJXAQwsbJJ7LE7D1wB+rAyhHHAaODF+RDSQ0NgMjDFkSA1Djw18VrxO76GlKAjRUhl+H8NL8Z+Q==",
-        "dependencies": {
-          "Microsoft.TestPlatform.ObjectModel": "17.14.1",
-          "Newtonsoft.Json": "13.0.3"
-        }
-      },
       "Microsoft.Win32.SystemEvents": {
         "type": "Transitive",
         "resolved": "10.0.8",
         "contentHash": "J9+VT0lkrA7wW38CGxO2sZd+iH9C0qzioMi/2ztpT32WOVr+04uNqFIrxisTRf+mvtXLtdqcio1AoS0vfAVLLQ=="
-      },
-      "Newtonsoft.Json": {
-        "type": "Transitive",
-        "resolved": "13.0.3",
-        "contentHash": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ=="
       },
       "NLayer": {
         "type": "Transitive",
@@ -96,11 +39,6 @@
         "type": "Transitive",
         "resolved": "1.0.0",
         "contentHash": "O08bJk78p96Nomx3BOctu6Du65lNbYfsow/rWAmD0fa1UqcECK4IV7JPcUPL3CdRodECOuoyq5V0PKkRi+/94w=="
-      },
-      "Serilog": {
-        "type": "Transitive",
-        "resolved": "4.3.1",
-        "contentHash": "savYe7h5yRlkqBVOwP8cIRDOdqKiPmYCU4W87JH38sBmcKD5EBoXvQIw6bNEvZ/pTe1gsiye3VFCzBsoppGkXQ=="
       },
       "Silk.NET.Core": {
         "type": "Transitive",
@@ -173,59 +111,10 @@
           "Vortice.SPIRV": "1.0.5"
         }
       },
-      "xunit.abstractions": {
-        "type": "Transitive",
-        "resolved": "2.0.3",
-        "contentHash": "pot1I4YOxlWjIb5jmwvvQNbTrZ3lJQ+jUGkGjWE3hEFM0l5gOnBWS+H3qsex68s5cO52g+44vpGzhAt+42vwKg=="
-      },
-      "xunit.analyzers": {
-        "type": "Transitive",
-        "resolved": "1.18.0",
-        "contentHash": "OtFMHN8yqIcYP9wcVIgJrq01AfTxijjAqVDy/WeQVSyrDC1RzBWeQPztL49DN2syXRah8TYnfvk035s7L95EZQ=="
-      },
-      "xunit.assert": {
-        "type": "Transitive",
-        "resolved": "2.9.3",
-        "contentHash": "/Kq28fCE7MjOV42YLVRAJzRF0WmEqsmflm0cfpMjGtzQ2lR5mYVj1/i0Y8uDAOLczkL3/jArrwehfMD0YogMAA=="
-      },
-      "xunit.core": {
-        "type": "Transitive",
-        "resolved": "2.9.3",
-        "contentHash": "BiAEvqGvyme19wE0wTKdADH+NloYqikiU0mcnmiNyXaF9HyHmE6sr/3DC5vnBkgsWaE6yPyWszKSPSApWdRVeQ==",
-        "dependencies": {
-          "xunit.extensibility.core": "[2.9.3]",
-          "xunit.extensibility.execution": "[2.9.3]"
-        }
-      },
-      "xunit.extensibility.core": {
-        "type": "Transitive",
-        "resolved": "2.9.3",
-        "contentHash": "kf3si0YTn2a8J8eZNb+zFpwfoyvIrQ7ivNk5ZYA5yuYk1bEtMe4DxJ2CF/qsRgmEnDr7MnW1mxylBaHTZ4qErA==",
-        "dependencies": {
-          "xunit.abstractions": "2.0.3"
-        }
-      },
-      "xunit.extensibility.execution": {
-        "type": "Transitive",
-        "resolved": "2.9.3",
-        "contentHash": "yMb6vMESlSrE3Wfj7V6cjQ3S4TXdXpRqYeNEI3zsX31uTsGMJjEw6oD5F5u1cHnMptjhEECnmZSsPxB6ChZHDQ==",
-        "dependencies": {
-          "xunit.extensibility.core": "[2.9.3]"
-        }
-      },
       "ZstdSharp.Port": {
         "type": "Transitive",
         "resolved": "0.8.8",
         "contentHash": "UIDFkA5DC3en3tOJ3Mof11yBx9kUQLsaeo/oFdvN6Bbkr9E9+VCqfIadHci8cu+I51K2Sl7XYWVl2R/mA75NBQ=="
-      },
-      "rekall.age.agent": {
-        "type": "Project",
-        "dependencies": {
-          "Rekall.Age.Core": "[0.1.0-preview.1, )",
-          "Rekall.Age.Project": "[0.1.0-preview.1, )",
-          "Rekall.Age.Validation": "[0.1.0-preview.1, )",
-          "Rekall.Age.World": "[0.1.0-preview.1, )"
-        }
       },
       "rekall.age.assetpipeline": {
         "type": "Project",
@@ -242,51 +131,8 @@
           "Rekall.Age.Core": "[0.1.0-preview.1, )"
         }
       },
-      "rekall.age.build": {
-        "type": "Project",
-        "dependencies": {
-          "Rekall.Age.Core": "[0.1.0-preview.1, )",
-          "Rekall.Age.Modules": "[0.1.0-preview.1, )"
-        }
-      },
       "rekall.age.core": {
         "type": "Project"
-      },
-      "rekall.age.editor": {
-        "type": "Project",
-        "dependencies": {
-          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
-          "Rekall.Age.Core": "[0.1.0-preview.1, )",
-          "Rekall.Age.Editor.Contracts": "[0.1.0-preview.1, )",
-          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
-          "Rekall.Age.Project": "[0.1.0-preview.1, )",
-          "Rekall.Age.Rendering": "[0.1.0-preview.1, )",
-          "Rekall.Age.Rendering.Abstractions": "[0.1.0-preview.1, )",
-          "Rekall.Age.Runtime": "[0.1.0-preview.1, )",
-          "Rekall.Age.Validation": "[0.1.0-preview.1, )",
-          "Rekall.Age.World": "[0.1.0-preview.1, )"
-        }
-      },
-      "rekall.age.editor.contracts": {
-        "type": "Project"
-      },
-      "rekall.age.leveldesign": {
-        "type": "Project",
-        "dependencies": {
-          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
-          "Rekall.Age.Core": "[0.1.0-preview.1, )",
-          "Rekall.Age.World": "[0.1.0-preview.1, )"
-        }
-      },
-      "rekall.age.mcp": {
-        "type": "Project",
-        "dependencies": {
-          "Rekall.Age.Agent": "[0.1.0-preview.1, )",
-          "Rekall.Age.Build": "[0.1.0-preview.1, )",
-          "Rekall.Age.Core": "[0.1.0-preview.1, )",
-          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
-          "Serilog": "[4.3.1, )"
-        }
       },
       "rekall.age.modeling": {
         "type": "Project",
@@ -299,13 +145,6 @@
       },
       "rekall.age.modeling.contracts": {
         "type": "Project"
-      },
-      "rekall.age.modulehost": {
-        "type": "Project",
-        "dependencies": {
-          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
-          "Rekall.Age.Rendering.Abstractions": "[0.1.0-preview.1, )"
-        }
       },
       "rekall.age.modules": {
         "type": "Project",
@@ -357,20 +196,6 @@
           "Rekall.Age.World": "[0.1.0-preview.1, )"
         }
       },
-      "rekall.age.rendering.webgpu": {
-        "type": "Project",
-        "dependencies": {
-          "Rekall.Age.Rendering": "[0.1.0-preview.1, )",
-          "Rekall.Age.Rendering.Abstractions": "[0.1.0-preview.1, )"
-        }
-      },
-      "rekall.age.rendering.windows": {
-        "type": "Project",
-        "dependencies": {
-          "Rekall.Age.Rendering": "[0.1.0-preview.1, )",
-          "Rekall.Age.Rendering.Abstractions": "[0.1.0-preview.1, )"
-        }
-      },
       "rekall.age.runtime": {
         "type": "Project",
         "dependencies": {
@@ -401,26 +226,6 @@
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
           "Rekall.Age.Modules": "[0.1.0-preview.1, )",
           "Rekall.Age.Project": "[0.1.0-preview.1, )",
-          "Rekall.Age.World": "[0.1.0-preview.1, )"
-        }
-      },
-      "rekall.age.workflows": {
-        "type": "Project",
-        "dependencies": {
-          "Rekall.Age.Agent": "[0.1.0-preview.1, )",
-          "Rekall.Age.AssetPipeline": "[0.1.0-preview.1, )",
-          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
-          "Rekall.Age.Build": "[0.1.0-preview.1, )",
-          "Rekall.Age.Core": "[0.1.0-preview.1, )",
-          "Rekall.Age.LevelDesign": "[0.1.0-preview.1, )",
-          "Rekall.Age.Mcp": "[0.1.0-preview.1, )",
-          "Rekall.Age.Modeling": "[0.1.0-preview.1, )",
-          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
-          "Rekall.Age.Playback": "[0.1.0-preview.1, )",
-          "Rekall.Age.Project": "[0.1.0-preview.1, )",
-          "Rekall.Age.Rendering": "[0.1.0-preview.1, )",
-          "Rekall.Age.Runtime": "[0.1.0-preview.1, )",
-          "Rekall.Age.Validation": "[0.1.0-preview.1, )",
           "Rekall.Age.World": "[0.1.0-preview.1, )"
         }
       },

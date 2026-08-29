@@ -240,7 +240,7 @@ public sealed class RekallAgeCamera2DComponent : RekallAgeComponent
     [RekallAgeProperty]
     public bool Active { get; init; } = true;
 
-    [RekallAgeProperty]
+    [RekallAgeProperty(Kind = "color")]
     public string ClearColor { get; init; } = "#102030";
 
     [RekallAgeProperty(Description = "Comma-separated named render layers included by this camera. Use * to include every layer and !name to exclude a layer, for example '*, !helpers'. This is a layer-name expression, not a numeric bitmask.")]
@@ -289,7 +289,7 @@ public sealed class RekallAgeCamera3DComponent : RekallAgeComponent
     [RekallAgeProperty(Minimum = 0.001)]
     public double FarClip { get; init; } = 1000;
 
-    [RekallAgeProperty]
+    [RekallAgeProperty(Kind = "color")]
     public string ClearColor { get; init; } = "#101820";
 
     [RekallAgeProperty(Description = "Comma-separated named render layers included by this camera. Use * to include every layer and !name to exclude a layer, for example '*, !helpers'. This is a layer-name expression, not a numeric bitmask.")]

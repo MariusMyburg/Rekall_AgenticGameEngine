@@ -156,6 +156,23 @@ public sealed class ModuleMetadataTests
     }
 
     [Fact]
+    public async Task CameraClearColorsExposeTheColorEditorContract()
+    {
+        var command = new ListComponentSchemasCommand(typeof(RekallAgeBuiltInModule).Assembly);
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("camera color schemas"), CancellationToken.None);
+
+        var result = await command.ExecuteAsync(new ListComponentSchemasRequest("rekall.builtins"), context);
+
+        Assert.True(result.Ok);
+        foreach (var componentType in new[] { "Rekall.Camera2D", "Rekall.Camera3D" })
+        {
+            var camera = Assert.Single(result.Value.Components, component => component.TypeName == componentType);
+            var clearColor = Assert.Single(camera.Properties, property => property.Name == "ClearColor");
+            Assert.Equal("color", clearColor.Kind);
+        }
+    }
+
+    [Fact]
     public async Task ComponentSchemaSearchReturnsFocusedRuntimeContracts()
     {
         var command = new SearchComponentSchemasCommand(typeof(RekallAgeBuiltInModule).Assembly);

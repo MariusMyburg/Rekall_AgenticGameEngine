@@ -1971,6 +1971,36 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task EmptyProjectInspectorWaitsForAnEntitySelectionInsteadOfInventingComponentState()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-empty-inspector-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Empty Inspector",
+                SceneNameInput = "Main"
+            };
+
+            await ExecuteAsync(viewModel.CreateCommand);
+
+            Assert.False(viewModel.HasInspectorSelection);
+            Assert.Empty(viewModel.ComponentTypeInput);
+            Assert.Empty(viewModel.PropertyNameInput);
+            Assert.Empty(viewModel.PropertyValueInput);
+            Assert.Equal("Select an entity to inspect components.", viewModel.InspectorEmptyStateText);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void AutomationArgumentsRequireExplicitBoundedInputs()
     {
         var parsed = RekallAgeStudioAutomation.TryParse(

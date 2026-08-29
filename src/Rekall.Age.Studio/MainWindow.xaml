@@ -16,7 +16,13 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="Project" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <TextBox Grid.Column="1" Text="{Binding ProjectPathInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0" />
+                <Grid Grid.Column="1" Margin="0,0,8,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBox Text="{Binding ProjectPathInput, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="{Binding ProjectPathInput}" />
+                    <Button x:Name="BrowseProjectButton" Grid.Column="1" Content="Browse…" Click="OnBrowseProjectClick"
+                            Padding="8,4" Margin="5,0,0,0" ToolTip="Choose a project folder" />
+                </Grid>
                 <TextBlock Grid.Column="2" Text="Name" VerticalAlignment="Center" Margin="0,0,8,0" />
                 <TextBox Grid.Column="3" Text="{Binding ProjectNameInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0" />
                 <TextBlock Grid.Column="4" Text="Scene" VerticalAlignment="Center" Margin="0,0,8,0" />
@@ -94,6 +100,16 @@
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top" Text="Scene Hierarchy" FontWeight="SemiBold" Margin="0,0,0,8" />
                     <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasInspectorSelection}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
                         <TextBlock Text="Selected entity name" Foreground="{StaticResource MutedText}" />
                         <Grid Margin="0,3,0,5"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBox Text="{Binding EntityNameInput, UpdateSourceTrigger=PropertyChanged}" /><Button Grid.Column="1" Content="Rename" Command="{Binding RenameEntityCommand}" /></Grid>
                         <UniformGrid Columns="4">
@@ -179,7 +195,23 @@
                             <Button Content="Remove" Command="{Binding RemovePropertyCommand}" Padding="8,4" Margin="3,0,0,0" />
                         </UniformGrid>
                     </StackPanel>
-                    <ListBox ItemsSource="{Binding InspectorLines}" />
+                    <Grid>
+                        <ListBox ItemsSource="{Binding InspectorLines}" />
+                        <TextBlock Text="{Binding InspectorEmptyStateText}" Foreground="{StaticResource MutedText}"
+                                   TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Margin="20" TextAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasInspectorSelection}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
                 </DockPanel>
             </Border>
 

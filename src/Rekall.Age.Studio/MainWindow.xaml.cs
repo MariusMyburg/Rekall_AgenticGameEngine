@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using System.Windows.Controls;
@@ -134,6 +135,17 @@ public partial class MainWindow : Window
             MessageBoxResult.Cancel => RekallAgeCodexApprovalDecision.Cancel,
             _ => RekallAgeCodexApprovalDecision.Decline
         };
+    }
+
+    private void OnBrowseProjectClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Choose a Rekall AGE project folder",
+            Multiselect = false
+        };
+        if (Directory.Exists(_viewModel.ProjectPathInput)) dialog.InitialDirectory = _viewModel.ProjectPathInput;
+        if (dialog.ShowDialog(this) == true) _viewModel.ProjectPathInput = dialog.FolderName;
     }
 
     private void ApplyLayout(RekallAgeStudioLayout layout)

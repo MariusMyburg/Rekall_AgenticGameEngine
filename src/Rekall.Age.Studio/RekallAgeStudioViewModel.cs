@@ -1333,6 +1333,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool HasProject => _session.Model is not null;
 
+    public bool HasInspectorSelection => SelectedEntityId is not null;
+
+    public string InspectorEmptyStateText => "Select an entity to inspect components.";
+
     public IReadOnlyList<RekallAgeStudioTransformTool> TransformTools { get; } =
         [RekallAgeStudioTransformTool.Select, RekallAgeStudioTransformTool.Move, RekallAgeStudioTransformTool.Rotate, RekallAgeStudioTransformTool.Scale];
 
@@ -3859,6 +3863,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _currentModel = model;
         OnPropertyChanged(nameof(SelectedEntityId));
         OnPropertyChanged(nameof(HasProject));
+        OnPropertyChanged(nameof(HasInspectorSelection));
         SceneNameInput = model.Scene.Name;
         Replace(EntityNodes, model.Scene.RootEntities);
         var selectedNode = SelectedEntityNode();
@@ -3870,13 +3875,22 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 .Where(property => property.IsDefined)
                 .Select(property => $"  {property.Name}: {property.Value}"))));
         Replace(ComponentSchemas, model.Inspector.AvailableComponents);
-        if (!ComponentSchemas.Any(component => component.Type.Equals(ComponentTypeInput, StringComparison.Ordinal)))
+        if (selectedNode is null)
+        {
+            ComponentTypeInput = string.Empty;
+            PropertyNameInput = string.Empty;
+            PropertyValueInput = string.Empty;
+            Replace(PropertySchemas, []);
+            Replace(PropertyValueChoices, []);
+            PropertySchemaHelp = InspectorEmptyStateText;
+        }
+        else if (!ComponentSchemas.Any(component => component.Type.Equals(ComponentTypeInput, StringComparison.Ordinal)))
         {
             ComponentTypeInput = model.Inspector.Components.FirstOrDefault()?.Type
                 ?? ComponentSchemas.FirstOrDefault()?.Type
                 ?? ComponentTypeInput;
         }
-        RefreshPropertySchemas();
+        if (selectedNode is not null) RefreshPropertySchemas();
         Replace(AssetLines, model.Assets.Assets.Select(asset => $"{asset.Kind}: {asset.DisplayName} ({asset.AssetId})"));
         if (_session.ProjectRoot is not null)
         {

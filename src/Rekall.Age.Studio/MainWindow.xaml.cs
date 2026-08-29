@@ -102,14 +102,16 @@ public partial class MainWindow : Window
 
     private void ApplyWorkspaceVisibility(bool refreshModeling)
     {
-        if (AuthorWorkspaceHost is null || WorldWorkspace is null || ModelingWorkspaceHost is null
+        if (AuthorWorkspaceHost is null || WorldWorkspace is null || CodeWorkspaceHost is null || ModelingWorkspaceHost is null
             || ProjectBar is null || MainToolbar is null) return;
         var workspace = WorkspaceName();
         var author = workspace == "Author";
         var world = workspace == "World";
+        var code = workspace == "Code";
         var modeling = workspace == "Modeling";
         AuthorWorkspaceHost.Visibility = author ? Visibility.Visible : Visibility.Collapsed;
         WorldWorkspace.Visibility = world ? Visibility.Visible : Visibility.Collapsed;
+        CodeWorkspaceHost.Visibility = code ? Visibility.Visible : Visibility.Collapsed;
         ModelingWorkspaceHost.Visibility = modeling ? Visibility.Visible : Visibility.Collapsed;
         ProjectBar.Visibility = modeling ? Visibility.Collapsed : Visibility.Visible;
         MainToolbar.Visibility = world ? Visibility.Visible : Visibility.Collapsed;
@@ -117,6 +119,10 @@ public partial class MainWindow : Window
         {
             if (_viewModel.RefreshMeshAssetsCommand.CanExecute(null)) _viewModel.RefreshMeshAssetsCommand.Execute(null);
             if (_viewModel.RefreshModelingGraphsCommand.CanExecute(null)) _viewModel.RefreshModelingGraphsCommand.Execute(null);
+        }
+        if (code && refreshModeling && _viewModel.RefreshCodeCommand.CanExecute(null))
+        {
+            _viewModel.RefreshCodeCommand.Execute(null);
         }
     }
 
@@ -323,13 +329,15 @@ public partial class MainWindow : Window
     private string WorkspaceName() => WorkspaceSelector.SelectedIndex switch
     {
         0 => "Author",
-        2 => "Modeling",
+        2 => "Code",
+        3 => "Modeling",
         _ => "World"
     };
 
     private void SelectWorkspace(string workspace) => WorkspaceSelector.SelectedIndex = workspace switch
     {
-        "Modeling" => 2,
+        "Modeling" => 3,
+        "Code" => 2,
         "World" => 1,
         _ => 0
     };

@@ -75,6 +75,7 @@
                         Background="{StaticResource ChromeBackground}" BorderThickness="0,0,0,1">
                 <TabItem Header="Author" />
                 <TabItem Header="World" />
+                <TabItem Header="Code" />
                 <TabItem Header="Modeling" />
             </TabControl>
             <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0">
@@ -88,6 +89,7 @@
                 <Button Content="Output" Tag="Output" Click="OnTogglePanelClick" />
             </StackPanel>
             <local:AuthorWorkspace x:Name="AuthorWorkspaceHost" Grid.Row="1" />
+            <local:CodeWorkspace x:Name="CodeWorkspaceHost" Grid.Row="1" Visibility="Collapsed" />
             <Grid x:Name="WorldWorkspace" Grid.Row="1" Visibility="Collapsed">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="HierarchyColumn" Width="290" /><ColumnDefinition Width="*" /><ColumnDefinition x:Name="InspectorColumn" Width="370" />

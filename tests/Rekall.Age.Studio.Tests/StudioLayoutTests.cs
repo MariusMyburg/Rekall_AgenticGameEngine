@@ -73,6 +73,30 @@ public sealed class StudioLayoutTests
     }
 
     [Fact]
+    public void StudioCodeWorkspaceExposesComponentAuthoringEditorBuildAndIdeActions()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+        var code = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "CodeWorkspace.xaml"));
+
+        Assert.Contains("Header=\"Code\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"CodeWorkspaceHost\"", window, StringComparison.Ordinal);
+        Assert.Contains("CreateAttachCodeComponentCommand", code, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding CodeSources}\"", code, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding CodeSourceText", code, StringComparison.Ordinal);
+        Assert.Contains("AcceptsReturn=\"True\"", code, StringComparison.Ordinal);
+        Assert.Contains("AcceptsTab=\"True\"", code, StringComparison.Ordinal);
+        Assert.Contains("FontFamily=\"Cascadia Code\"", code, StringComparison.Ordinal);
+        Assert.Contains("SaveCodeCommand", code, StringComparison.Ordinal);
+        Assert.Contains("BuildCodeCommand", code, StringComparison.Ordinal);
+        Assert.Contains("OpenCodeFileCommand", code, StringComparison.Ordinal);
+        Assert.Contains("OpenCodeProjectCommand", code, StringComparison.Ordinal);
+        Assert.Contains("OpenCodeSolutionCommand", code, StringComparison.Ordinal);
+        Assert.Contains("OpenCodeInVsCodeCommand", code, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding CodeOutputLines}\"", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StudioShellPromotesModelingToAnUnclutteredTopLevelWorkspace()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));

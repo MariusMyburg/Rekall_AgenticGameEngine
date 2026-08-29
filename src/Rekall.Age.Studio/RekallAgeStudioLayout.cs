@@ -133,7 +133,7 @@ internal sealed record RekallAgeStudioLayout(
             ActiveOutputTab = OutputTabs.Contains(candidate.ActiveOutputTab ?? string.Empty)
                 ? candidate.ActiveOutputTab!
                 : Default.ActiveOutputTab,
-            ActiveWorkspace = candidate.ActiveWorkspace is "Author" or "World" or "Modeling"
+            ActiveWorkspace = candidate.ActiveWorkspace is "Author" or "World" or "Code" or "Modeling"
                 ? candidate.ActiveWorkspace
                 : Default.ActiveWorkspace,
             Panels = normalizedPanels

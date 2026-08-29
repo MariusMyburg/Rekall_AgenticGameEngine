@@ -101,6 +101,7 @@ public sealed class StudioLayoutTests
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
         var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
         var author = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "AuthorWorkspace.xaml"));
+        var app = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "App.xaml"));
 
         Assert.DoesNotContain("<TabItem Header=\"AI Agent\"", window, StringComparison.Ordinal);
         Assert.Contains("IsOpenAiSelected", author, StringComparison.Ordinal);
@@ -113,6 +114,8 @@ public sealed class StudioLayoutTests
         Assert.Contains("ToolTip=\"{Binding ProjectPathInput}\"", window, StringComparison.Ordinal);
         Assert.Contains("HasInspectorSelection", window, StringComparison.Ordinal);
         Assert.Contains("InspectorEmptyStateText", window, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{TemplateBinding Text}\"", app, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"{TemplateBinding SelectionBoxItem}\"", app, StringComparison.Ordinal);
     }
 
     [Theory]

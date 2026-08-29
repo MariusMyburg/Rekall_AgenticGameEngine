@@ -350,6 +350,25 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task OllamaFallbackPrefersAnInstalledModelOverACloudProxy()
+    {
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            httpClientFactory: () => new HttpClient(new ProviderLifecycleHandler(
+                blockOllamaChat: false,
+                ollamaModels: ["deepseek-v3.1:671b-cloud", "qwen3.8:27b"]), disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+
+        await ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
+
+        Assert.Equal(["deepseek-v3.1:671b-cloud", "qwen3.8:27b"], viewModel.LanguageModels);
+        Assert.Equal("qwen3.8:27b", viewModel.SelectedLanguageModel);
+        Assert.Contains("using qwen3.8:27b", viewModel.ProviderDisplayStatus, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RapidProviderSwitchDoesNotPublishStaleModelsWhenTheFinalProviderFails()
     {
         var initialOllama = new ProviderLifecycleHandler(blockOllamaChat: false);
@@ -2352,6 +2371,7 @@ public sealed class StudioViewModelTests
     private sealed class ProviderLifecycleHandler(
         bool blockOllamaChat,
         bool blockOllamaModels = false,
+        IReadOnlyList<string>? ollamaModels = null,
         IReadOnlyList<string>? openAiModels = null,
         bool pauseModelResponse = false,
         Exception? modelFailure = null,
@@ -2390,9 +2410,15 @@ public sealed class StudioViewModelTests
                 }
                 if (pauseModelResponse) await _modelsRelease.Task.WaitAsync(cancellationToken);
                 if (modelFailure is not null) throw modelFailure;
-                return JsonResponse("""
-                    {"models":[{"name":"qwen3.5:35b","size":24000000000},{"name":"gemma3:latest","size":3000}]}
-                    """);
+                var models = ollamaModels ?? ["qwen3.5:35b", "gemma3:latest"];
+                return JsonResponse(new JsonObject
+                {
+                    ["models"] = new JsonArray(models.Select((model, index) => new JsonObject
+                    {
+                        ["name"] = model,
+                        ["size"] = index + 1
+                    }).ToArray())
+                }.ToJsonString());
             }
 
             if (request.RequestUri.AbsolutePath.EndsWith("/api/chat", StringComparison.Ordinal))

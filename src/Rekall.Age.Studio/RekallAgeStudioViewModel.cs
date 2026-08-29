@@ -3323,7 +3323,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 return;
             }
 
-            var fallback = LanguageModels[0];
+            var fallback = provider.Id == "ollama"
+                ? LanguageModels.FirstOrDefault(model => !model.EndsWith("-cloud", StringComparison.OrdinalIgnoreCase))
+                    ?? LanguageModels[0]
+                : LanguageModels[0];
             SelectedLanguageModel = fallback;
             var exception = new RekallAgeLanguageModelProviderException(
                 "REKALL_LANGUAGE_MODEL_DEFAULT_UNAVAILABLE",

@@ -47,7 +47,7 @@
                 <Grid>
                     <Border x:Name="ComboSurface" CornerRadius="3" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" />
                     <Grid Margin="{TemplateBinding Padding}"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="18" /></Grid.ColumnDefinitions>
-                        <ContentPresenter x:Name="Selection" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" VerticalAlignment="Center" IsHitTestVisible="False" />
+                        <TextBlock x:Name="Selection" Text="{TemplateBinding Text}" VerticalAlignment="Center" IsHitTestVisible="False" />
                         <TextBox x:Name="PART_EditableTextBox" Grid.Column="0" Background="Transparent" BorderThickness="0" Padding="0" VerticalContentAlignment="Center" Visibility="Hidden" />
                         <Path Grid.Column="1" Data="M 2 5 L 7 10 L 12 5" Stroke="{StaticResource MutedText}" StrokeThickness="1.5" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>

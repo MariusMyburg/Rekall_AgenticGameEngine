@@ -1,18 +1,19 @@
 using System.IO;
 using System.Text.Json.Nodes;
+using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
+using Rekall.Age.Rendering.Windows;
 using Rekall.Age.Studio;
 using Rekall.Age.World;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
 namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioPreviewSessionTests
 {
     [Fact]
-    public async Task InitialEditPreviewIncludesAuthoredUiWithoutAdvancingGameplay()
+    public async Task InitialEditPreviewBuildsPickableInteractionAndPresentsVulkanHardwareTelemetry()
     {
-        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-preview-ui-" + Guid.NewGuid().ToString("N"));
+        var root = TemporaryRoot("studio-preview-ui");
         try
         {
             var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])
@@ -23,128 +24,245 @@ public sealed class StudioPreviewSessionTests
             label = label.AddComponent(RekallAgeComponentDocument.Create(
                 "Rekall.Label",
                 new JsonObject { ["Width"] = 120, ["Height"] = 24, ["Text"] = "READY" }));
-            await new RekallAgeSceneStore().SaveAsync(
-                root,
-                RekallAgeSceneDocument.Create("Main", ["ui"]).AddEntity(canvas).AddEntity(label),
-                CancellationToken.None);
-            await using var preview = new RekallAgeStudioPreviewSession();
+            await SaveSceneAsync(root, RekallAgeSceneDocument.Create("Main", ["ui"]).AddEntity(canvas).AddEntity(label));
+            var presenter = new RecordingViewportPresenter();
+            await using var preview = new RekallAgeStudioVulkanPreviewSession(presenter);
 
             var initial = await preview.ResetAsync(root, "Main", 320, 180, CancellationToken.None);
 
+            Assert.True(initial.Presentation.PresentedFrame);
+            Assert.Equal("vulkan", initial.Backend);
+            Assert.True(initial.HardwareAccelerated);
             Assert.Equal(0, initial.FrameIndex);
             Assert.Equal(1, initial.RenderableCount);
             Assert.Equal(label.Id, initial.Interaction.Pick(10, 10));
+            Assert.Single(presenter.Presentations);
+            Assert.Equal(320, presenter.Presentations[0].Frame.Width);
+            Assert.Equal(180, presenter.Presentations[0].Frame.Height);
         }
         finally
         {
-            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            DeleteRoot(root);
         }
     }
 
     [Fact]
-    public async Task PreviewSessionPersistsRuntimeFramesUntilReset()
+    public async Task StepsReuseCachedAssetsAndPersistentPresenter()
     {
-        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-preview-" + Guid.NewGuid().ToString("N"));
+        var root = TemporaryRoot("studio-preview-cache");
         try
         {
-            await new RekallAgeSceneStore().SaveAsync(
-                root,
-                RekallAgeSceneDocument.Create("Main", ["world"]),
-                CancellationToken.None);
-            await using var preview = new RekallAgeStudioPreviewSession();
+            await SaveSceneAsync(root, RekallAgeSceneDocument.Create("Main", ["world"]));
+            var presenter = new RecordingViewportPresenter();
+            var resolveCount = 0;
+            await using var preview = new RekallAgeStudioVulkanPreviewSession(
+                presenter,
+                (_, _, _) =>
+                {
+                    resolveCount++;
+                    return ValueTask.FromResult(RekallAgeRuntimeViewportAssetSet.Empty with { });
+                });
 
             var initial = await preview.ResetAsync(root, "Main", 320, 180, CancellationToken.None);
             var first = await preview.StepAsync(1, CancellationToken.None);
             var seventh = await preview.StepAsync(6, CancellationToken.None);
-            var reset = await preview.ResetAsync(root, "Main", 320, 180, CancellationToken.None);
 
             Assert.Equal(0, initial.FrameIndex);
             Assert.Equal(1, first.FrameIndex);
             Assert.Equal(7, seventh.FrameIndex);
-            Assert.Equal(0, reset.FrameIndex);
-            Assert.Equal(320, seventh.Image.PixelWidth);
-            Assert.Equal(180, seventh.Image.PixelHeight);
-            Assert.True(seventh.Image.IsFrozen);
+            Assert.Equal(1, resolveCount);
+            Assert.Equal(3, presenter.Presentations.Count);
+            Assert.Same(presenter.Presentations[0].Assets, presenter.Presentations[1].Assets);
+            Assert.Same(presenter.Presentations[0].Assets, presenter.Presentations[2].Assets);
+            Assert.Equal(320, seventh.Presentation.Width);
+            Assert.Equal(180, seventh.Presentation.Height);
             Assert.Equal(320, seventh.Interaction.FrameWidth);
             Assert.Equal(180, seventh.Interaction.FrameHeight);
         }
         finally
         {
-            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            DeleteRoot(root);
         }
     }
 
     [Fact]
-    public async Task FailedResetPreservesThePreviousCoherentPreviewSession()
+    public async Task AssetInvalidationResolvesOnceMoreAndSignalsSharedInvalidation()
     {
-        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-preview-reset-" + Guid.NewGuid().ToString("N"));
+        var root = TemporaryRoot("studio-preview-invalidation");
         try
         {
-            await new RekallAgeSceneStore().SaveAsync(
-                root,
-                RekallAgeSceneDocument.Create("Main", ["world"]),
-                CancellationToken.None);
-            await using var preview = new RekallAgeStudioPreviewSession();
+            await SaveSceneAsync(root, RekallAgeSceneDocument.Create("Main", ["world"]));
+            var presenter = new RecordingViewportPresenter();
+            var resolved = new List<RekallAgeRuntimeViewportAssetSet>();
+            await using var preview = new RekallAgeStudioVulkanPreviewSession(
+                presenter,
+                (_, _, _) =>
+                {
+                    var assets = RekallAgeRuntimeViewportAssetSet.Empty with { };
+                    resolved.Add(assets);
+                    return ValueTask.FromResult(assets);
+                });
             await preview.ResetAsync(root, "Main", 320, 180, CancellationToken.None);
 
-            await Assert.ThrowsAnyAsync<Exception>(() =>
-                preview.ResetAsync(root, "Missing", 640, 360, CancellationToken.None).AsTask());
-            var advanced = await preview.StepAsync(1, CancellationToken.None);
+            await preview.InvalidateAssetsAsync(CancellationToken.None);
+            await preview.StepAsync(1, CancellationToken.None);
+            await preview.StepAsync(1, CancellationToken.None);
 
-            Assert.Equal(1, advanced.FrameIndex);
-            Assert.Equal(320, advanced.Image.PixelWidth);
-            Assert.Equal(180, advanced.Image.PixelHeight);
+            Assert.Equal(1, presenter.AssetInvalidationCount);
+            Assert.Equal(2, resolved.Count);
+            Assert.Same(resolved[1], presenter.Presentations[1].Assets);
+            Assert.Same(resolved[1], presenter.Presentations[2].Assets);
+            Assert.Equal(2, presenter.Presentations[1].Context.AssetRevision);
+            Assert.Equal(2, presenter.Presentations[2].Context.AssetRevision);
         }
         finally
         {
-            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            DeleteRoot(root);
         }
     }
 
     [Fact]
-    public async Task RenderFailureAfterInspectionDoesNotReplaceThePreviousSession()
+    public async Task FailedInitialVulkanPresentPreservesPreviousCoherentRuntimeSession()
     {
-        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-preview-render-" + Guid.NewGuid().ToString("N"));
+        var root = TemporaryRoot("studio-preview-reset");
         try
         {
-            await new RekallAgeSceneStore().SaveAsync(
-                root,
-                RekallAgeSceneDocument.Create("Main", ["world"]),
-                CancellationToken.None);
-            await using var preview = new RekallAgeStudioPreviewSession(
-                (world, _, width, height, _) => width == 640
-                    ? ValueTask.FromException<RekallAgeStudioPreviewFrame>(new InvalidOperationException("simulated render failure"))
-                    : ValueTask.FromResult(CreateFrame(world.FrameIndex, width, height)));
+            await SaveSceneAsync(root, RekallAgeSceneDocument.Create("Main", ["world"]));
+            var presenter = new RecordingViewportPresenter
+            {
+                Result = frame => frame.Width == 640
+                    ? RekallAgeVulkanPresentationFrame.Unavailable(
+                        frame,
+                        "simulated Vulkan reset failure",
+                        ["REKALL_STUDIO_VULKAN_UNAVAILABLE"])
+                    : RekallAgeVulkanPresentationFrame.Presented(frame, "test-gpu")
+            };
+            var resolved = new List<RekallAgeRuntimeViewportAssetSet>();
+            await using var preview = new RekallAgeStudioVulkanPreviewSession(
+                presenter,
+                (_, _, _) =>
+                {
+                    var assets = RekallAgeRuntimeViewportAssetSet.Empty with { };
+                    resolved.Add(assets);
+                    return ValueTask.FromResult(assets);
+                });
             await preview.ResetAsync(root, "Main", 320, 180, CancellationToken.None);
 
-            await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                preview.ResetAsync(root, "Main", 640, 360, CancellationToken.None).AsTask());
+            var unavailable = await preview.ResetAsync(root, "Main", 640, 360, CancellationToken.None);
             var advanced = await preview.StepAsync(1, CancellationToken.None);
 
+            Assert.False(unavailable.Presentation.PresentedFrame);
             Assert.Equal(1, advanced.FrameIndex);
-            Assert.Equal(320, advanced.Image.PixelWidth);
-            Assert.Equal(180, advanced.Image.PixelHeight);
+            Assert.Equal(320, advanced.Presentation.Width);
+            Assert.Equal(180, advanced.Presentation.Height);
+            Assert.Same(resolved[0], presenter.Presentations[^1].Assets);
+            Assert.Equal(2, resolved.Count);
         }
         finally
         {
-            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            DeleteRoot(root);
         }
     }
 
-    private static RekallAgeStudioPreviewFrame CreateFrame(int frameIndex, int width, int height)
+    [Fact]
+    public async Task UnavailableVulkanTelemetryHasNoBitmapFallback()
     {
-        var image = BitmapSource.Create(
-            width,
-            height,
-            96,
-            96,
-            PixelFormats.Bgra32,
-            null,
-            new byte[checked(width * height * 4)],
-            checked(width * 4));
-        image.Freeze();
-        return new RekallAgeStudioPreviewFrame(
-            image, frameIndex, 0, 0, "test",
-            new RekallAgeStudioViewportInteractionSnapshot(width, height, []));
+        var root = TemporaryRoot("studio-preview-unavailable");
+        try
+        {
+            await SaveSceneAsync(root, RekallAgeSceneDocument.Create("Main", ["world"]));
+            var presenter = new RecordingViewportPresenter
+            {
+                Result = frame => RekallAgeVulkanPresentationFrame.Unavailable(
+                    frame,
+                    "No Vulkan physical device is available.",
+                    ["REKALL_STUDIO_VULKAN_UNAVAILABLE", "VK_ERROR_INITIALIZATION_FAILED"])
+            };
+            await using var preview = new RekallAgeStudioVulkanPreviewSession(presenter);
+
+            var frame = await preview.ResetAsync(root, "Main", 320, 180, CancellationToken.None);
+
+            Assert.False(frame.Presentation.PresentedFrame);
+            Assert.Equal("vulkan", frame.Backend);
+            Assert.False(frame.HardwareAccelerated);
+            Assert.Equal("No Vulkan physical device is available.", frame.Presentation.FailureReason);
+            Assert.Contains("REKALL_STUDIO_VULKAN_UNAVAILABLE", frame.Presentation.Errors);
+            Assert.DoesNotContain(
+                typeof(System.Windows.Media.Imaging.BitmapSource),
+                typeof(RekallAgeStudioPreviewFrame).GetProperties().Select(property => property.PropertyType));
+        }
+        finally
+        {
+            DeleteRoot(root);
+        }
+    }
+
+    [Fact]
+    public void NormalStudioPreviewSourceDoesNotCallRenderRgba()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Rekall.Age.Studio",
+            "RekallAgeStudioVulkanPreviewSession.cs"));
+
+        Assert.DoesNotContain("RenderRgba", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("BitmapSource", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("PixelFormats", source, StringComparison.Ordinal);
+    }
+
+    private static string TemporaryRoot(string name) =>
+        Path.Combine(Path.GetTempPath(), $"rekall-age-{name}-{Guid.NewGuid():N}");
+
+    private static Task SaveSceneAsync(string root, RekallAgeSceneDocument scene) =>
+        new RekallAgeSceneStore().SaveAsync(root, scene, CancellationToken.None).AsTask();
+
+    private static void DeleteRoot(string root)
+    {
+        if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+    }
+
+    private sealed class RecordingViewportPresenter : IRekallAgeStudioViewportPresenter
+    {
+        public List<Presentation> Presentations { get; } = [];
+
+        public Func<RekallAgeRuntimeViewportFrame, RekallAgeVulkanPresentationFrame> Result { get; init; } =
+            frame => RekallAgeVulkanPresentationFrame.Presented(frame, "test-gpu");
+
+        public RekallAgeStudioViewportMetrics Metrics { get; } = new(320, 180, 320, 180, true);
+
+        public int AssetInvalidationCount { get; private set; }
+
+        public ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
+            RekallAgeRuntimeViewportFrame frame,
+            RekallAgeRuntimeViewportAssetSet assets,
+            RekallAgeStudioPresentationContext context,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Presentations.Add(new Presentation(frame, assets, context));
+            return ValueTask.FromResult(Result(frame));
+        }
+
+        public ValueTask InvalidateAssetsAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            AssetInvalidationCount++;
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask InvalidateShadersAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        internal sealed record Presentation(
+            RekallAgeRuntimeViewportFrame Frame,
+            RekallAgeRuntimeViewportAssetSet Assets,
+            RekallAgeStudioPresentationContext Context);
     }
 }

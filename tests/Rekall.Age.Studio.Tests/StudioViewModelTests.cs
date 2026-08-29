@@ -18,6 +18,7 @@ using Rekall.Age.Project;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Commands;
+using Rekall.Age.Rendering.Windows;
 using Rekall.Age.Studio;
 using Rekall.Age.Workflows;
 using Rekall.Age.Workflows.Commands;
@@ -1765,12 +1766,48 @@ public sealed class StudioViewModelTests
             Assert.Equal(1, viewModel.PreviewFrameIndex);
             Assert.Equal(2, preview.ResetCount);
             Assert.Equal(1, preview.StepCount);
+            Assert.All(preview.ResetSizes, size => Assert.Equal((800, 450), size));
+            Assert.True(viewModel.ViewportAvailable);
+            Assert.Contains("Vulkan", viewModel.ViewportBackendLabel, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("hardware", viewModel.ViewportBackendLabel, StringComparison.OrdinalIgnoreCase);
 
             await ExecuteAsync(viewModel.StopCommand);
 
             Assert.Equal(RekallAgeStudioMode.Edit, viewModel.Mode);
             Assert.False(viewModel.IsSimulating);
             Assert.Equal(3, preview.ResetCount);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task UnavailableVulkanPreviewSurfacesStructuredFailureWithoutChangingEditorMode()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-vulkan-unavailable-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession { ReturnUnavailable = true };
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Unavailable Test",
+                SceneNameInput = "Main"
+            };
+
+            await ExecuteAsync(viewModel.CreateCommand);
+
+            Assert.Equal(RekallAgeStudioMode.Edit, viewModel.Mode);
+            Assert.False(viewModel.ViewportAvailable);
+            Assert.Contains("Vulkan is unavailable", viewModel.ViewportUnavailableReason, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(
+                viewModel.ValidationLines,
+                line => line.Contains("REKALL_STUDIO_VULKAN_UNAVAILABLE", StringComparison.Ordinal));
         }
         finally
         {
@@ -2853,14 +2890,19 @@ public sealed class StudioViewModelTests
     private sealed class RecordingPreviewSession : IRekallAgeStudioPreviewSession
     {
         private int _frame;
+        private int _width = 800;
+        private int _height = 450;
         private TaskCompletionSource? _blockedReset;
         private TaskCompletionSource? _resetEntered;
         private TaskCompletionSource? _disposeBlocked;
         private TaskCompletionSource? _disposeEntered;
         public int ResetCount { get; private set; }
         public int StepCount { get; private set; }
+        public RekallAgeStudioViewportMetrics Metrics { get; } = new(800, 450, 800, 450, true);
+        public List<(int Width, int Height)> ResetSizes { get; } = [];
         public List<RekallAgeStudioViewportPickRegion> Regions { get; } = [];
         public bool IsDisposed { get; private set; }
+        public bool ReturnUnavailable { get; init; }
 
         public ValueTask<RekallAgeStudioPreviewFrame> ResetAsync(
             string projectRoot,
@@ -2871,6 +2913,9 @@ public sealed class StudioViewModelTests
         {
             ResetCount++;
             _frame = 0;
+            _width = width;
+            _height = height;
+            ResetSizes.Add((width, height));
             _resetEntered?.TrySetResult();
             return _blockedReset is null
                 ? ValueTask.FromResult(CreateFrame(_frame))
@@ -2930,12 +2975,27 @@ public sealed class StudioViewModelTests
 
         private RekallAgeStudioPreviewFrame CreateFrame(int frame)
         {
-            var image = BitmapSource.Create(
-                100, 100, 96, 96, PixelFormats.Bgra32, null, new byte[40_000], 400);
-            image.Freeze();
+            var runtimeFrame = new RekallAgeRuntimeViewportFrame(
+                "Main",
+                frame,
+                frame / 60d,
+                _width,
+                _height,
+                null,
+                [],
+                [],
+                0,
+                new RekallAgeRuntimeViewportOverlay(false, 0),
+                []);
+            var presentation = ReturnUnavailable
+                ? RekallAgeVulkanPresentationFrame.Unavailable(
+                    runtimeFrame,
+                    "Vulkan is unavailable: simulated initialization failure.",
+                    ["REKALL_STUDIO_VULKAN_UNAVAILABLE"])
+                : RekallAgeVulkanPresentationFrame.Presented(runtimeFrame, "test-gpu");
             return new RekallAgeStudioPreviewFrame(
-                image, frame, 0, 0, "software-live",
-                new RekallAgeStudioViewportInteractionSnapshot(100, 100, Regions));
+                presentation,
+                new RekallAgeStudioViewportInteractionSnapshot(_width, _height, Regions));
         }
     }
 

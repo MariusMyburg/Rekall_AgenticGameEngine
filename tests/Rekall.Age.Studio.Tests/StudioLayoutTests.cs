@@ -8,6 +8,44 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioLayoutTests
 {
     [Fact]
+    public void WorldViewportHostsRekallAgeVulkanViewportHostInsteadOfSceneViewportImage()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+
+        Assert.Contains("local:RekallAgeVulkanViewportHost", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"SceneVulkanViewportHost\"", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("SceneViewportImage", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("Source=\"{Binding ViewportImage}\"", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("SceneGizmoCanvas", window, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WorldViewportKeepsVulkanUnavailablePlaceholderAndExternalTransformControls()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+
+        Assert.Contains("x:Name=\"VulkanUnavailablePlaceholder\"", window, StringComparison.Ordinal);
+        Assert.Contains("ViewportUnavailableReason", window, StringComparison.Ordinal);
+        Assert.Contains("ViewportBackendLabel", window, StringComparison.Ordinal);
+        Assert.Contains("Vulkan is unavailable", window, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Grid.Row=\"2\"", window, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding TransformTools}\"", window, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding TransformSpaces}\"", window, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StudioCarriesTheSharedVulkanRuntimePackagesIntoItsExecutableOutput()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var project = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "Rekall.Age.Studio.csproj"));
+
+        Assert.Contains("<PackageReference Include=\"Veldrid\" Version=\"4.9.0\"", project, StringComparison.Ordinal);
+        Assert.Contains("<PackageReference Include=\"Veldrid.SPIRV\" Version=\"1.0.15\"", project, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DefaultAndPresetsExposeEveryNamedPanelWithUsefulBounds()
     {
         var layout = RekallAgeStudioLayout.Default;

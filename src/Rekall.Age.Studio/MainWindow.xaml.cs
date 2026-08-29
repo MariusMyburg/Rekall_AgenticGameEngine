@@ -4,8 +4,6 @@ using System.Windows;
 using System.Windows.Threading;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Shapes;
 using Rekall.Age.Editor.Contracts;
 using Rekall.Age.Workflows;
 using Serilog;
@@ -14,7 +12,7 @@ namespace Rekall.Age.Studio;
 
 public partial class MainWindow : Window
 {
-    private readonly RekallAgeStudioViewModel _viewModel = new();
+    private readonly RekallAgeStudioViewModel _viewModel;
     private readonly IRekallAgeStudioLayoutStore _layoutStore = new RekallAgeStudioLayoutStore();
     private readonly DispatcherTimer _previewTimer;
     private RekallAgeStudioLayout _layout = RekallAgeStudioLayout.Default;
@@ -28,6 +26,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeStudioVulkanPreviewSession(SceneVulkanViewportHost));
         _viewModel.CodexApprovalHandler = RequestCodexApprovalAsync;
         _viewModel.CodexAuthenticationLauncher = authenticationUri =>
         {
@@ -39,6 +39,8 @@ public partial class MainWindow : Window
         };
         DataContext = _viewModel;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        SceneVulkanViewportHost.PointerFact += OnSceneViewportPointerFact;
+        SceneVulkanViewportHost.MetricsChanged += OnSceneViewportMetricsChanged;
         _previewTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
             Interval = RekallAgeStudioPreviewCadence.PresentationInterval
@@ -59,6 +61,10 @@ public partial class MainWindow : Window
             _layout = await _layoutStore.LoadAsync(CancellationToken.None);
             ApplyLayout(_layout);
             await _viewModel.InitializeAsync(projectRoot, sceneName);
+            if (_viewModel.HasProject && SceneVulkanViewportHost.Metrics.IsPresentable)
+            {
+                await _viewModel.PresentViewportAtHostSizeAsync(SceneVulkanViewportHost.Metrics);
+            }
             _hadProject = _viewModel.HasProject;
             _initializing = false;
             _previewTimer.Start();
@@ -102,6 +108,8 @@ public partial class MainWindow : Window
 
     private void ApplyWorkspaceVisibility(bool refreshModeling)
     {
+        // InitializeComponent can raise SelectionChanged before the injected preview session exists.
+        if (_viewModel is null) return;
         if (AuthorWorkspaceHost is null || WorldWorkspace is null || CodeWorkspaceHost is null || ModelingWorkspaceHost is null
             || ProjectBar is null || MainToolbar is null) return;
         var workspace = WorkspaceName();
@@ -115,6 +123,10 @@ public partial class MainWindow : Window
         ModelingWorkspaceHost.Visibility = modeling ? Visibility.Visible : Visibility.Collapsed;
         ProjectBar.Visibility = modeling ? Visibility.Collapsed : Visibility.Visible;
         MainToolbar.Visibility = world ? Visibility.Visible : Visibility.Collapsed;
+        if (world && _viewModel.HasProject && !_viewModel.ViewportAvailable)
+        {
+            PrepareViewportHost();
+        }
         if (modeling && refreshModeling)
         {
             if (_viewModel.RefreshMeshAssetsCommand.CanExecute(null)) _viewModel.RefreshMeshAssetsCommand.Execute(null);
@@ -258,52 +270,76 @@ public partial class MainWindow : Window
         }) ?? RekallAgeStudioLayout.Default;
     }
 
-    private async void OnSceneViewportMouseDown(object sender, MouseButtonEventArgs e)
+    private async void OnSceneViewportPointerFact(
+        object? sender,
+        RekallAgeStudioViewportPointerFact fact)
     {
-        if (sender is not Image image || image.ActualWidth <= 0 || image.ActualHeight <= 0) return;
-        var position = e.GetPosition(image);
-        if (_viewModel.BeginSceneTransform(image.ActualWidth, image.ActualHeight, position.X, position.Y))
+        var metrics = SceneVulkanViewportHost.Metrics;
+        if (!metrics.IsPresentable || metrics.DipWidth <= 0 || metrics.DipHeight <= 0) return;
+        if (fact.Kind == RekallAgeStudioViewportPointerKind.Down
+            && fact.Button == RekallAgeStudioViewportPointerButton.Left)
         {
-            _sceneTransformDragging = true;
-            image.CaptureMouse();
-            e.Handled = true;
+            if (_viewModel.BeginSceneTransform(
+                    metrics.DipWidth,
+                    metrics.DipHeight,
+                    fact.DisplayX,
+                    fact.DisplayY))
+            {
+                _sceneTransformDragging = true;
+                SceneVulkanViewportHost.CapturePointer();
+                return;
+            }
+
+            await _viewModel.SelectViewportEntityAsync(
+                metrics.DipWidth,
+                metrics.DipHeight,
+                fact.DisplayX,
+                fact.DisplayY);
             return;
         }
-        await _viewModel.SelectViewportEntityAsync(
-            image.ActualWidth,
-            image.ActualHeight,
-            position.X,
-            position.Y);
-        e.Handled = true;
+        if (fact.Kind == RekallAgeStudioViewportPointerKind.Move && _sceneTransformDragging)
+        {
+            _viewModel.UpdateSceneTransform(
+                metrics.DipWidth,
+                metrics.DipHeight,
+                fact.DisplayX,
+                fact.DisplayY);
+            return;
+        }
+        if (fact.Kind == RekallAgeStudioViewportPointerKind.Up && _sceneTransformDragging)
+        {
+            _sceneTransformDragging = false;
+            _viewModel.UpdateSceneTransform(
+                metrics.DipWidth,
+                metrics.DipHeight,
+                fact.DisplayX,
+                fact.DisplayY);
+            await _viewModel.CompleteSceneTransformAsync();
+            return;
+        }
+        if (fact.Kind is RekallAgeStudioViewportPointerKind.FocusLost
+            or RekallAgeStudioViewportPointerKind.CaptureLost)
+        {
+            if (!_sceneTransformDragging) return;
+            _sceneTransformDragging = false;
+            _viewModel.CancelSceneTransform();
+        }
     }
 
-    private void OnSceneViewportMouseMove(object sender, MouseEventArgs e)
+    private async void OnSceneViewportMetricsChanged(
+        object? sender,
+        RekallAgeStudioViewportMetrics metrics)
     {
-        if (!_sceneTransformDragging || sender is not Image image) return;
-        var position = e.GetPosition(image);
-        _viewModel.UpdateSceneTransform(image.ActualWidth, image.ActualHeight, position.X, position.Y);
-        e.Handled = true;
+        if (!metrics.IsPresentable || !_viewModel.HasProject) return;
+        try
+        {
+            await _viewModel.PresentViewportAtHostSizeAsync(metrics);
+        }
+        catch (Exception exception)
+        {
+            Log.Error(exception, "Studio Vulkan viewport failed to present after resize.");
+        }
     }
-
-    private async void OnSceneViewportMouseUp(object sender, MouseButtonEventArgs e)
-    {
-        if (!_sceneTransformDragging || sender is not Image image) return;
-        _sceneTransformDragging = false;
-        var position = e.GetPosition(image);
-        _viewModel.UpdateSceneTransform(image.ActualWidth, image.ActualHeight, position.X, position.Y);
-        image.ReleaseMouseCapture();
-        await _viewModel.CompleteSceneTransformAsync();
-        e.Handled = true;
-    }
-
-    private void OnSceneViewportLostMouseCapture(object sender, MouseEventArgs e)
-    {
-        if (!_sceneTransformDragging) return;
-        _sceneTransformDragging = false;
-        _viewModel.CancelSceneTransform();
-    }
-
-    private void OnSceneViewportSizeChanged(object sender, SizeChangedEventArgs e) => RenderSceneGizmo();
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -311,12 +347,13 @@ public partial class MainWindow : Window
         {
             if (!_initializing && !_hadProject && _viewModel.HasProject) SelectWorkspace("Author");
             _hadProject = _viewModel.HasProject;
+            if (_viewModel.HasProject) PrepareViewportHost();
+            else ShowVulkanUnavailablePlaceholder();
         }
-        if (e.PropertyName is nameof(RekallAgeStudioViewModel.SceneGizmoHandles)
-            or nameof(RekallAgeStudioViewModel.TransformTool)
-            or nameof(RekallAgeStudioViewModel.ViewportImage))
+        if (e.PropertyName == nameof(RekallAgeStudioViewModel.ViewportAvailable))
         {
-            Dispatcher.BeginInvoke(RenderSceneGizmo, DispatcherPriority.Render);
+            if (_viewModel.ViewportAvailable) PrepareViewportHost();
+            else ShowVulkanUnavailablePlaceholder();
         }
     }
 
@@ -344,32 +381,16 @@ public partial class MainWindow : Window
         _ => 0
     };
 
-    private void RenderSceneGizmo()
+    private void PrepareViewportHost()
     {
-        if (SceneGizmoCanvas is null || SceneViewportImage is null) return;
-        SceneGizmoCanvas.Children.Clear();
-        foreach (var handle in _viewModel.GetSceneGizmoDisplayLines(
-                     SceneViewportImage.ActualWidth,
-                     SceneViewportImage.ActualHeight))
-        {
-            var color = handle.Axis switch
-            {
-                RekallAgeStudioTransformAxis.X => Color.FromRgb(239, 83, 80),
-                RekallAgeStudioTransformAxis.Y => Color.FromRgb(102, 187, 106),
-                _ => Color.FromRgb(66, 165, 245)
-            };
-            SceneGizmoCanvas.Children.Add(new Line
-            {
-                X1 = handle.X1,
-                Y1 = handle.Y1,
-                X2 = handle.X2,
-                Y2 = handle.Y2,
-                Stroke = new SolidColorBrush(color),
-                StrokeThickness = 3,
-                StrokeStartLineCap = PenLineCap.Round,
-                StrokeEndLineCap = PenLineCap.Triangle
-            });
-        }
+        VulkanUnavailablePlaceholder.Visibility = Visibility.Collapsed;
+        SceneVulkanViewportHost.Visibility = Visibility.Visible;
+    }
+
+    private void ShowVulkanUnavailablePlaceholder()
+    {
+        SceneVulkanViewportHost.Visibility = Visibility.Collapsed;
+        VulkanUnavailablePlaceholder.Visibility = Visibility.Visible;
     }
 
     private void OnMeshViewportMouseDown(object sender, MouseButtonEventArgs e)
@@ -425,6 +446,8 @@ public partial class MainWindow : Window
             if (!await ResolveDirtyCodeAsync()) return;
             _previewTimer.Stop();
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+            SceneVulkanViewportHost.PointerFact -= OnSceneViewportPointerFact;
+            SceneVulkanViewportHost.MetricsChanged -= OnSceneViewportMetricsChanged;
             try
             {
                 _layout = CaptureLayout();

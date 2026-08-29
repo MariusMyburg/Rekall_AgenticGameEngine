@@ -141,28 +141,35 @@
             <Border Grid.Column="1" Grid.Row="0" Margin="0,8,0,8" Background="#090C10"
                     BorderBrush="{StaticResource PanelBorder}" BorderThickness="1">
                 <Grid>
-                    <Image x:Name="SceneViewportImage" Source="{Binding ViewportImage}" Stretch="Uniform"
-                           RenderOptions.BitmapScalingMode="HighQuality" MouseLeftButtonDown="OnSceneViewportMouseDown"
-                           MouseMove="OnSceneViewportMouseMove" MouseLeftButtonUp="OnSceneViewportMouseUp"
-                           LostMouseCapture="OnSceneViewportLostMouseCapture" SizeChanged="OnSceneViewportSizeChanged"
-                           Cursor="Cross" ToolTip="Select scene entities directly through the rendered viewport." />
-                    <Canvas x:Name="SceneGizmoCanvas" IsHitTestVisible="False" />
-                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
-                        <TextBlock Text="AGE" Foreground="#33404D" FontSize="34" FontWeight="Light" HorizontalAlignment="Center" />
-                        <TextBlock Text="Open a project to render the live viewport" Foreground="#607184" Margin="0,8,0,0" />
-                        <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding ViewportImage}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></StackPanel.Style>
-                    </StackPanel>
-                    <Border VerticalAlignment="Top" Background="#D9171C23" Padding="12,8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Background="#D9171C23" Padding="12,8">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{Binding ViewportTitle}" FontSize="16" FontWeight="SemiBold" />
                             <TextBlock Text=" · " Foreground="#718096" />
                             <TextBlock Text="{Binding ViewportSummary}" Foreground="#AAB6C5" />
                             <TextBlock Text=" · " Foreground="#718096" />
+                            <TextBlock Text="{Binding ViewportBackendLabel}" Foreground="#78C8FF" FontWeight="SemiBold" />
+                            <TextBlock Text=" · " Foreground="#718096" />
                             <TextBlock Text="{Binding ModeLabel}" Foreground="{StaticResource Accent}" FontWeight="SemiBold" />
                         </StackPanel>
                     </Border>
-                    <Border VerticalAlignment="Top" HorizontalAlignment="Left" Margin="10,48,0,0"
-                            Background="#E3151920" BorderBrush="#394451" BorderThickness="1" CornerRadius="3" Padding="5">
+                    <Grid Grid.Row="1">
+                        <local:RekallAgeVulkanViewportHost x:Name="SceneVulkanViewportHost"
+                            Cursor="Cross" ToolTip="Select scene entities directly through the Vulkan viewport." />
+                        <StackPanel x:Name="VulkanUnavailablePlaceholder" Visibility="Collapsed"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                            <TextBlock Text="AGE" Foreground="#33404D" FontSize="34" FontWeight="Light" HorizontalAlignment="Center" />
+                            <TextBlock Text="Vulkan is unavailable" Foreground="#E28A8A" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" Margin="0,8,0,0" />
+                            <TextBlock Text="{Binding ViewportUnavailableReason}" Foreground="#8796A8" Margin="0,4,0,0"
+                                       TextAlignment="Center" TextWrapping="Wrap" MaxWidth="540" />
+                        </StackPanel>
+                    </Grid>
+                    <Border Grid.Row="2" Background="#E3151920" BorderBrush="#394451" BorderThickness="1,1,0,0" Padding="5">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Transform" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="3,0,5,0" />
                             <ComboBox Width="76" ItemsSource="{Binding TransformTools}" SelectedItem="{Binding TransformTool}" />

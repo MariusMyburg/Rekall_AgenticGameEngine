@@ -17,6 +17,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Rekall.Age.Studio\Rekall.Age.Studio.csproj" />
+    <ProjectReference Include="..\..\src\Rekall.Age.Rendering.Windows\Rekall.Age.Rendering.Windows.csproj" />
     <ProjectReference Include="..\..\src\Rekall.Age.World\Rekall.Age.World.csproj" />
   </ItemGroup>
 </Project>

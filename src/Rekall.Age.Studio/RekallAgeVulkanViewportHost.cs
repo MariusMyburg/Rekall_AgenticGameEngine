@@ -8,6 +8,7 @@ using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Windows;
 using Rekall.Age.Runtime.Abstractions;
+using Serilog;
 
 namespace Rekall.Age.Studio;
 
@@ -272,6 +273,7 @@ internal sealed class RekallAgeStudioVulkanViewportPresenter :
             }
             catch (Exception exception)
             {
+                Log.Warning(exception, "Studio Vulkan presentation session became unavailable.");
                 await DisposeSessionAsync();
                 return Unavailable(frame, exception.Message, exception);
             }
@@ -393,9 +395,23 @@ internal interface IRekallAgeVulkanViewportNativeWindow
 {
     IntPtr CreateChild(IntPtr parent);
 
+    void AttachMessageHandler(
+        IntPtr hwnd,
+        Func<int, IntPtr, IntPtr, bool> messageHandler)
+    {
+    }
+
+    void DetachMessageHandler(IntPtr hwnd)
+    {
+    }
+
     void DestroyChild(IntPtr hwnd);
 
     void ResizeChild(IntPtr hwnd, int width, int height);
+
+    void SetVisible(IntPtr hwnd, bool visible)
+    {
+    }
 
     (int Width, int Height) GetClientSize(IntPtr hwnd);
 
@@ -427,6 +443,7 @@ internal sealed class RekallAgeVulkanViewportHostCore
     private readonly object _resizeSync = new();
     private IntPtr _child;
     private RekallAgeStudioViewportMetrics? _pendingMetrics;
+    private bool _messageHandlerAttached;
     private bool _destroyed;
 
     internal RekallAgeVulkanViewportHostCore(
@@ -445,7 +462,7 @@ internal sealed class RekallAgeVulkanViewportHostCore
 
     internal bool HasPointerCapture { get; private set; }
 
-    internal IntPtr BuildWindow(IntPtr parent)
+    internal IntPtr BuildWindow(IntPtr parent, bool attachMessageHandler = true)
     {
         if (_child != IntPtr.Zero)
         {
@@ -458,8 +475,16 @@ internal sealed class RekallAgeVulkanViewportHostCore
             throw new InvalidOperationException("The Studio Vulkan child HWND could not be created.");
         }
 
+        if (attachMessageHandler) AttachWindowMessageHandler();
         _surface.AttachSurface(_child);
         return _child;
+    }
+
+    internal void AttachWindowMessageHandler()
+    {
+        if (_child == IntPtr.Zero || _destroyed || _messageHandlerAttached) return;
+        _native.AttachMessageHandler(_child, ProcessWindowMessage);
+        _messageHandlerAttached = true;
     }
 
     internal void QueueResize(
@@ -491,6 +516,7 @@ internal sealed class RekallAgeVulkanViewportHostCore
         }
 
         if (pending is not { } requested || _child == IntPtr.Zero || _destroyed) return;
+        _native.SetVisible(_child, requested.IsPresentable);
         RekallAgeStudioViewportMetrics coherent;
         if (!requested.IsPresentable)
         {
@@ -580,6 +606,11 @@ internal sealed class RekallAgeVulkanViewportHostCore
         }
 
         ReleasePointerCapture(releaseNative: true);
+        if (_messageHandlerAttached)
+        {
+            _native.DetachMessageHandler(_child);
+            _messageHandlerAttached = false;
+        }
         _native.DestroyChild(_child);
         _destroyed = true;
         _child = IntPtr.Zero;
@@ -645,7 +676,7 @@ internal sealed class RekallAgeVulkanViewportHost : HwndHost, IRekallAgeStudioVi
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _resizeScheduled;
 
-    internal RekallAgeVulkanViewportHost()
+    public RekallAgeVulkanViewportHost()
         : this(new RekallAgeWin32VulkanViewportNativeWindow(), new RekallAgeStudioVulkanViewportPresenter())
     {
     }
@@ -678,7 +709,12 @@ internal sealed class RekallAgeVulkanViewportHost : HwndHost, IRekallAgeStudioVi
 
     protected override HandleRef BuildWindowCore(HandleRef hwndParent)
     {
-        var child = _core.BuildWindow(hwndParent.Handle);
+        // HwndHost installs its own native plumbing after BuildWindowCore returns. Hook the
+        // final child procedure on the dispatcher so real mouse messages reach the core.
+        var child = _core.BuildWindow(hwndParent.Handle, attachMessageHandler: false);
+        _ = Dispatcher.BeginInvoke(
+            DispatcherPriority.Loaded,
+            new Action(_core.AttachWindowMessageHandler));
         ScheduleResize();
         return new HandleRef(this, child);
     }
@@ -706,7 +742,6 @@ internal sealed class RekallAgeVulkanViewportHost : HwndHost, IRekallAgeStudioVi
             ScheduleResize();
         }
 
-        _core.ProcessWindowMessage(msg, wParam, lParam);
         return IntPtr.Zero;
     }
 
@@ -748,12 +783,22 @@ internal sealed class RekallAgeVulkanViewportHost : HwndHost, IRekallAgeStudioVi
 
 internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulkanViewportNativeWindow
 {
+    private const int GwlpWndProc = -4;
     private const int WsChild = 0x40000000;
     private const int WsVisible = 0x10000000;
     private const int WsClipChildren = 0x02000000;
     private const int WsClipSiblings = 0x04000000;
+    private const int SsNotify = 0x00000100;
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpShowWindow = 0x0040;
+    private const uint SwpHideWindow = 0x0080;
+    private WindowProcedure? _windowProcedure;
+    private Func<int, IntPtr, IntPtr, bool>? _messageHandler;
+    private IntPtr _subclassedHwnd;
+    private IntPtr _originalWindowProcedure;
 
     public IntPtr CreateChild(IntPtr parent)
     {
@@ -761,7 +806,7 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
             0,
             "STATIC",
             string.Empty,
-            WsChild | WsVisible | WsClipChildren | WsClipSiblings,
+            WsChild | WsVisible | WsClipChildren | WsClipSiblings | SsNotify,
             0,
             0,
             1,
@@ -774,6 +819,56 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
         return child;
     }
 
+    public void AttachMessageHandler(
+        IntPtr hwnd,
+        Func<int, IntPtr, IntPtr, bool> messageHandler)
+    {
+        ArgumentNullException.ThrowIfNull(messageHandler);
+        if (_subclassedHwnd != IntPtr.Zero)
+        {
+            throw new InvalidOperationException("The Studio Vulkan child HWND already has a message handler.");
+        }
+
+        _messageHandler = messageHandler;
+        _windowProcedure = ForwardWindowMessage;
+        Marshal.SetLastPInvokeError(0);
+        _originalWindowProcedure = SetWindowProcedure(
+            hwnd,
+            Marshal.GetFunctionPointerForDelegate(_windowProcedure));
+        if (_originalWindowProcedure == IntPtr.Zero && Marshal.GetLastPInvokeError() != 0)
+        {
+            _messageHandler = null;
+            _windowProcedure = null;
+            throw new Win32Exception(Marshal.GetLastPInvokeError());
+        }
+
+        _subclassedHwnd = hwnd;
+    }
+
+    public void DetachMessageHandler(IntPtr hwnd)
+    {
+        if (_subclassedHwnd == IntPtr.Zero) return;
+        if (hwnd != _subclassedHwnd)
+        {
+            throw new InvalidOperationException("Cannot detach the Studio Vulkan handler from an unexpected HWND.");
+        }
+
+        if (_originalWindowProcedure != IntPtr.Zero)
+        {
+            Marshal.SetLastPInvokeError(0);
+            var result = SetWindowProcedure(hwnd, _originalWindowProcedure);
+            if (result == IntPtr.Zero && Marshal.GetLastPInvokeError() != 0)
+            {
+                throw new Win32Exception(Marshal.GetLastPInvokeError());
+            }
+        }
+
+        _subclassedHwnd = IntPtr.Zero;
+        _originalWindowProcedure = IntPtr.Zero;
+        _messageHandler = null;
+        _windowProcedure = null;
+    }
+
     public void DestroyChild(IntPtr hwnd)
     {
         if (!DestroyWindow(hwnd)) throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -782,6 +877,16 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
     public void ResizeChild(IntPtr hwnd, int width, int height)
     {
         if (!SetWindowPos(hwnd, IntPtr.Zero, 0, 0, width, height, SwpNoActivate | SwpNoZOrder))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+    }
+
+    public void SetVisible(IntPtr hwnd, bool visible)
+    {
+        var flags = SwpNoActivate | SwpNoZOrder | SwpNoMove | SwpNoSize
+            | (visible ? SwpShowWindow : SwpHideWindow);
+        if (!SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, flags))
         {
             throw new Win32Exception(Marshal.GetLastWin32Error());
         }
@@ -813,6 +918,23 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
         return (scale, scale);
     }
 
+    private IntPtr ForwardWindowMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam)
+    {
+        if (_messageHandler?.Invoke(message, wParam, lParam) == true)
+        {
+            return IntPtr.Zero;
+        }
+
+        return _originalWindowProcedure == IntPtr.Zero
+            ? DefWindowProcW(hwnd, message, wParam, lParam)
+            : CallWindowProcW(_originalWindowProcedure, hwnd, message, wParam, lParam);
+    }
+
+    private static IntPtr SetWindowProcedure(IntPtr hwnd, IntPtr windowProcedure) =>
+        IntPtr.Size == 8
+            ? SetWindowLongPtrW(hwnd, GwlpWndProc, windowProcedure)
+            : new IntPtr(SetWindowLongW(hwnd, GwlpWndProc, windowProcedure.ToInt32()));
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr CreateWindowExW(
         int extendedStyle,
@@ -827,6 +949,27 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
         IntPtr menu,
         IntPtr instance,
         IntPtr parameter);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    private static extern IntPtr SetWindowLongPtrW(IntPtr hwnd, int index, IntPtr newValue);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongW", SetLastError = true)]
+    private static extern int SetWindowLongW(IntPtr hwnd, int index, int newValue);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr CallWindowProcW(
+        IntPtr previousWindowProcedure,
+        IntPtr hwnd,
+        int message,
+        IntPtr wParam,
+        IntPtr lParam);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr DefWindowProcW(
+        IntPtr hwnd,
+        int message,
+        IntPtr wParam,
+        IntPtr lParam);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -879,4 +1022,11 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
         internal int X = x;
         internal int Y = y;
     }
+
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate IntPtr WindowProcedure(
+        IntPtr hwnd,
+        int message,
+        IntPtr wParam,
+        IntPtr lParam);
 }

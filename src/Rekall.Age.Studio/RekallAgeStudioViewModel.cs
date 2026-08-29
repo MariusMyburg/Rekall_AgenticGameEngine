@@ -238,7 +238,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _statusText = "Create or open a Rekall AGE project to begin.";
     private string _viewportTitle = "Viewport";
     private string _viewportSummary = "No rendered frame yet.";
-    private BitmapSource? _viewportImage;
+    private string _viewportBackendLabel = "Vulkan · unavailable";
+    private bool _viewportAvailable;
+    private string _viewportUnavailableReason = "Vulkan is unavailable until the World viewport surface is ready.";
     private RekallAgeStudioViewportInteractionSnapshot? _viewportInteraction;
     private RekallAgeStudioSceneGizmo? _sceneGizmo;
     private RekallAgeStudioTransformGesture? _sceneTransformGesture;
@@ -279,6 +281,16 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             new RekallAgeLanguageModelProviderCatalog(),
             null,
             new RekallAgeStudioPreviewSession(),
+            null)
+    {
+    }
+
+    internal RekallAgeStudioViewModel(IRekallAgeStudioPreviewSession previewSession)
+        : this(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            new RekallAgeLanguageModelProviderCatalog(),
+            null,
+            previewSession,
             null)
     {
     }
@@ -717,7 +729,6 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         set
         {
             if (!Set(ref _selectedRenderDebugView, value) || value is null || !File.Exists(value.OutputPath)) return;
-            ViewportImage = LoadBitmap(value.OutputPath);
             ViewportSummary = $"{value.Label} · {(value.NonBlank ? "nonblank" : "blank")}";
         }
     }
@@ -1385,10 +1396,22 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         private set => Set(ref _viewportSummary, value);
     }
 
-    public BitmapSource? ViewportImage
+    public string ViewportBackendLabel
     {
-        get => _viewportImage;
-        private set => Set(ref _viewportImage, value);
+        get => _viewportBackendLabel;
+        private set => Set(ref _viewportBackendLabel, value);
+    }
+
+    public bool ViewportAvailable
+    {
+        get => _viewportAvailable;
+        private set => Set(ref _viewportAvailable, value);
+    }
+
+    public string ViewportUnavailableReason
+    {
+        get => _viewportUnavailableReason;
+        private set => Set(ref _viewportUnavailableReason, value);
     }
 
     public int ViewportRenderableCount
@@ -4124,7 +4147,6 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             cancellationToken);
         if (result.Ok && result.Value is CaptureRuntimeViewportResult capture && capture.Captured)
         {
-            ViewportImage = LoadBitmap(capture.ScreenshotPath);
             ViewportRenderableCount = capture.RenderableCount;
             ViewportVisuallyInformative = IsStudioVisualProofAcceptable(
                 capture.FrameAnalysis,
@@ -4156,6 +4178,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private async Task StartSimulationAsync()
     {
         if (_session.ProjectRoot is null || _session.SceneName is null) return;
+        if (!TryGetPreviewMetrics(out var metrics)) return;
         IsBusy = true;
         var transitionEntered = false;
         try
@@ -4165,10 +4188,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             var frame = await _previewSession.ResetAsync(
                 _session.ProjectRoot,
                 _session.SceneName,
-                960,
-                540,
+                metrics.PixelWidth,
+                metrics.PixelHeight,
                 _lifecycleCancellation.Token);
             ApplyPreviewFrame(frame);
+            if (!ViewportAvailable) return;
             IsSimulationPaused = false;
             Mode = RekallAgeStudioMode.Simulate;
             StatusText = $"Simulating {_session.SceneName} in the live Studio viewport.";
@@ -4238,7 +4262,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         try
         {
             ApplyPreviewFrame(await _previewSession.StepAsync(1, _lifecycleCancellation.Token));
-            StatusText = $"Simulation advanced exactly one frame to {PreviewFrameIndex}.";
+            if (ViewportAvailable) StatusText = $"Simulation advanced exactly one frame to {PreviewFrameIndex}.";
         }
         finally
         {
@@ -4248,14 +4272,87 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private void ApplyPreviewFrame(RekallAgeStudioPreviewFrame frame)
     {
-        ViewportImage = frame.Image;
         _viewportInteraction = frame.Interaction;
         RefreshSceneGizmo();
         PreviewFrameIndex = frame.FrameIndex;
         ViewportRenderableCount = frame.RenderableCount;
-        ViewportSummary = $"{frame.Image.PixelWidth}×{frame.Image.PixelHeight} · frame {frame.FrameIndex} · "
-            + $"{frame.RenderableCount} renderables · {frame.ObservationCount} observations · live preview";
+        var validVulkanFrame = frame.Presentation.PresentedFrame
+            && frame.Backend.Equals("vulkan", StringComparison.Ordinal)
+            && frame.HardwareAccelerated;
+        ViewportAvailable = validVulkanFrame;
+        ViewportBackendLabel = validVulkanFrame
+            ? $"Vulkan · hardware{FormatDeviceSuffix(frame.Presentation.SelectedDeviceName)}"
+            : "Vulkan · unavailable";
+        RemoveVulkanUnavailableDiagnostics();
+        if (validVulkanFrame)
+        {
+            ViewportUnavailableReason = string.Empty;
+        }
+        else
+        {
+            var failure = frame.Presentation.FailureReason ?? "Vulkan presentation failed.";
+            ViewportUnavailableReason = failure.Contains("Vulkan is unavailable", StringComparison.OrdinalIgnoreCase)
+                ? failure
+                : $"Vulkan is unavailable: {failure}";
+            var details = frame.Presentation.Errors.Count == 0
+                ? ViewportUnavailableReason
+                : $"{ViewportUnavailableReason} ({string.Join("; ", frame.Presentation.Errors)})";
+            ValidationLines.Insert(0, $"error: REKALL_STUDIO_VULKAN_UNAVAILABLE - {details}");
+            StatusText = ViewportUnavailableReason;
+        }
+        ViewportSummary = $"{frame.Presentation.Width}×{frame.Presentation.Height} · frame {frame.FrameIndex} · "
+            + $"{frame.RenderableCount} renderables · {frame.ObservationCount} observations · "
+            + (validVulkanFrame ? "Vulkan hardware" : "Vulkan unavailable");
     }
+
+    internal async Task PresentViewportAtHostSizeAsync(RekallAgeStudioViewportMetrics metrics)
+    {
+        if (!metrics.IsPresentable || IsBusy || !IsLiveViewportEnabled
+            || _session.ProjectRoot is null || _session.SceneName is null)
+        {
+            return;
+        }
+
+        try
+        {
+            ApplyPreviewFrame(await _previewSession.PresentCurrentAsync(
+                metrics.PixelWidth,
+                metrics.PixelHeight,
+                _lifecycleCancellation.Token));
+        }
+        catch (InvalidOperationException)
+        {
+            await RefreshEditPreviewAsync(StatusText);
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+        }
+    }
+
+    private bool TryGetPreviewMetrics(out RekallAgeStudioViewportMetrics metrics)
+    {
+        metrics = _previewSession.Metrics;
+        if (metrics.IsPresentable) return true;
+        ViewportAvailable = false;
+        ViewportBackendLabel = "Vulkan · unavailable";
+        ViewportUnavailableReason = "Vulkan is unavailable until the World viewport surface has a positive physical size.";
+        StatusText = ViewportUnavailableReason;
+        return false;
+    }
+
+    private void RemoveVulkanUnavailableDiagnostics()
+    {
+        for (var index = ValidationLines.Count - 1; index >= 0; index--)
+        {
+            if (ValidationLines[index].Contains("REKALL_STUDIO_VULKAN_UNAVAILABLE", StringComparison.Ordinal))
+            {
+                ValidationLines.RemoveAt(index);
+            }
+        }
+    }
+
+    private static string FormatDeviceSuffix(string? deviceName) =>
+        string.IsNullOrWhiteSpace(deviceName) ? string.Empty : $" · {deviceName.Trim()}";
 
     private async Task PlayAsync()
     {
@@ -4315,12 +4412,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 Mode = RekallAgeStudioMode.Edit;
                 if (resetEditPreview && _session.ProjectRoot is not null && _session.SceneName is not null)
                 {
-                    ApplyPreviewFrame(await _previewSession.ResetAsync(
-                        _session.ProjectRoot,
-                        _session.SceneName,
-                        960,
-                        540,
-                        cancellationToken));
+                    if (TryGetPreviewMetrics(out var metrics))
+                    {
+                        ApplyPreviewFrame(await _previewSession.ResetAsync(
+                            _session.ProjectRoot,
+                            _session.SceneName,
+                            metrics.PixelWidth,
+                            metrics.PixelHeight,
+                            cancellationToken));
+                    }
                 }
                 StatusText = "Simulation stopped; authored scene state is unchanged.";
                 return;
@@ -4441,15 +4541,17 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private async Task RefreshEditPreviewAsync(string operationSummary)
     {
         if (_session.ProjectRoot is null || _session.SceneName is null) return;
+        if (!TryGetPreviewMetrics(out var metrics)) return;
         try
         {
+            await _previewSession.InvalidateAssetsAsync(_lifecycleCancellation.Token);
             ApplyPreviewFrame(await _previewSession.ResetAsync(
                 _session.ProjectRoot,
                 _session.SceneName,
-                960,
-                540,
+                metrics.PixelWidth,
+                metrics.PixelHeight,
                 _lifecycleCancellation.Token));
-            StatusText = operationSummary;
+            if (ViewportAvailable) StatusText = operationSummary;
         }
         catch (Exception exception) when (exception is IOException or InvalidOperationException or ArgumentException)
         {
@@ -4523,7 +4625,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         ApplyRendering(model.Rendering, synchronizeAuthoring: true);
         ViewportTitle = $"{model.Scene.Name} Viewport";
         ViewportRenderableCount = model.Runtime.RenderableCount;
-        if (ViewportImage is null)
+        if (!ViewportAvailable)
         {
             ViewportSummary = $"Camera {model.Runtime.ActiveCameraName ?? "none"} · {model.Runtime.RenderableCount} renderables";
         }
@@ -4742,18 +4844,6 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private static bool PathsEqual(string left, string right) => Path.GetFullPath(left).Equals(
         Path.GetFullPath(right),
         OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
-
-    private static BitmapImage LoadBitmap(string path)
-    {
-        using var stream = new MemoryStream(File.ReadAllBytes(path));
-        var image = new BitmapImage();
-        image.BeginInit();
-        image.CacheOption = BitmapCacheOption.OnLoad;
-        image.StreamSource = stream;
-        image.EndInit();
-        image.Freeze();
-        return image;
-    }
 
     private static JsonNode? ParsePropertyValue(string text)
     {

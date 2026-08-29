@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Rekall.Age.Editor.Contracts;
 
 namespace Rekall.Age.Studio.Tests;
@@ -14,9 +15,22 @@ public sealed class StudioInspectorReferenceEditorWpfTests
     public StudioInspectorReferenceEditorWpfTests(WpfApplicationTestFixture wpf) => _wpf = wpf;
 
     [Fact]
-    public void EntityReferenceRenderPreservesStableValueAndUserSelectionProjectsStableIdOnce()
+    public void SharedApplicationFixturePumpsDispatcherBetweenInvocations()
     {
+        using var dispatched = new ManualResetEventSlim();
+
         _wpf.Invoke(() =>
+            Dispatcher.CurrentDispatcher.BeginInvoke(() => dispatched.Set()));
+
+        Assert.True(
+            dispatched.Wait(TimeSpan.FromSeconds(2)),
+            "The shared WPF fixture stopped pumping the Dispatcher after an invocation returned.");
+    }
+
+    [Fact]
+    public async Task EntityReferenceRenderPreservesStableValueAndUserSelectionProjectsStableIdOnce()
+    {
+        await _wpf.InvokeAsync(async () =>
         {
             MainWindow? window = null;
             try
@@ -75,7 +89,15 @@ public sealed class StudioInspectorReferenceEditorWpfTests
             }
             finally
             {
-                window?.Close();
+                if (window is not null)
+                {
+                    var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    window.Closed += (_, _) => closed.TrySetResult();
+                    window.Close();
+                    await closed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                    Assert.False(window.IsVisible);
+                    Assert.DoesNotContain(window, Application.Current.Windows.OfType<Window>());
+                }
             }
         });
     }

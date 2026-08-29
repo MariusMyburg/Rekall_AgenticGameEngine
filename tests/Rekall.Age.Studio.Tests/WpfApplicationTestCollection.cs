@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.Runtime.ExceptionServices;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace Rekall.Age.Studio.Tests;
 
@@ -14,8 +14,10 @@ public sealed class WpfApplicationTestFixture : IDisposable
 {
     private readonly Thread _thread;
     private readonly ManualResetEventSlim _ready = new();
-    private readonly BlockingCollection<Action> _work = new();
+    private App? _application;
+    private Dispatcher? _dispatcher;
     private Exception? _startupFailure;
+    private bool _disposed;
 
     public WpfApplicationTestFixture()
     {
@@ -26,16 +28,21 @@ public sealed class WpfApplicationTestFixture : IDisposable
                 var app = new App();
                 app.InitializeComponent();
                 app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                _application = app;
+                _dispatcher = Dispatcher.CurrentDispatcher;
                 _ready.Set();
-                foreach (var action in _work.GetConsumingEnumerable()) action();
-                app.Shutdown();
+                Dispatcher.Run();
             }
             catch (Exception exception)
             {
                 _startupFailure = exception;
                 _ready.Set();
             }
-        });
+        })
+        {
+            IsBackground = true,
+            Name = "Rekall AGE WPF test application"
+        };
         _thread.SetApartmentState(ApartmentState.STA);
         _thread.Start();
         if (!_ready.Wait(TimeSpan.FromSeconds(10)))
@@ -48,35 +55,65 @@ public sealed class WpfApplicationTestFixture : IDisposable
     public void Invoke(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
-        Exception? failure = null;
-        using var completed = new ManualResetEventSlim();
-        _work.Add(() =>
+        InvokeAsync(() =>
         {
+            var synchronizationContext = SynchronizationContext.Current;
+            SynchronizationContext.SetSynchronizationContext(null);
             try
             {
                 action();
-            }
-            catch (Exception exception)
-            {
-                failure = exception;
+                return Task.CompletedTask;
             }
             finally
             {
-                completed.Set();
+                SynchronizationContext.SetSynchronizationContext(synchronizationContext);
             }
-        });
-        if (!completed.Wait(TimeSpan.FromSeconds(30)))
+        }).GetAwaiter().GetResult();
+    }
+
+    public async Task InvokeAsync(Func<Task> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var dispatcher = _dispatcher
+            ?? throw new InvalidOperationException("The WPF Application fixture has not finished starting.");
+        var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _ = dispatcher.BeginInvoke(new Action(async () =>
         {
-            throw new TimeoutException("WPF Application fixture action did not complete within thirty seconds.");
-        }
-        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+            try
+            {
+                await action();
+                completed.TrySetResult();
+            }
+            catch (Exception exception)
+            {
+                completed.TrySetException(exception);
+            }
+        }), DispatcherPriority.Send);
+
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(30));
     }
 
     public void Dispose()
     {
-        _work.CompleteAdding();
-        _thread.Join(TimeSpan.FromSeconds(10));
-        _work.Dispose();
+        if (_disposed) return;
+        _disposed = true;
+        var dispatcher = _dispatcher;
+        if (dispatcher is not null && !dispatcher.HasShutdownStarted)
+        {
+            _ = dispatcher.BeginInvoke(new Action(() =>
+            {
+                _application?.Shutdown();
+                if (!dispatcher.HasShutdownStarted) dispatcher.InvokeShutdown();
+            }), DispatcherPriority.Send);
+        }
+
+        var stopped = _thread.Join(TimeSpan.FromSeconds(10));
         _ready.Dispose();
+        if (!stopped)
+        {
+            throw new TimeoutException(
+                "The shared WPF Application thread did not stop within ten seconds after shutdown was requested.");
+        }
     }
 }

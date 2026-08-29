@@ -38,7 +38,8 @@ public sealed class RekallAgeOllamaGgufImporter : IRekallAgeGgufImporter
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(ggufPath)
-            || !Path.GetExtension(ggufPath).Equals(".gguf", StringComparison.OrdinalIgnoreCase))
+            || !Path.GetExtension(ggufPath).Equals(".gguf", StringComparison.OrdinalIgnoreCase)
+            || HasUnsupportedModelfilePathCharacter(ggufPath))
         {
             throw new RekallAgeLanguageModelProviderException(
                 "REKALL_GGUF_FILE_INVALID",
@@ -125,6 +126,9 @@ public sealed class RekallAgeOllamaGgufImporter : IRekallAgeGgufImporter
             }
         }
     }
+
+    private static bool HasUnsupportedModelfilePathCharacter(string path) =>
+        path.Any(character => character == '"' || char.IsControl(character));
 
     private static string BuildModelName(string fullPath)
     {

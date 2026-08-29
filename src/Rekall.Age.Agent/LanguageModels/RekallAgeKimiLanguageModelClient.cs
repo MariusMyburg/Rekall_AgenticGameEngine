@@ -9,21 +9,36 @@ namespace Rekall.Age.Agent.LanguageModels;
 public sealed class RekallAgeKimiLanguageModelClient : IRekallAgeLanguageModelClient
 {
     private const string DefaultBaseUrl = "https://api.moonshot.ai/v1/";
+    private const int MaximumAttempts = 3;
+    private static readonly TimeSpan MaximumRetryDelay = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan[] DefaultRetryDelays =
+        [TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(750)];
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
     private readonly Uri _baseUri;
+    private readonly Func<TimeSpan, CancellationToken, ValueTask> _retryDelay;
 
     public RekallAgeKimiLanguageModelClient(
         HttpClient httpClient,
         string apiKey,
         Uri? baseUri = null)
+        : this(httpClient, apiKey, baseUri, DelayAsync)
+    {
+    }
+
+    internal RekallAgeKimiLanguageModelClient(
+        HttpClient httpClient,
+        string apiKey,
+        Uri? baseUri,
+        Func<TimeSpan, CancellationToken, ValueTask> retryDelay)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _apiKey = string.IsNullOrWhiteSpace(apiKey)
             ? throw new ArgumentException("A Kimi API key is required.", nameof(apiKey))
             : apiKey;
         _baseUri = NormalizeBaseUri(baseUri ?? new Uri(DefaultBaseUrl));
+        _retryDelay = retryDelay ?? throw new ArgumentNullException(nameof(retryDelay));
     }
 
     public string ProviderId => "kimi";
@@ -31,8 +46,9 @@ public sealed class RekallAgeKimiLanguageModelClient : IRekallAgeLanguageModelCl
     public async ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(
         CancellationToken cancellationToken)
     {
-        using var request = CreateRequest(HttpMethod.Get, "models");
-        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        using var response = await SendWithRetriesAsync(
+            () => CreateRequest(HttpMethod.Get, "models"),
+            cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
         var root = await ReadObjectAsync(response, cancellationToken);
         return (root["data"] as JsonArray ?? [])
@@ -67,15 +83,20 @@ public sealed class RekallAgeKimiLanguageModelClient : IRekallAgeLanguageModelCl
         {
             payload["max_completion_tokens"] = maxOutputTokens;
         }
-        if (request.Temperature is { } temperature)
+        if (request.Temperature is { } temperature && !HasFixedTemperature(request.Model))
         {
             payload["temperature"] = temperature;
         }
         ApplyReasoning(request.Model, request.Think, payload);
 
-        using var message = CreateRequest(HttpMethod.Post, "chat/completions");
-        message.Content = JsonContent.Create(payload, options: JsonOptions);
-        using var response = await _httpClient.SendAsync(message, cancellationToken);
+        using var response = await SendWithRetriesAsync(
+            () =>
+            {
+                var message = CreateRequest(HttpMethod.Post, "chat/completions");
+                message.Content = JsonContent.Create(payload, options: JsonOptions);
+                return message;
+            },
+            cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
         var root = await ReadObjectAsync(response, cancellationToken);
         var choice = (root["choices"] as JsonArray)?.OfType<JsonObject>().FirstOrDefault()
@@ -131,6 +152,7 @@ public sealed class RekallAgeKimiLanguageModelClient : IRekallAgeLanguageModelCl
             && !string.IsNullOrWhiteSpace(message.ToolCallId))
         {
             value["tool_call_id"] = message.ToolCallId;
+            if (!string.IsNullOrWhiteSpace(message.ToolName)) value["name"] = message.ToolName;
         }
         if (message.ToolCalls is { Count: > 0 })
         {
@@ -253,6 +275,80 @@ public sealed class RekallAgeKimiLanguageModelClient : IRekallAgeLanguageModelCl
             retryable: retryable,
             sensitiveValues: [_apiKey]);
     }
+
+    private async ValueTask<HttpResponseMessage> SendWithRetriesAsync(
+        Func<HttpRequestMessage> requestFactory,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < MaximumAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                using var request = requestFactory();
+                var response = await _httpClient.SendAsync(request, cancellationToken);
+                if (!IsRetryable(response.StatusCode) || attempt == MaximumAttempts - 1)
+                {
+                    return response;
+                }
+
+                var delay = ResolveRetryDelay(response, attempt);
+                response.Dispose();
+                await _retryDelay(delay, cancellationToken);
+            }
+            catch (HttpRequestException) when (attempt < MaximumAttempts - 1)
+            {
+                await _retryDelay(DefaultRetryDelays[attempt], cancellationToken);
+            }
+            catch (HttpRequestException)
+            {
+                throw UnavailableTransportFailure();
+            }
+            catch (OperationCanceledException) when (
+                !cancellationToken.IsCancellationRequested
+                && attempt < MaximumAttempts - 1)
+            {
+                await _retryDelay(DefaultRetryDelays[attempt], cancellationToken);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                throw UnavailableTransportFailure();
+            }
+        }
+
+        throw new InvalidOperationException("The bounded Kimi retry loop did not return a response.");
+    }
+
+    private static TimeSpan ResolveRetryDelay(HttpResponseMessage response, int attempt)
+    {
+        var retryAfter = response.Headers.RetryAfter;
+        TimeSpan? dateDelay = retryAfter?.Date is { } date
+            ? date - DateTimeOffset.UtcNow
+            : null;
+        var requested = retryAfter?.Delta
+            ?? dateDelay
+            ?? DefaultRetryDelays[attempt];
+        if (requested < TimeSpan.Zero) return TimeSpan.Zero;
+        return requested > MaximumRetryDelay ? MaximumRetryDelay : requested;
+    }
+
+    private static bool IsRetryable(HttpStatusCode statusCode) =>
+        statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
+        || (int)statusCode >= 500;
+
+    private static bool HasFixedTemperature(string model) =>
+        model.StartsWith("kimi-k2", StringComparison.OrdinalIgnoreCase)
+        || model.StartsWith("kimi-k3", StringComparison.OrdinalIgnoreCase);
+
+    private static ValueTask DelayAsync(TimeSpan delay, CancellationToken cancellationToken) =>
+        new(Task.Delay(delay, cancellationToken));
+
+    private RekallAgeLanguageModelProviderException UnavailableTransportFailure() => new(
+        "REKALL_KIMI_UNAVAILABLE",
+        ProviderId,
+        "Kimi is temporarily unavailable.",
+        retryable: true,
+        sensitiveValues: [_apiKey]);
 
     private static string? ReadRequestId(HttpResponseMessage response)
     {

@@ -11,6 +11,10 @@ The current documented default is `kimi-k3`. Multi-turn requests replay prior
 assistant messages and matching `tool_call_id` tool results. Kimi K3 preserved
 reasoning is replayed through `reasoning_content`; K3 reasoning effort is
 normalized to the supported `low`, `high`, or `max` values.
+K2/K3 fixed-temperature requests omit caller-provided temperature values. Both
+model discovery and chat use three bounded, cancellation-aware attempts for
+HTTP 408, 429, and 5xx responses or transport failures. Provider `Retry-After`
+guidance is honored up to a five-second interactive cap.
 
 The Studio credential can come from `KIMI_API_KEY`, the official
 `MOONSHOT_API_KEY`, or a session-only password field. `REKALL_AGE_KIMI_URL`
@@ -33,7 +37,8 @@ has the `.gguf` extension and `GGUF` magic header, uses a deterministic safe
 local model name, deletes the transient Modelfile, refreshes Ollama discovery,
 and selects the imported model only when Ollama advertises both completion and
 tool capability. AGE never displays the local source path in status or error
-facts.
+facts. Paths containing quotes or control characters are rejected before a
+Modelfile is generated so a POSIX filename cannot inject Modelfile directives.
 
 Official references:
 

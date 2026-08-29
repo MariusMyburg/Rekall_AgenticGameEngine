@@ -106,6 +106,22 @@ public sealed class OllamaGgufImporterTests
         }
     }
 
+    [Theory]
+    [InlineData("model\"injection.gguf")]
+    [InlineData("model\nPARAMETER injected true.gguf")]
+    public async Task RejectsPathsThatCannotBeSafelyRepresentedInAModelfile(string fileName)
+    {
+        var runner = new RecordingRunner();
+        var importer = new RekallAgeOllamaGgufImporter(runner);
+
+        var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(() =>
+            importer.ImportAsync(fileName, CancellationToken.None).AsTask());
+
+        Assert.Equal("REKALL_GGUF_FILE_INVALID", error.Code);
+        Assert.Equal(0, runner.RunCount);
+        Assert.DoesNotContain(fileName, error.ToString(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task ProcessRunnerCancellationTerminatesTheChildWithoutDeadlockingPipes()
     {

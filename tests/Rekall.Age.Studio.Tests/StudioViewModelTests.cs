@@ -394,7 +394,7 @@ public sealed class StudioViewModelTests
         var catalog = new RekallAgeLanguageModelProviderCatalog(
             httpClientFactory: () => new HttpClient(new ProviderLifecycleHandler(
                 blockOllamaChat: false,
-                ollamaModels: ["gemma4:latest", "qwen3.8:27b"]), disposeHandler: true));
+                ollamaModels: ["gemma4:latest", "qwen3.5:35b"]), disposeHandler: true));
         await using var viewModel = new RekallAgeStudioViewModel(
             new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
             catalog,

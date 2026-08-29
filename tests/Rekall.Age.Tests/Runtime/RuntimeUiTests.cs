@@ -9,6 +9,34 @@ namespace Rekall.Age.Tests.Runtime;
 public sealed class RuntimeUiTests
 {
     [Fact]
+    public async Task UiProjectionDrawsParentsBeforeChildrenRegardlessOfNames()
+    {
+        var canvas = RekallAgeEntityDocument.Create("Canvas", ["ui"])
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.UiCanvas",
+                new JsonObject { ["ReferenceWidth"] = 400, ["ReferenceHeight"] = 200 }));
+        var panel = RekallAgeEntityDocument.Create("ZBackground", ["ui"]) with { ParentId = canvas.Id };
+        panel = panel.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Panel",
+            new JsonObject { ["Width"] = 200, ["Height"] = 100 }));
+        var label = RekallAgeEntityDocument.Create("AContent", ["ui"]) with { ParentId = panel.Id };
+        label = label.AddComponent(RekallAgeComponentDocument.Create(
+            "Rekall.Label",
+            new JsonObject { ["Width"] = 180, ["Height"] = 30, ["Text"] = "Visible" }));
+        var scene = RekallAgeSceneDocument.Create("Main", ["ui"])
+            .AddEntity(canvas)
+            .AddEntity(label)
+            .AddEntity(panel);
+
+        var result = await RekallAgeRuntimeExecutionLoop.CreateDefault()
+            .RunAsync(new RekallAgeRuntimeWorldBuilder().Build(scene), 1, CancellationToken.None);
+
+        Assert.Equal(
+            ["ZBackground", "AContent"],
+            result.World.Subsystems.Ui.Elements.Select(element => element.EntityName));
+    }
+
+    [Fact]
     public async Task EqualUiAnchorsRetainAuthoredSizeAndApplyPositionAndPivot()
     {
         var hud = RekallAgeEntityDocument.Create("HUD", ["ui"])

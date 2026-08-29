@@ -796,7 +796,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                 },
                 new RekallAgeRuntimeUiView(
                     Sort(canvases),
-                    Sort(elements),
+                    SortUiElements(elements, world.Entities),
                     elements.Count(element => element.Interactive)))
             {
                 Input = world.Subsystems.Input,
@@ -1331,6 +1331,64 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             .OrderBy(item => GetEntityName(item), StringComparer.Ordinal)
             .ThenBy(item => GetEntityId(item), StringComparer.Ordinal)
             .ToArray();
+    }
+
+    private static IReadOnlyList<RekallAgeRuntimeUiElement> SortUiElements(
+        IEnumerable<RekallAgeRuntimeUiElement> items,
+        IReadOnlyList<RekallAgeRuntimeEntity> entities)
+    {
+        var elements = items.ToDictionary(item => item.EntityId, StringComparer.Ordinal);
+        var entityById = entities.ToDictionary(entity => entity.Id, StringComparer.Ordinal);
+        var children = entities
+            .Where(entity => entity.ParentId is not null && elements.ContainsKey(entity.Id))
+            .GroupBy(entity => entity.ParentId!, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Select(entity => entity.Id).ToArray(), StringComparer.Ordinal);
+        var ordered = new List<RekallAgeRuntimeUiElement>(elements.Count);
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+
+        IEnumerable<string> Order(IEnumerable<string> ids) => ids
+            .OrderBy(id => ReadUiLayoutOrder(entityById.GetValueOrDefault(id)))
+            .ThenBy(id => elements[id].EntityName, StringComparer.Ordinal)
+            .ThenBy(id => id, StringComparer.Ordinal);
+
+        void Visit(string id)
+        {
+            if (!visited.Add(id) || !elements.TryGetValue(id, out var element))
+            {
+                return;
+            }
+
+            ordered.Add(element);
+            if (children.TryGetValue(id, out var childIds))
+            {
+                foreach (var childId in Order(childIds))
+                {
+                    Visit(childId);
+                }
+            }
+        }
+
+        foreach (var rootId in Order(elements.Keys.Where(id =>
+                     !entityById.TryGetValue(id, out var entity)
+                     || entity.ParentId is null
+                     || !elements.ContainsKey(entity.ParentId))))
+        {
+            Visit(rootId);
+        }
+
+        foreach (var remainingId in Order(elements.Keys.Where(id => !visited.Contains(id))))
+        {
+            Visit(remainingId);
+        }
+
+        return ordered;
+    }
+
+    private static double ReadUiLayoutOrder(RekallAgeRuntimeEntity? entity)
+    {
+        var component = entity?.Components.FirstOrDefault(candidate => candidate.Type is
+            "Rekall.UiElement" or "Rekall.Button" or "Rekall.Label" or "Rekall.Panel" or "Rekall.Image");
+        return component is null ? 0 : ReadNumber(component.Properties, "layoutOrder", 0);
     }
 
     private static string GetEntityName<T>(T item)

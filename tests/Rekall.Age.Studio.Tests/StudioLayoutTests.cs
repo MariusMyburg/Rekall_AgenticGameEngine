@@ -267,12 +267,17 @@ public sealed class StudioLayoutTests
         Assert.Contains("Text=\"{Binding InspectorSelectionName}\"", window, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding InspectorSelectionId}\"", window, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding InspectorComponentCountText}\"", window, StringComparison.Ordinal);
-        Assert.Contains("SelectedItem=\"{Binding SelectedInspectorComponent, Mode=TwoWay}\"", window, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding InspectorComponentEditors}\"", window, StringComparison.Ordinal);
+        Assert.Contains("SelectedValue=\"{Binding SelectedInspectorComponent, Mode=TwoWay}\"", window, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding SelectedInspectorComponentDescription}\"", window, StringComparison.Ordinal);
-        Assert.Contains("ItemsSource=\"{Binding Properties}\"", window, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding PropertyEditors}\"", window, StringComparison.Ordinal);
+        Assert.Contains("ContentTemplateSelector=\"{StaticResource InspectorEditorTemplateSelector}\"", window, StringComparison.Ordinal);
+        Assert.Contains("InspectorBooleanEditorTemplate", window, StringComparison.Ordinal);
+        Assert.Contains("InspectorColorEditorTemplate", window, StringComparison.Ordinal);
+        Assert.Contains("InspectorVector3EditorTemplate", window, StringComparison.Ordinal);
+        Assert.Contains("ResetInspectorPropertyCommand", window, StringComparison.Ordinal);
         Assert.Contains("Content=\"Add / Replace\"", window, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Set Value\"", window, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Reset\"", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"Set Value\"", window, StringComparison.Ordinal);
     }
 
     [Theory]

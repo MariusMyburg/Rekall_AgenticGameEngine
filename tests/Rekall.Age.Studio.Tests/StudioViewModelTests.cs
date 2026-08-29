@@ -1744,11 +1744,13 @@ public sealed class StudioViewModelTests
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-mode-" + Guid.NewGuid().ToString("N"));
         try
         {
+            var clock = new ManualMonotonicClock();
             var preview = new RecordingPreviewSession();
             await using var viewModel = new RekallAgeStudioViewModel(
                 new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
                 new EmptyModel(),
-                preview);
+                preview,
+                clock);
             viewModel.ProjectPathInput = root;
             viewModel.ProjectNameInput = "Mode Test";
             viewModel.SceneNameInput = "Main";
@@ -1758,6 +1760,7 @@ public sealed class StudioViewModelTests
             Assert.True(viewModel.SimulateCommand.CanExecute(null));
 
             await ExecuteAsync(viewModel.SimulateCommand);
+            clock.Advance(RekallAgeStudioPreviewCadence.PresentationInterval);
             await viewModel.AdvanceLivePreviewAsync();
 
             Assert.Equal(RekallAgeStudioMode.Simulate, viewModel.Mode);
@@ -1897,11 +1900,13 @@ public sealed class StudioViewModelTests
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-step-" + Guid.NewGuid().ToString("N"));
         try
         {
+            var clock = new ManualMonotonicClock();
             var preview = new RecordingPreviewSession();
             await using var viewModel = new RekallAgeStudioViewModel(
                 new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
                 new EmptyModel(),
-                preview)
+                preview,
+                clock)
             {
                 ProjectPathInput = root,
                 ProjectNameInput = "Pause Step Test",
@@ -1922,12 +1927,168 @@ public sealed class StudioViewModelTests
 
             await ExecuteAsync(viewModel.PauseSimulationCommand);
             Assert.False(viewModel.IsSimulationPaused);
+            clock.Advance(RekallAgeStudioPreviewCadence.PresentationInterval);
             await viewModel.AdvanceLivePreviewAsync();
             Assert.Equal(2, viewModel.PreviewFrameIndex);
             Assert.Equal(2, preview.StepCount);
 
             await ExecuteAsync(viewModel.StopCommand);
             Assert.False(viewModel.IsSimulationPaused);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SimulationCadenceCatchesUpAtMostSixFramesAndPresentsOnlyNewestState()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-cadence-catchup-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var clock = new ManualMonotonicClock();
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview,
+                clock)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Cadence Catchup Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.SimulateCommand);
+
+            clock.Advance(TimeSpan.FromMilliseconds(100));
+            await viewModel.AdvanceLivePreviewAsync();
+
+            Assert.Equal(6, viewModel.PreviewFrameIndex);
+            Assert.Equal(1, preview.StepCount);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task PausingAndResumingSimulationDiscardElapsedTimeWhileManualStepAdvancesOnce()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-cadence-pause-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var clock = new ManualMonotonicClock();
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview,
+                clock)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Cadence Pause Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.SimulateCommand);
+            await ExecuteAsync(viewModel.PauseSimulationCommand);
+
+            clock.Advance(TimeSpan.FromSeconds(10));
+            await viewModel.AdvanceLivePreviewAsync();
+            await ExecuteAsync(viewModel.StepSimulationCommand);
+
+            Assert.True(viewModel.IsSimulationPaused);
+            Assert.Equal(1, viewModel.PreviewFrameIndex);
+
+            await ExecuteAsync(viewModel.PauseSimulationCommand);
+            await viewModel.AdvanceLivePreviewAsync();
+            Assert.Equal(1, viewModel.PreviewFrameIndex);
+
+            clock.Advance(RekallAgeStudioPreviewCadence.PresentationInterval);
+            await viewModel.AdvanceLivePreviewAsync();
+            Assert.Equal(2, viewModel.PreviewFrameIndex);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task UnavailableAndRecoveredVulkanPreviewStartsSimulationCadenceFresh()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-cadence-recovery-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var clock = new ManualMonotonicClock();
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview,
+                clock)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Cadence Recovery Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.SimulateCommand);
+
+            preview.ReturnUnavailable = true;
+            clock.Advance(TimeSpan.FromSeconds(10));
+            await viewModel.PresentViewportAtHostSizeAsync(preview.Metrics);
+            await viewModel.AdvanceLivePreviewAsync();
+
+            Assert.False(viewModel.ViewportAvailable);
+            Assert.Equal(0, viewModel.PreviewFrameIndex);
+            Assert.Equal(0, preview.StepCount);
+
+            preview.ReturnUnavailable = false;
+            await viewModel.PresentViewportAtHostSizeAsync(preview.Metrics);
+            await viewModel.AdvanceLivePreviewAsync();
+            Assert.Equal(0, viewModel.PreviewFrameIndex);
+
+            clock.Advance(RekallAgeStudioPreviewCadence.PresentationInterval);
+            await viewModel.AdvanceLivePreviewAsync();
+            Assert.Equal(1, viewModel.PreviewFrameIndex);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task StopAndNextSimulationResetDiscardPriorCadenceState()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-cadence-stop-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var clock = new ManualMonotonicClock();
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview,
+                clock)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Cadence Stop Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.SimulateCommand);
+            clock.Advance(TimeSpan.FromMilliseconds(100));
+            await viewModel.AdvanceLivePreviewAsync();
+            await ExecuteAsync(viewModel.StopCommand);
+            await ExecuteAsync(viewModel.SimulateCommand);
+            await viewModel.AdvanceLivePreviewAsync();
+
+            Assert.Equal(0, viewModel.PreviewFrameIndex);
         }
         finally
         {
@@ -3112,6 +3273,15 @@ public sealed class StudioViewModelTests
                 presentation,
                 new RekallAgeStudioViewportInteractionSnapshot(_width, _height, Regions));
         }
+    }
+
+    private sealed class ManualMonotonicClock : IRekallAgeStudioMonotonicClock
+    {
+        private TimeSpan _timestamp;
+
+        public TimeSpan GetTimestamp() => _timestamp;
+
+        public void Advance(TimeSpan elapsed) => _timestamp += elapsed;
     }
 
     private sealed class UnauthenticatedCodexRunner : IRekallAgeCodexProjectAgentRunner

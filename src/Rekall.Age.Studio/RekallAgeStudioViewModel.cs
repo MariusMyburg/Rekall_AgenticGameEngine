@@ -41,6 +41,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeCommandRegistry _agentRegistry;
     private readonly RekallAgeLanguageModelProviderCatalog _languageModelProviderCatalog;
     private readonly IRekallAgeStudioPreviewSession _previewSession;
+    private readonly RekallAgeStudioSimulationCadence _simulationCadence;
     private readonly SemaphoreSlim _modeTransitionGate = new(1, 1);
     private readonly CancellationTokenSource _lifecycleCancellation = new();
     private readonly object _disposeSync = new();
@@ -345,6 +346,21 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     internal RekallAgeStudioViewModel(
         RekallAgeWorkbenchSession session,
+        IRekallAgeLanguageModelClient? languageModelClient,
+        IRekallAgeStudioPreviewSession previewSession,
+        IRekallAgeStudioMonotonicClock monotonicClock)
+        : this(
+            session,
+            new RekallAgeLanguageModelProviderCatalog(),
+            languageModelClient,
+            previewSession,
+            null,
+            monotonicClock)
+    {
+    }
+
+    internal RekallAgeStudioViewModel(
+        RekallAgeWorkbenchSession session,
         RekallAgeLanguageModelProviderCatalog languageModelProviderCatalog,
         IRekallAgeStudioPreviewSession previewSession,
         Action<string>? openPackageFolder = null)
@@ -357,12 +373,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         RekallAgeLanguageModelProviderCatalog languageModelProviderCatalog,
         IRekallAgeLanguageModelClient? fixedLanguageModelClient,
         IRekallAgeStudioPreviewSession previewSession,
-        Action<string>? openPackageFolder)
+        Action<string>? openPackageFolder,
+        IRekallAgeStudioMonotonicClock? monotonicClock = null)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _languageModelProviderCatalog = languageModelProviderCatalog
             ?? throw new ArgumentNullException(nameof(languageModelProviderCatalog));
         _previewSession = previewSession ?? throw new ArgumentNullException(nameof(previewSession));
+        _simulationCadence = new RekallAgeStudioSimulationCadence(
+            monotonicClock ?? new RekallAgeStudioStopwatchClock());
         _openPackageFolder = openPackageFolder ?? OpenDirectoryInExplorer;
         _agentRegistry = RekallAgeDefaultCommandRegistry.Create();
         _selectedLanguageModelProvider = _languageModelProviderCatalog.Providers.Single(provider => provider.Id == "ollama");
@@ -4245,6 +4264,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 metrics.PixelHeight,
                 _lifecycleCancellation.Token);
             ApplyPreviewFrame(frame);
+            ResetSimulationCadence();
             if (!ViewportAvailable) return;
             IsSimulationPaused = false;
             Mode = RekallAgeStudioMode.Simulate;
@@ -4273,15 +4293,17 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 await RefreshEditPreviewAsync(StatusText);
             }
         }
-        if (!IsSimulating || IsSimulationPaused || !IsLiveViewportEnabled || IsBusy
+        if (!IsSimulating || IsSimulationPaused || !ViewportAvailable || !IsLiveViewportEnabled || IsBusy
             || Interlocked.Exchange(ref _previewAdvancing, 1) != 0)
         {
             return;
         }
         try
         {
+            var simulationFrames = _simulationCadence.ConsumeSimulationFrames();
+            if (simulationFrames == 0) return;
             ApplyPreviewFrame(await _previewSession.StepAsync(
-                RekallAgeStudioPreviewCadence.FramesPerPresentation,
+                simulationFrames,
                 _lifecycleCancellation.Token));
         }
         catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
@@ -4302,6 +4324,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private Task ToggleSimulationPauseAsync()
     {
         IsSimulationPaused = !IsSimulationPaused;
+        ResetSimulationCadence();
         StatusText = IsSimulationPaused
             ? $"Simulation paused at frame {PreviewFrameIndex}."
             : $"Simulation resumed from frame {PreviewFrameIndex}.";
@@ -4315,6 +4338,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         try
         {
             ApplyPreviewFrame(await _previewSession.StepAsync(1, _lifecycleCancellation.Token));
+            ResetSimulationCadence();
             if (ViewportAvailable) StatusText = $"Simulation advanced exactly one frame to {PreviewFrameIndex}.";
         }
         finally
@@ -4323,8 +4347,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
     }
 
+    private void ResetSimulationCadence() => _simulationCadence.Reset();
+
     private void ApplyPreviewFrame(RekallAgeStudioPreviewFrame frame)
     {
+        var wasViewportAvailable = ViewportAvailable;
         _viewportInteraction = frame.Interaction;
         RefreshSceneGizmo();
         PreviewFrameIndex = frame.FrameIndex;
@@ -4333,6 +4360,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             && frame.Backend.Equals("vulkan", StringComparison.Ordinal)
             && frame.HardwareAccelerated;
         ViewportAvailable = validVulkanFrame;
+        if (wasViewportAvailable != validVulkanFrame) ResetSimulationCadence();
         ViewportBackendLabel = validVulkanFrame
             ? $"Vulkan · hardware{FormatDeviceSuffix(frame.Presentation.SelectedDeviceName)}"
             : "Vulkan · unavailable";
@@ -4492,6 +4520,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             transitionEntered = true;
             if (Mode == RekallAgeStudioMode.Simulate)
             {
+                ResetSimulationCadence();
                 IsSimulationPaused = false;
                 Mode = RekallAgeStudioMode.Edit;
                 if (resetEditPreview && _session.ProjectRoot is not null && _session.SceneName is not null)
@@ -4504,6 +4533,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                             metrics.PixelWidth,
                             metrics.PixelHeight,
                             cancellationToken));
+                        ResetSimulationCadence();
                     }
                 }
                 StatusText = "Simulation stopped; authored scene state is unchanged.";
@@ -4634,6 +4664,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 metrics.PixelWidth,
                 metrics.PixelHeight,
                 _lifecycleCancellation.Token));
+            ResetSimulationCadence();
             if (ViewportAvailable) StatusText = operationSummary;
         }
         catch (Exception exception) when (exception is IOException or InvalidOperationException or ArgumentException)

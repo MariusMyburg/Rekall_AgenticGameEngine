@@ -36,7 +36,13 @@ public sealed class ListModuleSourcesCommand
                 "No module sources found."));
         }
 
-        var sources = Directory.EnumerateFiles(modulesRoot, "*.cs", SearchOption.AllDirectories)
+        var enumeration = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            AttributesToSkip = FileAttributes.ReparsePoint,
+            IgnoreInaccessible = false
+        };
+        var sources = Directory.EnumerateFiles(modulesRoot, "*.cs", enumeration)
             .Where(path => !ContainsGeneratedDirectory(modulesRoot, path))
             .Where(path => !RekallAgeModuleSourcePaths.ContainsReparsePoint(modulesRoot, path))
             .Where(path => Path.GetRelativePath(modulesRoot, path).IndexOfAny(

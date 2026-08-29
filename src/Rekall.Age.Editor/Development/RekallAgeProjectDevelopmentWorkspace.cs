@@ -47,9 +47,12 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
         var solutionPath = Path.Combine(workspaceRoot, $"{ToSafeFileName(manifest.Name)}.slnx");
         var solutionLaunchPath = Path.ChangeExtension(solutionPath, ".slnLaunch");
 
-        var moduleProjects = Directory.Exists(Path.Combine(projectRoot, "Modules"))
-            ? Directory.EnumerateFiles(Path.Combine(projectRoot, "Modules"), "*.csproj", SearchOption.AllDirectories)
+        var modulesRoot = Path.Combine(projectRoot, "Modules");
+        var moduleFiles = Directory.Exists(modulesRoot)
+            ? Directory.EnumerateFiles(modulesRoot, "*", SafeRecursiveEnumeration)
                 .Where(path => !ContainsGeneratedSegment(projectRoot, path))
+                .Where(path => Path.GetExtension(path).Equals(".cs", StringComparison.OrdinalIgnoreCase)
+                    || Path.GetExtension(path).Equals(".csproj", StringComparison.OrdinalIgnoreCase))
                 .Select(Path.GetFullPath)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ToArray()
@@ -72,7 +75,7 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
             "2.0.0",
             cancellationToken).ConfigureAwait(false);
 
-        await WriteAsync(debugProjectPath, CreateDebugProject(cliPath, projectRoot), cancellationToken).ConfigureAwait(false);
+        await WriteAsync(debugProjectPath, CreateDebugProject(cliPath, projectRoot, ideRoot, moduleFiles), cancellationToken).ConfigureAwait(false);
         await WriteAsync(programPath, CreateDebugProgram(), cancellationToken).ConfigureAwait(false);
         await WriteAsync(
             launchSettingsPath,
@@ -86,7 +89,7 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
             vscodeTasksPath,
             vscodeTasks,
             cancellationToken).ConfigureAwait(false);
-        await WriteAsync(solutionPath, CreateSolution(Path.GetDirectoryName(solutionPath)!, debugProjectPath, moduleProjects), cancellationToken).ConfigureAwait(false);
+        await WriteAsync(solutionPath, CreateSolution(Path.GetDirectoryName(solutionPath)!, debugProjectPath), cancellationToken).ConfigureAwait(false);
         await WriteAsync(
             solutionLaunchPath,
             JsonSerializer.Serialize(CreateVisualStudioSolutionLaunch(
@@ -157,19 +160,30 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
 
     private static string CreateSolution(
         string solutionDirectory,
-        string debugProjectPath,
-        IEnumerable<string> moduleProjects)
+        string debugProjectPath)
     {
-        var paths = new[] { debugProjectPath }.Concat(moduleProjects)
-            .Select(path => Path.GetRelativePath(solutionDirectory, path).Replace('/', '\\'));
+        var path = Path.GetRelativePath(solutionDirectory, debugProjectPath).Replace('/', '\\');
         return "<Solution>\n"
-            + string.Concat(paths.Select(path => $"  <Project Path=\"{SecurityElement.Escape(path)}\" />\n"))
+            + $"  <Project Path=\"{SecurityElement.Escape(path)}\" />\n"
             + "</Solution>\n";
     }
 
-    private static string CreateDebugProject(string cliPath, string projectRoot)
+    private static string CreateDebugProject(
+        string cliPath,
+        string projectRoot,
+        string debugProjectDirectory,
+        IEnumerable<string> moduleFiles)
     {
         var command = SecurityElement.Escape($"\"{cliPath}\" build modules \"{projectRoot}\"");
+        var linkedFiles = string.Concat(moduleFiles.Select(path =>
+        {
+            var include = Path.GetRelativePath(debugProjectDirectory, path).Replace('/', '\\');
+            var projectRelative = Path.GetRelativePath(projectRoot, path).Replace('/', '\\');
+            var link = projectRelative.StartsWith("Modules\\", StringComparison.OrdinalIgnoreCase)
+                ? $"Game Modules\\{projectRelative["Modules\\".Length..]}"
+                : $"Game Modules\\{Path.GetFileName(path)}";
+            return $"    <None Include=\"{SecurityElement.Escape(include)}\" Link=\"{SecurityElement.Escape(link)}\" />\n";
+        }));
         return $"""
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
@@ -179,6 +193,8 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
                 <ImplicitUsings>enable</ImplicitUsings>
                 <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
               </PropertyGroup>
+              <ItemGroup>
+            {linkedFiles}  </ItemGroup>
               <Target Name="BuildRekallModules" BeforeTargets="Build">
                 <Exec Command="{command}" />
               </Target>
@@ -239,6 +255,13 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
             || segment.Equals("obj", StringComparison.OrdinalIgnoreCase)
             || segment.Equals(".rekall", StringComparison.OrdinalIgnoreCase));
     }
+
+    private static EnumerationOptions SafeRecursiveEnumeration => new()
+    {
+        RecurseSubdirectories = true,
+        AttributesToSkip = FileAttributes.ReparsePoint,
+        IgnoreInaccessible = false
+    };
 
     private static string RequireExistingDirectory(string path, string parameterName)
     {

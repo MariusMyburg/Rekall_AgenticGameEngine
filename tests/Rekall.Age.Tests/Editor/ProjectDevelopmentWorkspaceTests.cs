@@ -41,13 +41,15 @@ public sealed class ProjectDevelopmentWorkspaceTests
         Assert.Equal(firstLaunch, await File.ReadAllTextAsync(second.VsCodeLaunchPath));
         Assert.Equal(authoredBytes, await File.ReadAllBytesAsync(authoredSourcePath));
         Assert.EndsWith(Path.Combine(".rekall", "ide", "Neon Orchard.slnx"), first.SolutionPath, StringComparison.Ordinal);
-        Assert.Contains("Modules\\OrchardRules\\OrchardRules.csproj", firstSolution, StringComparison.Ordinal);
-        Assert.Contains("Modules\\PlayerMotion\\PlayerMotion.csproj", firstSolution, StringComparison.Ordinal);
         Assert.Contains("Rekall.Game.Debug\\Rekall.Game.Debug.csproj", firstSolution, StringComparison.Ordinal);
+        Assert.DoesNotContain("Modules\\OrchardRules\\OrchardRules.csproj", firstSolution, StringComparison.Ordinal);
+        Assert.DoesNotContain("Modules\\PlayerMotion\\PlayerMotion.csproj", firstSolution, StringComparison.Ordinal);
         var debugProject = await File.ReadAllTextAsync(first.DebugProjectPath);
         Assert.Contains("DisableFastUpToDateCheck", debugProject, StringComparison.Ordinal);
         Assert.Contains("build modules", debugProject, StringComparison.Ordinal);
         Assert.Contains(Path.GetFullPath(cliPath), debugProject, StringComparison.Ordinal);
+        Assert.Contains("Game Modules\\OrchardRules\\OrchardRulesModule.cs", debugProject, StringComparison.Ordinal);
+        Assert.Contains("Game Modules\\OrchardRules\\OrchardRules.csproj", debugProject, StringComparison.Ordinal);
         using var solutionLaunch = JsonDocument.Parse(await File.ReadAllTextAsync(first.VisualStudioSolutionLaunchPath));
         var launchProfile = Assert.Single(solutionLaunch.RootElement.EnumerateArray());
         Assert.Equal("Rekall AGE Game", launchProfile.GetProperty("Name").GetString());
@@ -123,5 +125,39 @@ public sealed class ProjectDevelopmentWorkspaceTests
             new RekallAgeProjectDevelopmentWorkspace().GenerateAsync(
                 new RekallAgeProjectDevelopmentWorkspaceRequest(root, "Main", playerPath),
                 CancellationToken.None).AsTask());
+    }
+
+    [Fact]
+    public async Task GenerateDoesNotTraverseReparseDirectoriesForIdeFiles()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var outside = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(root, RekallAgeProjectManifest.Create("Bounded Game", ["world", "modules"]), CancellationToken.None);
+        var moduleRoot = Path.Combine(root, "Modules", "Local");
+        Directory.CreateDirectory(moduleRoot);
+        await File.WriteAllTextAsync(Path.Combine(moduleRoot, "Local.cs"), "public sealed class Local;");
+        await File.WriteAllTextAsync(Path.Combine(outside, "Outside.cs"), "public sealed class Outside;");
+        await File.WriteAllTextAsync(Path.Combine(outside, "Outside.csproj"), "<Project />");
+        try
+        {
+            Directory.CreateSymbolicLink(Path.Combine(moduleRoot, "Linked"), outside);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return;
+        }
+        var playerPath = Path.Combine(root, "Player.exe");
+        var cliPath = Path.Combine(root, "rekall.exe");
+        await File.WriteAllBytesAsync(playerPath, [0]);
+        await File.WriteAllBytesAsync(cliPath, [0]);
+
+        var result = await new RekallAgeProjectDevelopmentWorkspace().GenerateAsync(
+            new RekallAgeProjectDevelopmentWorkspaceRequest(root, "Main", playerPath, cliPath),
+            CancellationToken.None);
+
+        var debugProject = await File.ReadAllTextAsync(result.DebugProjectPath);
+        Assert.Contains("Game Modules\\Local\\Local.cs", debugProject, StringComparison.Ordinal);
+        Assert.DoesNotContain("Outside.cs", debugProject, StringComparison.Ordinal);
+        Assert.DoesNotContain("Outside.csproj", debugProject, StringComparison.Ordinal);
     }
 }

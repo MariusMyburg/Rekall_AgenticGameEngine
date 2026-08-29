@@ -64,4 +64,31 @@ public sealed class ModuleSourceInspectionCommandTests
         Assert.False(read.Ok);
         Assert.Contains(read.Errors, error => error.Code == "REKALL_MODULE_SOURCE_PATH_OUTSIDE_PROJECT");
     }
+
+    [Fact]
+    public async Task ListModuleSourcesDoesNotTraverseReparseDirectories()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var outside = TestPaths.CreateTempDirectory();
+        var moduleRoot = Path.Combine(root, "Modules", "Movement");
+        Directory.CreateDirectory(moduleRoot);
+        await File.WriteAllTextAsync(Path.Combine(moduleRoot, "Movement.cs"), "public sealed class Movement;");
+        await File.WriteAllTextAsync(Path.Combine(outside, "Outside.cs"), "public sealed class Outside;");
+        try
+        {
+            Directory.CreateSymbolicLink(Path.Combine(moduleRoot, "Linked"), outside);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return;
+        }
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("list bounded sources"), CancellationToken.None);
+
+        var list = await new ListModuleSourcesCommand().ExecuteAsync(new ListModuleSourcesRequest(root), context);
+
+        Assert.True(list.Ok, list.Summary);
+        var source = Assert.Single(list.Value.Sources);
+        Assert.Equal("Movement.cs", source.FileName);
+        Assert.DoesNotContain(list.Value.Sources, item => item.SourcePath.StartsWith(outside, StringComparison.OrdinalIgnoreCase));
+    }
 }

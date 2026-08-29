@@ -28,12 +28,16 @@ public sealed class RekallAgeOllamaLanguageModelClient : IRekallAgeLanguageModel
         using var response = await _httpClient.GetAsync(new Uri(_baseUri, "api/tags"), cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
         var root = await ReadObjectAsync(response, cancellationToken);
-        return (root["models"] as JsonArray ?? [])
+        var discovered = (root["models"] as JsonArray ?? [])
             .OfType<JsonObject>()
             .Select(model => new RekallAgeLanguageModelInfo(
                 ReadString(model, "name") ?? ReadString(model, "model") ?? string.Empty,
                 ReadInt64(model, "size")))
             .Where(model => model.Id.Length > 0)
+            .ToArray();
+        var inspected = await Task.WhenAll(discovered.Select(model => InspectModelAsync(model, cancellationToken)));
+        return inspected
+            .Where(model => model.SupportsCompletion is not false)
             .OrderBy(model => model.Id, StringComparer.Ordinal)
             .ToArray();
     }
@@ -170,6 +174,40 @@ public sealed class RekallAgeOllamaLanguageModelClient : IRekallAgeLanguageModel
             ["parameters"] = tool.Parameters.DeepClone()
         }
     };
+
+    private async Task<RekallAgeLanguageModelInfo> InspectModelAsync(
+        RekallAgeLanguageModelInfo model,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await _httpClient.PostAsJsonAsync(
+                new Uri(_baseUri, "api/show"),
+                new JsonObject { ["model"] = model.Id },
+                JsonOptions,
+                cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return model;
+            }
+
+            var root = await ReadObjectAsync(response, cancellationToken);
+            var capabilities = (root["capabilities"] as JsonArray ?? [])
+                .OfType<JsonValue>()
+                .Select(value => value.TryGetValue<string>(out var capability) ? capability : string.Empty)
+                .Where(capability => capability.Length > 0)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            return model with
+            {
+                SupportsTools = capabilities.Contains("tools"),
+                SupportsCompletion = capabilities.Contains("completion")
+            };
+        }
+        catch (HttpRequestException)
+        {
+            return model;
+        }
+    }
 
     private static async ValueTask EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {

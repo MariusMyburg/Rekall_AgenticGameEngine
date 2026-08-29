@@ -369,12 +369,31 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task OllamaDiscoveryExcludesModelsWithoutToolsAndPrefersTheLargestLocalAuthoringModel()
+    {
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            httpClientFactory: () => new HttpClient(new ProviderLifecycleHandler(
+                blockOllamaChat: false,
+                ollamaModels: ["dolphin-llama3:latest", "llama3.2:latest", "qwen3.8:27b"]), disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+
+        await ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
+
+        Assert.Equal(["llama3.2:latest", "qwen3.8:27b"], viewModel.LanguageModels);
+        Assert.Equal("qwen3.8:27b", viewModel.SelectedLanguageModel);
+        Assert.Contains("using qwen3.8:27b", viewModel.ProviderDisplayStatus, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task SelectingADiscoveredModelClearsAStaleFallbackWarning()
     {
         var catalog = new RekallAgeLanguageModelProviderCatalog(
             httpClientFactory: () => new HttpClient(new ProviderLifecycleHandler(
                 blockOllamaChat: false,
-                ollamaModels: ["dolphin-llama3:latest", "qwen3.8:27b"]), disposeHandler: true));
+                ollamaModels: ["gemma4:latest", "qwen3.8:27b"]), disposeHandler: true));
         await using var viewModel = new RekallAgeStudioViewModel(
             new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
             catalog,
@@ -383,10 +402,10 @@ public sealed class StudioViewModelTests
         await ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
         Assert.Contains("Configured default", viewModel.ProviderDisplayStatus, StringComparison.Ordinal);
 
-        viewModel.SelectedLanguageModel = "qwen3.8:27b";
+        viewModel.SelectedLanguageModel = "gemma4:latest";
 
         Assert.DoesNotContain("Configured default", viewModel.ProviderDisplayStatus, StringComparison.Ordinal);
-        Assert.Equal("Using qwen3.8:27b with Local Ollama.", viewModel.ProviderDisplayStatus);
+        Assert.Equal("Using gemma4:latest with Local Ollama.", viewModel.ProviderDisplayStatus);
     }
 
     [Fact]
@@ -2479,6 +2498,17 @@ public sealed class StudioViewModelTests
                         ["name"] = model,
                         ["size"] = index + 1
                     }).ToArray())
+                }.ToJsonString());
+            }
+
+            if (request.RequestUri.AbsolutePath.EndsWith("/api/show", StringComparison.Ordinal))
+            {
+                var body = JsonNode.Parse(await request.Content!.ReadAsStringAsync(cancellationToken))!.AsObject();
+                var model = body["model"]!.GetValue<string>();
+                var supportsTools = !model.StartsWith("dolphin-", StringComparison.OrdinalIgnoreCase);
+                return JsonResponse(new JsonObject
+                {
+                    ["capabilities"] = new JsonArray(supportsTools ? ["completion", "tools"] : ["completion"])
                 }.ToJsonString());
             }
 

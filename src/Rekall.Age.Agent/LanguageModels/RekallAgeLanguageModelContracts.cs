@@ -145,7 +145,11 @@ public sealed record RekallAgeLanguageModelUsage(
     public int? ReasoningTokens { get; init; }
 }
 
-public sealed record RekallAgeLanguageModelInfo(string Id, long SizeBytes);
+public sealed record RekallAgeLanguageModelInfo(
+    string Id,
+    long SizeBytes,
+    bool? SupportsTools = null,
+    bool? SupportsCompletion = null);
 
 public enum RekallAgeLanguageModelStreamEventKind
 {

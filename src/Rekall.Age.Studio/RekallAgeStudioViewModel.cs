@@ -23,6 +23,7 @@ using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Commands;
 using Rekall.Age.Workflows;
 using Rekall.Age.Workflows.Commands;
+using Serilog;
 
 namespace Rekall.Age.Studio;
 
@@ -3012,6 +3013,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         AppendAgentLine($"provider: {providerId}");
         AppendAgentLine($"model: {model}");
         AppendAgentLine($"task: {AgentTaskInput.Trim()}");
+        Log.Information(
+            "Studio authoring started. Provider={ProviderId} Model={Model} ProjectRoot={ProjectRoot} Scene={SceneName} MaxTurns={MaxTurns}",
+            providerId,
+            model,
+            _session.ProjectRoot,
+            _session.SceneName,
+            AgentMaxTurns);
         var agentStopwatch = Stopwatch.StartNew();
         try
         {
@@ -3036,7 +3044,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             agentStopwatch.Stop();
             _lastAgentToolExecutions.Clear();
             _lastAgentToolExecutions.AddRange(result.AgentResult.ToolExecutions);
-            AppendAgentLine($"response: {result.AgentResult.ResponseId ?? "unavailable"}");
+            if (!string.IsNullOrWhiteSpace(result.AgentResult.ResponseId))
+            {
+                AppendAgentLine($"response: {result.AgentResult.ResponseId}");
+            }
             AppendAgentLine(
                 $"usage: input={result.AgentResult.Usage.PromptTokens} output={result.AgentResult.Usage.CompletionTokens} "
                 + $"cached={result.AgentResult.Usage.CachedInputTokens?.ToString(CultureInfo.InvariantCulture) ?? "unavailable"} "
@@ -3044,6 +3055,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             AppendAgentLine($"tools: {result.AgentResult.ToolCallCount}");
             AppendAgentLine($"elapsed: {agentStopwatch.Elapsed.TotalMilliseconds.ToString("F0", CultureInfo.InvariantCulture)} ms");
             AppendAgentLine(result.Summary);
+            Log.Information(
+                "Studio authoring completed. Provider={ProviderId} Model={Model} Succeeded={Succeeded} Turns={Turns} ToolCalls={ToolCalls} ElapsedMilliseconds={ElapsedMilliseconds}",
+                providerId,
+                model,
+                result.Succeeded,
+                result.AgentResult.Turns,
+                result.AgentResult.ToolCallCount,
+                agentStopwatch.Elapsed.TotalMilliseconds);
             if (!string.IsNullOrWhiteSpace(result.AgentResult.FinalContent))
             {
                 AppendAgentLine($"final: {Bound(result.AgentResult.FinalContent, 2_000)}");
@@ -3065,11 +3084,22 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
         catch (RekallAgeLanguageModelProviderException exception)
         {
+            Log.Warning(
+                "Studio authoring provider failure. Provider={ProviderId} Code={Code} HttpStatus={HttpStatus} Retryable={Retryable}",
+                exception.ProviderId,
+                exception.Code,
+                exception.HttpStatus,
+                exception.Retryable);
             ReportLanguageModelProviderFailure(exception);
             AppendAgentLine(ProviderStatus);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            Log.Information(
+                "Studio authoring cancelled. Provider={ProviderId} Model={Model} ElapsedMilliseconds={ElapsedMilliseconds}",
+                providerId,
+                model,
+                agentStopwatch.Elapsed.TotalMilliseconds);
             var reload = await _session.ReloadAsync(CancellationToken.None);
             if (reload.Ok && _session.Model is not null) ApplyModel(_session.Model);
             StatusText = "AI authoring cancelled.";
@@ -3306,7 +3336,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         IReadOnlyList<RekallAgeLanguageModelInfo> models)
     {
         var previousSelection = SelectedLanguageModel;
-        Replace(LanguageModels, models.Select(model => model.Id));
+        var authoringModels = provider.Id == "ollama"
+            ? models.Where(model => model.SupportsTools is not false).ToArray()
+            : models.ToArray();
+        Replace(LanguageModels, authoringModels.Select(model => model.Id));
         OnPropertyChanged(nameof(HasUsableLanguageModel));
         if (LanguageModels.Contains(previousSelection, StringComparer.Ordinal))
         {
@@ -3330,7 +3363,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             }
 
             var fallback = provider.Id == "ollama"
-                ? LanguageModels.FirstOrDefault(model => !model.EndsWith("-cloud", StringComparison.OrdinalIgnoreCase))
+                ? authoringModels
+                    .Where(model => !model.Id.EndsWith("-cloud", StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(model => model.SizeBytes)
+                    .ThenBy(model => model.Id, StringComparer.Ordinal)
+                    .Select(model => model.Id)
+                    .FirstOrDefault()
                     ?? LanguageModels[0]
                 : LanguageModels[0];
             SelectedLanguageModel = fallback;
@@ -3501,12 +3539,63 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         var suffix = progress.ToolExecution is null
             ? string.Empty
             : $" #{progress.ToolExecution.Sequence} {(progress.ToolExecution.Succeeded ? "ok" : "failed")}";
+        if (progress.ToolExecution is { } toolExecution)
+        {
+            if (toolExecution.Succeeded)
+            {
+                Log.Information(
+                    "Studio authoring tool progress. Turn={Turn} Phase={Phase} Tool={Tool} Sequence={Sequence} Succeeded={Succeeded} Message={Message}",
+                    progress.Turn,
+                    progress.Phase,
+                    toolExecution.Name,
+                    toolExecution.Sequence,
+                    toolExecution.Succeeded,
+                    progress.Message);
+            }
+            else
+            {
+                Log.Warning(
+                    "Studio authoring tool progress. Turn={Turn} Phase={Phase} Tool={Tool} Sequence={Sequence} Succeeded={Succeeded} Message={Message}",
+                    progress.Turn,
+                    progress.Phase,
+                    toolExecution.Name,
+                    toolExecution.Sequence,
+                    toolExecution.Succeeded,
+                    progress.Message);
+            }
+        }
+        else
+        {
+            Log.Information(
+                "Studio authoring progress. Turn={Turn} Phase={Phase} Message={Message}",
+                progress.Turn,
+                progress.Phase,
+                progress.Message);
+        }
         AppendAgentLine($"turn {progress.Turn}: {progress.Phase}{suffix} — {progress.Message}");
         if (progress.ToolExecution is { Succeeded: false } failed)
         {
-            AppendAgentLine($"tool failure: {Bound(failed.ResultPreview, 1_200)}");
+            AppendAgentLine($"tool failure: {AgentToolFailureSummary(failed.ResultPreview)}");
         }
         StatusText = progress.Message;
+    }
+
+    private static string AgentToolFailureSummary(string resultPreview)
+    {
+        try
+        {
+            var root = JsonNode.Parse(resultPreview) as JsonObject;
+            var summary = root?["summary"]?.GetValue<string>();
+            if (!string.IsNullOrWhiteSpace(summary))
+            {
+                return Bound(summary, 320);
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return Bound(resultPreview, 320);
     }
 
     private void AppendAgentLine(string value)
@@ -4223,8 +4312,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private RekallAgeAsyncCommand CreateAsyncCommand(Func<Task> execute, Func<bool> canExecute) =>
         new(execute, canExecute, ReportUnexpectedFailure);
 
-    private void ReportUnexpectedFailure(Exception _)
+    private void ReportUnexpectedFailure(Exception exception)
     {
+        Log.Error(exception, "Studio operation failed unexpectedly.");
         StatusText = "Studio operation failed. See Validation for details.";
         Replace(ValidationLines, ["error: REKALL_STUDIO_UNEXPECTED_FAILURE - The operation failed unexpectedly."]);
         IsBusy = false;

@@ -64,9 +64,25 @@ public sealed class OllamaLanguageModelClientTests
     [Fact]
     public async Task ListModelsReturnsInstalledOllamaModels()
     {
-        var handler = new StubHandler(_ => Task.FromResult(JsonResponse("""
-            {"models":[{"name":"qwen3.5:35b","size":24000000000},{"model":"gemma3:latest","size":3000}]}
-            """)));
+        var handler = new StubHandler(async request =>
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/api/tags", StringComparison.Ordinal))
+            {
+                return JsonResponse("""
+                    {"models":[{"name":"qwen3.5:35b","size":24000000000},{"model":"gemma3:latest","size":3000},{"name":"nomic-embed-text:latest","size":2000}]}
+                    """);
+            }
+
+            Assert.EndsWith("/api/show", request.RequestUri.AbsolutePath, StringComparison.Ordinal);
+            var body = JsonNode.Parse(await request.Content!.ReadAsStringAsync())!.AsObject();
+            var model = body["model"]!.GetValue<string>();
+            return model switch
+            {
+                "qwen3.5:35b" => JsonResponse("""{"capabilities":["completion","tools","thinking"]}"""),
+                "gemma3:latest" => JsonResponse("""{"capabilities":["completion"]}"""),
+                _ => JsonResponse("""{"capabilities":["embedding"]}""")
+            };
+        });
         using var http = new HttpClient(handler);
         var client = new RekallAgeOllamaLanguageModelClient(http, new Uri("http://localhost:11434"));
 
@@ -74,6 +90,8 @@ public sealed class OllamaLanguageModelClientTests
 
         Assert.Equal(["gemma3:latest", "qwen3.5:35b"], models.Select(model => model.Id));
         Assert.Equal(24_000_000_000, models.Single(model => model.Id == "qwen3.5:35b").SizeBytes);
+        Assert.True(models.Single(model => model.Id == "qwen3.5:35b").SupportsTools);
+        Assert.False(models.Single(model => model.Id == "gemma3:latest").SupportsTools);
     }
 
     [Fact]

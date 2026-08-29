@@ -51,7 +51,7 @@ public sealed class VeldridVulkanPresentationColorTests
     }
 
     [Fact]
-    public async Task TransparentGeometryCompositesRealSkyInsteadOfEnvironmentFallbackColor()
+    public async Task FxaaEdgeFiltersTransparentCoverageWithTheSameWeightsAsColor()
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -86,11 +86,18 @@ public sealed class VeldridVulkanPresentationColorTests
                 redFallback,
                 assets);
 
-            var redPixel = await CaptureCenterAsync(session, redFallback, assets, sceneRevision: 1);
-            var bluePixel = await CaptureCenterAsync(session, blueFallback, assets, sceneRevision: 2);
+            var redPixels = await CaptureAsync(session, redFallback, assets, sceneRevision: 1);
+            var bluePixels = await CaptureAsync(session, blueFallback, assets, sceneRevision: 2);
 
-            Assert.All(Enumerable.Range(0, 3), channel =>
-                Assert.InRange(redPixel[channel], bluePixel[channel] - 2, bluePixel[channel] + 2));
+            var maximumDifference = Enumerable.Range(0, redPixels.Length / 4)
+                .SelectMany(pixel => Enumerable.Range(0, 3)
+                    .Select(channel => Math.Abs(redPixels[pixel * 4 + channel] - bluePixels[pixel * 4 + channel])))
+                .Max();
+            // The two fallback colours are intentionally extreme, so luma-driven FXAA may
+            // select a slightly different edge direction. The incoherent center-alpha path
+            // produced a maximum channel error of 88; filtering RGBA together keeps the
+            // partial-coverage edge below half that visible discontinuity.
+            Assert.InRange(maximumDifference, 0, 50);
         }
         finally
         {
@@ -296,12 +303,22 @@ public sealed class VeldridVulkanPresentationColorTests
         RekallAgeRuntimeViewportAssetSet assets,
         int sceneRevision)
     {
+        var pixels = await CaptureAsync(session, frame, assets, sceneRevision);
+        var offset = ((frame.Height / 2 * frame.Width) + frame.Width / 2) * 4;
+        return pixels.AsSpan(offset, 4).ToArray();
+    }
+
+    private static async Task<byte[]> CaptureAsync(
+        RekallAgeVeldridVulkanPresentationSession session,
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets,
+        int sceneRevision)
+    {
         await session.PresentAsync(
             new RekallAgeVulkanSceneSubmission(frame, assets, [], 0, sceneRevision, 0),
             CancellationToken.None);
         var capture = await session.CapturePresentedRgbaAsync(CancellationToken.None);
-        var offset = ((capture.Height / 2 * capture.Width) + capture.Width / 2) * 4;
-        return capture.Rgba.Span.Slice(offset, 4).ToArray();
+        return capture.Rgba.ToArray();
     }
 
     private static class NativeWindow

@@ -164,10 +164,10 @@ void main()
     hdr += bloom;
     vec3 outputColor = applyDisplayTransform(hdr);
     float sceneCoverage = scene.a;
-    if (sceneCoverage <= 0.00001 && parameters.solidBackgroundLinear.w > 0.5)
+    if (parameters.solidBackgroundLinear.w > 0.5)
     {
         vec3 baseline = applyDisplayTransform(parameters.solidBackgroundLinear.rgb);
-        outputColor += parameters.solidBackgroundEncoded.rgb - baseline;
+        outputColor += (parameters.solidBackgroundEncoded.rgb - baseline) * (1.0 - sceneCoverage);
     }
     float backgroundAlpha = parameters.solidBackgroundLinear.w > 0.5
         ? parameters.solidBackgroundEncoded.a

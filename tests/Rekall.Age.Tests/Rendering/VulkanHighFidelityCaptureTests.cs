@@ -11,7 +11,7 @@ public sealed class VulkanHighFidelityCaptureTests
     {
         var camera = new RekallAgeRuntimeViewportCamera(
             "camera", "Camera", "Camera3D", true, 0, 0, -4,
-            FieldOfViewDegrees: 55, ClearColor: "#B4203AFF");
+            FieldOfViewDegrees: 55, ClearColor: "#B4203A80");
         var frame = new RekallAgeRuntimeViewportFrame(
             "Native Clear Color", 0, 0, 64, 64, camera, [camera],
             [new RekallAgeRuntimeViewportRenderable(
@@ -42,25 +42,56 @@ public sealed class VulkanHighFidelityCaptureTests
         Assert.True(result.Captured, string.Join(Environment.NewLine, result.Errors));
         Assert.NotNull(result.HighFidelityFrame);
         var image = await RekallAgePngReader.ReadRgbaAsync(result.OutputPath, CancellationToken.None);
-        var closest = Enumerable.Range(0, image.Width * image.Height)
-            .Select(pixel =>
-            {
-                var offset = pixel * 4;
-                var distance = Math.Abs(image.Rgba[offset] - 0xB4)
-                    + Math.Abs(image.Rgba[offset + 1] - 0x20)
-                    + Math.Abs(image.Rgba[offset + 2] - 0x3A);
-                return (distance, red: image.Rgba[offset], green: image.Rgba[offset + 1], blue: image.Rgba[offset + 2]);
-            })
-            .MinBy(item => item.distance);
-        Assert.True(closest.distance <= 3,
-            $"Closest background pixel was RGB ({closest.red}, {closest.green}, {closest.blue}), distance {closest.distance}.");
-        Assert.Contains(Enumerable.Range(0, image.Width * image.Height), pixel =>
+        AssertPixel(image, image.Width / 2, image.Height / 4, 0xB4, 0x20, 0x3A);
+        var backgroundOffset = ((image.Height / 4 * image.Width) + image.Width / 2) * 4;
+        Assert.InRange(image.Rgba[backgroundOffset + 3], 0x80 - 1, 0x80 + 1);
+    }
+
+    [Fact]
+    public async Task NativeTransparentGeometryUsesCoverageWeightedSolidCorrection()
+    {
+        var frame = NativeColorFrame("#B4203AFF", transparent: true);
+        var output = TestPaths.CreateTempDirectory();
+
+        var result = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            frame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(result.Captured, string.Join(Environment.NewLine, result.Errors));
+        var image = await RekallAgePngReader.ReadRgbaAsync(result.OutputPath, CancellationToken.None);
+        AssertPixel(image, image.Width / 2, image.Height / 4, 0xB4, 0x20, 0x3A);
+        var center = ((image.Height / 2 * image.Width) + image.Width / 2) * 4;
+        Assert.True(Math.Abs(image.Rgba[center] - 0xB4) > 10);
+        var toneMap = await File.ReadAllTextAsync(
+            Path.Combine(AppContext.BaseDirectory, "Shaders", "rekall_tonemap.frag"));
+        Assert.Contains(
+            "(parameters.solidBackgroundEncoded.rgb - baseline) * (1.0 - sceneCoverage)",
+            toneMap,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task NativeCameraBackgroundPolicyDoesNotRenderAuthoredSkyTexture()
+    {
+        var frame = NativeColorFrame("#B4203AFF", transparent: false) with
         {
-            var offset = pixel * 4;
-            return Math.Abs(image.Rgba[offset] - 0xB4) <= 1
-                && Math.Abs(image.Rgba[offset + 1] - 0x20) <= 1
-                && Math.Abs(image.Rgba[offset + 2] - 0x3A) <= 1;
-        });
+            Environment = new RekallAgeRuntimeViewportEnvironment(
+                "environment", "Environment", "asset_environment", 1, 2, "agx", 11.2, null, "camera")
+        };
+        var assets = RekallAgeRuntimeViewportAssetSet.Empty with
+        {
+            Images = new Dictionary<string, RekallAgeRgbaImage>(StringComparer.Ordinal)
+            {
+                ["asset_environment"] = new(1, 1, [0x10, 0xE0, 0x20, 0xFF])
+            }
+        };
+        var output = TestPaths.CreateTempDirectory();
+
+        var result = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            frame, assets, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(result.Captured, string.Join(Environment.NewLine, result.Errors));
+        var image = await RekallAgePngReader.ReadRgbaAsync(result.OutputPath, CancellationToken.None);
+        AssertPixel(image, image.Width / 2, image.Height / 4, 0xB4, 0x20, 0x3A);
     }
 
     [Fact]
@@ -78,7 +109,7 @@ public sealed class VulkanHighFidelityCaptureTests
             0, new(false, 0), [])
         {
             Environment = new RekallAgeRuntimeViewportEnvironment(
-                "environment", "Environment", "asset_environment", 1, 0, "agx", 11.2, null, "color")
+                "environment", "Environment", "asset_environment", 1, 0, "agx", 11.2, null, "skybox")
             {
                 AmbientSkyColor = "#000000",
                 AmbientGroundColor = "#000000"
@@ -148,7 +179,7 @@ public sealed class VulkanHighFidelityCaptureTests
             0, new(false, 0), [])
         {
             Environment = new RekallAgeRuntimeViewportEnvironment(
-                "environment", "Environment", "asset_environment", 1.4, 0, "agx", 11.2, null, "color")
+                "environment", "Environment", "asset_environment", 1.4, 0, "agx", 11.2, null, "skybox")
             {
                 AmbientSkyColor = "#111111",
                 AmbientGroundColor = "#111111"
@@ -1252,6 +1283,51 @@ public sealed class VulkanHighFidelityCaptureTests
             Enumerable.Range(0, highImage.Width * highImage.Height),
             pixel => PixelBrightness(highImage.Rgba, pixel) > PixelBrightness(legacyImage.Rgba, pixel) + 3);
         Assert.DoesNotContain(highImage.Rgba.Where((_, index) => index % 4 != 3), channel => channel == byte.MaxValue);
+    }
+
+    private static RekallAgeRuntimeViewportFrame NativeColorFrame(string clearColor, bool transparent)
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera", "Camera", "Camera3D", true, 0, 0, -4,
+            FieldOfViewDegrees: 55, ClearColor: clearColor);
+        var renderable = new RekallAgeRuntimeViewportRenderable(
+            "subject", "Subject", "mesh", "rekall.primitive.cube", 0, 0, 1, 0,
+            Variant: "rekall.geometry.cube", ScaleX: 0.6, ScaleY: 0.6, ScaleZ: 0.6,
+            MaterialColor: transparent ? "#FF603080" : "#FFFFFF")
+        {
+            AlphaMode = transparent ? "blend" : "opaque"
+        };
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Native Color", 0, 0, 64, 64, camera, [camera], [renderable], 0, new(false, 0), [])
+        {
+            Environment = new RekallAgeRuntimeViewportEnvironment(
+                "environment", "Environment", null, 1, 2, "agx", 11.2, null, "camera"),
+            PostProcessStack = new RekallAgeRuntimeViewportPostProcessStack(
+                "post", "Tone Map", true,
+                [new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")])
+        };
+        return frame with
+        {
+            ResolvedQualityPlan = new RekallAgeRenderQualityProfileResolver().Resolve(
+                new RekallAgeRenderQualityIntent("High", Bloom: false),
+                RekallAgeRenderingDeviceCapabilities.DesktopBaseline("native-test"),
+                frame.Width,
+                frame.Height)
+        };
+    }
+
+    private static void AssertPixel(
+        RekallAgeRgbaImage image,
+        int x,
+        int y,
+        byte red,
+        byte green,
+        byte blue)
+    {
+        var offset = (y * image.Width + x) * 4;
+        Assert.InRange(image.Rgba[offset], red - 1, red + 1);
+        Assert.InRange(image.Rgba[offset + 1], green - 1, green + 1);
+        Assert.InRange(image.Rgba[offset + 2], blue - 1, blue + 1);
     }
 
     private static int PixelBrightness(byte[] rgba, int pixel)

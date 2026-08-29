@@ -1288,15 +1288,15 @@ internal static class RekallAgeVeldridSceneShaders
         vec4 resolveFxaa(vec2 texel)
         {
             vec4 center = textureLod(sampler2D(SceneTexture, SceneSampler), fsin_UV, 0.0);
-            vec3 nw = textureLod(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(-1.0, -1.0), 0.0).rgb;
-            vec3 ne = textureLod(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(1.0, -1.0), 0.0).rgb;
-            vec3 sw = textureLod(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(-1.0, 1.0), 0.0).rgb;
-            vec3 se = textureLod(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(1.0, 1.0), 0.0).rgb;
+            vec4 nw = textureLod(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(-1.0, -1.0), 0.0);
+            vec4 ne = textureLod(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(1.0, -1.0), 0.0);
+            vec4 sw = textureLod(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(-1.0, 1.0), 0.0);
+            vec4 se = textureLod(sampler2D(SceneTexture, SceneSampler), fsin_UV + texel * vec2(1.0, 1.0), 0.0);
             float lumaCenter = luma(center.rgb);
-            float lumaNw = luma(nw);
-            float lumaNe = luma(ne);
-            float lumaSw = luma(sw);
-            float lumaSe = luma(se);
+            float lumaNw = luma(nw.rgb);
+            float lumaNe = luma(ne.rgb);
+            float lumaSw = luma(sw.rgb);
+            float lumaSe = luma(se.rgb);
             float lumaMin = min(lumaCenter, min(min(lumaNw, lumaNe), min(lumaSw, lumaSe)));
             float lumaMax = max(lumaCenter, max(max(lumaNw, lumaNe), max(lumaSw, lumaSe)));
             float edgeContrast = lumaMax - lumaMin;
@@ -1312,14 +1312,16 @@ internal static class RekallAgeVeldridSceneShaders
             float directionScale = 1.0 / (min(abs(direction.x), abs(direction.y)) + directionReduce);
             direction = clamp(direction * directionScale, vec2(-8.0), vec2(8.0)) * texel;
 
-            vec3 rgbA = 0.5 * (
-                texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + direction * (1.0 / 3.0 - 0.5)).rgb +
-                texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + direction * (2.0 / 3.0 - 0.5)).rgb);
-            vec3 rgbB = rgbA * 0.5 + 0.25 * (
-                texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + direction * -0.5).rgb +
-                texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + direction * 0.5).rgb);
-            float lumaB = luma(rgbB);
-            return vec4((lumaB < lumaMin || lumaB > lumaMax) ? rgbA : rgbB, center.a);
+            // Coverage must use the exact same taps and weights as colour. Returning center.a
+            // here produces a coverage discontinuity precisely where FXAA smooths an edge.
+            vec4 rgbaA = 0.5 * (
+                texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + direction * (1.0 / 3.0 - 0.5)) +
+                texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + direction * (2.0 / 3.0 - 0.5)));
+            vec4 rgbaB = rgbaA * 0.5 + 0.25 * (
+                texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + direction * -0.5) +
+                texture(sampler2D(SceneTexture, SceneSampler), fsin_UV + direction * 0.5));
+            float lumaB = luma(rgbaB.rgb);
+            return (lumaB < lumaMin || lumaB > lumaMax) ? rgbaA : rgbaB;
         }
 
         void main()

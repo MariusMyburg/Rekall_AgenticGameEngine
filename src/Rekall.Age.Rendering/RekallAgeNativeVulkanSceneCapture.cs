@@ -666,7 +666,11 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                     prepared.GeometryUpload,
                     prepared.ReadbackByteCount,
                     highFidelityPlan?.ShadowPlan);
-                CreateTextures(state, meshes, highFidelityPlan?.ParticlePlan, assets, frame.Environment?.SkyAssetId);
+                var resolvedBackground = RekallAgeEnvironmentBackgroundResolver.ResolveForHdr(frame);
+                var environmentAssetId = resolvedBackground.IsSolidColor
+                    ? null
+                    : frame.Environment?.SkyAssetId;
+                CreateTextures(state, meshes, highFidelityPlan?.ParticlePlan, assets, environmentAssetId);
                 CreateDescriptors(state, prepared.DrawPlan.MaterialKeys, highFidelityPlan?.ShadowPlan);
                 if (!TryCompileSceneShaders(
                     errors,

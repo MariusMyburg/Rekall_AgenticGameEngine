@@ -1331,6 +1331,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public string PauseSimulationLabel => IsSimulationPaused ? "Resume" : "Pause";
     public string? SelectedEntityId => _session.SelectedEntityId;
 
+    public bool HasProject => _session.Model is not null;
+
     public IReadOnlyList<RekallAgeStudioTransformTool> TransformTools { get; } =
         [RekallAgeStudioTransformTool.Select, RekallAgeStudioTransformTool.Move, RekallAgeStudioTransformTool.Rotate, RekallAgeStudioTransformTool.Scale];
 
@@ -3856,6 +3858,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         _currentModel = model;
         OnPropertyChanged(nameof(SelectedEntityId));
+        OnPropertyChanged(nameof(HasProject));
         SceneNameInput = model.Scene.Name;
         Replace(EntityNodes, model.Scene.RootEntities);
         var selectedNode = SelectedEntityNode();

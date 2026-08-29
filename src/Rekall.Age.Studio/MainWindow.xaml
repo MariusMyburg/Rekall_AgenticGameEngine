@@ -68,6 +68,7 @@
             <Grid.RowDefinitions><RowDefinition Height="38" /><RowDefinition Height="*" /></Grid.RowDefinitions>
             <TabControl x:Name="WorkspaceSelector" Grid.Row="0" SelectionChanged="OnWorkspaceChanged"
                         Background="{StaticResource ChromeBackground}" BorderThickness="0,0,0,1">
+                <TabItem Header="Author" />
                 <TabItem Header="World" />
                 <TabItem Header="Modeling" />
             </TabControl>
@@ -81,7 +82,8 @@
                 <Button Content="Inspector" Tag="Inspector" Click="OnTogglePanelClick" />
                 <Button Content="Output" Tag="Output" Click="OnTogglePanelClick" />
             </StackPanel>
-            <Grid x:Name="WorldWorkspace" Grid.Row="1">
+            <local:AuthorWorkspace x:Name="AuthorWorkspaceHost" Grid.Row="1" />
+            <Grid x:Name="WorldWorkspace" Grid.Row="1" Visibility="Collapsed">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="HierarchyColumn" Width="290" /><ColumnDefinition Width="*" /><ColumnDefinition x:Name="InspectorColumn" Width="370" />
             </Grid.ColumnDefinitions>
@@ -543,60 +545,6 @@
                             <Button Content="Audit Package" Command="{Binding AuditPackageCommand}" Padding="10,5" Margin="8,0,0,0" />
                             <Button Content="Open Package Folder" Command="{Binding OpenPackageFolderCommand}" Padding="10,5" Margin="8,0,0,0" />
                         </StackPanel>
-                    </Grid>
-                </TabItem>
-                <TabItem Header="AI Agent">
-                    <Grid Margin="8">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="330" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                            <TextBlock Text="Language-model provider" Foreground="#9FB0C4" />
-                            <ComboBox ItemsSource="{Binding LanguageModelProviders}"
-                                      SelectedItem="{Binding SelectedLanguageModelProvider, Mode=TwoWay}"
-                                      DisplayMemberPath="DisplayName" Margin="0,3,0,6" />
-                            <TextBlock Text="OpenAI session key" Foreground="#9FB0C4" />
-                            <Grid Margin="0,3,0,6">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                <PasswordBox x:Name="OpenAiApiKeyInput" PasswordChar="●" ToolTip="Held in memory for this Studio session only." />
-                                <Button Grid.Column="1" Content="Apply" Click="OnApplyOpenAiApiKeyClick" Padding="8,4" Margin="6,0,0,0" />
-                            </Grid>
-                            <TextBlock Text="Model" Foreground="#9FB0C4" />
-                            <ComboBox ItemsSource="{Binding LanguageModels}"
-                                      SelectedItem="{Binding SelectedLanguageModel, Mode=TwoWay}"
-                                      IsEditable="True" Margin="0,3,0,6" />
-                            <TextBlock Text="Reasoning effort" Foreground="#9FB0C4" />
-                            <ComboBox ItemsSource="{Binding ReasoningEfforts}"
-                                      SelectedItem="{Binding SelectedReasoningEffort, Mode=TwoWay}"
-                                      Margin="0,3,0,6" />
-                            <TextBlock Text="{Binding ProviderStatus}" Foreground="#75869A" TextWrapping="Wrap" Margin="0,0,0,6" />
-                            <UniformGrid Columns="2" Margin="0,0,0,6">
-                                <Button x:Name="SignInCodexButton" Content="Sign in to Codex" Command="{Binding SignInCodexCommand}" Padding="8,4" Margin="0,0,3,0" />
-                                <Button x:Name="CancelCodexSignInButton" Content="Cancel Codex Sign-In" Command="{Binding CancelCodexSignInCommand}" Padding="8,4" Margin="3,0,0,0" />
-                            </UniformGrid>
-                            <Button Content="Refresh Provider Status &amp; Models" Command="{Binding RefreshLanguageModelsCommand}" Padding="8,4" Margin="0,0,0,8" />
-                            <TextBlock Text="Game-authoring task" Foreground="#9FB0C4" />
-                            <Grid Height="86" Margin="0,3,0,6">
-                                <TextBox Text="{Binding AgentTaskInput, UpdateSourceTrigger=PropertyChanged}"
-                                         AcceptsReturn="True" TextWrapping="Wrap" Padding="4" />
-                                <TextBlock Text="Describe the game you want in ordinary language. AGE handles tools, implementation, testing, and delivery."
-                                           Foreground="#75869A" Margin="8,6" TextWrapping="Wrap" IsHitTestVisible="False">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding AgentTaskInput}" Value="">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Grid>
-                            <UniformGrid Columns="2">
-                                <Button Content="Run Agent" Command="{Binding RunAgentCommand}" Padding="8,4" Margin="0,0,3,0" />
-                                <Button Content="Cancel" Command="{Binding CancelAgentCommand}" Padding="8,4" Margin="3,0,0,0" />
-                            </UniformGrid>
-                        </StackPanel>
-                        <ListBox Grid.Column="1" ItemsSource="{Binding AgentLines}" />
                     </Grid>
                 </TabItem>
             </TabControl>

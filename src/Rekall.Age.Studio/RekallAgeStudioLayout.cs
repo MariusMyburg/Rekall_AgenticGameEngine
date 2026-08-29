@@ -35,14 +35,14 @@ internal sealed record RekallAgeStudioLayout(
     string ActiveOutputTab,
     IReadOnlyList<RekallAgeStudioDockPanelLayout> Panels)
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     private static readonly string[] PanelIds = ["Hierarchy", "Inspector", "Output"];
     private static readonly HashSet<string> OutputTabs = new(
-        ["Validation", "Assets", "Overview", "Actions", "Runtime", "Transactions", "Imports", "AI Agent"],
+        ["Validation", "Assets", "Overview", "Actions", "Runtime", "Transactions", "Imports"],
         StringComparer.Ordinal);
 
-    public string ActiveWorkspace { get; init; } = "World";
+    public string ActiveWorkspace { get; init; } = "Author";
 
     public static RekallAgeStudioLayout Default { get; } = new(
         CurrentVersion,
@@ -56,7 +56,10 @@ internal sealed record RekallAgeStudioLayout(
             new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 290, 0),
             new("Inspector", RekallAgeStudioDockRegion.Right, true, 370, 0),
             new("Output", RekallAgeStudioDockRegion.Bottom, true, 260, 0)
-        ]);
+        ])
+    {
+        ActiveWorkspace = "Author"
+    };
 
     public RekallAgeStudioDockPanelLayout Panel(string id) =>
         Panels.First(panel => panel.Id.Equals(id, StringComparison.Ordinal));
@@ -65,7 +68,8 @@ internal sealed record RekallAgeStudioLayout(
     {
         RekallAgeStudioLayoutPreset.Authoring => Default with
         {
-            ActiveOutputTab = "AI Agent",
+            ActiveWorkspace = "Author",
+            ActiveOutputTab = "Validation",
             Panels =
             [
                 new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 300, 0),
@@ -75,6 +79,7 @@ internal sealed record RekallAgeStudioLayout(
         },
         RekallAgeStudioLayoutPreset.Debug => Default with
         {
+            ActiveWorkspace = "World",
             ActiveOutputTab = "Runtime",
             Panels =
             [
@@ -88,10 +93,19 @@ internal sealed record RekallAgeStudioLayout(
 
     public static RekallAgeStudioLayout? Normalize(RekallAgeStudioLayout? candidate)
     {
-        if (candidate is null || candidate.Version != CurrentVersion || candidate.Panels is null)
+        if (candidate is null || candidate.Version is not (1 or CurrentVersion) || candidate.Panels is null)
         {
             return null;
         }
+
+        var legacyAuthoringLayout = candidate.Version == 1
+            && string.Equals(candidate.ActiveOutputTab, "AI Agent", StringComparison.Ordinal);
+        candidate = candidate with
+        {
+            Version = CurrentVersion,
+            ActiveWorkspace = legacyAuthoringLayout ? "Author" : candidate.ActiveWorkspace,
+            ActiveOutputTab = legacyAuthoringLayout ? "Validation" : candidate.ActiveOutputTab
+        };
 
         var panels = candidate.Panels.ToArray();
         if (panels.Length != PanelIds.Length
@@ -119,7 +133,7 @@ internal sealed record RekallAgeStudioLayout(
             ActiveOutputTab = OutputTabs.Contains(candidate.ActiveOutputTab ?? string.Empty)
                 ? candidate.ActiveOutputTab!
                 : Default.ActiveOutputTab,
-            ActiveWorkspace = candidate.ActiveWorkspace is "World" or "Modeling"
+            ActiveWorkspace = candidate.ActiveWorkspace is "Author" or "World" or "Modeling"
                 ? candidate.ActiveWorkspace
                 : Default.ActiveWorkspace,
             Panels = normalizedPanels

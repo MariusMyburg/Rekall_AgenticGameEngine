@@ -13,7 +13,7 @@ public sealed class StudioLayoutTests
         var layout = RekallAgeStudioLayout.Default;
 
         Assert.Equal(RekallAgeStudioLayout.CurrentVersion, layout.Version);
-        Assert.Equal("World", layout.ActiveWorkspace);
+        Assert.Equal("Author", layout.ActiveWorkspace);
         Assert.Equal(["Hierarchy", "Inspector", "Output"], layout.Panels.Select(panel => panel.Id).Order().ToArray());
         Assert.All(layout.Panels, panel => Assert.True(panel.Visible));
         Assert.InRange(layout.WindowWidth, 1120, 3840);
@@ -23,11 +23,13 @@ public sealed class StudioLayoutTests
         Assert.Equal(RekallAgeStudioDockRegion.Left, authoring.Panel("Hierarchy").Region);
         Assert.Equal(RekallAgeStudioDockRegion.Right, authoring.Panel("Inspector").Region);
         Assert.Equal(RekallAgeStudioDockRegion.Bottom, authoring.Panel("Output").Region);
-        Assert.Equal("AI Agent", authoring.ActiveOutputTab);
+        Assert.Equal("Author", authoring.ActiveWorkspace);
+        Assert.Equal("Validation", authoring.ActiveOutputTab);
 
         var debug = RekallAgeStudioLayout.CreatePreset(RekallAgeStudioLayoutPreset.Debug);
         Assert.True(debug.Panel("Output").Size > authoring.Panel("Output").Size);
         Assert.Equal("Runtime", debug.ActiveOutputTab);
+        Assert.Equal("World", debug.ActiveWorkspace);
     }
 
     [Fact]
@@ -78,8 +80,10 @@ public sealed class StudioLayoutTests
         var modeling = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "ModelingWorkspace.xaml"));
 
         Assert.Contains("x:Name=\"WorkspaceSelector\"", window, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Author\"", window, StringComparison.Ordinal);
         Assert.Contains("Header=\"World\"", window, StringComparison.Ordinal);
         Assert.Contains("Header=\"Modeling\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"AuthorWorkspaceHost\"", window, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"ModelingWorkspaceHost\"", window, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"ProjectBar\"", window, StringComparison.Ordinal);
         Assert.Contains("MeshViewportImage", modeling, StringComparison.Ordinal);
@@ -89,6 +93,22 @@ public sealed class StudioLayoutTests
         Assert.Contains("PreviewMeshOperationCommand", modeling, StringComparison.Ordinal);
         Assert.Contains("ApplyMeshOperationCommand", modeling, StringComparison.Ordinal);
         Assert.Contains("NODE CONTRACTS", modeling, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AuthorWorkspaceKeepsProviderSetupContextualAndPrimaryActionsVisible()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+        var author = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "AuthorWorkspace.xaml"));
+
+        Assert.DoesNotContain("<TabItem Header=\"AI Agent\"", window, StringComparison.Ordinal);
+        Assert.Contains("IsOpenAiSelected", author, StringComparison.Ordinal);
+        Assert.Contains("IsCodexSelected", author, StringComparison.Ordinal);
+        Assert.Contains("IsEditable=\"False\"", author, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Run Agent\"", author, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Cancel\"", author, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding AgentLines}\"", author, StringComparison.Ordinal);
     }
 
     [Theory]

@@ -20,6 +20,8 @@ public partial class MainWindow : Window
     private bool _shutdownComplete;
     private bool _meshTransformDragging;
     private bool _sceneTransformDragging;
+    private bool _initializing = true;
+    private bool _hadProject;
     private Task? _shutdownTask;
 
     public MainWindow()
@@ -56,6 +58,8 @@ public partial class MainWindow : Window
             _layout = await _layoutStore.LoadAsync(CancellationToken.None);
             ApplyLayout(_layout);
             await _viewModel.InitializeAsync(projectRoot, sceneName);
+            _hadProject = _viewModel.HasProject;
+            _initializing = false;
             _previewTimer.Start();
         }
         catch (Exception exception)
@@ -86,12 +90,22 @@ public partial class MainWindow : Window
 
     private void OnWorkspaceChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (WorldWorkspace is null || ModelingWorkspaceHost is null || ProjectBar is null || MainToolbar is null) return;
-        var modeling = WorkspaceSelector.SelectedIndex == 1;
-        WorldWorkspace.Visibility = modeling ? Visibility.Collapsed : Visibility.Visible;
+        if (AuthorWorkspaceHost is null || WorldWorkspace is null || ModelingWorkspaceHost is null
+            || ProjectBar is null || MainToolbar is null) return;
+        var workspace = WorkspaceName();
+        var author = workspace == "Author";
+        var world = workspace == "World";
+        var modeling = workspace == "Modeling";
+        AuthorWorkspaceHost.Visibility = author ? Visibility.Visible : Visibility.Collapsed;
+        WorldWorkspace.Visibility = world ? Visibility.Visible : Visibility.Collapsed;
         ModelingWorkspaceHost.Visibility = modeling ? Visibility.Visible : Visibility.Collapsed;
         ProjectBar.Visibility = modeling ? Visibility.Collapsed : Visibility.Visible;
-        MainToolbar.Visibility = modeling ? Visibility.Collapsed : Visibility.Visible;
+        MainToolbar.Visibility = world ? Visibility.Visible : Visibility.Collapsed;
+        if (author && _viewModel.LanguageModels.Count == 0
+            && _viewModel.RefreshLanguageModelsCommand.CanExecute(null))
+        {
+            _viewModel.RefreshLanguageModelsCommand.Execute(null);
+        }
         if (modeling)
         {
             if (_viewModel.RefreshMeshAssetsCommand.CanExecute(null)) _viewModel.RefreshMeshAssetsCommand.Execute(null);
@@ -122,13 +136,6 @@ public partial class MainWindow : Window
         };
     }
 
-    private async void OnApplyOpenAiApiKeyClick(object sender, RoutedEventArgs e)
-    {
-        var sessionKey = OpenAiApiKeyInput.Password;
-        OpenAiApiKeyInput.Clear();
-        await _viewModel.ApplyOpenAiApiKeyAsync(sessionKey);
-    }
-
     private void ApplyLayout(RekallAgeStudioLayout layout)
     {
         Width = layout.WindowWidth;
@@ -152,7 +159,7 @@ public partial class MainWindow : Window
                 break;
             }
         }
-        WorkspaceSelector.SelectedIndex = layout.ActiveWorkspace == "Modeling" ? 1 : 0;
+        SelectWorkspace(layout.ActiveWorkspace);
         WindowState = layout.WindowMaximized ? WindowState.Maximized : WindowState.Normal;
     }
 
@@ -167,8 +174,7 @@ public partial class MainWindow : Window
             WindowY = Top,
             WindowWidth = ActualWidth,
             WindowHeight = ActualHeight,
-            WindowMaximized = WindowState == WindowState.Maximized,
-            ActiveWorkspace = WorkspaceSelector.SelectedIndex == 1 ? "Modeling" : "World"
+            WindowMaximized = WindowState == WindowState.Maximized
         };
         ApplyLayout(_layout);
     }
@@ -199,7 +205,7 @@ public partial class MainWindow : Window
             WindowHeight = bounds.Height,
             WindowMaximized = WindowState == WindowState.Maximized,
             ActiveOutputTab = activeOutput,
-            ActiveWorkspace = WorkspaceSelector.SelectedIndex == 1 ? "Modeling" : "World",
+            ActiveWorkspace = WorkspaceName(),
             Panels =
             [
                 _layout.Panel("Hierarchy") with { Visible = HierarchyPanel.Visibility == Visibility.Visible, Size = HierarchyPanel.Visibility == Visibility.Visible ? Math.Max(180, HierarchyColumn.ActualWidth) : _layout.Panel("Hierarchy").Size },
@@ -258,6 +264,11 @@ public partial class MainWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(RekallAgeStudioViewModel.HasProject))
+        {
+            if (!_initializing && !_hadProject && _viewModel.HasProject) SelectWorkspace("Author");
+            _hadProject = _viewModel.HasProject;
+        }
         if (e.PropertyName is nameof(RekallAgeStudioViewModel.SceneGizmoHandles)
             or nameof(RekallAgeStudioViewModel.TransformTool)
             or nameof(RekallAgeStudioViewModel.ViewportImage))
@@ -265,6 +276,20 @@ public partial class MainWindow : Window
             Dispatcher.BeginInvoke(RenderSceneGizmo, DispatcherPriority.Render);
         }
     }
+
+    private string WorkspaceName() => WorkspaceSelector.SelectedIndex switch
+    {
+        0 => "Author",
+        2 => "Modeling",
+        _ => "World"
+    };
+
+    private void SelectWorkspace(string workspace) => WorkspaceSelector.SelectedIndex = workspace switch
+    {
+        "Modeling" => 2,
+        "World" => 1,
+        _ => 0
+    };
 
     private void RenderSceneGizmo()
     {

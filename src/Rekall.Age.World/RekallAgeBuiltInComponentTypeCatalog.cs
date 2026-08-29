@@ -25,6 +25,7 @@ public static class RekallAgeBuiltInComponentTypeCatalog
         "Rekall.FogVolume",
         "Rekall.ParticleEmitter3D",
         "Rekall.SpriteRenderer",
+        "Rekall.ShapeRenderer2D",
         "Rekall.MeshRenderer",
         "Rekall.XrRig",
         "Rekall.XrPoseSource",

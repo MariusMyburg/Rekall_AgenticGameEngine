@@ -186,6 +186,7 @@ public sealed class RekallAgeContextBuilder
     private static bool IsRenderable(string componentType)
     {
         return componentType is "Rekall.SpriteRenderer"
+            or "Rekall.ShapeRenderer2D"
             or "Rekall.MeshRenderer"
             or "Rekall.MeshSet"
             or "Rekall.GeometryPrimitive"

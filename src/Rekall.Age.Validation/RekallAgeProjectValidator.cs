@@ -839,6 +839,7 @@ public sealed class RekallAgeProjectValidator
     private static bool IsRenderable(string type)
     {
         return type is "Rekall.SpriteRenderer"
+            or "Rekall.ShapeRenderer2D"
             or "Rekall.MeshRenderer"
             or "Rekall.MeshSet"
             or "Rekall.GeometryPrimitive"

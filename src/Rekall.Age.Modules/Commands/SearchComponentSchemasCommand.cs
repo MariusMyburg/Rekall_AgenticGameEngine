@@ -206,7 +206,7 @@ public sealed class SearchComponentSchemasCommand
         {
             score += 50;
         }
-        else if (visible && typeName is "Rekall.SpriteRenderer" or "Rekall.GeometryPrimitive")
+        else if (visible && typeName is "Rekall.SpriteRenderer" or "Rekall.ShapeRenderer2D" or "Rekall.GeometryPrimitive")
         {
             score += 15;
         }

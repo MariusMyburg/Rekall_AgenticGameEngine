@@ -28,6 +28,7 @@ public sealed class RekallAgeBuiltInModule : RekallAgeModule
         builder.RegisterComponent<RekallAgeFogVolumeComponent>();
         builder.RegisterComponent<RekallAgeParticleEmitter3DComponent>();
         builder.RegisterComponent<RekallAgeSpriteRendererComponent>();
+        builder.RegisterComponent<RekallAgeShapeRenderer2DComponent>();
         builder.RegisterComponent<RekallAgeMeshRendererComponent>();
         builder.RegisterComponent<RekallAgeXrRigComponent>();
         builder.RegisterComponent<RekallAgeXrPoseSourceComponent>();
@@ -1446,6 +1447,28 @@ public sealed class RekallAgeSpriteRendererComponent : RekallAgeComponent
 
     [RekallAgeProperty(Kind = "assetRef", AssetKind = "texture")]
     public string? AssetId { get; init; }
+
+    [RekallAgeProperty]
+    public bool Active { get; init; } = true;
+}
+
+[RekallAgeComponent("Shape Renderer 2D", Description = "Renders an asset-free rectangle or circle in the XY plane. Rekall.Transform2D supplies world position, rotation, and scale.")]
+public sealed class RekallAgeShapeRenderer2DComponent : RekallAgeComponent
+{
+    [RekallAgeProperty(AllowedValues = ["rectangle", "circle"], Description = "Shape kind: rectangle or circle.")]
+    public string Shape { get; init; } = "rectangle";
+
+    [RekallAgeProperty(Minimum = 0.0001, Description = "Rectangle width in world units before Transform2D scale.")]
+    public double Width { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0.0001, Description = "Rectangle height in world units before Transform2D scale.")]
+    public double Height { get; init; } = 1;
+
+    [RekallAgeProperty(Minimum = 0.0001, Description = "Circle radius in world units before Transform2D scale.")]
+    public double Radius { get; init; } = 0.5;
+
+    [RekallAgeProperty(Kind = "color", Description = "Shape fill color in hexadecimal RGB or RGBA form.")]
+    public string Color { get; init; } = "#ffffff";
 
     [RekallAgeProperty]
     public bool Active { get; init; } = true;

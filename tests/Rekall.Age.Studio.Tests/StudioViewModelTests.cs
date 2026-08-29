@@ -156,6 +156,29 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task ProviderPresentationShowsOnlyTheSelectedProviderConfiguration()
+    {
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = "session-test-key" },
+            () => new HttpClient(new ProviderLifecycleHandler(blockOllamaChat: false), disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+
+        Assert.True(viewModel.IsOllamaSelected);
+        Assert.False(viewModel.IsOpenAiSelected);
+        Assert.False(viewModel.IsCodexSelected);
+
+        viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "codex");
+        await viewModel.WaitForLanguageModelProviderTransitionAsync();
+
+        Assert.False(viewModel.IsOllamaSelected);
+        Assert.False(viewModel.IsOpenAiSelected);
+        Assert.True(viewModel.IsCodexSelected);
+    }
+
+    [Fact]
     public async Task ProviderSelectionExposesStableMissingOpenAiCredentialGateWithoutRetainingOllamaModels()
     {
         var ollama = new ProviderLifecycleHandler(blockOllamaChat: false);
@@ -290,7 +313,7 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
-    public async Task ProviderDefaultAbsenceLeavesSelectionEmptyWithRequestedAndResolvedDiagnostics()
+    public async Task ProviderDefaultAbsenceSelectsDiscoveredFallbackAndRejectsInventedModelIds()
     {
         var handlers = new Queue<ProviderLifecycleHandler>(
         [
@@ -310,11 +333,20 @@ public sealed class StudioViewModelTests
         await viewModel.WaitForLanguageModelProviderTransitionAsync();
 
         Assert.Equal(["gpt-5.6-sol-preview"], viewModel.LanguageModels);
-        Assert.Empty(viewModel.SelectedLanguageModel);
+        Assert.Equal("gpt-5.6-sol-preview", viewModel.SelectedLanguageModel);
+        Assert.True(viewModel.HasUsableLanguageModel);
         Assert.Equal(
-            "REKALL_LANGUAGE_MODEL_DEFAULT_UNAVAILABLE: OpenAI API did not return its configured default model. "
-            + "Requested: gpt-5.6-sol. Resolved: gpt-5.6-sol-preview.",
-            viewModel.ProviderStatus);
+            "Configured default gpt-5.6-sol unavailable; using gpt-5.6-sol-preview.",
+            viewModel.ProviderDisplayStatus);
+        Assert.Contains(
+            viewModel.ValidationLines,
+            line => line.Contains("REKALL_LANGUAGE_MODEL_DEFAULT_UNAVAILABLE", StringComparison.Ordinal)
+                && line.Contains("Requested: gpt-5.6-sol", StringComparison.Ordinal)
+                && line.Contains("Resolved: gpt-5.6-sol-preview", StringComparison.Ordinal));
+
+        viewModel.SelectedLanguageModel = "invented-model";
+
+        Assert.Equal("gpt-5.6-sol-preview", viewModel.SelectedLanguageModel);
     }
 
     [Fact]

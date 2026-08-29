@@ -162,6 +162,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _selectedLanguageModel = string.Empty;
     private string _selectedReasoningEffort = "medium";
     private string _providerStatus = string.Empty;
+    private string _providerDisplayStatus = string.Empty;
     private string _agentTaskInput = string.Empty;
     private string? _selectedMeshAssetId;
     private string _modelAssetIdInput = string.Empty;
@@ -337,6 +338,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             _languageModelProviderLease = _languageModelProviderCatalog.Acquire("ollama", _agentRegistry);
             _languageModelRunner = _languageModelProviderLease.Runner;
             _providerStatus = $"{_selectedLanguageModelProvider.DisplayName} ready. Refresh models.";
+            _providerDisplayStatus = _providerStatus;
         }
         else
         {
@@ -344,6 +346,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             _languageModelRunner = runner;
             _fixedLanguageModelRunner = runner;
             _providerStatus = $"{fixedLanguageModelClient.ProviderId} test session ready.";
+            _providerDisplayStatus = _providerStatus;
         }
         _openCommand = CreateAsyncCommand(OpenFromInputsAsync, CanOpenOrCreate);
         _createCommand = CreateAsyncCommand(CreateFromInputsAsync, CanOpenOrCreate);
@@ -757,6 +760,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 Replace(LanguageModels, []);
                 SelectedLanguageModel = string.Empty;
                 ProviderStatus = $"Switching to {value.DisplayName}…";
+                ProviderDisplayStatus = ProviderStatus;
+                OnPropertyChanged(nameof(IsOllamaSelected));
+                OnPropertyChanged(nameof(IsOpenAiSelected));
+                OnPropertyChanged(nameof(IsCodexSelected));
                 QueueLanguageModelProviderTransition(value);
             }
             RefreshCommands();
@@ -768,14 +775,34 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         get => _selectedLanguageModel;
         set
         {
-            if (Set(ref _selectedLanguageModel, value ?? string.Empty)) RefreshCommands();
+            var candidate = value ?? string.Empty;
+            if (candidate.Length > 0 && !LanguageModels.Contains(candidate, StringComparer.Ordinal)) return;
+            if (Set(ref _selectedLanguageModel, candidate))
+            {
+                OnPropertyChanged(nameof(HasUsableLanguageModel));
+                RefreshCommands();
+            }
         }
     }
+
+    public bool IsOllamaSelected => SelectedLanguageModelProvider.Id == "ollama";
+
+    public bool IsOpenAiSelected => SelectedLanguageModelProvider.Id == "openai";
+
+    public bool IsCodexSelected => SelectedLanguageModelProvider.Id == "codex";
+
+    public bool HasUsableLanguageModel => LanguageModels.Contains(SelectedLanguageModel, StringComparer.Ordinal);
 
     public string ProviderStatus
     {
         get => _providerStatus;
         private set => Set(ref _providerStatus, value);
+    }
+
+    public string ProviderDisplayStatus
+    {
+        get => _providerDisplayStatus;
+        private set => Set(ref _providerDisplayStatus, value);
     }
 
     public bool HasSessionOpenAiCredential => _sessionOpenAiApiKey is not null;
@@ -3256,24 +3283,56 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         RekallAgeLanguageModelProviderDescriptor provider,
         IReadOnlyList<RekallAgeLanguageModelInfo> models)
     {
+        var previousSelection = SelectedLanguageModel;
         Replace(LanguageModels, models.Select(model => model.Id));
+        OnPropertyChanged(nameof(HasUsableLanguageModel));
+        if (LanguageModels.Contains(previousSelection, StringComparer.Ordinal))
+        {
+            SelectedLanguageModel = previousSelection;
+            SetLanguageModelProviderReadyStatus(provider);
+            return;
+        }
+
         if (!LanguageModels.Contains(provider.DefaultModel))
         {
-            SelectedLanguageModel = string.Empty;
-            ReportLanguageModelProviderFailure(new RekallAgeLanguageModelProviderException(
+            if (LanguageModels.Count == 0)
+            {
+                SelectedLanguageModel = string.Empty;
+                ReportLanguageModelProviderFailure(new RekallAgeLanguageModelProviderException(
+                    "REKALL_LANGUAGE_MODEL_DEFAULT_UNAVAILABLE",
+                    provider.Id,
+                    $"{provider.DisplayName} did not return its configured default model.",
+                    requestedValue: provider.DefaultModel,
+                    resolvedValue: "none"));
+                return;
+            }
+
+            var fallback = LanguageModels[0];
+            SelectedLanguageModel = fallback;
+            var exception = new RekallAgeLanguageModelProviderException(
                 "REKALL_LANGUAGE_MODEL_DEFAULT_UNAVAILABLE",
                 provider.Id,
                 $"{provider.DisplayName} did not return its configured default model.",
                 requestedValue: provider.DefaultModel,
-                resolvedValue: LanguageModels.Count == 0 ? "none" : string.Join(',', LanguageModels)));
+                resolvedValue: string.Join(',', LanguageModels));
+            ProviderStatus = FormatLanguageModelProviderDiagnostic(exception);
+            ProviderDisplayStatus = $"Configured default {provider.DefaultModel} unavailable; using {fallback}.";
+            StatusText = ProviderDisplayStatus;
+            Replace(ValidationLines, [$"warning: {ProviderStatus}"]);
             return;
         }
 
         SelectedLanguageModel = provider.DefaultModel;
+        SetLanguageModelProviderReadyStatus(provider);
+    }
+
+    private void SetLanguageModelProviderReadyStatus(RekallAgeLanguageModelProviderDescriptor provider)
+    {
         var authentication = provider.Id == "codex"
             ? $" via {CodexAuthenticationLabel(provider.AuthenticationState)}"
             : string.Empty;
         ProviderStatus = $"{provider.DisplayName} ready{authentication} with {LanguageModels.Count} model{(LanguageModels.Count == 1 ? string.Empty : "s")}.";
+        ProviderDisplayStatus = ProviderStatus;
         StatusText = ProviderStatus;
     }
 
@@ -3356,6 +3415,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         RekallAgeLanguageModelProviderException exception)
     {
         ProviderStatus = FormatLanguageModelProviderDiagnostic(exception);
+        ProviderDisplayStatus = exception.Message;
         StatusText = ProviderStatus;
         Replace(ValidationLines, [$"error: {ProviderStatus}"]);
     }

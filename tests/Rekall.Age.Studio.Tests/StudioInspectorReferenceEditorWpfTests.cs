@@ -6,21 +6,21 @@ using Rekall.Age.Editor.Contracts;
 
 namespace Rekall.Age.Studio.Tests;
 
+[Collection(WpfApplicationTestCollection.Name)]
 public sealed class StudioInspectorReferenceEditorWpfTests
 {
+    private readonly WpfApplicationTestFixture _wpf;
+
+    public StudioInspectorReferenceEditorWpfTests(WpfApplicationTestFixture wpf) => _wpf = wpf;
+
     [Fact]
     public void EntityReferenceRenderPreservesStableValueAndUserSelectionProjectsStableIdOnce()
     {
-        Exception? failure = null;
-        var thread = new Thread(() =>
+        _wpf.Invoke(() =>
         {
-            App? app = null;
             MainWindow? window = null;
             try
             {
-                app = new App();
-                app.InitializeComponent();
-                app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 window = new MainWindow();
                 var row = new RekallAgeStudioInspectorPropertyEditorModel(
                     "Game.Targeting",
@@ -73,20 +73,11 @@ public sealed class StudioInspectorReferenceEditorWpfTests
                 Assert.True(row.TryCreateValue(out var value, out var error), error);
                 Assert.Equal("\"entity-2\"", value!.ToJsonString());
             }
-            catch (Exception exception)
-            {
-                failure = exception;
-            }
             finally
             {
                 window?.Close();
-                app?.Shutdown();
             }
         });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        Assert.True(thread.Join(TimeSpan.FromSeconds(15)), "Inspector reference WPF thread did not complete.");
-        Assert.Null(failure);
     }
 
     private static IEnumerable<T> Descendants<T>(DependencyObject root) where T : DependencyObject

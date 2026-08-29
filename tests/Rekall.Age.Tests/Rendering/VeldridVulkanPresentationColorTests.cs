@@ -19,20 +19,11 @@ public sealed class VeldridVulkanPresentationColorTests
 
         const int width = 64;
         const int height = 64;
-        // White matches the renderer's neutral fallback environment, keeping lighting equal
-        // while the solid/sky presentation policies differ.
-        var assets = AssetsWithImage("one-pixel-sky", 0xFF, 0xFF, 0xFF);
+        var assets = RekallAgeRuntimeViewportAssetSet.Empty;
         var hwnd = NativeWindow.Create(width, height);
         try
         {
             var solid = Frame("#12203A", exposure: 2, renderables: [TransparentCube()]);
-            var sky = Frame(
-                "#12203A",
-                exposure: 2,
-                environmentBackground: "#12203A",
-                backgroundPolicy: "skybox",
-                skyAssetId: "one-pixel-sky",
-                renderables: [TransparentCube()]);
             await using var session = new RekallAgeVeldridVulkanPresentationSession(
                 new RekallAgeWin32RenderSurfaceDescriptor(hwnd, width, height),
                 new RekallAgeVulkanPresentationOptions(
@@ -44,11 +35,62 @@ public sealed class VeldridVulkanPresentationColorTests
                 assets);
 
             var solidPixel = await CaptureCenterAsync(session, solid, assets, sceneRevision: 1);
-            var skyPixel = await CaptureCenterAsync(session, sky, assets, sceneRevision: 2);
 
-            Assert.True(solidPixel[0] > 10, $"Expected transparent geometry coverage, got {solidPixel[0]}.");
+            Assert.True(
+                Math.Abs(solidPixel[0] - 0x12) > 20,
+                $"Expected transparent geometry to survive presentation, got RGB ({solidPixel[0]}, {solidPixel[1]}, {solidPixel[2]}).");
+            Assert.Contains(
+                "(SolidBackgroundEncoded.rgb - baseline) * (1.0 - sceneCoverage)",
+                RekallAgeVeldridSceneShaders.PresentFragmentShader,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            NativeWindow.Destroy(hwnd);
+        }
+    }
+
+    [Fact]
+    public async Task TransparentGeometryCompositesRealSkyInsteadOfEnvironmentFallbackColor()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        const int width = 64;
+        const int height = 64;
+        var assets = AssetsWithImage("one-pixel-sky", 0x20, 0xD0, 0x50);
+        var redFallback = Frame(
+            "#000000",
+            environmentBackground: "#D02020",
+            backgroundPolicy: "skybox",
+            skyAssetId: "one-pixel-sky",
+            renderables: [TransparentCube()]);
+        var blueFallback = Frame(
+            "#000000",
+            environmentBackground: "#2020D0",
+            backgroundPolicy: "skybox",
+            skyAssetId: "one-pixel-sky",
+            renderables: [TransparentCube()]);
+        var hwnd = NativeWindow.Create(width, height);
+        try
+        {
+            await using var session = new RekallAgeVeldridVulkanPresentationSession(
+                new RekallAgeWin32RenderSurfaceDescriptor(hwnd, width, height),
+                new RekallAgeVulkanPresentationOptions(
+                    Path.GetFullPath("."),
+                    SyncToVerticalBlank: false,
+                    SceneSupersampleFactor: 1,
+                    DebugHudEnabled: false),
+                redFallback,
+                assets);
+
+            var redPixel = await CaptureCenterAsync(session, redFallback, assets, sceneRevision: 1);
+            var bluePixel = await CaptureCenterAsync(session, blueFallback, assets, sceneRevision: 2);
+
             Assert.All(Enumerable.Range(0, 3), channel =>
-                Assert.InRange(solidPixel[channel], skyPixel[channel] - 6, skyPixel[channel] + 6));
+                Assert.InRange(redPixel[channel], bluePixel[channel] - 2, bluePixel[channel] + 2));
         }
         finally
         {

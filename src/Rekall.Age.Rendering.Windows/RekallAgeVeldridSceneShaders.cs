@@ -1332,9 +1332,13 @@ internal static class RekallAgeVeldridSceneShaders
             // identifies a bound sky explicitly, so a valid 1x1 environment is not mistaken
             // for the engine's fallback texture.
             float sceneCoverage = resolved.a;
-            if (sceneCoverage <= 0.00001 && SolidBackgroundLinear.w < 0.5)
+            if (SolidBackgroundLinear.w < 0.5)
             {
-                resolved.rgb = environmentBackground(fsin_UV);
+                // Scene colour was blended over the deterministic fallback clear. Replace
+                // only the uncovered portion with the bound sky, including partial coverage
+                // from transparent geometry and antialiased edges.
+                vec3 sky = environmentBackground(fsin_UV);
+                resolved.rgb += (sky - SolidBackgroundLinear.rgb) * (1.0 - sceneCoverage);
             }
             vec3 bloom = sampleBloom(fsin_UV, texel);
             float ambientOcclusion = resolveAmbientOcclusion(fsin_UV, texel);
@@ -1351,14 +1355,14 @@ internal static class RekallAgeVeldridSceneShaders
             }
 
             vec3 color = applyDisplayTransform(hdr);
-            if (sceneCoverage <= 0.00001 && SolidBackgroundLinear.w > 0.5)
+            if (SolidBackgroundLinear.w > 0.5)
             {
                 // A solid clear/background colour is a display-referred authoring value. Keep
                 // exposure, tone-map, bloom and other effects available to the composed scene,
                 // but subtract the baseline display transform from untouched background pixels
                 // so their baseline appearance agrees with the Inspector swatch.
                 vec3 baseline = applyDisplayTransform(SolidBackgroundLinear.rgb);
-                color += SolidBackgroundEncoded.rgb - baseline;
+                color += (SolidBackgroundEncoded.rgb - baseline) * (1.0 - sceneCoverage);
             }
             float backgroundAlpha = SolidBackgroundLinear.w > 0.5
                 ? SolidBackgroundEncoded.a

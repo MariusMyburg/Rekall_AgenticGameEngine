@@ -13,6 +13,13 @@
         <SolidColorBrush x:Key="Selection" Color="#214D61" />
         <SolidColorBrush x:Key="EditorHeaderBackground" Color="#20262E" />
         <SolidColorBrush x:Key="ViewportBackground" Color="#090C10" />
+        <!-- Prevent native WPF popup controls from inheriting the light Windows
+             palette while the rest of Studio uses the dark workbench theme. -->
+        <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#1C222B" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#E7EDF5" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.MenuHighlightBrushKey}" Color="#214D61" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#214D61" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#E7EDF5" />
         <Style TargetType="{x:Type Window}">
             <Setter Property="FontFamily" Value="Segoe UI" />
             <Setter Property="FontSize" Value="13" />
@@ -21,6 +28,102 @@
         </Style>
         <Style TargetType="{x:Type TextBlock}"><Setter Property="Foreground" Value="{StaticResource WorkbenchText}" /></Style>
         <Style TargetType="{x:Type Control}"><Setter Property="FontFamily" Value="Segoe UI" /><Setter Property="Foreground" Value="{StaticResource WorkbenchText}" /></Style>
+        <Style TargetType="{x:Type MenuItem}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource WorkbenchText}" />
+            <Setter Property="Padding" Value="7,4" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Grid>
+                            <Border x:Name="MenuSurface"
+                                    Background="{TemplateBinding Background}"
+                                    Padding="{TemplateBinding Padding}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ContentPresenter ContentSource="Header"
+                                                      RecognizesAccessKey="True"
+                                                      VerticalAlignment="Center"
+                                                      TextElement.Foreground="{TemplateBinding Foreground}" />
+                                    <Path x:Name="SubmenuArrow" Grid.Column="1" Visibility="Collapsed"
+                                          Margin="16,0,2,0" VerticalAlignment="Center"
+                                          Data="M 0 0 L 4 4 L 0 8" Stroke="{StaticResource MutedText}"
+                                          StrokeThickness="1.3" />
+                                </Grid>
+                            </Border>
+                            <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsSubmenuOpen}"
+                                   Placement="Right" AllowsTransparency="True" Focusable="False"
+                                   PopupAnimation="Fade">
+                                <Border MinWidth="230" MaxHeight="620"
+                                        Background="{StaticResource PanelBackground}"
+                                        BorderBrush="{StaticResource PanelBorder}"
+                                        BorderThickness="1" Padding="3">
+                                    <ScrollViewer CanContentScroll="True" VerticalScrollBarVisibility="Auto">
+                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Role" Value="TopLevelHeader">
+                                <Setter TargetName="PART_Popup" Property="Placement" Value="Bottom" />
+                            </Trigger>
+                            <Trigger Property="Role" Value="SubmenuHeader">
+                                <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="MenuSurface" Property="Background" Value="{StaticResource Selection}" />
+                                <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.42" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="{x:Type Separator}">
+            <Setter Property="Margin" Value="5,3" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Height="1" Background="{StaticResource PanelBorder}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="{x:Type ContextMenu}">
+            <Setter Property="Background" Value="{StaticResource PanelBackground}" />
+            <Setter Property="Foreground" Value="{StaticResource WorkbenchText}" />
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style TargetType="{x:Type ToolTip}">
+            <Setter Property="Background" Value="{StaticResource PanelRaised}" />
+            <Setter Property="Foreground" Value="{StaticResource WorkbenchText}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="MaxWidth" Value="520" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}"
+                                              TextElement.FontFamily="{TemplateBinding FontFamily}"
+                                              TextElement.FontSize="{TemplateBinding FontSize}" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style TargetType="{x:Type Button}">
             <Setter Property="Background" Value="{StaticResource PanelRaised}" /><Setter Property="Foreground" Value="{StaticResource WorkbenchText}" />
             <Setter Property="BorderBrush" Value="{StaticResource PanelBorder}" /><Setter Property="BorderThickness" Value="1" />

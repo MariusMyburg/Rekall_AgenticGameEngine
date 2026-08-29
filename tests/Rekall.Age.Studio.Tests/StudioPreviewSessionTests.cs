@@ -47,6 +47,34 @@ public sealed class StudioPreviewSessionTests
     }
 
     [Fact]
+    public async Task EditPreviewRendersWhenAuthoredModuleSourcesHaveNoVerifiedBuildReceipt()
+    {
+        var root = TemporaryRoot("studio-preview-unbuilt-module");
+        try
+        {
+            await SaveSceneAsync(root, RekallAgeSceneDocument.Create("Main", ["world"]));
+            Directory.CreateDirectory(Path.Combine(root, "Modules", "DraftGameplay"));
+            await File.WriteAllTextAsync(
+                Path.Combine(root, "Modules", "DraftGameplay", "DraftGameplay.csproj"),
+                "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+            var presenter = new RecordingViewportPresenter();
+            await using var preview = new RekallAgeStudioVulkanPreviewSession(presenter);
+
+            var initial = await preview.ResetAsync(root, "Main", 320, 180, CancellationToken.None);
+            var stepped = await preview.StepAsync(1, CancellationToken.None);
+
+            Assert.True(initial.Presentation.PresentedFrame);
+            Assert.Equal("vulkan", initial.Backend);
+            Assert.True(initial.HardwareAccelerated);
+            Assert.Equal(1, stepped.FrameIndex);
+        }
+        finally
+        {
+            DeleteRoot(root);
+        }
+    }
+
+    [Fact]
     public async Task StepsReuseCachedAssetsAndPersistentPresenter()
     {
         var root = TemporaryRoot("studio-preview-cache");

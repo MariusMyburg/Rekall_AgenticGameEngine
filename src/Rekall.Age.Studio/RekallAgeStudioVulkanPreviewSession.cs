@@ -3,6 +3,8 @@ using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Windows;
 using Rekall.Age.Runtime;
 using Rekall.Age.Runtime.Abstractions;
+using Rekall.Age.Modules.Security;
+using Serilog;
 using System.IO;
 
 namespace Rekall.Age.Studio;
@@ -108,7 +110,23 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
                     || !string.Equals(_projectRoot, normalizedProjectRoot, StringComparison.OrdinalIgnoreCase);
                 if (replaceMonitor) candidateMonitor = _dependencyMonitorFactory(normalizedProjectRoot);
                 else await ApplyExternalDependencyChangesAsync(cancellationToken);
-                candidateLoop = RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot);
+                try
+                {
+                    candidateLoop = RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot);
+                }
+                catch (RekallAgeModuleTrustException exception)
+                {
+                    // Editing and rendering a scene must not be blocked by an absent or
+                    // stale module build receipt. Never execute unverified assemblies;
+                    // retain the project-aware built-in systems and omit project modules.
+                    Log.Warning(
+                        exception,
+                        "Studio preview omitted unverified project modules. ProjectRoot={ProjectRoot} Code={Code}",
+                        normalizedProjectRoot,
+                        exception.Code);
+                    candidateLoop = RekallAgeRuntimeExecutionLoop.CreateDefaultWithoutProjectModules(
+                        normalizedProjectRoot);
+                }
                 var candidateWorld = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(
                     projectRoot,
                     sceneName,

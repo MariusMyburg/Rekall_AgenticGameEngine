@@ -59,6 +59,7 @@ public sealed class StudioWorkbenchSourceTests
     {
         var root = FindRepositoryRoot();
         var mainWindowXaml = await File.ReadAllTextAsync(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+        var appXaml = await File.ReadAllTextAsync(Path.Combine(root, "src", "Rekall.Age.Studio", "App.xaml"));
         var authorWorkspaceXaml = await File.ReadAllTextAsync(Path.Combine(root, "src", "Rekall.Age.Studio", "AuthorWorkspace.xaml"));
         var xaml = mainWindowXaml + Environment.NewLine + authorWorkspaceXaml;
         var mainWindowCode = await File.ReadAllTextAsync(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml.cs"));
@@ -67,6 +68,15 @@ public sealed class StudioWorkbenchSourceTests
         Assert.Contains("Content=\"Open Project…\" Click=\"OnOpenProjectClick\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("Content=\"Create Project…\" Click=\"OnCreateProjectClick\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"ExamplesMenu\" Header=\"_Examples\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("SystemColors.MenuBrushKey", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("SystemColors.MenuTextBrushKey", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("SystemColors.MenuHighlightBrushKey", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("TargetType=\"{x:Type ToolTip}\"", appXaml, StringComparison.Ordinal);
+        Assert.Contains("TargetType=\"{x:Type ContextMenu}\"", appXaml, StringComparison.Ordinal);
+        Assert.Contains("SystemColors.MenuBrushKey", appXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PART_Popup\"", appXaml, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{StaticResource PanelBackground}\"", appXaml, StringComparison.Ordinal);
+        Assert.Contains("TextElement.Foreground=\"{TemplateBinding Foreground}\"", appXaml, StringComparison.Ordinal);
         Assert.Contains("PopulateExamplesMenu();", mainWindowCode, StringComparison.Ordinal);
         Assert.Contains("Tag = example", mainWindowCode, StringComparison.Ordinal);
         Assert.Contains("_viewModel.OpenProjectAsync(dialog.FolderName)", mainWindowCode, StringComparison.Ordinal);

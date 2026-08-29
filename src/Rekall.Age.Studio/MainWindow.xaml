@@ -124,6 +124,15 @@
               Background="{StaticResource ChromeBackground}"
               Foreground="{StaticResource WorkbenchText}"
               BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
+            <Menu.Resources>
+                <!-- WPF's stock submenu popup otherwise falls back to the light OS menu
+                     palette even though Studio is dark themed. Keep dynamically-created
+                     example entries readable as well as the static File entries. -->
+                <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#1C222B" />
+                <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#E7EDF5" />
+                <SolidColorBrush x:Key="{x:Static SystemColors.MenuHighlightBrushKey}" Color="#214D61" />
+                <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#E7EDF5" />
+            </Menu.Resources>
             <MenuItem Header="_File">
                 <MenuItem Header="_Create Project…" Click="OnCreateProjectClick" />
                 <MenuItem Header="_Open Project…" Click="OnOpenProjectClick" />

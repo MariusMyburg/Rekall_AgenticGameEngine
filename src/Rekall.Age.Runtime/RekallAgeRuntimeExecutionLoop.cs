@@ -36,6 +36,17 @@ public sealed class RekallAgeRuntimeExecutionLoop : IDisposable
         return CreateDefault(systems, projectRoot);
     }
 
+    /// <summary>
+    /// Creates the normal engine runtime systems for a project without loading its
+    /// authored module assemblies. Editor surfaces use this to keep scenes inspectable
+    /// while module sources are unbuilt or fail the verified-load contract.
+    /// </summary>
+    public static RekallAgeRuntimeExecutionLoop CreateDefaultWithoutProjectModules(string projectRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot);
+        return CreateDefault([], Path.GetFullPath(projectRoot));
+    }
+
     public static RekallAgeRuntimeExecutionLoop CreateDefault(IEnumerable<Type> moduleTypes)
     {
         ArgumentNullException.ThrowIfNull(moduleTypes);

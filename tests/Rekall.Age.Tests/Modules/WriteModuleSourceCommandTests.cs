@@ -74,6 +74,40 @@ public sealed class WriteModuleSourceCommandTests
         Assert.Contains(write.Errors, error => error.Code == "REKALL_MODULE_SOURCE_PATH_OUTSIDE_PROJECT");
     }
 
+    [Fact]
+    public async Task WriteModuleSourceSupportsNestedFilesButKeepsThemInsideTheModule()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("write nested module source"), CancellationToken.None);
+
+        var write = await new WriteModuleSourceCommand().ExecuteAsync(
+            new WriteModuleSourceRequest(root, "Movement", Path.Combine("Systems", "Mover.cs"), "public sealed class Mover {}"),
+            context);
+
+        Assert.True(write.Ok, write.Summary);
+        Assert.Equal(
+            Path.GetFullPath(Path.Combine(root, "Modules", "Movement", "Systems", "Mover.cs")),
+            write.Value.SourcePath);
+    }
+
+    [Fact]
+    public async Task WriteModuleSourceRejectsAStaleExpectedRevision()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var sourcePath = Path.Combine(root, "Modules", "Movement", "Mover.cs");
+        Directory.CreateDirectory(Path.GetDirectoryName(sourcePath)!);
+        await File.WriteAllTextAsync(sourcePath, "external edit");
+        var context = new RekallAgeCommandContext("studio", RekallAgeTransaction.Begin("conflicting module source"), CancellationToken.None);
+
+        var write = await new WriteModuleSourceCommand().ExecuteAsync(
+            new WriteModuleSourceRequest(root, "Movement", "Mover.cs", "studio edit", new string('0', 64)),
+            context);
+
+        Assert.False(write.Ok);
+        Assert.Contains(write.Errors, error => error.Code == "REKALL_MODULE_SOURCE_CHANGED");
+        Assert.Equal("external edit", await File.ReadAllTextAsync(sourcePath));
+    }
+
     private static string CreateAgentPlayableSource()
     {
         return """

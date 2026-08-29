@@ -31,11 +31,11 @@ public sealed class ReadModuleSourceCommand
         var sourcePath = RekallAgeModuleSourcePaths.GetSourcePath(request.ProjectRoot, request.ModuleName, request.FileName);
         var emptyResult = new ReadModuleSourceResult(request.ModuleName, request.FileName, sourcePath, string.Empty);
 
-        if (!RekallAgeModuleSourcePaths.IsSafeDirectModuleSourcePath(request.ProjectRoot, request.ModuleName, request.FileName, sourcePath))
+        if (!RekallAgeModuleSourcePaths.IsSafeModuleSourcePath(request.ProjectRoot, request.ModuleName, request.FileName, sourcePath))
         {
             var error = new RekallAgeCommandError(
                 "REKALL_MODULE_SOURCE_PATH_OUTSIDE_PROJECT",
-                "Module source paths must stay under one direct project module directory.",
+                "Module source paths must stay under their project module directory.",
                 sourcePath);
             return RekallAgeCommandResult<ReadModuleSourceResult>.Failure(emptyResult, error.Message, [error]);
         }

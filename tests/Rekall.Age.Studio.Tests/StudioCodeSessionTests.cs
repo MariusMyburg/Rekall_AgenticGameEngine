@@ -14,6 +14,7 @@ public sealed class StudioCodeSessionTests
             Directory.CreateDirectory(moduleRoot);
             var sourcePath = Path.Combine(moduleRoot, "MovementModule.cs");
             await File.WriteAllTextAsync(sourcePath, "public sealed class MovementModule { }");
+            await File.WriteAllTextAsync(Path.Combine(moduleRoot, "Movement.csproj"), "<Project />");
             Directory.CreateDirectory(Path.Combine(moduleRoot, "obj"));
             await File.WriteAllTextAsync(Path.Combine(moduleRoot, "obj", "Generated.cs"), "generated");
             var outsidePath = Path.Combine(root, "Outside.cs");
@@ -68,6 +69,41 @@ public sealed class StudioCodeSessionTests
         {
             if (Directory.Exists(firstRoot)) Directory.Delete(firstRoot, recursive: true);
             if (Directory.Exists(secondRoot)) Directory.Delete(secondRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SessionPreservesNestedSourceIdentityAndRefusesToOverwriteExternalChanges()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-code-nested-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var moduleRoot = Path.Combine(root, "Modules", "Movement");
+            var sourcePath = Path.Combine(moduleRoot, "Systems", "Mover.cs");
+            var projectPath = Path.Combine(moduleRoot, "Movement.Runtime.csproj");
+            Directory.CreateDirectory(Path.GetDirectoryName(sourcePath)!);
+            await File.WriteAllTextAsync(sourcePath, "original");
+            await File.WriteAllTextAsync(projectPath, "<Project />");
+            var session = new RekallAgeStudioCodeSession();
+
+            var source = Assert.Single(await session.RefreshAsync(root, CancellationToken.None));
+            await session.OpenAsync(source, CancellationToken.None);
+
+            Assert.Equal(Path.Combine("Systems", "Mover.cs"), source.FileName);
+            Assert.Equal(Path.GetFullPath(projectPath), session.SelectedProjectPath);
+            session.SourceText = "studio edit";
+            await File.WriteAllTextAsync(sourcePath, "external edit");
+
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => session.SaveAsync(root, CancellationToken.None).AsTask());
+
+            Assert.Contains("changed outside", error.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("external edit", await File.ReadAllTextAsync(sourcePath));
+            Assert.True(session.IsDirty);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }
 }

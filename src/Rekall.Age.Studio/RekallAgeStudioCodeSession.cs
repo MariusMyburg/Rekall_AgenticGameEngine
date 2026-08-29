@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Persistence;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor.Development;
 using Rekall.Age.Modules.Commands;
@@ -33,6 +34,7 @@ internal sealed class RekallAgeStudioCodeSession
     private string? _projectRoot;
     private string _sourceText = string.Empty;
     private string _savedSourceText = string.Empty;
+    private string? _savedSourceSha256;
 
     public RekallAgeStudioCodeSession(
         IRekallAgeStudioExternalLauncher? launcher = null,
@@ -44,11 +46,7 @@ internal sealed class RekallAgeStudioCodeSession
 
     public RekallAgeModuleSourceInfo? SelectedSource { get; private set; }
 
-    public string? SelectedProjectPath => SelectedSource is null
-        ? null
-        : Path.Combine(
-            Path.GetDirectoryName(SelectedSource.SourcePath)!,
-            $"{SelectedSource.ModuleName}.csproj");
+    public string? SelectedProjectPath => SelectedSource?.ProjectPath;
 
     public string SourceText
     {
@@ -95,10 +93,12 @@ internal sealed class RekallAgeStudioCodeSession
             throw new InvalidOperationException("The source file is no longer available in the active project.");
         }
 
-        var text = await File.ReadAllTextAsync(selected.SourcePath, cancellationToken).ConfigureAwait(false);
+        var bytes = await File.ReadAllBytesAsync(selected.SourcePath, cancellationToken).ConfigureAwait(false);
+        var text = DecodeSource(bytes);
         SelectedSource = selected;
         _sourceText = text;
         _savedSourceText = text;
+        _savedSourceSha256 = RekallAgeDocumentRevision.Compute(bytes);
     }
 
     public async ValueTask SaveAsync(string projectRoot, CancellationToken cancellationToken)
@@ -114,7 +114,8 @@ internal sealed class RekallAgeStudioCodeSession
                 _projectRoot,
                 SelectedSource.ModuleName,
                 SelectedSource.FileName,
-                SourceText),
+                SourceText,
+                _savedSourceSha256),
             CreateContext("Save Studio code source", cancellationToken)).ConfigureAwait(false);
         if (!result.Ok)
         {
@@ -122,6 +123,7 @@ internal sealed class RekallAgeStudioCodeSession
         }
 
         _savedSourceText = SourceText;
+        _savedSourceSha256 = RekallAgeDocumentRevision.Compute(new System.Text.UTF8Encoding(false).GetBytes(SourceText));
     }
 
     public async ValueTask<RekallAgeProjectDevelopmentWorkspaceResult> GenerateDevelopmentWorkspaceAsync(
@@ -167,4 +169,10 @@ internal sealed class RekallAgeStudioCodeSession
     private static StringComparison PathComparison => OperatingSystem.IsWindows()
         ? StringComparison.OrdinalIgnoreCase
         : StringComparison.Ordinal;
+
+    private static string DecodeSource(byte[] bytes)
+    {
+        using var reader = new StreamReader(new MemoryStream(bytes), detectEncodingFromByteOrderMarks: true);
+        return reader.ReadToEnd();
+    }
 }

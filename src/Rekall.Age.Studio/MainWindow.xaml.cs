@@ -156,6 +156,7 @@ public partial class MainWindow : Window
             : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         var dialog = new CreateProjectDialog(initialParent) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Request is null) return;
+        if (!await ResolveDirtyCodeAsync()) return;
 
         _viewModel.ProjectPathInput = dialog.Request.ProjectRoot;
         _viewModel.ProjectNameInput = dialog.Request.ProjectName;
@@ -172,6 +173,7 @@ public partial class MainWindow : Window
         };
         if (Directory.Exists(_viewModel.ProjectPathInput)) dialog.InitialDirectory = _viewModel.ProjectPathInput;
         if (dialog.ShowDialog(this) != true) return;
+        if (!await ResolveDirtyCodeAsync()) return;
 
         await _viewModel.OpenProjectAsync(dialog.FolderName);
     }
@@ -420,6 +422,7 @@ public partial class MainWindow : Window
         if (!_shutdownComplete)
         {
             e.Cancel = true;
+            if (!await ResolveDirtyCodeAsync()) return;
             _previewTimer.Stop();
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             try
@@ -448,6 +451,26 @@ public partial class MainWindow : Window
             return;
         }
         base.OnClosing(e);
+    }
+
+    private async Task<bool> ResolveDirtyCodeAsync()
+    {
+        if (!_viewModel.IsCodeDirty) return true;
+        var choice = MessageBox.Show(
+            this,
+            "The current C# source has unsaved changes. Save them before continuing?",
+            "Unsaved C# source",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Warning);
+        if (choice == MessageBoxResult.Cancel) return false;
+        if (choice == MessageBoxResult.Yes)
+        {
+            await _viewModel.SaveCodeChangesAsync();
+            return !_viewModel.IsCodeDirty;
+        }
+
+        await _viewModel.DiscardCodeChangesAsync();
+        return !_viewModel.IsCodeDirty;
     }
 }
 

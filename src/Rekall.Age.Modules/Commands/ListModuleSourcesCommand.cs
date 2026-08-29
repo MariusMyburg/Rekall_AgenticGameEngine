@@ -8,6 +8,7 @@ public sealed record RekallAgeModuleSourceInfo(
     string ModuleName,
     string FileName,
     string SourcePath,
+    string? ProjectPath,
     long Bytes);
 
 public sealed record ListModuleSourcesResult(IReadOnlyList<RekallAgeModuleSourceInfo> Sources);
@@ -37,13 +38,25 @@ public sealed class ListModuleSourcesCommand
 
         var sources = Directory.EnumerateFiles(modulesRoot, "*.cs", SearchOption.AllDirectories)
             .Where(path => !ContainsGeneratedDirectory(modulesRoot, path))
+            .Where(path => Path.GetRelativePath(modulesRoot, path).IndexOfAny(
+                [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]) >= 0)
             .Select(path =>
             {
-                var moduleName = Path.GetFileName(Path.GetDirectoryName(path)!);
+                var relative = Path.GetRelativePath(modulesRoot, path);
+                var segments = relative.Split(
+                    [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                    StringSplitOptions.RemoveEmptyEntries);
+                var moduleName = segments[0];
+                var moduleRoot = Path.Combine(modulesRoot, moduleName);
+                var projectPath = Directory.EnumerateFiles(moduleRoot, "*.csproj", SearchOption.TopDirectoryOnly)
+                    .OrderBy(candidate => candidate, StringComparer.OrdinalIgnoreCase)
+                    .Select(Path.GetFullPath)
+                    .FirstOrDefault();
                 return new RekallAgeModuleSourceInfo(
                     moduleName,
-                    Path.GetFileName(path),
+                    Path.GetRelativePath(moduleRoot, path),
                     Path.GetFullPath(path),
+                    projectPath,
                     new FileInfo(path).Length);
             })
             .OrderBy(source => source.ModuleName, StringComparer.Ordinal)

@@ -12,11 +12,11 @@ internal static class RekallAgeModuleSourcePaths
         return Path.GetFullPath(Path.Combine(GetModulesRoot(projectRoot), moduleName, fileName));
     }
 
-    public static bool IsSafeDirectModuleSourcePath(string projectRoot, string moduleName, string fileName, string sourcePath)
+    public static bool IsSafeModuleSourcePath(string projectRoot, string moduleName, string fileName, string sourcePath)
     {
         return IsSimplePathSegment(moduleName) &&
-            IsSimplePathSegment(fileName) &&
-            IsInsideDirectory(sourcePath, GetModulesRoot(projectRoot));
+            IsSafeRelativePath(fileName) &&
+            IsInsideDirectory(sourcePath, Path.Combine(GetModulesRoot(projectRoot), moduleName));
     }
 
     private static bool IsInsideDirectory(string path, string directory)
@@ -35,5 +35,18 @@ internal static class RekallAgeModuleSourcePaths
             value.IndexOfAny([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]) < 0 &&
             !value.Equals(".", StringComparison.Ordinal) &&
             !value.Equals("..", StringComparison.Ordinal);
+    }
+
+    private static bool IsSafeRelativePath(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || Path.IsPathRooted(value))
+        {
+            return false;
+        }
+
+        var segments = value.Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+            StringSplitOptions.RemoveEmptyEntries);
+        return segments.Length > 0 && segments.All(IsSimplePathSegment);
     }
 }

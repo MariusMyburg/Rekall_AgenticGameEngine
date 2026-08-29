@@ -33,8 +33,8 @@ public sealed class ScaffoldModuleCommand
         ScaffoldModuleRequest request,
         RekallAgeCommandContext context)
     {
-        var moduleName = ToIdentifier(request.ModuleName, "GameModule");
-        var componentName = ToIdentifier(request.ComponentName, "GameComponent");
+        var moduleName = RekallAgeModuleIdentifiers.ToIdentifier(request.ModuleName, "GameModule");
+        var componentName = RekallAgeModuleIdentifiers.ToIdentifier(request.ComponentName, "GameComponent");
         var moduleClass = moduleName.EndsWith("Module", StringComparison.Ordinal)
             ? moduleName
             : $"{moduleName}Module";
@@ -89,20 +89,6 @@ public sealed class ScaffoldModuleCommand
         source.AppendLine("    public bool Enabled { get; init; } = true;");
         source.AppendLine("}");
         return source.ToString();
-    }
-
-    private static string ToIdentifier(string value, string fallback)
-    {
-        var parts = value.Split([' ', '-', '_', '.'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var identifier = string.Concat(parts.Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
-        if (string.IsNullOrWhiteSpace(identifier))
-        {
-            return fallback;
-        }
-
-        return char.IsLetter(identifier[0]) || identifier[0] == '_'
-            ? identifier
-            : $"{fallback}{identifier}";
     }
 
     private static string ToDisplayName(string identifier)

@@ -40,10 +40,14 @@ public sealed class ProjectDevelopmentWorkspaceTests
         Assert.Equal(firstSolution, await File.ReadAllTextAsync(second.SolutionPath));
         Assert.Equal(firstLaunch, await File.ReadAllTextAsync(second.VsCodeLaunchPath));
         Assert.Equal(authoredBytes, await File.ReadAllBytesAsync(authoredSourcePath));
-        Assert.EndsWith("Neon Orchard.slnx", first.SolutionPath, StringComparison.Ordinal);
+        Assert.EndsWith(Path.Combine(".rekall", "ide", "Neon Orchard.slnx"), first.SolutionPath, StringComparison.Ordinal);
         Assert.Contains("Modules\\OrchardRules\\OrchardRules.csproj", firstSolution, StringComparison.Ordinal);
         Assert.Contains("Modules\\PlayerMotion\\PlayerMotion.csproj", firstSolution, StringComparison.Ordinal);
-        Assert.Contains(".rekall\\ide\\Rekall.Game.Debug\\Rekall.Game.Debug.csproj", firstSolution, StringComparison.Ordinal);
+        Assert.Contains("Rekall.Game.Debug\\Rekall.Game.Debug.csproj", firstSolution, StringComparison.Ordinal);
+        var debugProject = await File.ReadAllTextAsync(first.DebugProjectPath);
+        Assert.Contains("DisableFastUpToDateCheck", debugProject, StringComparison.Ordinal);
+        Assert.Contains("build modules", debugProject, StringComparison.Ordinal);
+        Assert.Contains(Path.GetFullPath(cliPath), debugProject, StringComparison.Ordinal);
 
         using var visualStudio = JsonDocument.Parse(await File.ReadAllTextAsync(first.VisualStudioLaunchSettingsPath));
         var profile = visualStudio.RootElement.GetProperty("profiles").GetProperty("Rekall AGE Game");
@@ -65,5 +69,53 @@ public sealed class ProjectDevelopmentWorkspaceTests
         Assert.Equal(Path.GetFullPath(cliPath), task.GetProperty("command").GetString());
         Assert.Equal(["build", "modules", Path.GetFullPath(root)],
             task.GetProperty("args").EnumerateArray().Select(item => item.GetString()!).ToArray());
+    }
+
+    [Fact]
+    public async Task GenerateMergesRekallEntriesIntoExistingVsCodeConfiguration()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Configured Game", ["world", "modules"]),
+            CancellationToken.None);
+        var engineRoot = Path.Combine(root, "Engine");
+        Directory.CreateDirectory(engineRoot);
+        var playerPath = Path.Combine(engineRoot, "Player.exe");
+        var cliPath = Path.Combine(engineRoot, "rekall.exe");
+        await File.WriteAllBytesAsync(playerPath, [0]);
+        await File.WriteAllBytesAsync(cliPath, [0]);
+        var vscodeRoot = Path.Combine(root, ".vscode");
+        Directory.CreateDirectory(vscodeRoot);
+        await File.WriteAllTextAsync(Path.Combine(vscodeRoot, "launch.json"),
+            """{"version":"0.2.0","presentation":{"hidden":false},"configurations":[{"name":"My Tool","type":"coreclr"}]}""");
+        await File.WriteAllTextAsync(Path.Combine(vscodeRoot, "tasks.json"),
+            """{"version":"2.0.0","tasks":[{"label":"My Build","type":"process","command":"dotnet"}]}""");
+
+        var result = await new RekallAgeProjectDevelopmentWorkspace().GenerateAsync(
+            new RekallAgeProjectDevelopmentWorkspaceRequest(root, "Main", playerPath, cliPath),
+            CancellationToken.None);
+
+        using var launch = JsonDocument.Parse(await File.ReadAllTextAsync(result.VsCodeLaunchPath));
+        Assert.True(launch.RootElement.GetProperty("presentation").GetProperty("hidden").ValueKind == JsonValueKind.False);
+        Assert.Equal(["My Tool", "Rekall AGE: Play Game"],
+            launch.RootElement.GetProperty("configurations").EnumerateArray().Select(item => item.GetProperty("name").GetString()!).ToArray());
+        using var tasks = JsonDocument.Parse(await File.ReadAllTextAsync(result.VsCodeTasksPath));
+        Assert.Equal(["My Build", "Rekall AGE: Build Modules"],
+            tasks.RootElement.GetProperty("tasks").EnumerateArray().Select(item => item.GetProperty("label").GetString()!).ToArray());
+    }
+
+    [Fact]
+    public async Task GenerateRequiresCanonicalCliBuildInsteadOfFallingBackToSolutionBuild()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(root, RekallAgeProjectManifest.Create("Game", ["world", "modules"]), CancellationToken.None);
+        var playerPath = Path.Combine(root, "Player.exe");
+        await File.WriteAllBytesAsync(playerPath, [0]);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            new RekallAgeProjectDevelopmentWorkspace().GenerateAsync(
+                new RekallAgeProjectDevelopmentWorkspaceRequest(root, "Main", playerPath),
+                CancellationToken.None).AsTask());
     }
 }

@@ -1,5 +1,6 @@
 using System.Security;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Rekall.Age.Core.Persistence;
 using Rekall.Age.Project;
 
@@ -31,19 +32,18 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
         var projectRoot = RequireExistingDirectory(request.ProjectRoot, nameof(request.ProjectRoot));
         var sceneName = RequireValue(request.SceneName, nameof(request.SceneName));
         var playerPath = RequireExistingFile(request.PlayerExecutablePath, nameof(request.PlayerExecutablePath));
-        var cliPath = string.IsNullOrWhiteSpace(request.CliExecutablePath)
-            ? null
-            : RequireExistingFile(request.CliExecutablePath, nameof(request.CliExecutablePath));
+        var cliPath = RequireExistingFile(request.CliExecutablePath, nameof(request.CliExecutablePath));
         var manifest = await new RekallAgeProjectStore().LoadAsync(projectRoot, cancellationToken).ConfigureAwait(false);
 
-        var ideRoot = Path.Combine(projectRoot, ".rekall", "ide", "Rekall.Game.Debug");
+        var workspaceRoot = Path.Combine(projectRoot, ".rekall", "ide");
+        var ideRoot = Path.Combine(workspaceRoot, "Rekall.Game.Debug");
         var debugProjectPath = Path.Combine(ideRoot, "Rekall.Game.Debug.csproj");
         var programPath = Path.Combine(ideRoot, "Program.cs");
         var launchSettingsPath = Path.Combine(ideRoot, "Properties", "launchSettings.json");
         var vscodeRoot = Path.Combine(projectRoot, ".vscode");
         var vscodeLaunchPath = Path.Combine(vscodeRoot, "launch.json");
         var vscodeTasksPath = Path.Combine(vscodeRoot, "tasks.json");
-        var solutionPath = Path.Combine(projectRoot, $"{ToSafeFileName(manifest.Name)}.slnx");
+        var solutionPath = Path.Combine(workspaceRoot, $"{ToSafeFileName(manifest.Name)}.slnx");
 
         var moduleProjects = Directory.Exists(Path.Combine(projectRoot, "Modules"))
             ? Directory.EnumerateFiles(Path.Combine(projectRoot, "Modules"), "*.csproj", SearchOption.AllDirectories)
@@ -53,7 +53,24 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
                 .ToArray()
             : [];
 
-        await WriteAsync(debugProjectPath, CreateDebugProject(), cancellationToken).ConfigureAwait(false);
+        var vscodeLaunch = await MergeNamedArrayAsync(
+            vscodeLaunchPath,
+            "configurations",
+            "name",
+            "Rekall AGE: Play Game",
+            JsonSerializer.SerializeToNode(CreateVsCodeLaunchConfiguration(playerPath, projectRoot, sceneName))!,
+            "0.2.0",
+            cancellationToken).ConfigureAwait(false);
+        var vscodeTasks = await MergeNamedArrayAsync(
+            vscodeTasksPath,
+            "tasks",
+            "label",
+            "Rekall AGE: Build Modules",
+            JsonSerializer.SerializeToNode(CreateVsCodeTask(cliPath, projectRoot))!,
+            "2.0.0",
+            cancellationToken).ConfigureAwait(false);
+
+        await WriteAsync(debugProjectPath, CreateDebugProject(cliPath, projectRoot), cancellationToken).ConfigureAwait(false);
         await WriteAsync(programPath, CreateDebugProgram(), cancellationToken).ConfigureAwait(false);
         await WriteAsync(
             launchSettingsPath,
@@ -61,13 +78,13 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
             cancellationToken).ConfigureAwait(false);
         await WriteAsync(
             vscodeLaunchPath,
-            JsonSerializer.Serialize(CreateVsCodeLaunch(playerPath, projectRoot, sceneName), JsonOptions) + Environment.NewLine,
+            vscodeLaunch,
             cancellationToken).ConfigureAwait(false);
         await WriteAsync(
             vscodeTasksPath,
-            JsonSerializer.Serialize(CreateVsCodeTasks(cliPath, solutionPath, projectRoot), JsonOptions) + Environment.NewLine,
+            vscodeTasks,
             cancellationToken).ConfigureAwait(false);
-        await WriteAsync(solutionPath, CreateSolution(projectRoot, debugProjectPath, moduleProjects), cancellationToken).ConfigureAwait(false);
+        await WriteAsync(solutionPath, CreateSolution(Path.GetDirectoryName(solutionPath)!, debugProjectPath, moduleProjects), cancellationToken).ConfigureAwait(false);
 
         return new RekallAgeProjectDevelopmentWorkspaceResult(
             solutionPath,
@@ -92,74 +109,58 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
             }
         };
 
-    private static object CreateVsCodeLaunch(string playerPath, string projectRoot, string sceneName) => new
+    private static object CreateVsCodeLaunchConfiguration(string playerPath, string projectRoot, string sceneName) => new
     {
-        version = "0.2.0",
-        configurations = new[]
-        {
-            new
-            {
-                name = "Rekall AGE: Play Game",
-                type = "coreclr",
-                request = "launch",
-                program = playerPath,
-                args = new[] { projectRoot, sceneName, "--graphics", "--backend", "vulkan" },
-                cwd = projectRoot,
-                preLaunchTask = "Rekall AGE: Build Modules"
-            }
-        }
+        name = "Rekall AGE: Play Game",
+        type = "coreclr",
+        request = "launch",
+        program = playerPath,
+        args = new[] { projectRoot, sceneName, "--graphics", "--backend", "vulkan" },
+        cwd = projectRoot,
+        preLaunchTask = "Rekall AGE: Build Modules"
     };
 
-    private static object CreateVsCodeTasks(string? cliPath, string solutionPath, string projectRoot) => new
+    private static object CreateVsCodeTask(string cliPath, string projectRoot) => new
     {
-        version = "2.0.0",
-        tasks = new[]
-        {
-            cliPath is null
-                ? new
-                {
-                    label = "Rekall AGE: Build Modules",
-                    type = "process",
-                    command = "dotnet",
-                    args = new[] { "build", solutionPath },
-                    options = new { cwd = projectRoot },
-                    problemMatcher = "$msCompile"
-                }
-                : new
-                {
-                    label = "Rekall AGE: Build Modules",
-                    type = "process",
-                    command = cliPath,
-                    args = new[] { "build", "modules", projectRoot },
-                    options = new { cwd = projectRoot },
-                    problemMatcher = "$msCompile"
-                }
-        }
+        label = "Rekall AGE: Build Modules",
+        type = "process",
+        command = cliPath,
+        args = new[] { "build", "modules", projectRoot },
+        options = new { cwd = projectRoot },
+        problemMatcher = "$msCompile"
     };
 
     private static string CreateSolution(
-        string projectRoot,
+        string solutionDirectory,
         string debugProjectPath,
         IEnumerable<string> moduleProjects)
     {
         var paths = new[] { debugProjectPath }.Concat(moduleProjects)
-            .Select(path => Path.GetRelativePath(projectRoot, path).Replace('/', '\\'));
+            .Select(path => Path.GetRelativePath(solutionDirectory, path).Replace('/', '\\'));
         return "<Solution>\n"
             + string.Concat(paths.Select(path => $"  <Project Path=\"{SecurityElement.Escape(path)}\" />\n"))
             + "</Solution>\n";
     }
 
-    private static string CreateDebugProject() => """
-        <Project Sdk="Microsoft.NET.Sdk">
-          <PropertyGroup>
-            <OutputType>Exe</OutputType>
-            <TargetFramework>net10.0</TargetFramework>
-            <Nullable>enable</Nullable>
-            <ImplicitUsings>enable</ImplicitUsings>
-          </PropertyGroup>
-        </Project>
+    private static string CreateDebugProject(string cliPath, string projectRoot)
+    {
+        var command = SecurityElement.Escape($"\"{cliPath}\" build modules \"{projectRoot}\"");
+        return $"""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <OutputType>Exe</OutputType>
+                <TargetFramework>net10.0</TargetFramework>
+                <Nullable>enable</Nullable>
+                <ImplicitUsings>enable</ImplicitUsings>
+                <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+              </PropertyGroup>
+              <Target Name="BuildRekallModules" BeforeTargets="Build">
+                <Exec Command="{command}" />
+              </Target>
+            </Project>
 
-        """;
+            """;
+    }
 
     private static string CreateDebugProgram() => """
         Console.WriteLine("Use the 'Rekall AGE Game' launch profile or press F5 to start the production Player.");
@@ -168,6 +169,42 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
 
     private static async ValueTask WriteAsync(string path, string contents, CancellationToken cancellationToken) =>
         await RekallAgeAtomicFile.WriteAllTextAsync(path, contents, MaximumGeneratedFileBytes, cancellationToken).ConfigureAwait(false);
+
+    private static async ValueTask<string> MergeNamedArrayAsync(
+        string path,
+        string arrayName,
+        string identityName,
+        string identityValue,
+        JsonNode generatedItem,
+        string defaultVersion,
+        CancellationToken cancellationToken)
+    {
+        JsonObject document;
+        if (File.Exists(path))
+        {
+            var existing = await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false);
+            document = JsonNode.Parse(
+                existing,
+                documentOptions: new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip }) as JsonObject
+                ?? throw new InvalidDataException($"IDE configuration '{path}' must contain a JSON object.");
+        }
+        else
+        {
+            document = new JsonObject { ["version"] = defaultVersion };
+        }
+
+        var items = document[arrayName] as JsonArray ?? new JsonArray();
+        document[arrayName] = items;
+        for (var index = items.Count - 1; index >= 0; index--)
+        {
+            if (items[index]?[identityName]?.GetValue<string>() == identityValue)
+            {
+                items.RemoveAt(index);
+            }
+        }
+        items.Add(generatedItem);
+        return document.ToJsonString(JsonOptions) + Environment.NewLine;
+    }
 
     private static bool ContainsGeneratedSegment(string root, string path)
     {
@@ -186,7 +223,7 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
             : throw new DirectoryNotFoundException($"Project directory '{fullPath}' does not exist.");
     }
 
-    private static string RequireExistingFile(string path, string parameterName)
+    private static string RequireExistingFile(string? path, string parameterName)
     {
         var fullPath = Path.GetFullPath(RequireValue(path, parameterName));
         return File.Exists(fullPath)
@@ -194,7 +231,7 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
             : throw new FileNotFoundException($"Required executable '{fullPath}' does not exist.", fullPath);
     }
 
-    private static string RequireValue(string value, string parameterName) =>
+    private static string RequireValue(string? value, string parameterName) =>
         string.IsNullOrWhiteSpace(value) ? throw new ArgumentException("Value is required.", parameterName) : value.Trim();
 
     private static string ToSafeFileName(string value)

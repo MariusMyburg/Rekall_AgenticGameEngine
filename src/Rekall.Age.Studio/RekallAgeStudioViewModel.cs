@@ -1753,6 +1753,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         && !string.IsNullOrWhiteSpace(ComponentTypeInput);
     private bool CanEditProperty() => CanEditComponent() && !string.IsNullOrWhiteSpace(PropertyNameInput);
     private bool CanCreateAttachCodeComponent() => HasSelectedEntity()
+        && !IsCodeDirty
         && !string.IsNullOrWhiteSpace(CodeModuleNameInput)
         && !string.IsNullOrWhiteSpace(CodeComponentNameInput)
         && !string.IsNullOrWhiteSpace(CodeSystemNameInput);
@@ -1939,6 +1940,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public string? SelectedCodeSourcePath => SelectedCodeSource?.SourcePath;
 
     public string? SelectedCodeProjectPath => _codeSession.SelectedProjectPath;
+
+    public string? CodeSolutionPath => _codeSession.DevelopmentWorkspace?.SolutionPath;
+
+    public string? CodeVsCodeLaunchPath => _codeSession.DevelopmentWorkspace?.VsCodeLaunchPath;
 
     public string CodeModuleNameInput
     {
@@ -2750,6 +2755,19 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         CodeStatusText = $"Saved {SelectedCodeSource?.FileName}.";
     });
 
+    internal async Task SaveCodeChangesAsync()
+    {
+        await SaveCodeSourceAsync();
+    }
+
+    internal async Task DiscardCodeChangesAsync()
+    {
+        if (SelectedCodeSource is not null)
+        {
+            await OpenCodeSourceAsync(SelectedCodeSource);
+        }
+    }
+
     private Task BuildCodeAsync() => RunCodeActionAsync(async () =>
     {
         if (_session.ProjectRoot is null) return;
@@ -2879,8 +2897,20 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             player,
             ResolveCliExecutable(),
             _lifecycleCancellation.Token);
-        if (openVsCode) _codeSession.OpenInVsCode();
-        else _codeSession.OpenSolution();
+        OnPropertyChanged(nameof(CodeSolutionPath));
+        OnPropertyChanged(nameof(CodeVsCodeLaunchPath));
+        CodeStatusText = $"Generated IDE workspace at {workspace.SolutionPath}.";
+        try
+        {
+            if (openVsCode) _codeSession.OpenInVsCode();
+            else _codeSession.OpenSolution();
+        }
+        catch (System.ComponentModel.Win32Exception exception)
+        {
+            throw new InvalidOperationException(
+                $"IDE workspace generated at {workspace.SolutionPath}. Automatic launch failed: {exception.Message}",
+                exception);
+        }
         CodeStatusText = openVsCode
             ? $"Opened VS Code at {_session.ProjectRoot}."
             : $"Opened {workspace.SolutionPath}.";

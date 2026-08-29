@@ -8,6 +8,23 @@ namespace Rekall.Age.Tests.Modules;
 public sealed class ScaffoldRuntimeSystemModuleCommandTests
 {
     [Fact]
+    public async Task ScaffoldSanitizesPathLikeNamesIntoAContainedIdentifier()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("safe scaffold"), CancellationToken.None);
+
+        var result = await new ScaffoldRuntimeSystemModuleCommand().ExecuteAsync(
+            new ScaffoldRuntimeSystemModuleRequest(root, "game.safe", "Safe", @"C:\Temp\Rules", "../State", "Systems/Mover"),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        var modulesRoot = Path.GetFullPath(Path.Combine(root, "Modules")) + Path.DirectorySeparatorChar;
+        Assert.StartsWith(modulesRoot, Path.GetFullPath(result.Value.SourcePath), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(':', result.Value.ModuleClass);
+        Assert.DoesNotContain(Path.DirectorySeparatorChar, result.Value.ModuleClass);
+    }
+
+    [Fact]
     public void SchemaGivesAgentsTheExactCompactCallAndEditingContract()
     {
         var description = new ScaffoldRuntimeSystemModuleCommand().Schema.Description;

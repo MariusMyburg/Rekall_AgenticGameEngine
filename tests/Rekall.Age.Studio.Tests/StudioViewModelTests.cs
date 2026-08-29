@@ -2393,6 +2393,10 @@ public sealed class StudioViewModelTests
             Assert.Contains(viewModel.InspectorLines, line =>
                 line.Contains("Game.Modules.Mover.MoverState", StringComparison.Ordinal));
 
+            viewModel.CodeSourceText += Environment.NewLine + "// unsaved";
+            Assert.True(viewModel.IsCodeDirty);
+            Assert.False(viewModel.CreateAttachCodeComponentCommand.CanExecute(null));
+
             var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
             var entity = Assert.Single(scene.Entities);
             var component = Assert.Single(entity.Components, candidate =>

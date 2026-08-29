@@ -92,8 +92,18 @@
                 <TextBox Grid.Row="1" Text="{Binding CodeSourceText, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True" AcceptsTab="True" FontFamily="Cascadia Code" FontSize="13"
                          HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
-                         TextWrapping="NoWrap" SpellCheck.IsEnabled="False" Padding="13,10"
-                         IsReadOnly="False" />
+                         TextWrapping="NoWrap" SpellCheck.IsEnabled="False" Padding="13,10">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox">
+                            <Setter Property="IsReadOnly" Value="False" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedCodeSource}" Value="{x:Null}">
+                                    <Setter Property="IsReadOnly" Value="True" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
                 <Border Grid.Row="2" Background="#141A21" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,1,0,0" Padding="9,5">
                     <TextBlock Text="{Binding SelectedCodeSourcePath, TargetNullValue='Select or create a module source'}"
                                FontFamily="Cascadia Code" FontSize="10" Foreground="{StaticResource MutedText}" TextTrimming="CharacterEllipsis" />
@@ -126,6 +136,9 @@
                     <TextBlock Text="{Binding SelectedCodeProjectPath, TargetNullValue='Select a source to see its project path'}"
                                FontFamily="Cascadia Code" FontSize="10" Foreground="{StaticResource MutedText}"
                                TextWrapping="Wrap" Margin="3,6,3,2" />
+                    <TextBlock Text="{Binding CodeSolutionPath, TargetNullValue='IDE workspace will be generated when opened'}"
+                               FontFamily="Cascadia Code" FontSize="10" Foreground="{StaticResource MutedText}"
+                               TextWrapping="Wrap" Margin="3,2" />
                     <TextBlock Text="{Binding CodeStatusText}" TextWrapping="Wrap" Margin="3,5,3,7" />
                     <Border Height="1" Background="{StaticResource PanelBorder}" />
                     <TextBlock Text="BUILD OUTPUT" FontSize="11" FontWeight="Bold" Foreground="{StaticResource Accent}" Margin="3,9,3,5" />

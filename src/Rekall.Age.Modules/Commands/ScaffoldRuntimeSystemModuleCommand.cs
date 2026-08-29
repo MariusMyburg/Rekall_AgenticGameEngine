@@ -35,9 +35,9 @@ public sealed class ScaffoldRuntimeSystemModuleCommand
         ScaffoldRuntimeSystemModuleRequest request,
         RekallAgeCommandContext context)
     {
-        var moduleName = ToIdentifier(request.ModuleName, "RuntimeModule");
-        var componentName = ToIdentifier(request.ComponentName, "RuntimeComponent");
-        var systemName = ToIdentifier(request.SystemName, "RuntimeSystem");
+        var moduleName = RekallAgeModuleIdentifiers.ToIdentifier(request.ModuleName, "RuntimeModule");
+        var componentName = RekallAgeModuleIdentifiers.ToIdentifier(request.ComponentName, "RuntimeComponent");
+        var systemName = RekallAgeModuleIdentifiers.ToIdentifier(request.SystemName, "RuntimeSystem");
         var moduleClass = moduleName.EndsWith("Module", StringComparison.Ordinal)
             ? moduleName
             : $"{moduleName}Module";
@@ -184,20 +184,6 @@ public sealed class ScaffoldRuntimeSystemModuleCommand
         source.AppendLine("    }");
         source.AppendLine("}");
         return source.ToString();
-    }
-
-    private static string ToIdentifier(string value, string fallback)
-    {
-        var parts = value.Split([' ', '-', '_', '.'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var identifier = string.Concat(parts.Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
-        if (string.IsNullOrWhiteSpace(identifier))
-        {
-            return fallback;
-        }
-
-        return char.IsLetter(identifier[0]) || identifier[0] == '_'
-            ? identifier
-            : $"{fallback}{identifier}";
     }
 
     private static string ToDisplayName(string identifier)

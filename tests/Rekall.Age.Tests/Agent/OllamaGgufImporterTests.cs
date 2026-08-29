@@ -122,6 +122,19 @@ public sealed class OllamaGgufImporterTests
         Assert.DoesNotContain(fileName, error.ToString(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("/tmp/parent\"quoted/model.gguf")]
+    [InlineData("/tmp/parent\nPARAMETER injected true/model.gguf")]
+    public void RejectsUnsafeCharactersIntroducedByResolvedParentPath(string resolvedFullPath)
+    {
+        var error = Assert.Throws<RekallAgeLanguageModelProviderException>(() =>
+            RekallAgeOllamaGgufImporter.ValidateResolvedModelfileSourcePath(resolvedFullPath));
+
+        Assert.Equal("REKALL_GGUF_FILE_INVALID", error.Code);
+        Assert.Equal("gguf", error.ProviderId);
+        Assert.DoesNotContain(resolvedFullPath, error.ToString(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task ProcessRunnerCancellationTerminatesTheChildWithoutDeadlockingPipes()
     {

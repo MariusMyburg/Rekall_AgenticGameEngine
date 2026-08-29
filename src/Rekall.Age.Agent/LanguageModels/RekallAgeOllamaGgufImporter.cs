@@ -38,15 +38,20 @@ public sealed class RekallAgeOllamaGgufImporter : IRekallAgeGgufImporter
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(ggufPath)
-            || !Path.GetExtension(ggufPath).Equals(".gguf", StringComparison.OrdinalIgnoreCase)
-            || HasUnsupportedModelfilePathCharacter(ggufPath))
+            || !Path.GetExtension(ggufPath).Equals(".gguf", StringComparison.OrdinalIgnoreCase))
         {
-            throw new RekallAgeLanguageModelProviderException(
-                "REKALL_GGUF_FILE_INVALID",
-                "gguf",
-                "Select a local .gguf model file.");
+            throw InvalidGgufFile();
         }
-        var fullPath = Path.GetFullPath(ggufPath);
+        string fullPath;
+        try
+        {
+            fullPath = Path.GetFullPath(ggufPath);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            throw InvalidGgufFile();
+        }
+        ValidateResolvedModelfileSourcePath(fullPath);
         if (!File.Exists(fullPath))
         {
             throw new RekallAgeLanguageModelProviderException(
@@ -127,8 +132,18 @@ public sealed class RekallAgeOllamaGgufImporter : IRekallAgeGgufImporter
         }
     }
 
-    private static bool HasUnsupportedModelfilePathCharacter(string path) =>
-        path.Any(character => character == '"' || char.IsControl(character));
+    internal static void ValidateResolvedModelfileSourcePath(string fullPath)
+    {
+        if (fullPath.Any(character => character == '"' || char.IsControl(character)))
+        {
+            throw InvalidGgufFile();
+        }
+    }
+
+    private static RekallAgeLanguageModelProviderException InvalidGgufFile() => new(
+        "REKALL_GGUF_FILE_INVALID",
+        "gguf",
+        "Select a local .gguf model file.");
 
     private static string BuildModelName(string fullPath)
     {

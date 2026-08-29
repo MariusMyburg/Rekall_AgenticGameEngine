@@ -38,6 +38,9 @@ public sealed class StudioWorkbenchSourceTests
         Assert.Contains("OnInspectorTextEditorLostKeyboardFocus", xaml, StringComparison.Ordinal);
         Assert.Contains("OnInspectorBooleanChanged", xaml, StringComparison.Ordinal);
         Assert.Contains("OnInspectorChoiceChanged", xaml, StringComparison.Ordinal);
+        Assert.Contains("SelectedValue=\"{Binding ReferenceValue, Mode=OneWay}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding ReferenceSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("OnInspectorReferenceChoiceChanged", xaml, StringComparison.Ordinal);
         Assert.Contains("OnInspectorJsonEditorKeyDown", xaml, StringComparison.Ordinal);
         Assert.Contains("RestoreOriginalDraft", windowCode, StringComparison.Ordinal);
         Assert.Contains("CommitInspectorPropertyCommand", windowCode, StringComparison.Ordinal);

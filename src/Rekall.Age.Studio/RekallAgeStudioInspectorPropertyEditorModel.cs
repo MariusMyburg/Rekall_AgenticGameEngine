@@ -17,6 +17,7 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
     private JsonNode? _originalValue;
     private bool _originalValueIsValid;
     private string _textValue = string.Empty;
+    private string _referenceSearchText = string.Empty;
     private bool? _booleanValue;
     private string _colorValue = string.Empty;
     private string _colorRed = string.Empty;
@@ -75,7 +76,29 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
     public string TextValue
     {
         get => _textValue;
-        set => SetDraft(ref _textValue, value ?? string.Empty);
+        set
+        {
+            if (IsReferenceTemplate())
+            {
+                SetReferenceValue(value ?? string.Empty, ReferenceDisplayText(value ?? string.Empty));
+                return;
+            }
+            SetDraft(ref _textValue, value ?? string.Empty);
+        }
+    }
+
+    public string ReferenceValue => _textValue;
+
+    public string ReferenceSearchText
+    {
+        get => _referenceSearchText;
+        set
+        {
+            var next = value ?? string.Empty;
+            if (string.Equals(_referenceSearchText, next, StringComparison.Ordinal)) return;
+            _referenceSearchText = next;
+            OnPropertyChanged();
+        }
     }
 
     public bool? BooleanValue
@@ -203,6 +226,18 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
 
     public void RestoreOriginalDraft() => InitializeDraft(_persistedDisplayValue, _persistedIsDefined);
 
+    public void SelectReferenceValue(string value) =>
+        SetReferenceValue(value ?? string.Empty, ReferenceDisplayText(value ?? string.Empty));
+
+    public void AcceptReferenceSearchText()
+    {
+        if (!IsReferenceTemplate()) return;
+        var choice = ChoiceItems.FirstOrDefault(item =>
+            item.DisplayName.Equals(ReferenceSearchText, StringComparison.OrdinalIgnoreCase)
+            || item.Value.Equals(ReferenceSearchText, StringComparison.Ordinal));
+        SetReferenceValue(choice?.Value ?? ReferenceSearchText, choice?.DisplayName ?? ReferenceSearchText);
+    }
+
     internal void SetServerValidation(string? message) => ValidationMessage = message;
 
     private static string SelectTemplateKind(RekallAgeInspectorPropertyModel property)
@@ -252,6 +287,7 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
         OriginalDisplayValue = displayValue;
         IsDefined = isDefined;
         _textValue = InitialTextValue(draftValue, isDefined);
+        _referenceSearchText = IsReferenceTemplate() ? ReferenceDisplayText(_textValue) : string.Empty;
         _booleanValue = isDefined && bool.TryParse(displayValue, out var boolean) ? boolean : null;
         _colorValue = isDefined ? draftValue : string.Empty;
         _colorRed = string.Empty;
@@ -273,6 +309,8 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
         OnPropertyChanged(nameof(OriginalDisplayValue));
         OnPropertyChanged(nameof(IsDefined));
         OnPropertyChanged(nameof(TextValue));
+        OnPropertyChanged(nameof(ReferenceValue));
+        OnPropertyChanged(nameof(ReferenceSearchText));
         OnPropertyChanged(nameof(BooleanValue));
         OnPropertyChanged(nameof(ColorValue));
         OnPropertyChanged(nameof(ColorRed));
@@ -526,7 +564,36 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
         if (string.Equals(field, next, StringComparison.Ordinal) && _colorChannelsAreActive) return;
         field = next;
         _colorChannelsAreActive = true;
+        var nextColor = TryCreateColor(out var normalized, out _) ? normalized : string.Empty;
+        if (!string.Equals(_colorValue, nextColor, StringComparison.Ordinal))
+        {
+            _colorValue = nextColor;
+            OnPropertyChanged(nameof(ColorValue));
+        }
         NotifyDraftChanged(propertyName);
+    }
+
+    private bool IsReferenceTemplate() => TemplateKind is "assetRef" or "entityRef";
+
+    private string ReferenceDisplayText(string value) =>
+        ChoiceItems.FirstOrDefault(choice => choice.Value.Equals(value, StringComparison.Ordinal))?.DisplayName ?? value;
+
+    private void SetReferenceValue(string value, string displayText)
+    {
+        var valueChanged = !string.Equals(_textValue, value, StringComparison.Ordinal);
+        var displayChanged = !string.Equals(_referenceSearchText, displayText, StringComparison.Ordinal);
+        if (!valueChanged && !displayChanged) return;
+        _textValue = value;
+        _referenceSearchText = displayText;
+        if (valueChanged)
+        {
+            OnPropertyChanged(nameof(TextValue));
+            OnPropertyChanged(nameof(ReferenceValue));
+        }
+        if (displayChanged) OnPropertyChanged(nameof(ReferenceSearchText));
+        ValidationMessage = TryCreateValueCore(out _, out var error) ? null : error;
+        OnPropertyChanged(nameof(IsDirty));
+        OnPropertyChanged(nameof(IsValid));
     }
 
     private static bool TryReadFiniteJsonNumber(JsonNode? node, out double number)

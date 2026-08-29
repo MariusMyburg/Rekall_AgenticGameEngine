@@ -103,9 +103,21 @@ public sealed class StudioInspectorPropertyEditorModelTests
             ]);
         Assert.Equal(["entity-1", "entity-2"], entity.Choices);
         Assert.Equal("Target (entity-2)", entity.ChoiceItems[1].DisplayName);
+        Assert.Equal("entity-2", entity.ReferenceValue);
+        Assert.Equal("Target (entity-2)", entity.ReferenceSearchText);
         entity.TextValue = entity.ChoiceItems[0].Value;
         Assert.True(entity.TryCreateValue(out var value, out var error), error);
         Assert.Equal("\"entity-1\"", value!.ToJsonString());
+
+        entity.RestoreOriginalDraft();
+        entity.ReferenceSearchText = "agent-authored-stable-id";
+        Assert.Equal("entity-2", entity.ReferenceValue);
+        Assert.False(entity.IsDirty);
+        entity.AcceptReferenceSearchText();
+        Assert.Equal("agent-authored-stable-id", entity.ReferenceValue);
+        Assert.True(entity.IsDirty);
+        Assert.True(entity.TryCreateValue(out value, out error), error);
+        Assert.Equal("\"agent-authored-stable-id\"", value!.ToJsonString());
     }
 
     [Fact]
@@ -127,11 +139,23 @@ public sealed class StudioInspectorPropertyEditorModelTests
     public void ColorChannelDraftsProduceCanonicalColorAndRetainInvalidChannelFeedback()
     {
         var row = Row("color", "#10203040");
+        var swatchNotifications = 0;
+        row.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(RekallAgeStudioInspectorPropertyEditorModel.ColorValue))
+            {
+                swatchNotifications++;
+            }
+        };
 
         Assert.Equal("16", row.ColorRed);
         Assert.Equal("32", row.ColorGreen);
         Assert.Equal("48", row.ColorBlue);
         Assert.Equal("64", row.ColorAlpha);
+
+        row.ColorRed = "17";
+        Assert.Equal("#11203040", row.ColorValue);
+        Assert.Equal(1, swatchNotifications);
 
         row.ColorRed = "255";
         row.ColorGreen = "102";

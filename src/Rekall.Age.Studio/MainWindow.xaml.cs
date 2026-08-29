@@ -167,8 +167,36 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnInspectorChoiceEditorKeyDown(object sender, KeyEventArgs e) =>
-        OnInspectorTextEditorKeyDown(sender, e);
+    private void OnInspectorReferenceEditorKeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: RekallAgeStudioInspectorPropertyEditorModel row }) return;
+        if (e.Key == Key.Escape)
+        {
+            row.RestoreOriginalDraft();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            row.AcceptReferenceSearchText();
+            CommitInspectorRow(row);
+            e.Handled = true;
+        }
+    }
+
+    private void OnInspectorReferenceEditorLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: RekallAgeStudioInspectorPropertyEditorModel row }) return;
+        if (e.NewFocus is FrameworkElement { DataContext: RekallAgeStudioInspectorPropertyEditorModel nextRow }
+            && ReferenceEquals(row, nextRow))
+        {
+            return;
+        }
+
+        row.AcceptReferenceSearchText();
+        CommitInspectorRow(row);
+    }
 
     private void OnInspectorTextEditorLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
@@ -196,6 +224,22 @@ public partial class MainWindow : Window
         {
             CommitInspectorRow(row);
         }
+    }
+
+    private void OnInspectorReferenceChoiceChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ComboBox
+            {
+                DataContext: RekallAgeStudioInspectorPropertyEditorModel row,
+                SelectedItem: RekallAgeStudioInspectorPropertyChoice choice
+            })
+        {
+            return;
+        }
+
+        if (row.ReferenceValue.Equals(choice.Value, StringComparison.Ordinal)) return;
+        row.SelectReferenceValue(choice.Value);
+        CommitInspectorRow(row);
     }
 
     private void CommitInspectorRow(RekallAgeStudioInspectorPropertyEditorModel row)

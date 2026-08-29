@@ -33,7 +33,7 @@
   </ItemGroup>
   <ItemGroup>
     <StudioExampleFile Include="$(MSBuildProjectDirectory)\..\..\Examples\**\*"
-                       Exclude="$(MSBuildProjectDirectory)\..\..\Examples\**\.git\**;$(MSBuildProjectDirectory)\..\..\Examples\**\.rekall\**;$(MSBuildProjectDirectory)\..\..\Examples\**\.vs\**;$(MSBuildProjectDirectory)\..\..\Examples\**\bin\**;$(MSBuildProjectDirectory)\..\..\Examples\**\obj\**;$(MSBuildProjectDirectory)\..\..\Examples\**\TestResults\**" />
+                       Exclude="$(MSBuildProjectDirectory)\..\..\Examples\**\.git\**;$(MSBuildProjectDirectory)\..\..\Examples\**\.rekall\**;$(MSBuildProjectDirectory)\..\..\Examples\**\.vs\**;$(MSBuildProjectDirectory)\..\..\Examples\**\bin\**;$(MSBuildProjectDirectory)\..\..\Examples\**\Builds\**;$(MSBuildProjectDirectory)\..\..\Examples\**\Captures\**;$(MSBuildProjectDirectory)\..\..\Examples\**\obj\**;$(MSBuildProjectDirectory)\..\..\Examples\**\TestResults\**" />
   </ItemGroup>
   <Target Name="CopyBundledExamples" AfterTargets="Publish">
     <Copy SourceFiles="@(StudioExampleFile)"

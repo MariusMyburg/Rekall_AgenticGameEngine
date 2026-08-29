@@ -43,7 +43,7 @@ public sealed class StudioExampleLibraryTests
         var source = WriteProject(Path.Combine(root, "sources"), "summit", "Summit Run", ["world"]);
         Directory.CreateDirectory(Path.Combine(source, "Scenes"));
         await File.WriteAllTextAsync(Path.Combine(source, "Scenes", "Main.age.scene.json"), "{\"entities\":[]}");
-        foreach (var transient in new[] { ".rekall", ".git", ".vs", "bin", "obj", "TestResults" })
+        foreach (var transient in new[] { ".rekall", ".git", ".vs", "bin", "Builds", "Captures", "obj", "TestResults" })
         {
             var transientRoot = Path.Combine(source, "Modules", transient);
             Directory.CreateDirectory(transientRoot);
@@ -58,7 +58,7 @@ public sealed class StudioExampleLibraryTests
 
         Assert.Equal(sourceManifestBefore, await File.ReadAllTextAsync(Path.Combine(source, "rekall.project.json")));
         Assert.True(File.Exists(Path.Combine(destination, "Scenes", "Main.age.scene.json")));
-        Assert.All(new[] { ".rekall", ".git", ".vs", "bin", "obj", "TestResults" }, transient =>
+        Assert.All(new[] { ".rekall", ".git", ".vs", "bin", "Builds", "Captures", "obj", "TestResults" }, transient =>
             Assert.False(Directory.Exists(Path.Combine(destination, "Modules", transient))));
         Assert.DoesNotContain(
             Directory.EnumerateDirectories(Path.GetDirectoryName(destination)!),

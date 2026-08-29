@@ -10,6 +10,8 @@ internal sealed class RekallAgeStudioExampleLibrary
         ".rekall",
         ".vs",
         "bin",
+        "Builds",
+        "Captures",
         "obj",
         "TestResults"
     };

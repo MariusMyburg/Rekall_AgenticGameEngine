@@ -452,6 +452,7 @@ public partial class MainWindow : Window
                 await _exampleLibrary.CopyAsync(example, destination, transition.CancellationToken);
             }
 
+            transition.CancellationToken.ThrowIfCancellationRequested();
             await _viewModel.OpenProjectAsync(destination);
             if (_viewModel.HasProject) SelectWorkspace("World");
         }

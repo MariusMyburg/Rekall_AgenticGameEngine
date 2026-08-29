@@ -42,6 +42,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeLanguageModelProviderCatalog _languageModelProviderCatalog;
     private readonly IRekallAgeStudioPreviewSession _previewSession;
     private readonly RekallAgeStudioSimulationCadence _simulationCadence;
+    private readonly IRekallAgeGgufImporter _ggufImporter;
     private readonly SemaphoreSlim _modeTransitionGate = new(1, 1);
     private readonly CancellationTokenSource _lifecycleCancellation = new();
     private readonly object _disposeSync = new();
@@ -157,6 +158,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private Task? _activeCodexSignIn;
     private CancellationTokenSource? _codexSignInCancellation;
     private string? _sessionOpenAiApiKey;
+    private string? _sessionKimiApiKey;
     private bool _isBusy;
     private bool _isAgentRunning;
     private bool _isLiveViewportEnabled = true;
@@ -372,13 +374,23 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
     }
 
+    internal RekallAgeStudioViewModel(
+        RekallAgeWorkbenchSession session,
+        RekallAgeLanguageModelProviderCatalog languageModelProviderCatalog,
+        IRekallAgeStudioPreviewSession previewSession,
+        IRekallAgeGgufImporter ggufImporter)
+        : this(session, languageModelProviderCatalog, null, previewSession, null, null, ggufImporter)
+    {
+    }
+
     private RekallAgeStudioViewModel(
         RekallAgeWorkbenchSession session,
         RekallAgeLanguageModelProviderCatalog languageModelProviderCatalog,
         IRekallAgeLanguageModelClient? fixedLanguageModelClient,
         IRekallAgeStudioPreviewSession previewSession,
         Action<string>? openPackageFolder,
-        IRekallAgeStudioMonotonicClock? monotonicClock = null)
+        IRekallAgeStudioMonotonicClock? monotonicClock = null,
+        IRekallAgeGgufImporter? ggufImporter = null)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _languageModelProviderCatalog = languageModelProviderCatalog
@@ -386,6 +398,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _previewSession = previewSession ?? throw new ArgumentNullException(nameof(previewSession));
         _simulationCadence = new RekallAgeStudioSimulationCadence(
             monotonicClock ?? new RekallAgeStudioStopwatchClock());
+        _ggufImporter = ggufImporter ?? new RekallAgeOllamaGgufImporter();
         _openPackageFolder = openPackageFolder ?? OpenDirectoryInExplorer;
         _agentRegistry = RekallAgeDefaultCommandRegistry.Create();
         _selectedLanguageModelProvider = _languageModelProviderCatalog.Providers.Single(provider => provider.Id == "ollama");
@@ -447,7 +460,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _undoCommand = CreateAsyncCommand(UndoAsync, () => HasEditableProject() && _session.CanUndoSinceOpen);
         _redoCommand = CreateAsyncCommand(RedoAsync, () => HasEditableProject() && _session.CanRedo);
         _discoverModelsCommand = CreateAsyncCommand(
-            DiscoverModelsAsync,
+            () => DiscoverModelsAsync(),
             () => !IsBusy && !IsAgentRunning && _languageModelRunner is not null);
         _signInCodexCommand = CreateAsyncCommand(SignInCodexAsync,
             () => !IsBusy && !IsAgentRunning && _activeCodexSignIn is not { IsCompleted: false }
@@ -903,6 +916,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 ProviderStatus = $"Switching to {value.DisplayName}…";
                 ProviderDisplayStatus = ProviderStatus;
                 OnPropertyChanged(nameof(IsOllamaSelected));
+                OnPropertyChanged(nameof(IsGgufSelected));
+                OnPropertyChanged(nameof(IsKimiSelected));
                 OnPropertyChanged(nameof(IsOpenAiSelected));
                 OnPropertyChanged(nameof(IsCodexSelected));
                 QueueLanguageModelProviderTransition(value);
@@ -942,6 +957,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool IsOllamaSelected => SelectedLanguageModelProvider.Id == "ollama";
 
+    public bool IsGgufSelected => SelectedLanguageModelProvider.Id == "gguf";
+
+    public bool IsKimiSelected => SelectedLanguageModelProvider.Id == "kimi";
+
     public bool IsOpenAiSelected => SelectedLanguageModelProvider.Id == "openai";
 
     public bool IsCodexSelected => SelectedLanguageModelProvider.Id == "codex";
@@ -961,6 +980,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     }
 
     public bool HasSessionOpenAiCredential => _sessionOpenAiApiKey is not null;
+
+    public bool HasSessionKimiCredential => _sessionKimiApiKey is not null;
 
     public RekallAgeCodexApprovalCallback? CodexApprovalHandler { get; set; }
 
@@ -3553,7 +3574,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
     }
 
-    private Task DiscoverModelsAsync()
+    private Task DiscoverModelsAsync(bool propagateProviderFailure = false)
     {
         lock (_languageModelLifecycleSync)
         {
@@ -3566,7 +3587,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 cancellation,
                 SelectedLanguageModelProvider,
                 runner,
-                _languageModelProviderTransitionGeneration);
+                _languageModelProviderTransitionGeneration,
+                propagateProviderFailure);
             return _activeLanguageModelRefresh;
         }
     }
@@ -3575,7 +3597,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         CancellationTokenSource operationCancellation,
         RekallAgeLanguageModelProviderDescriptor provider,
         IRekallAgeProjectAgentRunner runner,
-        long generation)
+        long generation,
+        bool propagateProviderFailure)
     {
         IsBusy = true;
         try
@@ -3586,6 +3609,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         catch (RekallAgeLanguageModelProviderException exception)
         {
             ReportLanguageModelProviderFailureIfCurrent(provider, runner, generation, exception);
+            if (propagateProviderFailure) throw;
         }
         catch (OperationCanceledException) when (operationCancellation.IsCancellationRequested)
         {
@@ -3989,7 +4013,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         IReadOnlyList<RekallAgeLanguageModelInfo> models)
     {
         var previousSelection = SelectedLanguageModel;
-        var authoringModels = provider.Id == "ollama"
+        var isOllamaBacked = provider.Id is "ollama" or "gguf";
+        var authoringModels = isOllamaBacked
             ? models.Where(model => model.SupportsTools is not false).ToArray()
             : models.ToArray();
         Replace(LanguageModels, authoringModels.Select(model => model.Id));
@@ -4015,7 +4040,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 return;
             }
 
-            var fallback = provider.Id == "ollama"
+            var fallback = isOllamaBacked
                 ? authoringModels
                     .Where(model => !model.Id.EndsWith("-cloud", StringComparison.OrdinalIgnoreCase))
                     .OrderByDescending(model => model.SizeBytes)
@@ -4117,15 +4142,28 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 provider.Id,
                 "Language-model provider transition failed unexpectedly."));
 
-    private RekallAgeLanguageModelProviderSettings? SessionLanguageModelProviderSettings() =>
-        _sessionOpenAiApiKey is null
-            ? null
-            : new RekallAgeLanguageModelProviderSettings
-            {
-                OllamaUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL"),
-                OpenAiApiKey = _sessionOpenAiApiKey,
-                OpenAiUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OPENAI_URL")
-            };
+    private RekallAgeLanguageModelProviderSettings? SessionLanguageModelProviderSettings()
+    {
+        if (_sessionOpenAiApiKey is null && _sessionKimiApiKey is null) return null;
+        return new RekallAgeLanguageModelProviderSettings
+        {
+            OllamaUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL"),
+            OpenAiApiKey = _sessionOpenAiApiKey ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY"),
+            OpenAiUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OPENAI_URL"),
+            KimiApiKey = _sessionKimiApiKey ?? ReadFirstEnvironmentValue("KIMI_API_KEY", "MOONSHOT_API_KEY"),
+            KimiUrl = Environment.GetEnvironmentVariable("REKALL_AGE_KIMI_URL")
+        };
+    }
+
+    private static string? ReadFirstEnvironmentValue(params string[] names)
+    {
+        foreach (var name in names)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            if (!string.IsNullOrWhiteSpace(value)) return value;
+        }
+        return null;
+    }
 
     private void ReportLanguageModelProviderFailure(
         RekallAgeLanguageModelProviderException exception)
@@ -4414,6 +4452,99 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             IsBusy = false;
         }
+    }
+
+    public Task ApplyKimiApiKeyAsync(string? apiKey)
+    {
+        lock (_languageModelLifecycleSync)
+        {
+            _sessionKimiApiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey;
+            OnPropertyChanged(nameof(HasSessionKimiCredential));
+            OnPropertyChanged(nameof(LanguageModelProviders));
+            _selectedLanguageModelProvider = LanguageModelProviders.Single(
+                provider => provider.Id == _selectedLanguageModelProvider.Id);
+            OnPropertyChanged(nameof(SelectedLanguageModelProvider));
+            if (SelectedLanguageModelProvider.Id != "kimi")
+            {
+                ProviderStatus = _sessionKimiApiKey is null
+                    ? "Kimi session key cleared."
+                    : "Kimi session key accepted in memory for this Studio session.";
+                return Task.CompletedTask;
+            }
+
+            Replace(LanguageModels, []);
+            SelectedLanguageModel = string.Empty;
+            ProviderStatus = "Refreshing Kimi session authentication…";
+            QueueLanguageModelProviderTransition(SelectedLanguageModelProvider);
+            return _languageModelProviderTransition;
+        }
+    }
+
+    public async Task ImportGgufModelAsync(string? ggufPath)
+    {
+        if (!IsGgufSelected)
+        {
+            ReportLanguageModelProviderFailure(new RekallAgeLanguageModelProviderException(
+                "REKALL_GGUF_PROVIDER_REQUIRED",
+                SelectedLanguageModelProvider.Id,
+                "Select Local GGUF before importing a GGUF model.",
+                resolvedValue: "gguf"));
+            return;
+        }
+
+        await CancelAndAwaitLanguageModelRefreshAsync();
+        IsBusy = true;
+        ProviderStatus = "Importing the selected GGUF model through Ollama…";
+        ProviderDisplayStatus = ProviderStatus;
+        RekallAgeGgufImportResult result;
+        try
+        {
+            result = await _ggufImporter.ImportAsync(ggufPath ?? string.Empty, _lifecycleCancellation.Token);
+        }
+        catch (RekallAgeLanguageModelProviderException exception)
+        {
+            ReportLanguageModelProviderFailure(exception);
+            return;
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception)
+        {
+            ReportLanguageModelProviderFailure(new RekallAgeLanguageModelProviderException(
+                "REKALL_GGUF_IMPORT_FAILED",
+                "gguf",
+                "The GGUF import failed unexpectedly."));
+            return;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+
+        if (!IsGgufSelected) return;
+        try
+        {
+            await DiscoverModelsAsync(propagateProviderFailure: true);
+        }
+        catch (RekallAgeLanguageModelProviderException exception)
+        {
+            ReportLanguageModelProviderFailure(exception);
+            return;
+        }
+        if (!LanguageModels.Contains(result.ModelName, StringComparer.Ordinal))
+        {
+            ReportLanguageModelProviderFailure(new RekallAgeLanguageModelProviderException(
+                "REKALL_GGUF_TOOL_CAPABILITY_REQUIRED",
+                "gguf",
+                "Ollama imported the model, but it does not advertise the tool capability required for game authoring."));
+            return;
+        }
+        SelectedLanguageModel = result.ModelName;
+        ProviderStatus = "Local GGUF model imported and ready through Ollama.";
+        ProviderDisplayStatus = $"Using {result.ModelName} with {SelectedLanguageModelProvider.DisplayName}.";
+        StatusText = ProviderStatus;
     }
 
     private void ResetSimulationCadence() => _simulationCadence.Reset();

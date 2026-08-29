@@ -191,13 +191,13 @@ public sealed class StudioViewModelTests
             catalog,
             new RecordingPreviewSession());
 
-        Assert.Equal(["ollama", "openai", "codex"], viewModel.LanguageModelProviders.Select(provider => provider.Id));
+        Assert.Equal(["ollama", "gguf", "kimi", "openai", "codex"], viewModel.LanguageModelProviders.Select(provider => provider.Id));
         Assert.Equal(["none", "low", "medium", "high", "xhigh", "max"], viewModel.ReasoningEfforts);
         Assert.Equal("medium", viewModel.SelectedReasoningEffort);
         Assert.Equal("ollama", viewModel.SelectedLanguageModelProvider.Id);
         await ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
-        Assert.Equal(["gemma3:latest", "qwen3.5:35b"], viewModel.LanguageModels);
-        Assert.Equal("qwen3.5:35b", viewModel.SelectedLanguageModel);
+        Assert.Equal(["gemma3:latest", "qwen3.8:27b"], viewModel.LanguageModels);
+        Assert.Equal("qwen3.8:27b", viewModel.SelectedLanguageModel);
 
         viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "openai");
         await viewModel.WaitForLanguageModelProviderTransitionAsync();
@@ -356,7 +356,7 @@ public sealed class StudioViewModelTests
         var catalog = new RekallAgeLanguageModelProviderCatalog(
             httpClientFactory: () => new HttpClient(new ProviderLifecycleHandler(
                 blockOllamaChat: false,
-                ollamaModels: ["deepseek-v3.1:671b-cloud", "qwen3.8:27b"]), disposeHandler: true));
+                ollamaModels: ["deepseek-v3.1:671b-cloud", "qwen3.5:35b"]), disposeHandler: true));
         await using var viewModel = new RekallAgeStudioViewModel(
             new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
             catalog,
@@ -364,9 +364,9 @@ public sealed class StudioViewModelTests
 
         await ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
 
-        Assert.Equal(["deepseek-v3.1:671b-cloud", "qwen3.8:27b"], viewModel.LanguageModels);
-        Assert.Equal("qwen3.8:27b", viewModel.SelectedLanguageModel);
-        Assert.Contains("using qwen3.8:27b", viewModel.ProviderDisplayStatus, StringComparison.Ordinal);
+        Assert.Equal(["deepseek-v3.1:671b-cloud", "qwen3.5:35b"], viewModel.LanguageModels);
+        Assert.Equal("qwen3.5:35b", viewModel.SelectedLanguageModel);
+        Assert.Contains("using qwen3.5:35b", viewModel.ProviderDisplayStatus, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -375,7 +375,7 @@ public sealed class StudioViewModelTests
         var catalog = new RekallAgeLanguageModelProviderCatalog(
             httpClientFactory: () => new HttpClient(new ProviderLifecycleHandler(
                 blockOllamaChat: false,
-                ollamaModels: ["dolphin-llama3:latest", "llama3.2:latest", "qwen3.8:27b"]), disposeHandler: true));
+                ollamaModels: ["dolphin-llama3:latest", "llama3.2:latest", "qwen3.5:35b"]), disposeHandler: true));
         await using var viewModel = new RekallAgeStudioViewModel(
             new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
             catalog,
@@ -383,9 +383,9 @@ public sealed class StudioViewModelTests
 
         await ExecuteAsync(viewModel.RefreshLanguageModelsCommand);
 
-        Assert.Equal(["llama3.2:latest", "qwen3.8:27b"], viewModel.LanguageModels);
-        Assert.Equal("qwen3.8:27b", viewModel.SelectedLanguageModel);
-        Assert.Contains("using qwen3.8:27b", viewModel.ProviderDisplayStatus, StringComparison.Ordinal);
+        Assert.Equal(["llama3.2:latest", "qwen3.5:35b"], viewModel.LanguageModels);
+        Assert.Equal("qwen3.5:35b", viewModel.SelectedLanguageModel);
+        Assert.Contains("using qwen3.5:35b", viewModel.ProviderDisplayStatus, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -3169,7 +3169,7 @@ public sealed class StudioViewModelTests
                 }
                 if (pauseModelResponse) await _modelsRelease.Task.WaitAsync(cancellationToken);
                 if (modelFailure is not null) throw modelFailure;
-                var models = ollamaModels ?? ["qwen3.5:35b", "gemma3:latest"];
+                var models = ollamaModels ?? ["qwen3.8:27b", "gemma3:latest"];
                 return JsonResponse(new JsonObject
                 {
                     ["models"] = new JsonArray(models.Select((model, index) => new JsonObject
@@ -3209,7 +3209,7 @@ public sealed class StudioViewModelTests
                 }
 
                 return JsonResponse("""
-                    {"model":"qwen3.5:35b","message":{"role":"assistant","content":"complete"},"done":true,"done_reason":"stop","total_duration":1,"prompt_eval_count":1,"eval_count":1}
+                    {"model":"qwen3.8:27b","message":{"role":"assistant","content":"complete"},"done":true,"done_reason":"stop","total_duration":1,"prompt_eval_count":1,"eval_count":1}
                     """);
             }
 

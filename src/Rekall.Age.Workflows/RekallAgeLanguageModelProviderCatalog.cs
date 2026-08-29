@@ -31,6 +31,11 @@ public sealed class RekallAgeLanguageModelProviderSettings
 
     public string? OpenAiUrl { get; init; }
 
+    [JsonIgnore]
+    public string? KimiApiKey { get; init; }
+
+    public string? KimiUrl { get; init; }
+
     public string? CodexApprovalPolicy { get; init; }
 
     public override string ToString() => "Language model provider settings.";
@@ -60,13 +65,33 @@ public sealed class RekallAgeLanguageModelProviderCatalog
     {
         var settings = sessionSettings ?? _settings;
         var hasOpenAiApiKey = !string.IsNullOrWhiteSpace(settings.OpenAiApiKey);
+        var hasKimiApiKey = !string.IsNullOrWhiteSpace(settings.KimiApiKey);
         return Array.AsReadOnly<RekallAgeLanguageModelProviderDescriptor>(
         [
-            new("ollama", "Local Ollama", "qwen3.5:35b", "none")
+            new("ollama", "Local Ollama", "qwen3.8:27b", "none")
             {
                 AuthenticationState = "not-required",
                 IsAvailable = true,
                 Diagnostics = []
+            },
+            new("gguf", "Local GGUF (via Ollama)", "qwen3.8:27b", "none")
+            {
+                AuthenticationState = "not-required",
+                IsAvailable = true,
+                Diagnostics = []
+            },
+            new("kimi", "Kimi API", "kimi-k3", "api-key")
+            {
+                AuthenticationState = hasKimiApiKey ? "configured" : "required",
+                IsAvailable = hasKimiApiKey,
+                Diagnostics = hasKimiApiKey
+                    ? []
+                    : Array.AsReadOnly(
+                    [
+                        new RekallAgeLanguageModelProviderDiagnostic(
+                            "REKALL_KIMI_API_KEY_MISSING",
+                            "Kimi requires KIMI_API_KEY, MOONSHOT_API_KEY, or a session-only API key.")
+                    ])
             },
             new("openai", "OpenAI API", "gpt-5.6-sol", "api-key")
             {
@@ -217,6 +242,11 @@ public sealed class RekallAgeLanguageModelProviderCatalog
             IRekallAgeLanguageModelClient client = normalizedProviderId switch
             {
                 "ollama" => new RekallAgeOllamaLanguageModelClient(httpClient, ResolveOllamaUrl(settings)),
+                "gguf" => new RekallAgeGgufLanguageModelClient(httpClient, ResolveOllamaUrl(settings)),
+                "kimi" => new RekallAgeKimiLanguageModelClient(
+                    httpClient,
+                    settings.KimiApiKey!,
+                    ResolveKimiUrl(settings)),
                 "openai" => new RekallAgeOpenAiLanguageModelClient(
                     httpClient,
                     settings.OpenAiApiKey!,
@@ -240,7 +270,9 @@ public sealed class RekallAgeLanguageModelProviderCatalog
     {
         OllamaUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL"),
         OpenAiApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY"),
-        OpenAiUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OPENAI_URL")
+        OpenAiUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OPENAI_URL"),
+        KimiApiKey = FirstNonEmptyEnvironmentValue("KIMI_API_KEY", "MOONSHOT_API_KEY"),
+        KimiUrl = Environment.GetEnvironmentVariable("REKALL_AGE_KIMI_URL")
     };
 
     private static HttpClient CreateHttpClient() => new() { Timeout = TimeSpan.FromMinutes(30) };
@@ -252,4 +284,19 @@ public sealed class RekallAgeLanguageModelProviderCatalog
         string.IsNullOrWhiteSpace(settings.OpenAiUrl)
             ? null
             : new Uri(settings.OpenAiUrl, UriKind.Absolute);
+
+    private static Uri? ResolveKimiUrl(RekallAgeLanguageModelProviderSettings settings) =>
+        string.IsNullOrWhiteSpace(settings.KimiUrl)
+            ? null
+            : new Uri(settings.KimiUrl, UriKind.Absolute);
+
+    private static string? FirstNonEmptyEnvironmentValue(params string[] names)
+    {
+        foreach (var name in names)
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            if (!string.IsNullOrWhiteSpace(value)) return value;
+        }
+        return null;
+    }
 }

@@ -59,6 +59,8 @@ internal static class RekallAgeCli
                 ["agent", "providers"] => ListLanguageModelProviders(),
                 ["agent", "models", var provider] =>
                     await ListLanguageModelsAsync(registry, provider, cancellationToken),
+                ["agent", "import-gguf", var path] =>
+                    await ImportGgufModelAsync(path, cancellationToken),
                 ["agent", "auth", var provider, "status"] =>
                     await ShowLanguageModelAuthenticationStatusAsync(registry, provider, cancellationToken),
                 ["agent", "auth", var provider, "login"] =>
@@ -3286,7 +3288,7 @@ internal static class RekallAgeCli
         cancellationToken.IsCancellationRequested
         && arguments.Count >= 2
         && arguments[0].Equals("agent", StringComparison.OrdinalIgnoreCase)
-        && arguments[1] is "models" or "run" or "run-project" or "auth";
+        && arguments[1] is "models" or "import-gguf" or "run" or "run-project" or "auth";
 
     private static void WriteLanguageModelProviderDiagnostic(RekallAgeLanguageModelProviderException error)
     {
@@ -3320,6 +3322,16 @@ internal static class RekallAgeCli
             Console.WriteLine($"{model.Id}\t{model.SizeBytes}");
         }
 
+        return 0;
+    }
+
+    private static async Task<int> ImportGgufModelAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        var result = await new RekallAgeOllamaGgufImporter().ImportAsync(path, cancellationToken);
+        Console.WriteLine($"Imported Ollama model: {result.ModelName}");
+        Console.WriteLine("Provider: gguf");
         return 0;
     }
 

@@ -34,7 +34,15 @@ public sealed class AgentCliTests
 
         Assert.Equal(0, providers.ExitCode);
         Assert.Contains(
-            "ollama\tLocal Ollama\tqwen3.5:35b\tnone\tnot-required\tavailable\t-",
+            "ollama\tLocal Ollama\tqwen3.8:27b\tnone\tnot-required\tavailable\t-",
+            providers.Output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "gguf\tLocal GGUF (via Ollama)\tqwen3.8:27b\tnone\tnot-required\tavailable\t-",
+            providers.Output,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "kimi\tKimi API\tkimi-k3\tapi-key\trequired\tunavailable\tREKALL_KIMI_API_KEY_MISSING",
             providers.Output,
             StringComparison.Ordinal);
         Assert.Contains(
@@ -54,7 +62,7 @@ public sealed class AgentCliTests
         Assert.Equal(1, unsupportedProvider.ExitCode);
         Assert.Contains("REKALL_LANGUAGE_MODEL_PROVIDER_UNSUPPORTED", unsupportedProvider.Output, StringComparison.Ordinal);
         Assert.Contains("Requested: missing-provider", unsupportedProvider.Output, StringComparison.Ordinal);
-        Assert.Contains("Resolved: ollama,openai,codex", unsupportedProvider.Output, StringComparison.Ordinal);
+        Assert.Contains("Resolved: ollama,gguf,kimi,openai,codex", unsupportedProvider.Output, StringComparison.Ordinal);
         Assert.DoesNotContain(sessionKey, providers.Output, StringComparison.Ordinal);
         Assert.DoesNotContain(sessionKey, missingAuth.Output, StringComparison.Ordinal);
         Assert.DoesNotContain(sessionKey, unsupportedModel.Output, StringComparison.Ordinal);
@@ -204,6 +212,22 @@ public sealed class AgentCliTests
 
         Assert.Equal(2, result.ExitCode);
         Assert.Contains("Invalid maximum turn count 'zero'.", result.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GgufImportCommandValidatesTheFileBeforeStartingOllama()
+    {
+        var path = Path.Combine(TestPaths.CreateTempDirectory(), "not-a-model.txt");
+        await File.WriteAllTextAsync(path, "not gguf");
+
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            null,
+            "agent", "import-gguf", path);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("REKALL_GGUF_FILE_INVALID", result.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain(path, result.Output, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

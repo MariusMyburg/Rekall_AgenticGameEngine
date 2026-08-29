@@ -66,6 +66,28 @@
                                 </StackPanel>
                             </Border>
 
+                            <Border x:Name="GgufConfiguration" Padding="10" Background="#151B22" CornerRadius="4" Margin="0,0,0,10">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsGgufSelected}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <StackPanel>
+                                    <TextBlock Text="Local GGUF via Ollama" FontWeight="SemiBold" />
+                                    <TextBlock Text="Choose a local GGUF file. Studio imports it through Ollama, then makes it available in the model list."
+                                               Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,3,0,7" />
+                                    <WrapPanel>
+                                        <Button Content="Browse and import GGUF…" Click="OnImportGgufClick" />
+                                        <Button Content="Refresh imported models" Command="{Binding RefreshLanguageModelsCommand}" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+
                             <Border x:Name="OpenAiConfiguration" Padding="10" Background="#151B22" CornerRadius="4" Margin="0,0,0,10">
                                 <Border.Style>
                                     <Style TargetType="Border">
@@ -87,6 +109,31 @@
                                         <Button Grid.Column="1" Content="Apply key" Click="OnApplyOpenAiApiKeyClick" Margin="7,0,0,0" />
                                     </Grid>
                                     <Button Content="Refresh OpenAI models" Command="{Binding RefreshLanguageModelsCommand}"
+                                            HorizontalAlignment="Left" Margin="0,7,0,0" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border x:Name="KimiConfiguration" Padding="10" Background="#151B22" CornerRadius="4" Margin="0,0,0,10">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsKimiSelected}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <StackPanel>
+                                    <TextBlock Text="Kimi API session" FontWeight="SemiBold" />
+                                    <TextBlock Text="The Kimi key is held in memory for this Studio session only. KIMI_API_KEY and MOONSHOT_API_KEY are also supported."
+                                               Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,3,0,7" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <PasswordBox x:Name="KimiApiKeyInput" PasswordChar="●" Padding="7,5" />
+                                        <Button Grid.Column="1" Content="Apply key" Click="OnApplyKimiApiKeyClick" Margin="7,0,0,0" />
+                                    </Grid>
+                                    <Button Content="Refresh Kimi models" Command="{Binding RefreshLanguageModelsCommand}"
                                             HorizontalAlignment="Left" Margin="0,7,0,0" />
                                 </StackPanel>
                             </Border>

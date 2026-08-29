@@ -52,12 +52,27 @@ public sealed class LanguageModelProviderCatalogTests
 
         var ollama = Assert.Single(catalog.Providers, provider => provider.Id == "ollama");
         Assert.Equal("Local Ollama", ollama.DisplayName);
-        Assert.Equal("qwen3.5:35b", ollama.DefaultModel);
+        Assert.Equal("qwen3.8:27b", ollama.DefaultModel);
         Assert.Equal("none", ollama.AuthenticationKind);
         Assert.Equal("not-required", ollama.AuthenticationState);
         Assert.True(ollama.IsAvailable);
         Assert.Equal("available", ollama.Availability);
         Assert.Empty(ollama.Diagnostics);
+
+        var gguf = Assert.Single(catalog.Providers, provider => provider.Id == "gguf");
+        Assert.Equal("Local GGUF (via Ollama)", gguf.DisplayName);
+        Assert.Equal("qwen3.8:27b", gguf.DefaultModel);
+        Assert.Equal("none", gguf.AuthenticationKind);
+        Assert.Equal("not-required", gguf.AuthenticationState);
+        Assert.True(gguf.IsAvailable);
+
+        var kimi = Assert.Single(catalog.Providers, provider => provider.Id == "kimi");
+        Assert.Equal("Kimi API", kimi.DisplayName);
+        Assert.Equal("kimi-k3", kimi.DefaultModel);
+        Assert.Equal("api-key", kimi.AuthenticationKind);
+        Assert.Equal("required", kimi.AuthenticationState);
+        Assert.False(kimi.IsAvailable);
+        Assert.Equal("REKALL_KIMI_API_KEY_MISSING", Assert.Single(kimi.Diagnostics).Code);
 
         var openAi = Assert.Single(catalog.Providers, provider => provider.Id == "openai");
         Assert.Equal("OpenAI API", openAi.DisplayName);
@@ -94,6 +109,66 @@ public sealed class LanguageModelProviderCatalogTests
         Assert.Equal("available", openAi.Availability);
         Assert.Empty(openAi.Diagnostics);
         Assert.False(openAi.ToString().Contains(sessionCredential, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ConfiguredKimiDescriptorAndSettingsNeverExposeAuthenticationMaterial()
+    {
+        var sessionCredential = "kimi-credential-" + Guid.NewGuid().ToString("N");
+        var settings = new RekallAgeLanguageModelProviderSettings
+        {
+            KimiApiKey = sessionCredential,
+            KimiUrl = "https://gateway.example.test/v1/"
+        };
+        var catalog = new RekallAgeLanguageModelProviderCatalog(settings);
+
+        var kimi = Assert.Single(catalog.Providers, provider => provider.Id == "kimi");
+        var serialized = JsonSerializer.Serialize(settings);
+
+        Assert.Equal("configured", kimi.AuthenticationState);
+        Assert.True(kimi.IsAvailable);
+        Assert.Empty(kimi.Diagnostics);
+        Assert.DoesNotContain(sessionCredential, kimi.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(sessionCredential, serialized, StringComparison.Ordinal);
+        Assert.Contains("gateway.example.test", serialized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void KimiWithoutASessionKeyFailsBeforeCreatingAHttpClient()
+    {
+        var factoryCalls = 0;
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { KimiApiKey = " " },
+            () =>
+            {
+                factoryCalls++;
+                return new HttpClient();
+            });
+
+        var error = Assert.Throws<RekallAgeLanguageModelProviderException>(() =>
+            catalog.Acquire("kimi", new RekallAgeCommandRegistry()));
+
+        Assert.Equal("REKALL_KIMI_API_KEY_MISSING", error.Code);
+        Assert.Equal("kimi", error.ProviderId);
+        Assert.Equal(0, factoryCalls);
+    }
+
+    [Fact]
+    public async Task KimiAndGgufAcquireTheirExactProviderClients()
+    {
+        var handlers = new Queue<HttpMessageHandler>(
+            [new DisposalTrackingHandler(), new DisposalTrackingHandler()]);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { KimiApiKey = "session-key" },
+            () => new HttpClient(handlers.Dequeue(), disposeHandler: true));
+
+        await using var kimi = catalog.Acquire("kimi", new RekallAgeCommandRegistry());
+        await using var gguf = catalog.Acquire("gguf", new RekallAgeCommandRegistry());
+
+        Assert.IsType<RekallAgeKimiLanguageModelClient>(kimi.ModelClient);
+        Assert.Equal("kimi", kimi.Runner.ProviderId);
+        Assert.IsType<RekallAgeGgufLanguageModelClient>(gguf.ModelClient);
+        Assert.Equal("gguf", gguf.Runner.ProviderId);
     }
 
     [Fact]
@@ -141,7 +216,7 @@ public sealed class LanguageModelProviderCatalogTests
 
         Assert.Equal("REKALL_LANGUAGE_MODEL_PROVIDER_UNSUPPORTED", error.Code);
         Assert.Equal("missing-provider", error.RequestedValue);
-        Assert.Equal("ollama,openai,codex", error.ResolvedValue);
+        Assert.Equal("ollama,gguf,kimi,openai,codex", error.ResolvedValue);
     }
 
     [Fact]

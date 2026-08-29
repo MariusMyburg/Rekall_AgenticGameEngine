@@ -121,6 +121,10 @@
                             <Button Content="Show/Hide" Command="{Binding ToggleEntityVisibleCommand}" />
                             <Button Content="Lock" Command="{Binding ToggleEntityLockedCommand}" />
                         </UniformGrid>
+                        <Button Content="Edit Linked Model" Click="OnEditLinkedModelClick"
+                                IsEnabled="{Binding CanEditSelectedLinkedModel}"
+                                ToolTip="Open this linked Model Asset's source mesh in the 3D Modeling workspace"
+                                Margin="0,5,0,0" />
                         <TextBlock Text="Parent entity ID" Foreground="{StaticResource MutedText}" Margin="0,7,0,0" />
                         <Grid Margin="0,3,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBox Text="{Binding ParentEntityIdInput, UpdateSourceTrigger=PropertyChanged}" /><Button Grid.Column="1" Content="Parent" Command="{Binding ReparentEntityCommand}" /><Button Grid.Column="2" Content="Clear" Command="{Binding ClearEntityParentCommand}" /></Grid>
                     </StackPanel>

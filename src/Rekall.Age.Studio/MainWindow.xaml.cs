@@ -296,6 +296,14 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void OnEditLinkedModelClick(object sender, RoutedEventArgs e)
+    {
+        if (await _viewModel.OpenSelectedLinkedModelInModelingAsync())
+        {
+            SelectWorkspace("Modeling");
+        }
+    }
+
     private string WorkspaceName() => WorkspaceSelector.SelectedIndex switch
     {
         0 => "Author",

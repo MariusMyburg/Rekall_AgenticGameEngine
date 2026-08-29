@@ -384,7 +384,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _openPackageFolderCommand = CreateAsyncCommand(OpenPackageFolderAsync, CanOpenPackageFolder);
         _publishWebCommand = CreateAsyncCommand(PublishWebAsync, HasOpenProject);
         _auditWebCommand = CreateAsyncCommand(AuditWebAsync, CanAuditWeb);
-        _undoCommand = CreateAsyncCommand(UndoAsync, () => HasEditableProject() && _session.CanUndo);
+        _undoCommand = CreateAsyncCommand(UndoAsync, () => HasEditableProject() && _session.CanUndoSinceOpen);
         _redoCommand = CreateAsyncCommand(RedoAsync, () => HasEditableProject() && _session.CanRedo);
         _discoverModelsCommand = CreateAsyncCommand(
             DiscoverModelsAsync,
@@ -1350,6 +1350,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool HasInspectorSelection => SelectedEntityId is not null;
 
+    public bool CanEditSelectedLinkedModel => SelectedLinkedModelAssetId() is not null;
+
     public string InspectorEmptyStateText => "Select an entity to inspect components.";
 
     public IReadOnlyList<RekallAgeStudioTransformTool> TransformTools { get; } =
@@ -1812,7 +1814,54 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         RefreshMeshEditingState();
     });
 
-    private Task PublishModelAsync() => RunAsync(PublishModelOperationAsync);
+    public async Task<bool> OpenSelectedLinkedModelInModelingAsync()
+    {
+        var modelAssetId = SelectedLinkedModelAssetId();
+        if (_session.ProjectRoot is null || modelAssetId is null || IsBusy) return false;
+
+        IsBusy = true;
+        try
+        {
+            var model = await _modelAssetStore.LoadAsync(
+                _session.ProjectRoot,
+                modelAssetId,
+                _lifecycleCancellation.Token);
+            if (model.Source.Kind != RekallAgeModelSourceKind.Mesh)
+            {
+                StatusText = $"Model Asset '{modelAssetId}' does not have an editable mesh source.";
+                return false;
+            }
+
+            Replace(MeshAssetIds, _modeling.ListAssets(_session.ProjectRoot));
+            if (!MeshAssetIds.Contains(model.Source.AssetId))
+            {
+                StatusText = $"The source mesh '{model.Source.AssetId}' for Model Asset '{modelAssetId}' is unavailable.";
+                return false;
+            }
+
+            SelectedMeshAssetId = model.Source.AssetId;
+            ModelAssetIdInput = model.AssetId;
+            ModelAssetDisplayNameInput = model.DisplayName;
+            _meshViewportCamera = RekallAgeStudioViewportCamera.Identity;
+            await _modeling.OpenAsync(_session.ProjectRoot, model.Source.AssetId, _lifecycleCancellation.Token);
+            _modeling.SetDomain(MeshEditDomain);
+            RefreshMeshEditingState();
+            StatusText = $"Editing source mesh '{model.Source.AssetId}' for linked Model Asset '{modelAssetId}'.";
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or InvalidOperationException or ArgumentException)
+        {
+            StatusText = exception.Message;
+            Replace(MeshDiagnosticLines, [$"error: REKALL_STUDIO_LINKED_MODEL_OPEN_FAILED - {exception.Message}"]);
+            return false;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private Task PublishModelAsync() => RunAsync(PublishModelOperationAsync, refreshPreviewAfter: true);
 
     private Task PlaceModelAsync() => RunAsync(PlaceModelOperationAsync, refreshPreviewAfter: true);
 
@@ -2365,8 +2414,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             _ => []
         };
         Replace(MeshElementIds, ids);
+        var selectedOperationId = SelectedMeshOperationId;
         Replace(MeshOperationIds, _modeling.AvailableOperations.Select(item => item.OperationId));
-        if (SelectedMeshOperationId is null || !MeshOperationIds.Contains(SelectedMeshOperationId)) SelectedMeshOperationId = MeshOperationIds.FirstOrDefault();
+        SelectedMeshOperationId = selectedOperationId is not null && MeshOperationIds.Contains(selectedOperationId)
+            ? selectedOperationId
+            : MeshOperationIds.FirstOrDefault();
         if (SelectedMeshElementId is null || !MeshElementIds.Contains(SelectedMeshElementId.Value)) SelectedMeshElementId = MeshElementIds.Count == 0 ? null : MeshElementIds[0];
         Replace(MeshSelectionLines, _modeling.SelectedElementIds.Select((id, index) => $"{index + 1}. {MeshEditDomain} {id}{(id == _modeling.ActiveElementId ? " (active)" : string.Empty)}"));
         MeshSummary = $"{mesh.Name} r{mesh.Revision} · {mesh.Topology.PointIds.Count} points · {mesh.Topology.EdgeIds.Count} edges · {mesh.Topology.FaceIds.Count} faces · {_modeling.SelectedElementIds.Count} selected{(_modeling.Preview is null ? string.Empty : " · PREVIEW")}";
@@ -2395,7 +2447,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         refreshPreviewAfter: true);
 
     private Task UndoAsync() => RunAsync(
-        () => _session.UndoAsync("studio", CancellationToken.None).AsTask(),
+        () => _session.UndoSinceOpenAsync("studio", CancellationToken.None).AsTask(),
         refreshPreviewAfter: true);
 
     private Task RedoAsync() => RunAsync(
@@ -3972,6 +4024,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         OnPropertyChanged(nameof(SelectedEntityId));
         OnPropertyChanged(nameof(HasProject));
         OnPropertyChanged(nameof(HasInspectorSelection));
+        OnPropertyChanged(nameof(CanEditSelectedLinkedModel));
         SceneNameInput = model.Scene.Name;
         Replace(EntityNodes, model.Scene.RootEntities);
         var selectedNode = SelectedEntityNode();
@@ -4024,6 +4077,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
         RefreshSceneGizmo();
     }
+
+    private string? SelectedLinkedModelAssetId() => _currentModel?.Inspector.Components
+        .FirstOrDefault(component => component.Type.Equals("Rekall.ModelAssetReference", StringComparison.Ordinal))?
+        .Properties.FirstOrDefault(property => property.IsDefined
+            && property.Name.Equals("assetId", StringComparison.OrdinalIgnoreCase))?
+        .Value;
 
     private void ApplyRendering(
         RekallAgeWorkbenchRenderQualityModel rendering,

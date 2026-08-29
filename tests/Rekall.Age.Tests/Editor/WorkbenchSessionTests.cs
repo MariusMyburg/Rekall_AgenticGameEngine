@@ -239,6 +239,45 @@ public sealed class WorkbenchSessionTests
     }
 
     [Fact]
+    public async Task SessionScopedUndoDoesNotTargetTransactionsFromBeforeTheSceneWasOpened()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var registry = CreateRegistry();
+        await CreateProjectAndSceneAsync(registry, root);
+        var setup = new RekallAgeWorkbenchSession(registry);
+        Assert.True((await setup.OpenAsync(root, "Main", default)).Ok);
+        Assert.True((await setup.ExecuteAsync(
+            "rekall.entity.create",
+            JsonSerializer.Serialize(new { projectRoot = root, sceneName = "Main", name = "Preexisting", tags = Array.Empty<string>() }),
+            "Create Preexisting",
+            "agent",
+            default)).Ok);
+
+        var session = new RekallAgeWorkbenchSession(registry);
+        Assert.True((await session.OpenAsync(root, "Main", default)).Ok);
+        Assert.True(session.CanUndo);
+        Assert.False(session.CanUndoSinceOpen);
+
+        Assert.True((await session.ExecuteAsync(
+            "rekall.entity.create",
+            JsonSerializer.Serialize(new { projectRoot = root, sceneName = "Main", name = "Current Edit", tags = Array.Empty<string>() }),
+            "Create Current Edit",
+            "studio",
+            default)).Ok);
+        Assert.True(session.CanUndoSinceOpen);
+
+        Assert.True((await session.UndoSinceOpenAsync("studio", default)).Ok);
+        Assert.False(session.CanUndoSinceOpen);
+        Assert.Contains(session.Model!.Scene.RootEntities, entity => entity.Name == "Preexisting");
+        Assert.DoesNotContain(session.Model.Scene.RootEntities, entity => entity.Name == "Current Edit");
+
+        var refused = await session.UndoSinceOpenAsync("studio", default);
+        Assert.False(refused.Ok);
+        Assert.Equal("REKALL_WORKBENCH_UNDO_SESSION_EMPTY", Assert.Single(refused.Errors).Code);
+        Assert.Contains(session.Model.Scene.RootEntities, entity => entity.Name == "Preexisting");
+    }
+
+    [Fact]
     public async Task WorkbenchUndoRejectsLegacyDeletePreimageForFrozenImmutableOutputBeforeAnyMutation()
     {
         var root = TestPaths.CreateTempDirectory();

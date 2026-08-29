@@ -53,6 +53,32 @@ public sealed class ComponentAuthoringAdmissionTests
     }
 
     [Fact]
+    public async Task DefaultRegistrySetsExistingBuiltInPropertyCaseInsensitively()
+    {
+        var (root, entity) = await CreateSceneAsync(
+            RekallAgeComponentDocument.Create(
+                "Rekall.GeometryPrimitive",
+                new JsonObject { ["Primitive"] = "sphere", ["Color"] = "#39ff14" }));
+        var registry = RekallAgeDefaultCommandRegistry.Create();
+
+        var result = await registry.ExecuteAsync<SetComponentPropertyRequest, SetComponentPropertyResult>(
+            "rekall.component.set_property",
+            new SetComponentPropertyRequest(
+                root,
+                "Main",
+                entity.Id,
+                "Rekall.GeometryPrimitive",
+                "color",
+                JsonValue.Create("#ff66cc")),
+            Context("case-insensitive property update"));
+
+        Assert.True(result.Ok, result.Summary);
+        var component = Assert.Single((await LoadAsync(root)).Entities.Single().Components);
+        Assert.Equal(["Primitive", "color"], component.Properties.Select(property => property.Key));
+        Assert.Equal("#ff66cc", component.Properties["color"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task DefaultRegistryRejectsInvalidBlueprintPropertiesAtIndexedTargets()
     {
         var (root, _) = await CreateSceneAsync();

@@ -24,6 +24,7 @@ public sealed class RekallAgeWorkbenchSession
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Stack<string> _undoTransactions = new();
     private readonly Stack<string> _redoTransactions = new();
+    private int _undoTransactionCountAtOpen;
     private RenderingEvidence? _renderingEvidence;
 
     public RekallAgeWorkbenchSession(RekallAgeCommandRegistry registry)
@@ -68,6 +69,8 @@ public sealed class RekallAgeWorkbenchSession
     public RekallAgeWorkbenchModel? Model { get; private set; }
 
     public bool CanUndo => _undoTransactions.Count > 0;
+
+    public bool CanUndoSinceOpen => _undoTransactions.Count > _undoTransactionCountAtOpen;
 
     public bool CanRedo => _redoTransactions.Count > 0;
 
@@ -124,6 +127,7 @@ public sealed class RekallAgeWorkbenchSession
             SelectedEntityId = model.Inspector.SelectedEntityId;
             _undoTransactions.Clear();
             _redoTransactions.Clear();
+            _undoTransactionCountAtOpen = 0;
             return new RekallAgeWorkbenchOperationResult(
                 true,
                 $"Created project '{projectName}' and scene '{sceneName}'.",
@@ -319,6 +323,38 @@ public sealed class RekallAgeWorkbenchSession
         }
     }
 
+    public async ValueTask<RekallAgeWorkbenchOperationResult> UndoSinceOpenAsync(
+        string actor,
+        CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!CanUndoSinceOpen)
+            {
+                return Failure(
+                    "REKALL_WORKBENCH_UNDO_SESSION_EMPTY",
+                    "There is no edit from the current Studio session to undo.");
+            }
+
+            var targetId = _undoTransactions.Pop();
+            var restored = await RestoreHistoryEntryAsync(targetId, "Undo", actor + "-undo", cancellationToken).ConfigureAwait(false);
+            if (restored.Result.Ok)
+            {
+                _redoTransactions.Push(restored.InverseTransactionId!);
+            }
+            else
+            {
+                _undoTransactions.Push(targetId);
+            }
+            return restored.Result;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async ValueTask<RekallAgeWorkbenchOperationResult> RedoAsync(
         string actor,
         CancellationToken cancellationToken)
@@ -403,6 +439,7 @@ public sealed class RekallAgeWorkbenchSession
         {
             _undoTransactions.Push(entry.Id);
         }
+        _undoTransactionCountAtOpen = _undoTransactions.Count;
     }
 
     private async ValueTask<(RekallAgeWorkbenchOperationResult Result, string? InverseTransactionId)> RestoreHistoryEntryAsync(

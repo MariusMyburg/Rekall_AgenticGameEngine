@@ -83,7 +83,7 @@ public sealed class StudioWorkbenchSourceTests
         Assert.Contains("_session.OpenSceneAsync", code, StringComparison.Ordinal);
         Assert.Contains("rekall.workflow.package_playable_game", code, StringComparison.Ordinal);
         Assert.Contains("rekall.workflow.audit_playable_package", code, StringComparison.Ordinal);
-        Assert.Contains("_session.UndoAsync", code, StringComparison.Ordinal);
+        Assert.Contains("_session.UndoSinceOpenAsync", code, StringComparison.Ordinal);
         Assert.Contains("_session.RedoAsync", code, StringComparison.Ordinal);
         Assert.Contains("model.Inspector.AvailableComponents", code, StringComparison.Ordinal);
         Assert.Contains("SelectedPropertySchema", code, StringComparison.Ordinal);

@@ -43,8 +43,9 @@ public sealed class SetComponentPropertyCommand
         {
             var component = scene.GetRequiredEntity(request.EntityId).Components.Single(item =>
                 item.Type.Equals(request.ComponentType, StringComparison.Ordinal));
-            var prospectiveProperties = component.Properties.DeepClone().AsObject();
-            prospectiveProperties[request.PropertyName] = request.Value?.DeepClone();
+            var prospectiveProperties = component
+                .SetProperty(request.PropertyName, request.Value)
+                .Properties;
             var propertyErrors = await _propertyAdmission.ValidateAsync(
                 request.ProjectRoot,
                 request.ComponentType,

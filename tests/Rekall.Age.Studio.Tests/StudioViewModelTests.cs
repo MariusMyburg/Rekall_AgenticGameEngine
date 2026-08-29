@@ -1011,6 +1011,29 @@ public sealed class StudioViewModelTests
             Assert.Equal("hero-model", viewModel.LastPublishedModelAssetId);
             Assert.Equal(entity.Id, viewModel.LastPlacedModelEntityId);
             Assert.True(preview.ResetCount > previewResetsBeforePlacement);
+
+            Assert.True(viewModel.CanEditSelectedLinkedModel);
+            viewModel.SelectedMeshAssetId = null;
+            Assert.True(await viewModel.OpenSelectedLinkedModelInModelingAsync());
+            Assert.Equal("hero-box", viewModel.SelectedMeshAssetId);
+            Assert.Equal("hero-model", viewModel.ModelAssetIdInput);
+            Assert.Equal("Hero Model", viewModel.ModelAssetDisplayNameInput);
+            Assert.Contains("8 points", viewModel.MeshSummary, StringComparison.Ordinal);
+
+            viewModel.MeshEditDomain = RekallAgeGeometryDomain.Face;
+            viewModel.SelectedMeshElementId = viewModel.MeshElementIds[0];
+            await ExecuteAsync(viewModel.SelectMeshElementCommand);
+            viewModel.SelectedMeshOperationId = "extrude_faces";
+            await ExecuteAsync(viewModel.ApplyMeshOperationCommand);
+            var previewResetsBeforeRebuild = preview.ResetCount;
+            await ExecuteAsync(viewModel.PublishModelCommand);
+
+            var rebuilt = await new RekallAgeModelAssetStore().LoadAsync(root, "hero-model", default);
+            Assert.Equal(2, rebuilt.Revision);
+            Assert.Equal(2, rebuilt.LastSuccessfulBuild!.SourceLogicalRevision);
+            Assert.NotEqual(published.LastSuccessfulBuild!.CompiledContentHash, rebuilt.LastSuccessfulBuild.CompiledContentHash);
+            Assert.False(File.Exists(new RekallAgeModelAssetStore().GetModelPath(root, "hero-box")));
+            Assert.True(preview.ResetCount > previewResetsBeforeRebuild);
         }
         finally
         {
@@ -1024,10 +1047,11 @@ public sealed class StudioViewModelTests
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-model-actions-" + Guid.NewGuid().ToString("N"));
         try
         {
+            var preview = new RecordingPreviewSession();
             await using var viewModel = new RekallAgeStudioViewModel(
                 new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
                 new EmptyModel(),
-                new RecordingPreviewSession())
+                preview)
             {
                 ProjectPathInput = root,
                 ProjectNameInput = "Model Actions Test",
@@ -1039,7 +1063,9 @@ public sealed class StudioViewModelTests
 
             Assert.True(viewModel.PublishModelCommand.CanExecute(null));
             Assert.False(viewModel.PlaceModelCommand.CanExecute(null));
+            var previewResetsBeforePublish = preview.ResetCount;
             await ExecuteAsync(viewModel.PublishModelCommand);
+            Assert.True(preview.ResetCount > previewResetsBeforePublish);
 
             var store = new RekallAgeModelAssetStore();
             var first = await store.LoadAsync(root, "display-mesh", CancellationToken.None);
@@ -1048,7 +1074,9 @@ public sealed class StudioViewModelTests
             Assert.True(viewModel.PlaceModelCommand.CanExecute(null));
 
             viewModel.ModelAssetDisplayNameInput = "Renamed Display Model";
+            previewResetsBeforePublish = preview.ResetCount;
             await ExecuteAsync(viewModel.PublishModelCommand);
+            Assert.True(preview.ResetCount > previewResetsBeforePublish);
             var rebuilt = await store.LoadAsync(root, "display-mesh", CancellationToken.None);
             Assert.Equal(2, rebuilt.Revision);
             Assert.Equal("Renamed Display Model", rebuilt.DisplayName);
@@ -2060,6 +2088,49 @@ public sealed class StudioViewModelTests
             Assert.Empty(viewModel.PropertyNameInput);
             Assert.Empty(viewModel.PropertyValueInput);
             Assert.Equal("Select an entity to inspect components.", viewModel.InspectorEmptyStateText);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ManualMeshPreviewPreservesTheSelectedOperationForApply()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-manual-preview-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Manual Preview Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.SelectedMeshPrimitive = "box";
+            viewModel.MeshPrimitiveAssetIdInput = "preview-box";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            viewModel.MeshEditDomain = RekallAgeGeometryDomain.Face;
+            viewModel.SelectedMeshElementId = viewModel.MeshElementIds[0];
+            await ExecuteAsync(viewModel.SelectMeshElementCommand);
+            viewModel.SelectedMeshOperationId = "extrude_faces";
+            viewModel.MeshOperationIds.CollectionChanged += (_, _) => viewModel.SelectedMeshOperationId = null;
+
+            await ExecuteAsync(viewModel.PreviewMeshOperationCommand);
+
+            Assert.Equal("extrude_faces", viewModel.SelectedMeshOperationId);
+            Assert.Contains("PREVIEW", viewModel.MeshSummary, StringComparison.Ordinal);
+
+            await ExecuteAsync(viewModel.ApplyMeshOperationCommand);
+
+            Assert.Equal("extrude_faces", viewModel.SelectedMeshOperationId);
+            Assert.DoesNotContain("PREVIEW", viewModel.MeshSummary, StringComparison.Ordinal);
+            var persisted = await new RekallAgeMeshAssetStore().LoadAsync(root, "preview-box", default);
+            Assert.Equal(10, persisted.Topology.FaceIds.Count);
         }
         finally
         {

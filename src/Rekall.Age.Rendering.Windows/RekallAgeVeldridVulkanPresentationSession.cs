@@ -116,6 +116,23 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
     private bool _disposed;
 
     public RekallAgeVeldridVulkanPresentationSession(
+        RekallAgeWin32RenderSurfaceDescriptor surface,
+        RekallAgeVulkanPresentationOptions options,
+        RekallAgeRuntimeViewportFrame initialFrame,
+        RekallAgeRuntimeViewportAssetSet initialAssets,
+        int initialAssetRevision = 0)
+        : this(
+            SwapchainSource.CreateWin32(surface.Hwnd, IntPtr.Zero),
+            surface.Width,
+            surface.Height,
+            options,
+            initialFrame,
+            initialAssets,
+            initialAssetRevision)
+    {
+    }
+
+    public RekallAgeVeldridVulkanPresentationSession(
         SwapchainSource swapchainSource,
         int pixelWidth,
         int pixelHeight,

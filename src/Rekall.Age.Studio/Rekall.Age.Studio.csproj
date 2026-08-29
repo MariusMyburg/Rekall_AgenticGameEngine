@@ -20,6 +20,7 @@
     <ProjectReference Include="..\Rekall.Age.Modeling.Contracts\Rekall.Age.Modeling.Contracts.csproj" />
     <ProjectReference Include="..\Rekall.Age.Modules\Rekall.Age.Modules.csproj" />
     <ProjectReference Include="..\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Rendering.Windows\Rekall.Age.Rendering.Windows.csproj" />
     <ProjectReference Include="..\Rekall.Age.Runtime\Rekall.Age.Runtime.csproj" />
     <ProjectReference Include="..\Rekall.Age.Workflows\Rekall.Age.Workflows.csproj" />
   </ItemGroup>

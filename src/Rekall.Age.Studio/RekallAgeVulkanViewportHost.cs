@@ -1,0 +1,882 @@
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Threading;
+using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
+using Rekall.Age.Rendering.Windows;
+using Rekall.Age.Runtime.Abstractions;
+
+namespace Rekall.Age.Studio;
+
+internal readonly record struct RekallAgeStudioViewportMetrics(
+    double DipWidth,
+    double DipHeight,
+    int PixelWidth,
+    int PixelHeight,
+    bool IsVisible)
+{
+    public bool IsPresentable => IsVisible && PixelWidth > 0 && PixelHeight > 0;
+
+    public static RekallAgeStudioViewportMetrics FromDips(
+        double dipWidth,
+        double dipHeight,
+        double dpiScaleX,
+        double dpiScaleY,
+        bool isVisible)
+    {
+        var width = double.IsFinite(dipWidth) ? Math.Max(0, dipWidth) : 0;
+        var height = double.IsFinite(dipHeight) ? Math.Max(0, dipHeight) : 0;
+        var scaleX = double.IsFinite(dpiScaleX) && dpiScaleX > 0 ? dpiScaleX : 1;
+        var scaleY = double.IsFinite(dpiScaleY) && dpiScaleY > 0 ? dpiScaleY : 1;
+        return new RekallAgeStudioViewportMetrics(
+            width,
+            height,
+            checked((int)Math.Round(width * scaleX, MidpointRounding.AwayFromZero)),
+            checked((int)Math.Round(height * scaleY, MidpointRounding.AwayFromZero)),
+            isVisible);
+    }
+}
+
+internal sealed record RekallAgeStudioPresentationContext(
+    string ProjectRoot,
+    IReadOnlyList<RekallAgeRuntimeGpuWorkload> RuntimeGpuWorkloads,
+    int RuntimeEntityCount,
+    int SceneRevision,
+    int AssetRevision,
+    string? DebugBackendText = null);
+
+internal interface IRekallAgeStudioViewportPresenter : IAsyncDisposable
+{
+    RekallAgeStudioViewportMetrics Metrics { get; }
+
+    ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets,
+        RekallAgeStudioPresentationContext context,
+        CancellationToken cancellationToken);
+
+    ValueTask InvalidateAssetsAsync(CancellationToken cancellationToken);
+
+    ValueTask InvalidateShadersAsync(CancellationToken cancellationToken);
+}
+
+internal interface IRekallAgeVulkanViewportSurfaceController : IAsyncDisposable
+{
+    RekallAgeStudioViewportMetrics Metrics { get; }
+
+    bool IsDisposed { get; }
+
+    void AttachSurface(IntPtr hwnd);
+
+    ValueTask<RekallAgeStudioViewportMetrics> ResizeAsync(
+        RekallAgeStudioViewportMetrics requested,
+        Func<(int Width, int Height)> resizeAndReadClient,
+        CancellationToken cancellationToken);
+
+    ValueTask SuspendAsync(
+        RekallAgeStudioViewportMetrics metrics,
+        CancellationToken cancellationToken);
+}
+
+internal sealed class RekallAgeStudioVulkanViewportPresenter :
+    IRekallAgeStudioViewportPresenter,
+    IRekallAgeVulkanViewportSurfaceController
+{
+    internal const string UnavailableCode = "REKALL_STUDIO_VULKAN_UNAVAILABLE";
+
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly Func<
+        RekallAgeWin32RenderSurfaceDescriptor,
+        RekallAgeVulkanPresentationOptions,
+        RekallAgeRuntimeViewportFrame,
+        RekallAgeRuntimeViewportAssetSet,
+        int,
+        IRekallAgeVulkanPresentationSession> _sessionFactory;
+    private RekallAgeWin32RenderSurface? _surface;
+    private IRekallAgeVulkanPresentationSession? _session;
+    private RekallAgeStudioViewportMetrics _metrics;
+    private string? _sessionProjectRoot;
+    private bool _assetsInvalidated;
+    private bool _shadersInvalidated;
+    private bool _disposed;
+
+    internal RekallAgeStudioVulkanViewportPresenter()
+        : this((surface, options, frame, assets, assetRevision) =>
+            new RekallAgeVeldridVulkanPresentationSession(
+                surface,
+                options,
+                frame,
+                assets,
+                assetRevision))
+    {
+    }
+
+    internal RekallAgeStudioVulkanViewportPresenter(
+        Func<
+            RekallAgeWin32RenderSurfaceDescriptor,
+            RekallAgeVulkanPresentationOptions,
+            RekallAgeRuntimeViewportFrame,
+            RekallAgeRuntimeViewportAssetSet,
+            int,
+            IRekallAgeVulkanPresentationSession> sessionFactory)
+    {
+        _sessionFactory = sessionFactory ?? throw new ArgumentNullException(nameof(sessionFactory));
+    }
+
+    public RekallAgeStudioViewportMetrics Metrics => _metrics;
+
+    public bool IsDisposed => _disposed;
+
+    public void AttachSurface(IntPtr hwnd)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_surface is not null)
+        {
+            throw new InvalidOperationException("The Studio Vulkan presenter already has a child surface.");
+        }
+
+        _surface = RekallAgeWin32RenderSurface.CreateExternal(hwnd);
+    }
+
+    public async ValueTask<RekallAgeStudioViewportMetrics> ResizeAsync(
+        RekallAgeStudioViewportMetrics requested,
+        Func<(int Width, int Height)> resizeAndReadClient,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(resizeAndReadClient);
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            ThrowIfDisposed();
+            if (!requested.IsPresentable)
+            {
+                _metrics = requested;
+                return _metrics;
+            }
+
+            var verified = resizeAndReadClient();
+            _metrics = requested with
+            {
+                PixelWidth = Math.Max(0, verified.Width),
+                PixelHeight = Math.Max(0, verified.Height)
+            };
+            if (!_metrics.IsPresentable)
+            {
+                return _metrics;
+            }
+
+            _session?.Resize(_metrics.PixelWidth, _metrics.PixelHeight);
+            return _metrics;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async ValueTask SuspendAsync(
+        RekallAgeStudioViewportMetrics metrics,
+        CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            ThrowIfDisposed();
+            _metrics = metrics with { IsVisible = false };
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets,
+        RekallAgeStudioPresentationContext context,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        ArgumentNullException.ThrowIfNull(assets);
+        ArgumentNullException.ThrowIfNull(context);
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            ThrowIfDisposed();
+            if (_surface is null || !_metrics.IsPresentable)
+            {
+                return Unavailable(frame, "The Studio Vulkan child surface is not ready.");
+            }
+
+            if (frame.Width != _metrics.PixelWidth || frame.Height != _metrics.PixelHeight)
+            {
+                return Unavailable(
+                    frame,
+                    $"The Studio Vulkan surface resized from {frame.Width}x{frame.Height} to "
+                    + $"{_metrics.PixelWidth}x{_metrics.PixelHeight} before presentation.");
+            }
+
+            try
+            {
+                if (_session is null
+                    || !string.Equals(_sessionProjectRoot, context.ProjectRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    await DisposeSessionAsync();
+                    var descriptor = _surface.Describe(_metrics.PixelWidth, _metrics.PixelHeight);
+                    _session = _sessionFactory(
+                        descriptor,
+                        new RekallAgeVulkanPresentationOptions(
+                            context.ProjectRoot,
+                            SyncToVerticalBlank: true,
+                            SceneSupersampleFactor: RekallAgeInteractiveAntialiasing.DefaultSupersampleFactor,
+                            DebugHudEnabled: false),
+                        frame,
+                        assets,
+                        context.AssetRevision);
+                    _sessionProjectRoot = context.ProjectRoot;
+                    _assetsInvalidated = false;
+                    _shadersInvalidated = false;
+                }
+                else
+                {
+                    if (_assetsInvalidated)
+                    {
+                        await _session.InvalidateAssetsAsync(cancellationToken);
+                        _assetsInvalidated = false;
+                    }
+
+                    if (_shadersInvalidated)
+                    {
+                        await _session.InvalidateShadersAsync(cancellationToken);
+                        _shadersInvalidated = false;
+                    }
+                }
+
+                return await _session.PresentAsync(
+                    new RekallAgeVulkanSceneSubmission(
+                        frame,
+                        assets,
+                        context.RuntimeGpuWorkloads,
+                        context.RuntimeEntityCount,
+                        context.SceneRevision,
+                        context.AssetRevision,
+                        context.DebugBackendText),
+                    cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                await DisposeSessionAsync();
+                return Unavailable(frame, exception.Message, exception);
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async ValueTask InvalidateAssetsAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            ThrowIfDisposed();
+            _assetsInvalidated = true;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async ValueTask InvalidateShadersAsync(CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            ThrowIfDisposed();
+            _shadersInvalidated = true;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            if (_disposed) return;
+            _disposed = true;
+            await DisposeSessionAsync();
+            _surface?.Dispose();
+            _surface = null;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private static RekallAgeVulkanPresentationFrame Unavailable(
+        RekallAgeRuntimeViewportFrame frame,
+        string reason,
+        Exception? exception = null) =>
+        RekallAgeVulkanPresentationFrame.Unavailable(
+            frame,
+            string.IsNullOrWhiteSpace(reason) ? "Vulkan presentation failed." : reason,
+            exception is null
+                ? [UnavailableCode]
+                : [UnavailableCode, $"{exception.GetType().Name}: {exception.Message}"]);
+
+    private async ValueTask DisposeSessionAsync()
+    {
+        if (_session is null) return;
+        try
+        {
+            await _session.DisposeAsync();
+        }
+        finally
+        {
+            _session = null;
+            _sessionProjectRoot = null;
+        }
+    }
+
+    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
+}
+
+internal enum RekallAgeStudioViewportPointerKind
+{
+    Move,
+    Down,
+    Up,
+    Wheel,
+    FocusGained,
+    FocusLost,
+    CaptureLost
+}
+
+internal enum RekallAgeStudioViewportPointerButton
+{
+    None,
+    Left
+}
+
+[Flags]
+internal enum RekallAgeStudioViewportPointerModifiers
+{
+    None = 0,
+    LeftButton = 1,
+    Shift = 2,
+    Control = 4
+}
+
+internal sealed record RekallAgeStudioViewportPointerFact(
+    RekallAgeStudioViewportPointerKind Kind,
+    double DisplayX,
+    double DisplayY,
+    RekallAgeStudioViewportPointerButton Button,
+    int WheelDelta,
+    RekallAgeStudioViewportPointerModifiers Modifiers);
+
+internal interface IRekallAgeVulkanViewportNativeWindow
+{
+    IntPtr CreateChild(IntPtr parent);
+
+    void DestroyChild(IntPtr hwnd);
+
+    void ResizeChild(IntPtr hwnd, int width, int height);
+
+    (int Width, int Height) GetClientSize(IntPtr hwnd);
+
+    (int X, int Y) ScreenToClient(IntPtr hwnd, int x, int y);
+
+    void Focus(IntPtr hwnd);
+
+    void Capture(IntPtr hwnd);
+
+    void ReleaseCapture();
+
+    (double ScaleX, double ScaleY) GetDpiScale(IntPtr hwnd) => (1, 1);
+}
+
+internal sealed class RekallAgeVulkanViewportHostCore
+{
+    internal const int WmSize = 0x0005;
+    internal const int WmSetFocus = 0x0007;
+    internal const int WmKillFocus = 0x0008;
+    internal const int WmMouseMove = 0x0200;
+    internal const int WmLeftButtonDown = 0x0201;
+    internal const int WmLeftButtonUp = 0x0202;
+    internal const int WmMouseWheel = 0x020A;
+    internal const int WmCaptureChanged = 0x0215;
+    internal const int WmDpiChanged = 0x02E0;
+
+    private readonly IRekallAgeVulkanViewportNativeWindow _native;
+    private readonly IRekallAgeVulkanViewportSurfaceController _surface;
+    private readonly object _resizeSync = new();
+    private IntPtr _child;
+    private RekallAgeStudioViewportMetrics? _pendingMetrics;
+    private bool _destroyed;
+
+    internal RekallAgeVulkanViewportHostCore(
+        IRekallAgeVulkanViewportNativeWindow native,
+        IRekallAgeVulkanViewportSurfaceController surface)
+    {
+        _native = native ?? throw new ArgumentNullException(nameof(native));
+        _surface = surface ?? throw new ArgumentNullException(nameof(surface));
+    }
+
+    internal event EventHandler<RekallAgeStudioViewportPointerFact>? PointerFact;
+
+    internal event EventHandler<RekallAgeStudioViewportMetrics>? MetricsChanged;
+
+    internal RekallAgeStudioViewportMetrics Metrics => _surface.Metrics;
+
+    internal bool HasPointerCapture { get; private set; }
+
+    internal IntPtr BuildWindow(IntPtr parent)
+    {
+        if (_child != IntPtr.Zero)
+        {
+            throw new InvalidOperationException("The Studio Vulkan child HWND was already created.");
+        }
+
+        _child = _native.CreateChild(parent);
+        if (_child == IntPtr.Zero)
+        {
+            throw new InvalidOperationException("The Studio Vulkan child HWND could not be created.");
+        }
+
+        _surface.AttachSurface(_child);
+        return _child;
+    }
+
+    internal void QueueResize(
+        double dipWidth,
+        double dipHeight,
+        double dpiScaleX,
+        double dpiScaleY,
+        bool isVisible)
+    {
+        var metrics = RekallAgeStudioViewportMetrics.FromDips(
+            dipWidth,
+            dipHeight,
+            dpiScaleX,
+            dpiScaleY,
+            isVisible);
+        lock (_resizeSync)
+        {
+            _pendingMetrics = metrics;
+        }
+    }
+
+    internal async ValueTask ApplyPendingResizeAsync(CancellationToken cancellationToken)
+    {
+        RekallAgeStudioViewportMetrics? pending;
+        lock (_resizeSync)
+        {
+            pending = _pendingMetrics;
+            _pendingMetrics = null;
+        }
+
+        if (pending is not { } requested || _child == IntPtr.Zero || _destroyed) return;
+        RekallAgeStudioViewportMetrics coherent;
+        if (!requested.IsPresentable)
+        {
+            await _surface.SuspendAsync(requested, cancellationToken);
+            coherent = _surface.Metrics;
+        }
+        else
+        {
+            coherent = await _surface.ResizeAsync(
+                requested,
+                () =>
+                {
+                    _native.ResizeChild(_child, requested.PixelWidth, requested.PixelHeight);
+                    return _native.GetClientSize(_child);
+                },
+                cancellationToken);
+        }
+
+        MetricsChanged?.Invoke(this, coherent);
+    }
+
+    internal bool ProcessWindowMessage(int message, IntPtr wParam, IntPtr lParam)
+    {
+        if (_child == IntPtr.Zero || _destroyed) return false;
+        switch (message)
+        {
+            case WmMouseMove:
+                Emit(RekallAgeStudioViewportPointerKind.Move, ClientPoint(lParam),
+                    RekallAgeStudioViewportPointerButton.None, 0, Modifiers(wParam));
+                return true;
+            case WmLeftButtonDown:
+                _native.Focus(_child);
+                Emit(RekallAgeStudioViewportPointerKind.Down, ClientPoint(lParam),
+                    RekallAgeStudioViewportPointerButton.Left, 0, Modifiers(wParam));
+                return true;
+            case WmLeftButtonUp:
+                Emit(RekallAgeStudioViewportPointerKind.Up, ClientPoint(lParam),
+                    RekallAgeStudioViewportPointerButton.Left, 0, Modifiers(wParam));
+                ReleasePointerCapture(releaseNative: true);
+                return true;
+            case WmMouseWheel:
+                var screen = DecodePoint(lParam);
+                var client = _native.ScreenToClient(_child, screen.X, screen.Y);
+                Emit(RekallAgeStudioViewportPointerKind.Wheel, client,
+                    RekallAgeStudioViewportPointerButton.None, SignedHighWord(wParam), Modifiers(wParam));
+                return true;
+            case WmSetFocus:
+                Emit(RekallAgeStudioViewportPointerKind.FocusGained, (0, 0),
+                    RekallAgeStudioViewportPointerButton.None, 0, RekallAgeStudioViewportPointerModifiers.None);
+                return true;
+            case WmKillFocus:
+                ReleasePointerCapture(releaseNative: true);
+                Emit(RekallAgeStudioViewportPointerKind.FocusLost, (0, 0),
+                    RekallAgeStudioViewportPointerButton.None, 0, RekallAgeStudioViewportPointerModifiers.None);
+                return true;
+            case WmCaptureChanged:
+                ReleasePointerCapture(releaseNative: false);
+                Emit(RekallAgeStudioViewportPointerKind.CaptureLost, (0, 0),
+                    RekallAgeStudioViewportPointerButton.None, 0, RekallAgeStudioViewportPointerModifiers.None);
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    internal void CapturePointer()
+    {
+        if (_child == IntPtr.Zero || _destroyed || HasPointerCapture) return;
+        _native.Capture(_child);
+        HasPointerCapture = true;
+    }
+
+    internal ValueTask DisposePresenterAsync() => _surface.DisposeAsync();
+
+    internal void DestroyWindow(IntPtr hwnd)
+    {
+        if (_destroyed || _child == IntPtr.Zero) return;
+        if (hwnd != _child)
+        {
+            throw new InvalidOperationException("WPF requested destruction of an unexpected Studio Vulkan HWND.");
+        }
+
+        if (!_surface.IsDisposed)
+        {
+            throw new InvalidOperationException(
+                "The Studio Vulkan presenter must be drained and disposed before its child HWND is destroyed.");
+        }
+
+        ReleasePointerCapture(releaseNative: true);
+        _native.DestroyChild(_child);
+        _destroyed = true;
+        _child = IntPtr.Zero;
+    }
+
+    private void Emit(
+        RekallAgeStudioViewportPointerKind kind,
+        (int X, int Y) physicalPoint,
+        RekallAgeStudioViewportPointerButton button,
+        int wheelDelta,
+        RekallAgeStudioViewportPointerModifiers modifiers)
+    {
+        var metrics = Metrics;
+        var scaleX = metrics.DipWidth > 0 && metrics.PixelWidth > 0
+            ? metrics.PixelWidth / metrics.DipWidth
+            : 1;
+        var scaleY = metrics.DipHeight > 0 && metrics.PixelHeight > 0
+            ? metrics.PixelHeight / metrics.DipHeight
+            : 1;
+        PointerFact?.Invoke(this, new RekallAgeStudioViewportPointerFact(
+            kind,
+            physicalPoint.X / scaleX,
+            physicalPoint.Y / scaleY,
+            button,
+            wheelDelta,
+            modifiers));
+    }
+
+    private static (int X, int Y) ClientPoint(IntPtr lParam) => DecodePoint(lParam);
+
+    private static (int X, int Y) DecodePoint(IntPtr value)
+    {
+        var bits = unchecked((uint)value.ToInt64());
+        return (unchecked((short)(bits & 0xFFFF)), unchecked((short)((bits >> 16) & 0xFFFF)));
+    }
+
+    private static int SignedHighWord(IntPtr value) =>
+        unchecked((short)((unchecked((uint)value.ToInt64()) >> 16) & 0xFFFF));
+
+    private static RekallAgeStudioViewportPointerModifiers Modifiers(IntPtr wParam)
+    {
+        var keys = unchecked((ushort)(unchecked((uint)wParam.ToInt64()) & 0xFFFF));
+        var result = RekallAgeStudioViewportPointerModifiers.None;
+        if ((keys & 0x0001) != 0) result |= RekallAgeStudioViewportPointerModifiers.LeftButton;
+        if ((keys & 0x0004) != 0) result |= RekallAgeStudioViewportPointerModifiers.Shift;
+        if ((keys & 0x0008) != 0) result |= RekallAgeStudioViewportPointerModifiers.Control;
+        return result;
+    }
+
+    private void ReleasePointerCapture(bool releaseNative)
+    {
+        if (!HasPointerCapture) return;
+        HasPointerCapture = false;
+        if (releaseNative) _native.ReleaseCapture();
+    }
+}
+
+internal sealed class RekallAgeVulkanViewportHost : HwndHost, IRekallAgeStudioViewportPresenter
+{
+    private readonly RekallAgeStudioVulkanViewportPresenter _presenter;
+    private readonly RekallAgeVulkanViewportHostCore _core;
+    private readonly TaskCompletionSource<RekallAgeStudioViewportMetrics> _surfaceReady =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private bool _resizeScheduled;
+
+    internal RekallAgeVulkanViewportHost()
+        : this(new RekallAgeWin32VulkanViewportNativeWindow(), new RekallAgeStudioVulkanViewportPresenter())
+    {
+    }
+
+    internal RekallAgeVulkanViewportHost(
+        IRekallAgeVulkanViewportNativeWindow native,
+        RekallAgeStudioVulkanViewportPresenter presenter)
+    {
+        _presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
+        _core = new RekallAgeVulkanViewportHostCore(native, presenter);
+        _core.PointerFact += (_, fact) => PointerFact?.Invoke(this, fact);
+        _core.MetricsChanged += (_, metrics) =>
+        {
+            MetricsChanged?.Invoke(this, metrics);
+            if (metrics.IsPresentable) _surfaceReady.TrySetResult(metrics);
+        };
+        IsVisibleChanged += (_, _) => ScheduleResize();
+    }
+
+    internal event EventHandler<RekallAgeStudioViewportPointerFact>? PointerFact;
+
+    internal event EventHandler<RekallAgeStudioViewportMetrics>? MetricsChanged;
+
+    public RekallAgeStudioViewportMetrics Metrics => _presenter.Metrics;
+
+    internal Task<RekallAgeStudioViewportMetrics> WaitForSurfaceReadyAsync(CancellationToken cancellationToken) =>
+        _surfaceReady.Task.WaitAsync(cancellationToken);
+
+    internal void CapturePointer() => _core.CapturePointer();
+
+    protected override HandleRef BuildWindowCore(HandleRef hwndParent)
+    {
+        var child = _core.BuildWindow(hwndParent.Handle);
+        ScheduleResize();
+        return new HandleRef(this, child);
+    }
+
+    protected override void DestroyWindowCore(HandleRef hwnd)
+    {
+        _core.DestroyWindow(hwnd.Handle);
+    }
+
+    protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
+    {
+        base.OnRenderSizeChanged(sizeInfo);
+        ScheduleResize();
+    }
+
+    protected override IntPtr WndProc(
+        IntPtr hwnd,
+        int msg,
+        IntPtr wParam,
+        IntPtr lParam,
+        ref bool handled)
+    {
+        if (msg is RekallAgeVulkanViewportHostCore.WmSize or RekallAgeVulkanViewportHostCore.WmDpiChanged)
+        {
+            ScheduleResize();
+        }
+
+        _core.ProcessWindowMessage(msg, wParam, lParam);
+        return IntPtr.Zero;
+    }
+
+    public ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets,
+        RekallAgeStudioPresentationContext context,
+        CancellationToken cancellationToken) =>
+        _presenter.PresentAsync(frame, assets, context, cancellationToken);
+
+    public ValueTask InvalidateAssetsAsync(CancellationToken cancellationToken) =>
+        _presenter.InvalidateAssetsAsync(cancellationToken);
+
+    public ValueTask InvalidateShadersAsync(CancellationToken cancellationToken) =>
+        _presenter.InvalidateShadersAsync(cancellationToken);
+
+    public ValueTask DisposeAsync() => _core.DisposePresenterAsync();
+
+    private void ScheduleResize()
+    {
+        if (_resizeScheduled) return;
+        _resizeScheduled = true;
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(async () =>
+        {
+            _resizeScheduled = false;
+            if (!IsLoaded && !IsVisible) return;
+            var dpi = VisualTreeHelper.GetDpi(this);
+            _core.QueueResize(ActualWidth, ActualHeight, dpi.DpiScaleX, dpi.DpiScaleY, IsVisible);
+            try
+            {
+                await _core.ApplyPendingResizeAsync(CancellationToken.None);
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }));
+    }
+}
+
+internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulkanViewportNativeWindow
+{
+    private const int WsChild = 0x40000000;
+    private const int WsVisible = 0x10000000;
+    private const int WsClipChildren = 0x02000000;
+    private const int WsClipSiblings = 0x04000000;
+    private const uint SwpNoActivate = 0x0010;
+    private const uint SwpNoZOrder = 0x0004;
+
+    public IntPtr CreateChild(IntPtr parent)
+    {
+        var child = CreateWindowExW(
+            0,
+            "STATIC",
+            string.Empty,
+            WsChild | WsVisible | WsClipChildren | WsClipSiblings,
+            0,
+            0,
+            1,
+            1,
+            parent,
+            IntPtr.Zero,
+            IntPtr.Zero,
+            IntPtr.Zero);
+        if (child == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
+        return child;
+    }
+
+    public void DestroyChild(IntPtr hwnd)
+    {
+        if (!DestroyWindow(hwnd)) throw new Win32Exception(Marshal.GetLastWin32Error());
+    }
+
+    public void ResizeChild(IntPtr hwnd, int width, int height)
+    {
+        if (!SetWindowPos(hwnd, IntPtr.Zero, 0, 0, width, height, SwpNoActivate | SwpNoZOrder))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+    }
+
+    public (int Width, int Height) GetClientSize(IntPtr hwnd)
+    {
+        if (!GetClientRect(hwnd, out var rect)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        return (Math.Max(0, rect.Right - rect.Left), Math.Max(0, rect.Bottom - rect.Top));
+    }
+
+    public (int X, int Y) ScreenToClient(IntPtr hwnd, int x, int y)
+    {
+        var point = new Point(x, y);
+        if (!ScreenToClient(hwnd, ref point)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        return (point.X, point.Y);
+    }
+
+    public void Focus(IntPtr hwnd) => SetFocus(hwnd);
+
+    public void Capture(IntPtr hwnd) => SetCapture(hwnd);
+
+    public void ReleaseCapture() => ReleaseCaptureNative();
+
+    public (double ScaleX, double ScaleY) GetDpiScale(IntPtr hwnd)
+    {
+        var dpi = GetDpiForWindow(hwnd);
+        var scale = dpi > 0 ? dpi / 96d : 1;
+        return (scale, scale);
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr CreateWindowExW(
+        int extendedStyle,
+        string className,
+        string windowName,
+        int style,
+        int x,
+        int y,
+        int width,
+        int height,
+        IntPtr parent,
+        IntPtr menu,
+        IntPtr instance,
+        IntPtr parameter);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DestroyWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(
+        IntPtr hwnd,
+        IntPtr insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetClientRect(IntPtr hwnd, out Rect rect);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ScreenToClient(IntPtr hwnd, ref Point point);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetFocus(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SetCapture(IntPtr hwnd);
+
+    [DllImport("user32.dll", EntryPoint = "ReleaseCapture")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ReleaseCaptureNative();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect
+    {
+        internal int Left;
+        internal int Top;
+        internal int Right;
+        internal int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Point(int x, int y)
+    {
+        internal int X = x;
+        internal int Y = y;
+    }
+}

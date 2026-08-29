@@ -1,6 +1,7 @@
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Windows;
+using Rekall.Age.Runtime.Abstractions;
 
 namespace Rekall.Age.Tests.Rendering;
 
@@ -75,6 +76,92 @@ public sealed class VulkanPresentationContractTests
         await session.DisposeAsync();
 
         Assert.Equal(0, destroyCalls);
+    }
+
+    [Fact]
+    public void SceneSubmissionCopiesRuntimeWorkloadsAndCarriesRevisionFacts()
+    {
+        var workloads = new List<RekallAgeRuntimeGpuWorkload>
+        {
+            new("particles")
+        };
+
+        var submission = new RekallAgeVulkanSceneSubmission(
+            ViewportFrame(320, 180),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            workloads,
+            SceneRevision: 7,
+            AssetRevision: 11,
+            DebugBackendText: "OpenXR");
+        workloads.Clear();
+
+        Assert.Single(submission.RuntimeGpuWorkloads);
+        Assert.Equal("particles", submission.RuntimeGpuWorkloads[0].Id);
+        Assert.Equal(7, submission.SceneRevision);
+        Assert.Equal(11, submission.AssetRevision);
+        Assert.Equal("OpenXR", submission.DebugBackendText);
+    }
+
+    [Fact]
+    public void LegacyPixelSubmissionCopiesPixelsWithoutWeakeningSceneSubmissionFacts()
+    {
+        var pixels = new byte[2 * 2 * 4];
+        pixels[0] = 17;
+        var scene = new RekallAgeVulkanSceneSubmission(
+            ViewportFrame(320, 180),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            Array.Empty<RekallAgeRuntimeGpuWorkload>(),
+            SceneRevision: 3,
+            AssetRevision: 4);
+
+        var submission = new RekallAgeVulkanPixelSubmission(2, 2, pixels, scene);
+        pixels[0] = 99;
+
+        Assert.Equal(17, submission.Rgba.Span[0]);
+        Assert.Equal(3, submission.Scene.SceneRevision);
+    }
+
+    [Fact]
+    public void NativeDeviceInfoContainsOnlyImmutableInteropFacts()
+    {
+        var info = new RekallAgeVulkanNativeDeviceInfo(
+            "Test GPU",
+            "Vulkan",
+            1,
+            2,
+            3,
+            4,
+            5,
+            "Driver",
+            "1.2.3");
+
+        Assert.Equal("Test GPU", info.DeviceName);
+        Assert.Equal((ulong)1, info.Instance);
+        Assert.Equal((uint)5, info.GraphicsQueueFamilyIndex);
+        Assert.DoesNotContain(
+            typeof(RekallAgeVulkanNativeDeviceInfo).GetProperties(),
+            property => property.PropertyType.FullName?.Contains("Veldrid.GraphicsDevice", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task SurfaceBoundSessionContractPresentsSubmissionsAndCapturesRgba()
+    {
+        await using var session = new RecordingPresentationSession();
+        var submission = new RekallAgeVulkanSceneSubmission(
+            ViewportFrame(320, 180),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            Array.Empty<RekallAgeRuntimeGpuWorkload>(),
+            SceneRevision: 1,
+            AssetRevision: 1);
+
+        var presented = await session.PresentAsync(submission, CancellationToken.None);
+        var pixels = await session.CapturePresentedRgbaAsync(CancellationToken.None);
+
+        Assert.True(presented.PresentedFrame);
+        Assert.Equal(320, pixels.Width);
+        Assert.Equal(180, pixels.Height);
+        Assert.Equal(320 * 180 * 4, pixels.Rgba.Length);
+        Assert.Equal("Test GPU", session.DeviceInfo.DeviceName);
     }
 
     [Fact]
@@ -169,6 +256,26 @@ public sealed class VulkanPresentationContractTests
         public RekallAgeWin32RenderSurfaceDescriptor LastSurface { get; private set; }
 
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+        public RekallAgeVulkanNativeDeviceInfo DeviceInfo { get; } = new(
+            "Test GPU",
+            "Vulkan",
+            1,
+            2,
+            3,
+            4,
+            5,
+            "Driver",
+            "1.2.3");
+
+        public ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
+            RekallAgeVulkanSceneSubmission submission,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(RekallAgeVulkanPresentationFrame.Presented(submission.Frame));
+
+        public ValueTask<RekallAgeVulkanPresentedPixels> CapturePresentedRgbaAsync(
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(new RekallAgeVulkanPresentedPixels(320, 180, new byte[320 * 180 * 4]));
 
         public ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
             RekallAgeWin32RenderSurfaceDescriptor surface,

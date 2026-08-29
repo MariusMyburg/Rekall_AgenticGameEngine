@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Rekall.Age.Rendering\Rekall.Age.Rendering.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Rendering.Windows\Rekall.Age.Rendering.Windows.csproj" />
     <ProjectReference Include="..\Rekall.Age.Runtime\Rekall.Age.Runtime.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -5,7 +5,7 @@ using Rekall.Age.Rendering.Abstractions;
 using Veldrid;
 using Veldrid.SPIRV;
 
-namespace Rekall.Age.Player.Windows;
+namespace Rekall.Age.Rendering.Windows;
 
 /// <summary>
 /// Records AGE RenderingDevice command buffers into the Windows Player's active

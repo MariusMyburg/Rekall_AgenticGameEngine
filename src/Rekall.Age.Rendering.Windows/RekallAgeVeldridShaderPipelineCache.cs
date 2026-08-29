@@ -4,7 +4,7 @@ using Rekall.Age.Rendering.Abstractions;
 using Veldrid;
 using Veldrid.SPIRV;
 
-namespace Rekall.Age.Player.Windows;
+namespace Rekall.Age.Rendering.Windows;
 
 internal sealed record RekallAgeVeldridShaderPipelineSelection(
     Pipeline Pipeline,

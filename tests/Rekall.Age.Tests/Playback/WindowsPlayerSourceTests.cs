@@ -13,22 +13,22 @@ public sealed class WindowsPlayerSourceTests
     [Fact]
     public void WindowsPlayerConsumesAuthoredHemisphericalAmbientLighting()
     {
-        var program = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Rekall.Age.Player.Windows", "Program.cs"));
+        var shaders = ReadSharedRendererSource("RekallAgeVeldridSceneShaders.cs");
 
-        Assert.Contains("AmbientSkyColor", program, StringComparison.Ordinal);
-        Assert.Contains("AmbientGroundColor", program, StringComparison.Ordinal);
-        Assert.Contains("mix(Frame.EnvironmentAmbientGroundColor.rgb, Frame.EnvironmentAmbientSkyColor.rgb", program, StringComparison.Ordinal);
+        Assert.Contains("AmbientSkyColor", shaders, StringComparison.Ordinal);
+        Assert.Contains("AmbientGroundColor", shaders, StringComparison.Ordinal);
+        Assert.Contains("mix(Frame.EnvironmentAmbientGroundColor.rgb, Frame.EnvironmentAmbientSkyColor.rgb", shaders, StringComparison.Ordinal);
     }
 
     [Fact]
     public void WindowsPlayerNormalMappingFallsBackForDegenerateUvDerivatives()
     {
-        var program = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Rekall.Age.Player.Windows", "Program.cs"));
+        var shaders = ReadSharedRendererSource("RekallAgeVeldridSceneShaders.cs");
 
-        Assert.Contains("float determinant = st1.s * st2.t - st1.t * st2.s;", program, StringComparison.Ordinal);
-        Assert.Contains("if (abs(determinant) <= 0.0000001)", program, StringComparison.Ordinal);
-        Assert.Contains("return normal;", program, StringComparison.Ordinal);
-        Assert.Contains("tangentRaw - normal * dot(normal, tangentRaw)", program, StringComparison.Ordinal);
+        Assert.Contains("float determinant = st1.s * st2.t - st1.t * st2.s;", shaders, StringComparison.Ordinal);
+        Assert.Contains("if (abs(determinant) <= 0.0000001)", shaders, StringComparison.Ordinal);
+        Assert.Contains("return normal;", shaders, StringComparison.Ordinal);
+        Assert.Contains("tangentRaw - normal * dot(normal, tangentRaw)", shaders, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -39,15 +39,50 @@ public sealed class WindowsPlayerSourceTests
         var cache = File.ReadAllText(Path.Combine(
             root,
             "src",
-            "Rekall.Age.Player.Windows",
+            "Rekall.Age.Rendering.Windows",
             "RekallAgeVeldridShaderPipelineCache.cs"));
+        var renderer = ReadSharedRendererSource("RekallAgeVeldridVulkanPresentationSession.cs");
 
-        Assert.Contains("_shaderPipelineCache.Resolve(draw.ShaderPipeline, transparent)", program, StringComparison.Ordinal);
+        Assert.Contains("_shaderPipelineCache.Resolve(draw.ShaderPipeline, transparent)", renderer, StringComparison.Ordinal);
         Assert.Contains("new FileSystemWatcher(shadersRoot)", program, StringComparison.Ordinal);
         Assert.Contains("IncludeSubdirectories = true", program, StringComparison.Ordinal);
         Assert.Contains("REKALL_SHADER_HOT_RELOAD_RETAINED", cache, StringComparison.Ordinal);
         Assert.Contains("MaximumCachedPipelinePairs", cache, StringComparison.Ordinal);
         Assert.Contains("_waitForIdle()", cache, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WindowsPlayerDelegatesCanonicalScenePresentationToPersistentSharedSession()
+    {
+        var program = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Rekall.Age.Player.Windows", "Program.cs"));
+        var renderer = ReadSharedRendererSource("RekallAgeVeldridVulkanPresentationSession.cs");
+
+        Assert.Contains("VeldridStartup.GetSwapchainSource(window)", program, StringComparison.Ordinal);
+        Assert.Contains("new RekallAgeVeldridVulkanPresentationSession(", program, StringComparison.Ordinal);
+        Assert.Contains("_presentationSession.PresentAsync(", program, StringComparison.Ordinal);
+        Assert.Equal(1, CountOccurrences(program, "_presentationSession.PresentAsync("));
+        Assert.DoesNotContain("private readonly GraphicsDevice _device", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("private void DrawScenePacket", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("_device.SubmitCommands(_commands)", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("_device.SwapBuffers()", program, StringComparison.Ordinal);
+        Assert.Contains("_device.SubmitCommands(_commands)", renderer, StringComparison.Ordinal);
+        Assert.Contains("_device.SwapBuffers()", renderer, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SharedRendererOwnsCaptureNativeInteropAndShaderResources()
+    {
+        var program = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "Rekall.Age.Player.Windows", "Program.cs"));
+        var renderer = ReadSharedRendererSource("RekallAgeVeldridVulkanPresentationSession.cs");
+        var shaders = ReadSharedRendererSource("RekallAgeVeldridSceneShaders.cs");
+
+        Assert.Contains("CapturePresentedRgbaAsync", program, StringComparison.Ordinal);
+        Assert.Contains("public RekallAgeVulkanNativeDeviceInfo DeviceInfo", renderer, StringComparison.Ordinal);
+        Assert.Contains("CapturePresentedRgbaAsync", renderer, StringComparison.Ordinal);
+        Assert.Contains("RuntimeGpuWorkloads", renderer, StringComparison.Ordinal);
+        Assert.Contains("AssetRevision", renderer, StringComparison.Ordinal);
+        Assert.Contains("SceneVertexShader", shaders, StringComparison.Ordinal);
+        Assert.DoesNotContain("private const string SceneVertexShader", program, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -239,6 +274,26 @@ public sealed class WindowsPlayerSourceTests
         }
 
         throw new InvalidOperationException("The Windows player has not been built.");
+    }
+
+    private static string ReadSharedRendererSource(string fileName) =>
+        File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Rekall.Age.Rendering.Windows",
+            fileName));
+
+    private static int CountOccurrences(string value, string fragment)
+    {
+        var count = 0;
+        var offset = 0;
+        while ((offset = value.IndexOf(fragment, offset, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            offset += fragment.Length;
+        }
+
+        return count;
     }
 
     private static string FindRepositoryRoot([CallerFilePath] string sourceFilePath = "") =>

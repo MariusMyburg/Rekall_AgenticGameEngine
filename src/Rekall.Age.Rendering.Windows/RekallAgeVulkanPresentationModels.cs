@@ -1,20 +1,171 @@
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
+using Rekall.Age.Runtime.Abstractions;
 
 namespace Rekall.Age.Rendering.Windows;
 
 public interface IRekallAgeVulkanPresentationSession : IAsyncDisposable
 {
+    RekallAgeVulkanNativeDeviceInfo DeviceInfo =>
+        throw new NotSupportedException("This presentation session does not expose native Vulkan device metadata.");
+
+    ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
+        RekallAgeVulkanSceneSubmission submission,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This presentation session does not support surface-bound scene submissions.");
+
     ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
         RekallAgeWin32RenderSurfaceDescriptor surface,
         RekallAgeRuntimeViewportFrame frame,
         RekallAgeRuntimeViewportAssetSet assets,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This presentation session is bound to its construction surface.");
 
     ValueTask InvalidateAssetsAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
     ValueTask InvalidateShadersAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+    ValueTask<RekallAgeVulkanPresentedPixels> CapturePresentedRgbaAsync(
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("This presentation session does not support GPU readback.");
+
+    void Resize(int pixelWidth, int pixelHeight) =>
+        throw new NotSupportedException("This presentation session does not support resizing.");
 }
+
+public sealed record RekallAgeVulkanPresentationOptions(
+    string ProjectRoot,
+    bool SyncToVerticalBlank = true,
+    int SceneSupersampleFactor = 2,
+    bool DebugHudEnabled = false,
+    Action<string>? Log = null);
+
+public sealed record RekallAgeVulkanSceneSubmission
+{
+    public RekallAgeVulkanSceneSubmission(
+        RekallAgeRuntimeViewportFrame Frame,
+        RekallAgeRuntimeViewportAssetSet Assets,
+        IReadOnlyList<RekallAgeRuntimeGpuWorkload> RuntimeGpuWorkloads,
+        int SceneRevision,
+        int AssetRevision,
+        string? DebugBackendText = null)
+    {
+        ArgumentNullException.ThrowIfNull(Frame);
+        ArgumentNullException.ThrowIfNull(Assets);
+        ArgumentNullException.ThrowIfNull(RuntimeGpuWorkloads);
+        if (SceneRevision < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(SceneRevision));
+        }
+
+        if (AssetRevision < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(AssetRevision));
+        }
+
+        this.Frame = Frame;
+        this.Assets = Assets;
+        this.RuntimeGpuWorkloads = RuntimeGpuWorkloads.Count == 0
+            ? Array.Empty<RekallAgeRuntimeGpuWorkload>()
+            : RuntimeGpuWorkloads.ToArray();
+        this.SceneRevision = SceneRevision;
+        this.AssetRevision = AssetRevision;
+        this.DebugBackendText = string.IsNullOrWhiteSpace(DebugBackendText) ? null : DebugBackendText.Trim();
+    }
+
+    public RekallAgeRuntimeViewportFrame Frame { get; }
+
+    public RekallAgeRuntimeViewportAssetSet Assets { get; }
+
+    public IReadOnlyList<RekallAgeRuntimeGpuWorkload> RuntimeGpuWorkloads { get; }
+
+    public int SceneRevision { get; }
+
+    public int AssetRevision { get; }
+
+    public string? DebugBackendText { get; }
+}
+
+public sealed record RekallAgeVulkanPresentedPixels
+{
+    public RekallAgeVulkanPresentedPixels(int width, int height, ReadOnlyMemory<byte> rgba)
+    {
+        if (width <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(width));
+        }
+
+        if (height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(height));
+        }
+
+        if (rgba.Length != checked(width * height * 4))
+        {
+            throw new ArgumentException("RGBA pixels must contain exactly width * height * 4 bytes.", nameof(rgba));
+        }
+
+        Width = width;
+        Height = height;
+        Rgba = rgba.ToArray();
+    }
+
+    public int Width { get; }
+
+    public int Height { get; }
+
+    public ReadOnlyMemory<byte> Rgba { get; }
+}
+
+public sealed record RekallAgeVulkanPixelSubmission
+{
+    public RekallAgeVulkanPixelSubmission(
+        int width,
+        int height,
+        ReadOnlyMemory<byte> rgba,
+        RekallAgeVulkanSceneSubmission scene)
+    {
+        if (width <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(width));
+        }
+
+        if (height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(height));
+        }
+
+        if (rgba.Length != checked(width * height * 4))
+        {
+            throw new ArgumentException("RGBA pixels must contain exactly width * height * 4 bytes.", nameof(rgba));
+        }
+
+        ArgumentNullException.ThrowIfNull(scene);
+        Width = width;
+        Height = height;
+        Rgba = rgba.ToArray();
+        Scene = scene;
+    }
+
+    public int Width { get; }
+
+    public int Height { get; }
+
+    public ReadOnlyMemory<byte> Rgba { get; }
+
+    public RekallAgeVulkanSceneSubmission Scene { get; }
+}
+
+public sealed record RekallAgeVulkanNativeDeviceInfo(
+    string DeviceName,
+    string Backend,
+    ulong Instance,
+    ulong PhysicalDevice,
+    ulong Device,
+    ulong GraphicsQueue,
+    uint GraphicsQueueFamilyIndex,
+    string? DriverName,
+    string? DriverInfo);
 
 public sealed record RekallAgeVulkanPresentationFrame
 {

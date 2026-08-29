@@ -2,7 +2,7 @@ using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 using Veldrid;
 
-namespace Rekall.Age.Player.Windows;
+namespace Rekall.Age.Rendering.Windows;
 
 /// <summary>Executes AGE's backend-neutral present-pass command stream on Veldrid.</summary>
 internal sealed class RekallAgeVeldridPresentPassAdapter : IDisposable

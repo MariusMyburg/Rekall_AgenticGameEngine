@@ -5,7 +5,7 @@ using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime.Abstractions;
 using Veldrid;
 
-namespace Rekall.Age.Player.Windows;
+namespace Rekall.Age.Rendering.Windows;
 
 internal sealed record RekallAgeRuntimeGpuExecutionReport(
     int EnabledWorkloads,

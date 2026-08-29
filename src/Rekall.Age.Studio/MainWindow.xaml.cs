@@ -651,7 +651,48 @@ public partial class MainWindow : Window
         {
             ApplyViewportAvailabilityVisual();
         }
+        if (e.PropertyName == nameof(RekallAgeStudioViewModel.EntityNodes))
+        {
+            _ = Dispatcher.BeginInvoke(
+                DispatcherPriority.Loaded,
+                new Action(RestoreSceneHierarchySelection));
+        }
     }
+
+    private void RestoreSceneHierarchySelection()
+    {
+        if (_viewModel.SelectedEntityId is not { } entityId) return;
+        SelectHierarchyItem(SceneHierarchyTree, SceneHierarchyTree.Items, entityId);
+    }
+
+    private static bool SelectHierarchyItem(
+        ItemsControl parent,
+        ItemCollection items,
+        string entityId)
+    {
+        parent.UpdateLayout();
+        foreach (var item in items.OfType<RekallAgeSceneEntityNode>())
+        {
+            if (parent.ItemContainerGenerator.ContainerFromItem(item) is not TreeViewItem container) continue;
+            if (item.EntityId.Equals(entityId, StringComparison.Ordinal))
+            {
+                container.IsSelected = true;
+                container.BringIntoView();
+                return true;
+            }
+            if (!ContainsEntity(item.Children, entityId)) continue;
+            container.IsExpanded = true;
+            container.UpdateLayout();
+            return SelectHierarchyItem(container, container.Items, entityId);
+        }
+        return false;
+    }
+
+    private static bool ContainsEntity(
+        IReadOnlyList<RekallAgeSceneEntityNode> nodes,
+        string entityId) => nodes.Any(node =>
+        node.EntityId.Equals(entityId, StringComparison.Ordinal)
+        || ContainsEntity(node.Children, entityId));
 
     private async void OnEditLinkedModelClick(object sender, RoutedEventArgs e)
     {

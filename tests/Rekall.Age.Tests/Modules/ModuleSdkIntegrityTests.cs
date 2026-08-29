@@ -115,6 +115,25 @@ public sealed class ModuleSdkIntegrityTests
         AssertSdkRejected(bounded);
     }
 
+    [Fact]
+    public void MissingSdkBehindAReparseAncestorIsRejectedAsReparseInsteadOfMissing()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var sdkParent = Path.Combine(root, ".rekall", "sdk");
+        Directory.CreateDirectory(sdkParent);
+        var verifier = new RekallAgeModuleSdkIntegrityVerifier(
+            new RekallAgeModuleSdkIntegrityLimits(),
+            path => Path.GetFullPath(path).Equals(Path.GetFullPath(sdkParent), StringComparison.OrdinalIgnoreCase)
+                ? FileAttributes.Directory | FileAttributes.ReparsePoint
+                : File.GetAttributes(path));
+
+        var result = verifier.Verify(root);
+
+        Assert.False(result.Ready);
+        Assert.Contains(result.Issues, issue => issue.Message.Contains("reparse point", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(result.Issues, issue => issue.Message.Contains("SDK is missing", StringComparison.Ordinal));
+    }
+
     private static void AssertSdkRejected(RekallAgeCommandResult<BuildModulesResult> result)
     {
         Assert.False(result.Ok);

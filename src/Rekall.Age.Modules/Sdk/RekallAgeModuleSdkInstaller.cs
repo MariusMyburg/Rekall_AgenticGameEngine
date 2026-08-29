@@ -44,17 +44,19 @@ public sealed class RekallAgeModuleSdkInstaller
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot);
         var compatibilityVersion = RekallAgeProductInfo.Current.ModuleSdkCompatibilityVersion;
+        var projectFullPath = Path.GetFullPath(projectRoot);
         var sdkRoot = Path.Combine(
-            Path.GetFullPath(projectRoot),
+            projectFullPath,
             ".rekall",
             "sdk",
             compatibilityVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        Directory.CreateDirectory(sdkRoot);
+        EnsureDirectoryChainIsConfined(projectFullPath, sdkRoot, createMissing: true);
 
         var installedAssemblies = new List<string>();
         foreach (var assemblyName in AssemblyNames)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            EnsureDirectoryChainIsConfined(projectFullPath, sdkRoot, createMissing: false);
             var source = ResolveAssembly(assemblyName);
             var destination = Path.Combine(sdkRoot, assemblyName);
             File.Copy(source, destination, overwrite: true);
@@ -62,6 +64,7 @@ public sealed class RekallAgeModuleSdkInstaller
         }
 
         var propsPath = Path.Combine(sdkRoot, "Rekall.Age.Sdk.props");
+        EnsureDirectoryChainIsConfined(projectFullPath, sdkRoot, createMissing: false);
         await File.WriteAllTextAsync(propsPath, CreatePropsFile(), cancellationToken);
 
         var manifestPath = Path.Combine(sdkRoot, "rekall.sdk.json");
@@ -90,6 +93,7 @@ public sealed class RekallAgeModuleSdkInstaller
         var temporaryManifest = manifestPath + $".tmp-{Guid.NewGuid():N}";
         try
         {
+            EnsureDirectoryChainIsConfined(projectFullPath, sdkRoot, createMissing: false);
             await File.WriteAllTextAsync(temporaryManifest, manifestJson, cancellationToken);
             File.Move(temporaryManifest, manifestPath, overwrite: true);
         }
@@ -154,6 +158,32 @@ public sealed class RekallAgeModuleSdkInstaller
     }
 
     internal static IReadOnlyList<string> RequiredAssemblyNames => AssemblyNames;
+
+    private static void EnsureDirectoryChainIsConfined(
+        string projectRoot,
+        string sdkRoot,
+        bool createMissing)
+    {
+        var chain = new[]
+        {
+            projectRoot,
+            Path.Combine(projectRoot, ".rekall"),
+            Path.Combine(projectRoot, ".rekall", "sdk"),
+            sdkRoot
+        };
+        foreach (var path in chain)
+        {
+            if (!Directory.Exists(path))
+            {
+                if (!createMissing) throw new IOException($"Project-local module SDK directory '{path}' disappeared during installation.");
+                Directory.CreateDirectory(path);
+            }
+            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new IOException($"Project-local module SDK path cannot contain a reparse point: '{path}'.");
+            }
+        }
+    }
 
     private static string ComputeSha256(string path)
     {

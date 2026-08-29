@@ -4370,9 +4370,76 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 metrics.PixelWidth,
                 metrics.PixelHeight,
                 _lifecycleCancellation.Token);
+            frame = await RecoverPreviewResizeRaceAsync(
+                frame,
+                _session.ProjectRoot,
+                _session.SceneName);
             ApplyPreviewFrame(frame);
             ResetSimulationCadence();
             if (!ViewportAvailable) return;
+            if (frame.ProjectModuleDiagnostic is { } rebuildDiagnostic
+                && CanAutomaticallyRebuildModules(rebuildDiagnostic.Code))
+            {
+                StatusText = $"Rebuilding gameplay modules before simulation ({rebuildDiagnostic.Code})…";
+                var build = await _session.ExecuteAsync(
+                    "rekall.build.modules",
+                    JsonSerializer.Serialize(new { projectRoot = _session.ProjectRoot }),
+                    "Rebuild gameplay modules for simulation",
+                    "studio-simulate",
+                    _lifecycleCancellation.Token);
+                if (!build.Ok && IsMissingProjectModuleSdk(build.Errors))
+                {
+                    StatusText = "Installing the project-local gameplay module SDK before simulation…";
+                    var installSdk = await _session.ExecuteAsync(
+                        "rekall.module.install_sdk",
+                        JsonSerializer.Serialize(new { projectRoot = _session.ProjectRoot }),
+                        "Install gameplay module SDK for simulation",
+                        "studio-simulate",
+                        _lifecycleCancellation.Token);
+                    if (!installSdk.Ok)
+                    {
+                        build = installSdk;
+                    }
+                    else
+                    {
+                        StatusText = "Rebuilding gameplay modules before simulation…";
+                        build = await _session.ExecuteAsync(
+                            "rekall.build.modules",
+                            JsonSerializer.Serialize(new { projectRoot = _session.ProjectRoot }),
+                            "Rebuild gameplay modules for simulation",
+                            "studio-simulate",
+                            _lifecycleCancellation.Token);
+                    }
+                }
+                if (_session.Model is not null) ApplyModel(_session.Model);
+                if (!build.Ok)
+                {
+                    StatusText = $"Simulation blocked: {build.Summary}";
+                    foreach (var error in build.Errors)
+                    {
+                        var buildDiagnostic = $"blocking: {error.Code} - {error.Message}";
+                        if (!ValidationLines.Contains(buildDiagnostic, StringComparer.Ordinal))
+                        {
+                            ValidationLines.Insert(0, buildDiagnostic);
+                        }
+                    }
+                    return;
+                }
+
+                frame = await _previewSession.ResetAsync(
+                    _session.ProjectRoot,
+                    _session.SceneName,
+                    metrics.PixelWidth,
+                    metrics.PixelHeight,
+                    _lifecycleCancellation.Token);
+                frame = await RecoverPreviewResizeRaceAsync(
+                    frame,
+                    _session.ProjectRoot,
+                    _session.SceneName);
+                ApplyPreviewFrame(frame);
+                ResetSimulationCadence();
+                if (!ViewportAvailable) return;
+            }
             if (frame.ProjectModuleDiagnostic is { } moduleDiagnostic)
             {
                 Mode = RekallAgeStudioMode.Edit;
@@ -4384,6 +4451,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 }
                 return;
             }
+            RemoveProjectModuleBlockingDiagnostics();
             IsSimulationPaused = false;
             Mode = RekallAgeStudioMode.Simulate;
             StatusText = $"Simulating {_session.SceneName} in the live Studio viewport.";
@@ -4395,6 +4463,59 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             if (transitionEntered) _modeTransitionGate.Release();
             IsBusy = false;
+        }
+    }
+
+    private static bool CanAutomaticallyRebuildModules(string code) => code is
+        "REKALL_MODULE_RECEIPT_MISSING"
+        or "REKALL_MODULE_RECEIPT_MALFORMED"
+        or "REKALL_MODULE_RECEIPT_INCOMPATIBLE"
+        or "REKALL_MODULE_RECEIPT_HOST_POSTURE_MISMATCH"
+        or "REKALL_MODULE_SOURCE_STALE"
+        or "REKALL_MODULE_ASSEMBLY_MISSING"
+        or "REKALL_MODULE_ASSEMBLY_IDENTITY_MISMATCH"
+        or "REKALL_MODULE_OUTPUT_HASH_MISMATCH"
+        or "REKALL_MODULE_OUTPUT_SET_MISMATCH"
+        or "REKALL_MODULE_OUTPUT_SIZE_MISMATCH";
+
+    private static bool IsMissingProjectModuleSdk(IReadOnlyList<RekallAgeCommandError> errors) =>
+        errors.Count > 0
+        && errors.All(error => error.Code.Equals("REKALL_MODULE_SDK_INTEGRITY_FAILED", StringComparison.Ordinal))
+        && errors.Any(error => error.Message.Equals(
+            "Project-local module SDK is missing.",
+            StringComparison.Ordinal));
+
+    private async ValueTask<RekallAgeStudioPreviewFrame> RecoverPreviewResizeRaceAsync(
+        RekallAgeStudioPreviewFrame frame,
+        string projectRoot,
+        string sceneName)
+    {
+        if (frame.Presentation.PresentedFrame
+            || frame.Presentation.FailureReason?.Contains(
+                "surface resized from",
+                StringComparison.OrdinalIgnoreCase) != true)
+        {
+            return frame;
+        }
+
+        var currentMetrics = _previewSession.Metrics;
+        if (!currentMetrics.IsPresentable) return frame;
+        return await _previewSession.ResetAsync(
+            projectRoot,
+            sceneName,
+            currentMetrics.PixelWidth,
+            currentMetrics.PixelHeight,
+            _lifecycleCancellation.Token);
+    }
+
+    private void RemoveProjectModuleBlockingDiagnostics()
+    {
+        for (var index = ValidationLines.Count - 1; index >= 0; index--)
+        {
+            if (ValidationLines[index].StartsWith("blocking: REKALL_MODULE_", StringComparison.Ordinal))
+            {
+                ValidationLines.RemoveAt(index);
+            }
         }
     }
 
@@ -4917,7 +5038,16 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         // transient null selection back into SceneNameInput during model refreshes.
         Replace(SceneNames, model.Project.Scenes.Select(scene => scene.Name));
         SceneNameInput = model.Scene.Name;
-        Replace(EntityNodes, model.Scene.RootEntities);
+        // WPF's TreeView owns selection on its generated item containers. Replacing
+        // equivalent nodes during an inspector-only refresh destroys those
+        // containers, so a click appears to select and immediately unselect an
+        // entity. Keep the existing graph objects until the authored hierarchy or
+        // one of its visible labels actually changes.
+        if (!EntityNodeListsEqual(EntityNodes, model.Scene.RootEntities))
+        {
+            Replace(EntityNodes, model.Scene.RootEntities);
+            OnPropertyChanged(nameof(EntityNodes));
+        }
         var selectedNode = SelectedEntityNode();
         EntityNameInput = selectedNode?.Name ?? string.Empty;
         ParentEntityIdInput = selectedNode?.ParentId ?? string.Empty;
@@ -5328,6 +5458,29 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         target.Clear();
         foreach (var value in values) target.Add(value);
     }
+
+    private static bool EntityNodeListsEqual(
+        IReadOnlyList<RekallAgeSceneEntityNode> current,
+        IReadOnlyList<RekallAgeSceneEntityNode> updated)
+    {
+        if (current.Count != updated.Count) return false;
+        for (var index = 0; index < current.Count; index++)
+        {
+            if (!EntityNodesEqual(current[index], updated[index])) return false;
+        }
+        return true;
+    }
+
+    private static bool EntityNodesEqual(
+        RekallAgeSceneEntityNode current,
+        RekallAgeSceneEntityNode updated) =>
+        current.EntityId.Equals(updated.EntityId, StringComparison.Ordinal)
+        && current.Name.Equals(updated.Name, StringComparison.Ordinal)
+        && string.Equals(current.ParentId, updated.ParentId, StringComparison.Ordinal)
+        && current.Visible == updated.Visible
+        && current.Locked == updated.Locked
+        && current.Tags.SequenceEqual(updated.Tags, StringComparer.Ordinal)
+        && EntityNodeListsEqual(current.Children, updated.Children);
 
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {

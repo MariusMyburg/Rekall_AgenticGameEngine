@@ -71,12 +71,6 @@ public sealed class RekallAgeModuleSdkIntegrityVerifier
     {
         var compatibility = RekallAgeProductInfo.Current.ModuleSdkCompatibilityVersion;
         var issues = new List<RekallAgeModuleSdkIntegrityIssue>();
-        if (!Directory.Exists(sdkRoot))
-        {
-            issues.Add(new RekallAgeModuleSdkIntegrityIssue("Project-local module SDK is missing.", sdkRoot));
-            return new RekallAgeModuleSdkIntegrityResult(false, sdkRoot, issues);
-        }
-
         var projectFullPath = Path.GetFullPath(projectRoot);
         var sdkPathChain = new[]
         {
@@ -89,6 +83,12 @@ public sealed class RekallAgeModuleSdkIntegrityVerifier
         if (reparsePath is not null)
         {
             issues.Add(new RekallAgeModuleSdkIntegrityIssue("Project-local module SDK path cannot contain a reparse point.", reparsePath));
+            return new RekallAgeModuleSdkIntegrityResult(false, sdkRoot, issues);
+        }
+
+        if (!Directory.Exists(sdkRoot))
+        {
+            issues.Add(new RekallAgeModuleSdkIntegrityIssue("Project-local module SDK is missing.", sdkRoot));
             return new RekallAgeModuleSdkIntegrityResult(false, sdkRoot, issues);
         }
 

@@ -20,6 +20,8 @@
         <SolidColorBrush x:Key="{x:Static SystemColors.MenuHighlightBrushKey}" Color="#214D61" />
         <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#214D61" />
         <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#E7EDF5" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#214D61" />
+        <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#E7EDF5" />
         <Style TargetType="{x:Type Window}">
             <Setter Property="FontFamily" Value="Segoe UI" />
             <Setter Property="FontSize" Value="13" />
@@ -174,7 +176,17 @@
         <Style TargetType="{x:Type ListBox}"><Setter Property="Background" Value="#151A21" /><Setter Property="Foreground" Value="{StaticResource WorkbenchText}" /><Setter Property="BorderBrush" Value="{StaticResource PanelBorder}" /></Style>
         <Style TargetType="{x:Type ListBoxItem}"><Setter Property="Padding" Value="6,3" /><Style.Triggers><Trigger Property="IsSelected" Value="True"><Setter Property="Background" Value="{StaticResource Selection}" /></Trigger></Style.Triggers></Style>
         <Style TargetType="{x:Type TreeView}"><Setter Property="Background" Value="#151A21" /><Setter Property="Foreground" Value="{StaticResource WorkbenchText}" /><Setter Property="BorderBrush" Value="{StaticResource PanelBorder}" /><Setter Property="Padding" Value="4" /></Style>
-        <Style TargetType="{x:Type TreeViewItem}"><Setter Property="Foreground" Value="{StaticResource WorkbenchText}" /><Setter Property="Padding" Value="3" /></Style>
+        <Style TargetType="{x:Type TreeViewItem}">
+            <Setter Property="Foreground" Value="{StaticResource WorkbenchText}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="3" />
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{StaticResource Selection}" />
+                    <Setter Property="Foreground" Value="{StaticResource WorkbenchText}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
         <Style TargetType="{x:Type ToolBar}"><Setter Property="Background" Value="{StaticResource ChromeBackground}" /><Setter Property="Foreground" Value="{StaticResource WorkbenchText}" /></Style>
         <Style TargetType="{x:Type TabControl}"><Setter Property="Background" Value="{StaticResource PanelBackground}" /><Setter Property="BorderBrush" Value="{StaticResource PanelBorder}" /></Style>
         <Style TargetType="{x:Type TabItem}">

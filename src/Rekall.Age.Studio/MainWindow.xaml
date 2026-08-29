@@ -265,7 +265,7 @@
                         <TextBlock Text="Parent entity ID" Foreground="{StaticResource MutedText}" Margin="0,7,0,0" />
                         <Grid Margin="0,3,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBox Text="{Binding ParentEntityIdInput, UpdateSourceTrigger=PropertyChanged}" /><Button Grid.Column="1" Content="Parent" Command="{Binding ReparentEntityCommand}" /><Button Grid.Column="2" Content="Clear" Command="{Binding ClearEntityParentCommand}" /></Grid>
                     </StackPanel>
-                    <TreeView ItemsSource="{Binding EntityNodes}" SelectedItemChanged="OnSelectedEntityChanged">
+                    <TreeView x:Name="SceneHierarchyTree" ItemsSource="{Binding EntityNodes}" SelectedItemChanged="OnSelectedEntityChanged">
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Children}"><TextBlock Text="{Binding Name}" /></HierarchicalDataTemplate>
                         </TreeView.ItemTemplate>

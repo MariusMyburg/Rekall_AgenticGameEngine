@@ -63,6 +63,28 @@ public sealed class ModuleSdkInstallerTests
     }
 
     [Fact]
+    public async Task InstallerDoesNotWriteThroughAProjectSdkReparsePoint()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var outside = TestPaths.CreateTempDirectory();
+        Directory.CreateDirectory(Path.Combine(root, ".rekall"));
+        try
+        {
+            Directory.CreateSymbolicLink(Path.Combine(root, ".rekall", "sdk"), outside);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return;
+        }
+
+        var installError = await Assert.ThrowsAsync<IOException>(() =>
+            new RekallAgeModuleSdkInstaller().InstallAsync(root, CancellationToken.None).AsTask());
+
+        Assert.Contains("reparse point", installError.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(outside));
+    }
+
+    [Fact]
     public void ProjectFileImportsProjectLocalSdkWithoutAbsolutePaths()
     {
         var project = RekallAgeModuleProjectFile.Create("AgentModule");

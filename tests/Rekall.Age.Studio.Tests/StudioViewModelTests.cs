@@ -1278,6 +1278,36 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task SelectingEntityKeepsEquivalentHierarchyNodesStableForTreeViewSelection()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-tree-selection-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Tree Selection Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+            var entity = Assert.Single(viewModel.EntityNodes);
+
+            await viewModel.SelectEntityAsync(entity);
+
+            Assert.Equal(entity.EntityId, viewModel.SelectedEntityId);
+            Assert.Same(entity, Assert.Single(viewModel.EntityNodes));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task SceneGizmoDragPersistsAsOneUndoableTransformTransaction()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-gizmo-" + Guid.NewGuid().ToString("N"));
@@ -1795,8 +1825,8 @@ public sealed class StudioViewModelTests
             var preview = new RecordingPreviewSession
             {
                 ProjectModuleDiagnostic = new RekallAgeStudioProjectModuleDiagnostic(
-                    "REKALL_MODULE_RECEIPT_MISSING",
-                    "Module build receipt is missing. Rebuild the module.")
+                    "REKALL_MODULE_TRUST_REPARSE_POINT",
+                    "Module output traverses an untrusted reparse point.")
             };
             await using var viewModel = new RekallAgeStudioViewModel(
                 new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
@@ -1812,10 +1842,42 @@ public sealed class StudioViewModelTests
             Assert.Equal(RekallAgeStudioMode.Edit, viewModel.Mode);
             Assert.False(viewModel.IsSimulating);
             Assert.Equal(0, preview.StepCount);
-            Assert.Contains("REKALL_MODULE_RECEIPT_MISSING", viewModel.StatusText, StringComparison.Ordinal);
+            Assert.Contains("REKALL_MODULE_TRUST_REPARSE_POINT", viewModel.StatusText, StringComparison.Ordinal);
             Assert.Contains(
                 viewModel.ValidationLines,
-                line => line.StartsWith("blocking: REKALL_MODULE_RECEIPT_MISSING", StringComparison.Ordinal));
+                line => line.StartsWith("blocking: REKALL_MODULE_TRUST_REPARSE_POINT", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task SimulateRecoversAResizeRaceWithinTheSameModeTransition()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-sim-resize-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Sim Resize Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            preview.ReturnResizeMismatchOnce = true;
+
+            await ExecuteAsync(viewModel.SimulateCommand);
+
+            Assert.Equal(RekallAgeStudioMode.Simulate, viewModel.Mode);
+            Assert.True(viewModel.ViewportAvailable);
+            Assert.Equal(3, preview.ResetCount);
+            Assert.Equal(0, preview.PresentCurrentCount);
         }
         finally
         {
@@ -2238,6 +2300,9 @@ public sealed class StudioViewModelTests
         Assert.Contains("TargetType=\"{x:Type TextBox}\"", app, StringComparison.Ordinal);
         Assert.Contains("TargetType=\"{x:Type ComboBox}\"", app, StringComparison.Ordinal);
         Assert.Contains("TargetType=\"{x:Type ListBox}\"", app, StringComparison.Ordinal);
+        Assert.Contains("InactiveSelectionHighlightBrushKey", app, StringComparison.Ordinal);
+        Assert.Contains("InactiveSelectionHighlightTextBrushKey", app, StringComparison.Ordinal);
+        Assert.Contains("<Trigger Property=\"IsSelected\" Value=\"True\">", app, StringComparison.Ordinal);
         Assert.Contains("SimulateCommand", window, StringComparison.Ordinal);
         Assert.Contains("IsLiveViewportEnabled", window, StringComparison.Ordinal);
         Assert.Contains("ModeLabel", window, StringComparison.Ordinal);
@@ -3359,6 +3424,7 @@ public sealed class StudioViewModelTests
         public bool IsDisposed { get; private set; }
         public bool IsDisposalComplete { get; private set; }
         public bool ReturnUnavailable { get; set; }
+        public bool ReturnResizeMismatchOnce { get; set; }
         public RekallAgeStudioProjectModuleDiagnostic? ProjectModuleDiagnostic { get; set; }
         private bool _externalDependencyChangePending;
 
@@ -3375,6 +3441,17 @@ public sealed class StudioViewModelTests
             _height = height;
             ResetSizes.Add((width, height));
             _resetEntered?.TrySetResult();
+            if (ReturnResizeMismatchOnce)
+            {
+                ReturnResizeMismatchOnce = false;
+                var runtimeFrame = CreateRuntimeFrame(_frame, width - 4, height);
+                return ValueTask.FromResult(new RekallAgeStudioPreviewFrame(
+                    RekallAgeVulkanPresentationFrame.Unavailable(
+                        runtimeFrame,
+                        $"The Studio Vulkan surface resized from {width - 4}x{height} to {width}x{height} before presentation."),
+                    new RekallAgeStudioViewportInteractionSnapshot(width - 4, height, Regions),
+                    ProjectModuleDiagnostic));
+            }
             return _blockedReset is null
                 ? ValueTask.FromResult(CreateFrame(_frame))
                 : AwaitBlockedResetAsync(_blockedReset, cancellationToken);
@@ -3467,18 +3544,7 @@ public sealed class StudioViewModelTests
 
         private RekallAgeStudioPreviewFrame CreateFrame(int frame)
         {
-            var runtimeFrame = new RekallAgeRuntimeViewportFrame(
-                "Main",
-                frame,
-                frame / 60d,
-                _width,
-                _height,
-                null,
-                [],
-                [],
-                0,
-                new RekallAgeRuntimeViewportOverlay(false, 0),
-                []);
+            var runtimeFrame = CreateRuntimeFrame(frame, _width, _height);
             var presentation = ReturnUnavailable
                 ? RekallAgeVulkanPresentationFrame.Unavailable(
                     runtimeFrame,
@@ -3490,6 +3556,20 @@ public sealed class StudioViewModelTests
                 new RekallAgeStudioViewportInteractionSnapshot(_width, _height, Regions),
                 ProjectModuleDiagnostic);
         }
+
+        private static RekallAgeRuntimeViewportFrame CreateRuntimeFrame(int frame, int width, int height) =>
+            new(
+                "Main",
+                frame,
+                frame / 60d,
+                width,
+                height,
+                null,
+                [],
+                [],
+                0,
+                new RekallAgeRuntimeViewportOverlay(false, 0),
+                []);
     }
 
     private sealed class ManualMonotonicClock : IRekallAgeStudioMonotonicClock

@@ -227,7 +227,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
     private readonly RekallAgeSdlAudioOutput? _audioOutput;
     private readonly RekallAgeRuntimeRenderFrameBuilder _frameBuilder = new();
     private RekallAgeRuntimeViewportAssetSet _assets;
-    private int _entityCount;
+    private int _runtimeEntityCount;
     private readonly RekallAgeOpenXrSessionBootstrapResult? _openXrStatus;
     private readonly RekallAgeOpenXrVulkanInteropInspection? _openXrVulkanInterop;
     private readonly RekallAgeOpenXrCompositorSessionBootstrapResult? _openXrCompositorSession;
@@ -316,7 +316,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _audioOutput = RekallAgeSdlAudioOutput.TryCreate(out var audioStatus);
         PlayerLog.Write(audioStatus);
         _assets = assets;
-        _entityCount = entityCount;
+        _runtimeEntityCount = entityCount;
         _openXrStatus = openXrStatus;
         _openXrVulkanInterop = openXrVulkanInterop;
         _openXrCompositorSession = openXrCompositorSession;
@@ -1168,7 +1168,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
         _sceneDocument = scene;
         _runtimeWorld = runResult.World;
         LoadPersistentState();
-        _entityCount = _runtimeWorld.Entities.Count;
+        _runtimeEntityCount = _runtimeWorld.Entities.Count;
         _sceneRevision++;
         _simulationClock.Reset(_clock.Elapsed);
     }
@@ -1220,7 +1220,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             ["operation"] = operation,
             ["applied"] = applied,
             ["frameIndex"] = _frameIndex,
-            ["entityCount"] = _entityCount,
+            ["entityCount"] = _runtimeEntityCount,
             ["renderableCount"] = frame.Renderables.Count,
             ["sceneRevision"] = _sceneRevision,
             ["assetRevision"] = _assetRevision,
@@ -1370,6 +1370,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             frame,
             _assets,
             _runtimeWorld.Subsystems.Rendering.GpuWorkloads,
+            _runtimeEntityCount,
             _sceneRevision,
             _assetRevision,
             BuildDebugBackendText());
@@ -1403,6 +1404,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             uiFrame,
             _assets,
             _runtimeWorld.Subsystems.Rendering.GpuWorkloads,
+            _runtimeEntityCount,
             _sceneRevision,
             _assetRevision,
             BuildDebugBackendText());
@@ -1459,6 +1461,7 @@ internal sealed class RekallAgeVeldridPlayer : IAsyncDisposable
             .GetAwaiter()
             .GetResult();
         _runtimeWorld = result.World;
+        _runtimeEntityCount = _runtimeWorld.Entities.Count;
         _audioOutput?.Submit(result.AudioFrames);
         PersistChangedState();
         HonourSceneTransitionRequest();

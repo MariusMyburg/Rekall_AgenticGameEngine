@@ -46,6 +46,7 @@ public sealed record RekallAgeVulkanSceneSubmission
         RekallAgeRuntimeViewportFrame Frame,
         RekallAgeRuntimeViewportAssetSet Assets,
         IReadOnlyList<RekallAgeRuntimeGpuWorkload> RuntimeGpuWorkloads,
+        int RuntimeEntityCount,
         int SceneRevision,
         int AssetRevision,
         string? DebugBackendText = null)
@@ -53,6 +54,11 @@ public sealed record RekallAgeVulkanSceneSubmission
         ArgumentNullException.ThrowIfNull(Frame);
         ArgumentNullException.ThrowIfNull(Assets);
         ArgumentNullException.ThrowIfNull(RuntimeGpuWorkloads);
+        if (RuntimeEntityCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(RuntimeEntityCount));
+        }
+
         if (SceneRevision < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(SceneRevision));
@@ -68,6 +74,7 @@ public sealed record RekallAgeVulkanSceneSubmission
         this.RuntimeGpuWorkloads = RuntimeGpuWorkloads.Count == 0
             ? Array.Empty<RekallAgeRuntimeGpuWorkload>()
             : RuntimeGpuWorkloads.ToArray();
+        this.RuntimeEntityCount = RuntimeEntityCount;
         this.SceneRevision = SceneRevision;
         this.AssetRevision = AssetRevision;
         this.DebugBackendText = string.IsNullOrWhiteSpace(DebugBackendText) ? null : DebugBackendText.Trim();
@@ -78,6 +85,8 @@ public sealed record RekallAgeVulkanSceneSubmission
     public RekallAgeRuntimeViewportAssetSet Assets { get; }
 
     public IReadOnlyList<RekallAgeRuntimeGpuWorkload> RuntimeGpuWorkloads { get; }
+
+    public int RuntimeEntityCount { get; }
 
     public int SceneRevision { get; }
 

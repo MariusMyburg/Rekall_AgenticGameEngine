@@ -81,6 +81,14 @@ public sealed class WindowsPlayerSourceTests
         Assert.Contains("CapturePresentedRgbaAsync", renderer, StringComparison.Ordinal);
         Assert.Contains("RuntimeGpuWorkloads", renderer, StringComparison.Ordinal);
         Assert.Contains("AssetRevision", renderer, StringComparison.Ordinal);
+        Assert.Equal(2, CountOccurrences(program, "_runtimeEntityCount = _runtimeWorld.Entities.Count;"));
+        Assert.Equal(
+            2,
+            CountOccurrences(
+                program.Replace("\r\n", "\n", StringComparison.Ordinal),
+                "_runtimeWorld.Subsystems.Rendering.GpuWorkloads,\n            _runtimeEntityCount,"));
+        Assert.Contains("_runtimeEntityCount = submission.RuntimeEntityCount;", renderer, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Distinct(StringComparer.Ordinal)", renderer, StringComparison.Ordinal);
         Assert.Contains("SceneVertexShader", shaders, StringComparison.Ordinal);
         Assert.DoesNotContain("private const string SceneVertexShader", program, StringComparison.Ordinal);
     }

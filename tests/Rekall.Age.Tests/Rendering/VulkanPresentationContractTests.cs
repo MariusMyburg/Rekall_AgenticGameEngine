@@ -90,6 +90,7 @@ public sealed class VulkanPresentationContractTests
             ViewportFrame(320, 180),
             RekallAgeRuntimeViewportAssetSet.Empty,
             workloads,
+            RuntimeEntityCount: 37,
             SceneRevision: 7,
             AssetRevision: 11,
             DebugBackendText: "OpenXR");
@@ -97,6 +98,7 @@ public sealed class VulkanPresentationContractTests
 
         Assert.Single(submission.RuntimeGpuWorkloads);
         Assert.Equal("particles", submission.RuntimeGpuWorkloads[0].Id);
+        Assert.Equal(37, submission.RuntimeEntityCount);
         Assert.Equal(7, submission.SceneRevision);
         Assert.Equal(11, submission.AssetRevision);
         Assert.Equal("OpenXR", submission.DebugBackendText);
@@ -111,6 +113,7 @@ public sealed class VulkanPresentationContractTests
             ViewportFrame(320, 180),
             RekallAgeRuntimeViewportAssetSet.Empty,
             Array.Empty<RekallAgeRuntimeGpuWorkload>(),
+            RuntimeEntityCount: 1,
             SceneRevision: 3,
             AssetRevision: 4);
 
@@ -119,6 +122,18 @@ public sealed class VulkanPresentationContractTests
 
         Assert.Equal(17, submission.Rgba.Span[0]);
         Assert.Equal(3, submission.Scene.SceneRevision);
+    }
+
+    [Fact]
+    public void SceneSubmissionRejectsNegativeRuntimeEntityTelemetry()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RekallAgeVulkanSceneSubmission(
+            ViewportFrame(320, 180),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            Array.Empty<RekallAgeRuntimeGpuWorkload>(),
+            RuntimeEntityCount: -1,
+            SceneRevision: 1,
+            AssetRevision: 1));
     }
 
     [Fact]
@@ -151,6 +166,7 @@ public sealed class VulkanPresentationContractTests
             ViewportFrame(320, 180),
             RekallAgeRuntimeViewportAssetSet.Empty,
             Array.Empty<RekallAgeRuntimeGpuWorkload>(),
+            RuntimeEntityCount: 1,
             SceneRevision: 1,
             AssetRevision: 1);
 

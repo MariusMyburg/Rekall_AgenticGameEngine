@@ -106,7 +106,7 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
     private int _surfaceWidth;
     private int _surfaceHeight;
     private int _frameIndex;
-    private int _entityCount;
+    private int _runtimeEntityCount;
     private int _fps;
     private int _lastFpsFrame;
     private double _lastFpsTime;
@@ -586,14 +586,12 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
                 {
                     var bgra = colorFormat is PixelFormat.B8_G8_R8_A8_UNorm
                         or PixelFormat.B8_G8_R8_A8_UNorm_SRgb;
-                    var pixels = new byte[checked((int)(width * height * 4))];
-                    for (var i = 0; i < pixels.Length; i += 4)
-                    {
-                        pixels[i] = bgra ? map[i + 2] : map[i];
-                        pixels[i + 1] = map[i + 1];
-                        pixels[i + 2] = bgra ? map[i] : map[i + 2];
-                        pixels[i + 3] = 255;
-                    }
+                    var pixels = RekallAgeVulkanRgbaReadback.CopyToTightlyPackedRgba(
+                        checked((int)width),
+                        checked((int)height),
+                        checked((int)map.MappedResource.RowPitch),
+                        bgra,
+                        offset => map[offset]);
 
                     return ValueTask.FromResult(
                         new RekallAgeVulkanPresentedPixels((int)width, (int)height, pixels));
@@ -666,54 +664,58 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
             }
 
             _disposed = true;
-            _device.WaitForIdle();
-            _runtimeGpuWorkloadExecutor.Dispose();
-            _sceneTarget.Dispose();
-            foreach (var materialSet in _materialSets.Values)
+            var cleanup = new List<RekallAgeCleanupRegistration>
             {
-                materialSet.Dispose();
+                new("graphics-device", _device.Dispose),
+                new("command-list", _commands.Dispose),
+                new("frame-layout", _frameLayout.Dispose),
+                new("directional-shadow-frame-layout", _directionalShadowFrameLayout.Dispose),
+                new("draw-layout", _drawLayout.Dispose),
+                new("material-layout", _materialLayout.Dispose),
+                new("present-texture-layout", _presentTextureLayout.Dispose),
+                new("post-process-layout", _postProcessLayout.Dispose),
+                new("hud-texture-layout", _hudTextureLayout.Dispose),
+                new("directional-shadow-target", _directionalShadowTarget.Dispose),
+                new("scene-target", _sceneTarget.Dispose),
+                new("scene-pipeline", _scenePipeline.Dispose),
+                new("scene-transparent-pipeline", _sceneTransparentPipeline.Dispose),
+                new("directional-shadow-pipeline", _directionalShadowPipeline.Dispose),
+                new("present-pipeline", _presentPipeline.Dispose),
+                new("hud-pipeline", _hudPipeline.Dispose),
+                new("shader-pipeline-cache", _shaderPipelineCache.Dispose),
+                new("present-pass-adapter", _presentPassAdapter.Dispose),
+                new("runtime-gpu-workload-executor", _runtimeGpuWorkloadExecutor.Dispose),
+                new("vertex-buffer", _vertexBuffer.Dispose),
+                new("index-buffer", _indexBuffer.Dispose),
+                new("hud-vertex-buffer", _hudVertexBuffer.Dispose),
+                new("frame-uniform-buffer", _frameUniformBuffer.Dispose),
+                new("fog-uniform-buffer", _fogUniformBuffer.Dispose),
+                new("directional-shadow-frame-uniform-buffer", _directionalShadowFrameUniformBuffer.Dispose),
+                new("draw-uniform-buffer", _drawUniformBuffer.Dispose),
+                new("post-process-uniform-buffer", _postProcessUniformBuffer.Dispose),
+                new("directional-shadow-frame-set", _directionalShadowFrameSet.Dispose),
+                new("draw-set", _drawSet.Dispose),
+                new("white-texture", _whiteTexture.Dispose),
+                new("flat-normal-texture", _flatNormalTexture.Dispose),
+                new("default-metallic-roughness-texture", _defaultMetallicRoughnessTexture.Dispose)
+            };
+            foreach (var texture in _textures)
+            {
+                cleanup.Add(new($"texture:{texture.Key}", texture.Value.Dispose));
             }
 
-            _hudTextureSet.Dispose();
-            _uiTexture.Dispose();
-            _frameSet.Dispose();
-            _directionalShadowFrameSet.Dispose();
-            _drawSet.Dispose();
-            _postProcessSet.Dispose();
-            _vertexBuffer.Dispose();
-            _indexBuffer.Dispose();
-            _hudVertexBuffer.Dispose();
-            _frameUniformBuffer.Dispose();
-            _fogUniformBuffer.Dispose();
-            _directionalShadowFrameUniformBuffer.Dispose();
-            _drawUniformBuffer.Dispose();
-            _postProcessUniformBuffer.Dispose();
-            foreach (var texture in _textures.Values)
+            cleanup.Add(new("post-process-set", _postProcessSet.Dispose));
+            cleanup.Add(new("frame-set", _frameSet.Dispose));
+            cleanup.Add(new("hud-texture", _hudTexture.Dispose));
+            cleanup.Add(new("hud-texture-set", _hudTextureSet.Dispose));
+            cleanup.Add(new("ui-texture", _uiTexture.Dispose));
+            foreach (var materialSet in _materialSets)
             {
-                texture.Dispose();
+                cleanup.Add(new($"material-set:{materialSet.Key}", materialSet.Value.Dispose));
             }
 
-            _whiteTexture.Dispose();
-            _flatNormalTexture.Dispose();
-            _defaultMetallicRoughnessTexture.Dispose();
-            _hudTexture.Dispose();
-            _shaderPipelineCache.Dispose();
-            _scenePipeline.Dispose();
-            _sceneTransparentPipeline.Dispose();
-            _directionalShadowPipeline.Dispose();
-            _presentPipeline.Dispose();
-            _presentPassAdapter.Dispose();
-            _hudPipeline.Dispose();
-            _frameLayout.Dispose();
-            _directionalShadowFrameLayout.Dispose();
-            _drawLayout.Dispose();
-            _materialLayout.Dispose();
-            _presentTextureLayout.Dispose();
-            _postProcessLayout.Dispose();
-            _hudTextureLayout.Dispose();
-            _directionalShadowTarget.Dispose();
-            _commands.Dispose();
-            _device.Dispose();
+            cleanup.Add(new("graphics-device-idle", _device.WaitForIdle));
+            RekallAgeBestEffortCleanup.RunInReverse(cleanup, _log);
             return ValueTask.CompletedTask;
         }
     }
@@ -743,10 +745,7 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
 
         _sceneRevision = submission.SceneRevision;
         _debugBackendText = submission.DebugBackendText;
-        _entityCount = frame.Renderables
-            .Select(renderable => renderable.EntityId)
-            .Distinct(StringComparer.Ordinal)
-            .Count();
+        _runtimeEntityCount = submission.RuntimeEntityCount;
         return frame;
     }
 
@@ -1755,7 +1754,7 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
     {
         var stats = new RekallAgeSceneDebugHudStats(
             frame.SceneName,
-            _entityCount,
+            _runtimeEntityCount,
             frame.Renderables.Count,
             frame.Renderables.Count(renderable => renderable.EntityId.EndsWith(":collider", StringComparison.Ordinal)),
             packet.MeshCount,

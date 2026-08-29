@@ -6,6 +6,37 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class EnvironmentBackgroundResolverTests
 {
     [Fact]
+    public void HdrBackgroundParsesEncodedRgbaAndDecodesRgbToLinearLight()
+    {
+        var resolved = RekallAgeEnvironmentBackgroundResolver.ResolveForHdr(
+            Frame("camera", null, cameraColor: "#B4203AFF"));
+
+        Assert.Equal(0xB4 / 255f, resolved.EncodedSrgb.X, 5);
+        Assert.Equal(0x20 / 255f, resolved.EncodedSrgb.Y, 5);
+        Assert.Equal(0x3A / 255f, resolved.EncodedSrgb.Z, 5);
+        Assert.Equal(1f, resolved.EncodedSrgb.W);
+        Assert.Equal(0.45641103f, resolved.LinearRgba.X, 5);
+        Assert.Equal(0.01444384f, resolved.LinearRgba.Y, 5);
+        Assert.Equal(0.04231141f, resolved.LinearRgba.Z, 5);
+        Assert.Equal(1f, resolved.LinearRgba.W);
+        Assert.True(resolved.IsSolidColor);
+    }
+
+    [Fact]
+    public void HdrBackgroundKeepsAuthoredAlphaAndMarksAvailableSkyAsToneMapped()
+    {
+        var rgba = RekallAgeEnvironmentBackgroundResolver.ResolveForHdr(
+            Frame("camera", null, cameraColor: "#80402080"));
+        var sky = RekallAgeEnvironmentBackgroundResolver.ResolveForHdr(
+            Frame("skybox", "#18303f", skyAssetId: "sky.hdr"));
+
+        Assert.Equal(0x80 / 255f, rgba.EncodedSrgb.W, 5);
+        Assert.Equal(0x80 / 255f, rgba.LinearRgba.W, 5);
+        Assert.True(rgba.IsSolidColor);
+        Assert.False(sky.IsSolidColor);
+    }
+
+    [Fact]
     public void AuthoredEnvironmentBackgroundOverridesCameraClearForColorAndSkyFallbackPolicies()
     {
         foreach (var policy in new[] { "color", "skybox" })
@@ -27,7 +58,8 @@ public sealed class EnvironmentBackgroundResolverTests
         foreach (var (policy, backgroundColor) in new[]
                  {
                      ("camera", "#ffffff"),
-                     ("color", "not-a-color")
+                     ("color", "not-a-color"),
+                     ("color", "#ffffffzz")
                  })
         {
             var color = RekallAgeEnvironmentBackgroundResolver.Resolve(Frame(policy, backgroundColor));
@@ -39,7 +71,11 @@ public sealed class EnvironmentBackgroundResolverTests
         }
     }
 
-    private static RekallAgeRuntimeViewportFrame Frame(string policy, string? backgroundColor)
+    private static RekallAgeRuntimeViewportFrame Frame(
+        string policy,
+        string? backgroundColor,
+        string cameraColor = "#080b0b",
+        string? skyAssetId = null)
     {
         return new RekallAgeRuntimeViewportFrame(
             "Main",
@@ -47,7 +83,7 @@ public sealed class EnvironmentBackgroundResolverTests
             1.0 / 60.0,
             640,
             360,
-            new RekallAgeRuntimeViewportCamera("camera", "Camera", "camera", true, ClearColor: "#080b0b"),
+            new RekallAgeRuntimeViewportCamera("camera", "Camera", "camera", true, ClearColor: cameraColor),
             [],
             [],
             0,
@@ -57,7 +93,7 @@ public sealed class EnvironmentBackgroundResolverTests
             Environment = new RekallAgeRuntimeViewportEnvironment(
                 "environment",
                 "Environment",
-                null,
+                skyAssetId,
                 1,
                 0,
                 "agx",

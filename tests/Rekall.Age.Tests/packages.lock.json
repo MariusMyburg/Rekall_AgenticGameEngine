@@ -18,6 +18,29 @@
           "Microsoft.TestPlatform.TestHost": "17.14.1"
         }
       },
+      "Veldrid": {
+        "type": "Direct",
+        "requested": "[4.9.0, )",
+        "resolved": "4.9.0",
+        "contentHash": "Rvu7/OLNt6Yy/hbC+rAmjBbxcSirbG/BjOdLCF7kl5mGBkMGka3pLuTlkbXSt4UONh3tks0I7k/OJ7Sr8HFIoA==",
+        "dependencies": {
+          "NativeLibraryLoader": "1.0.13",
+          "Veldrid.MetalBindings": "4.9.0",
+          "Veldrid.OpenGLBindings": "4.9.0",
+          "Vk": "1.0.25",
+          "Vortice.D3DCompiler": "2.3.0",
+          "Vortice.Direct3D11": "2.3.0"
+        }
+      },
+      "Veldrid.SPIRV": {
+        "type": "Direct",
+        "requested": "[1.0.15, )",
+        "resolved": "1.0.15",
+        "contentHash": "hzupRH5uGibW8P/URwTFX1lDEmi1LWZKWf0euQyfS0FKVDI2gGDTB5ucq6JViG8Bk6U7Q2s1EsTXIDfXpu0oVQ==",
+        "dependencies": {
+          "Veldrid": "4.8.0"
+        }
+      },
       "xunit": {
         "type": "Direct",
         "requested": "[2.9.3, )",
@@ -190,19 +213,6 @@
           "Microsoft.Win32.SystemEvents": "10.0.8"
         }
       },
-      "Veldrid": {
-        "type": "Transitive",
-        "resolved": "4.9.0",
-        "contentHash": "Rvu7/OLNt6Yy/hbC+rAmjBbxcSirbG/BjOdLCF7kl5mGBkMGka3pLuTlkbXSt4UONh3tks0I7k/OJ7Sr8HFIoA==",
-        "dependencies": {
-          "NativeLibraryLoader": "1.0.13",
-          "Veldrid.MetalBindings": "4.9.0",
-          "Veldrid.OpenGLBindings": "4.9.0",
-          "Vk": "1.0.25",
-          "Vortice.D3DCompiler": "2.3.0",
-          "Vortice.Direct3D11": "2.3.0"
-        }
-      },
       "Veldrid.MetalBindings": {
         "type": "Transitive",
         "resolved": "4.9.0",
@@ -212,14 +222,6 @@
         "type": "Transitive",
         "resolved": "4.9.0",
         "contentHash": "Du3zr+qWQO2Pzsl2iOeLmg23gxdr6BQ9yx5ygmcoBn6nm1AsbG4JMeEIpSGDt8WiTmy2VsUNY0kIGZklkrRoWQ=="
-      },
-      "Veldrid.SPIRV": {
-        "type": "Transitive",
-        "resolved": "1.0.15",
-        "contentHash": "hzupRH5uGibW8P/URwTFX1lDEmi1LWZKWf0euQyfS0FKVDI2gGDTB5ucq6JViG8Bk6U7Q2s1EsTXIDfXpu0oVQ==",
-        "dependencies": {
-          "Veldrid": "4.8.0"
-        }
       },
       "Vk": {
         "type": "Transitive",
@@ -484,9 +486,7 @@
           "Rekall.Age.Rendering": "[0.1.0-preview.1, )",
           "Rekall.Age.Rendering.Abstractions": "[0.1.0-preview.1, )",
           "Rekall.Age.Runtime.Abstractions": "[0.1.0-preview.1, )",
-          "System.Drawing.Common": "[10.0.8, )",
-          "Veldrid": "[4.9.0, )",
-          "Veldrid.SPIRV": "[1.0.15, )"
+          "System.Drawing.Common": "[10.0.8, )"
         }
       },
       "rekall.age.runtime": {
@@ -550,6 +550,15 @@
       }
     },
     "net10.0/win-x64": {
+      "Veldrid.SPIRV": {
+        "type": "Direct",
+        "requested": "[1.0.15, )",
+        "resolved": "1.0.15",
+        "contentHash": "hzupRH5uGibW8P/URwTFX1lDEmi1LWZKWf0euQyfS0FKVDI2gGDTB5ucq6JViG8Bk6U7Q2s1EsTXIDfXpu0oVQ==",
+        "dependencies": {
+          "Veldrid": "4.8.0"
+        }
+      },
       "Microsoft.Win32.SystemEvents": {
         "type": "Transitive",
         "resolved": "10.0.8",
@@ -559,14 +568,6 @@
         "type": "Transitive",
         "resolved": "2.23.0",
         "contentHash": "H6OMLIWdh2HITvkmj+ALs8LTIdQvQ2/JTtkDXinVbJ3xxrQIBXhVmc9jnuTQ67YDybGlENSMrgthzhLwK0rjnQ=="
-      },
-      "Veldrid.SPIRV": {
-        "type": "Transitive",
-        "resolved": "1.0.15",
-        "contentHash": "hzupRH5uGibW8P/URwTFX1lDEmi1LWZKWf0euQyfS0FKVDI2gGDTB5ucq6JViG8Bk6U7Q2s1EsTXIDfXpu0oVQ==",
-        "dependencies": {
-          "Veldrid": "4.8.0"
-        }
       },
       "Vortice.SPIRV.Reflect": {
         "type": "Transitive",

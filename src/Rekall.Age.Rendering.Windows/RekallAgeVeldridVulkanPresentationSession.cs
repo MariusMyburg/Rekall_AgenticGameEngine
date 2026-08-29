@@ -1019,6 +1019,7 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
 
         _lastUiVertexCount = uiVertices.Length;
         _lastHudVertexCount = hudVertices.Length;
+        var background = RekallAgeEnvironmentBackgroundResolver.ResolveForHdr(frame);
         _device.UpdateBuffer(
             _postProcessUniformBuffer,
             0,
@@ -1029,15 +1030,22 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
                 packet.FrameUniform.CameraPosition,
                 sceneFrame.Environment,
                 _sceneTarget.Width,
-                _sceneTarget.Height));
+                _sceneTarget.Height,
+                background,
+                solidBackground: ReferenceEquals(_environmentTexture, _whiteTexture)));
 
         _commands.Begin();
         RecordDirectionalShadowPass(packet, interactiveShadow);
         _commands.SetFramebuffer(_sceneTarget.Framebuffer);
         _commands.SetFullViewports();
         _commands.SetFullScissorRects();
-        var background = RekallAgeEnvironmentBackgroundResolver.Resolve(frame);
-        _commands.ClearColorTarget(0, new RgbaFloat(background.X, background.Y, background.Z, background.W));
+        _commands.ClearColorTarget(
+            0,
+            new RgbaFloat(
+                background.LinearRgba.X,
+                background.LinearRgba.Y,
+                background.LinearRgba.Z,
+                background.LinearRgba.W));
         _commands.ClearDepthStencil(1f);
         if (packet.Vertices.Length > 0)
         {
@@ -1146,7 +1154,8 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
     }
 
     private TextureBinding ResolveEnvironmentTexture(RekallAgeRuntimeViewportFrame frame) =>
-        !string.IsNullOrWhiteSpace(frame.Environment?.SkyAssetId)
+        !RekallAgeEnvironmentBackgroundResolver.ResolveForHdr(frame).IsSolidColor
+        && !string.IsNullOrWhiteSpace(frame.Environment?.SkyAssetId)
         && _textures.TryGetValue(frame.Environment.SkyAssetId, out var authoredEnvironment)
             ? authoredEnvironment
             : _whiteTexture;
@@ -1590,7 +1599,9 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
         Vector4 cameraPosition,
         RekallAgeRuntimeViewportEnvironment? environment,
         int width,
-        int height)
+        int height,
+        RekallAgeResolvedEnvironmentBackground background,
+        bool solidBackground)
     {
         var inverseViewProjection = Matrix4x4.Invert(viewProjection, out var inverse)
             ? inverse
@@ -1633,7 +1644,13 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
                 AmbientOcclusionParameters = ambientOcclusionParameters,
                 InverseViewProjection = inverseViewProjection,
                 CameraPosition = cameraPosition,
-                EnvironmentParameters = environmentParameters
+                EnvironmentParameters = environmentParameters,
+                SolidBackgroundEncoded = background.EncodedSrgb,
+                SolidBackgroundLinear = new Vector4(
+                    background.LinearRgba.X,
+                    background.LinearRgba.Y,
+                    background.LinearRgba.Z,
+                    solidBackground ? 1 : 0)
             };
         }
 
@@ -1645,7 +1662,13 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
                 AmbientOcclusionParameters = ambientOcclusionParameters,
                 InverseViewProjection = inverseViewProjection,
                 CameraPosition = cameraPosition,
-                EnvironmentParameters = environmentParameters
+                EnvironmentParameters = environmentParameters,
+                SolidBackgroundEncoded = background.EncodedSrgb,
+                SolidBackgroundLinear = new Vector4(
+                    background.LinearRgba.X,
+                    background.LinearRgba.Y,
+                    background.LinearRgba.Z,
+                    solidBackground ? 1 : 0)
             };
         }
 
@@ -1682,7 +1705,13 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
             ambientOcclusionParameters,
             inverseViewProjection,
             cameraPosition,
-            environmentParameters);
+            environmentParameters,
+            background.EncodedSrgb,
+            new Vector4(
+                background.LinearRgba.X,
+                background.LinearRgba.Y,
+                background.LinearRgba.Z,
+                solidBackground ? 1 : 0));
     }
 
     private static void AddTextureId(HashSet<string> textureIds, string? textureId)
@@ -2644,7 +2673,9 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
         Vector4 AmbientOcclusionParameters,
         Matrix4x4 InverseViewProjection,
         Vector4 CameraPosition,
-        Vector4 EnvironmentParameters)
+        Vector4 EnvironmentParameters,
+        Vector4 SolidBackgroundEncoded,
+        Vector4 SolidBackgroundLinear)
     {
         public static PostProcessUniform Default { get; } = new(
             new Vector4(0.86f, 0.42f, 1f, 1f),
@@ -2652,14 +2683,18 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
             Vector4.Zero,
             Matrix4x4.Identity,
             Vector4.Zero,
-            new Vector4(0, 11.2f, 0, 0));
+            new Vector4(0, 11.2f, 0, 0),
+            Vector4.Zero,
+            Vector4.Zero);
         public static PostProcessUniform Disabled { get; } = new(
             new Vector4(0.86f, 0f, 1f, 0f),
             Vector4.One,
             Vector4.Zero,
             Matrix4x4.Identity,
             Vector4.Zero,
-            new Vector4(0, 11.2f, 0, 0));
+            new Vector4(0, 11.2f, 0, 0),
+            Vector4.Zero,
+            Vector4.Zero);
     }
 
     private sealed record RenderPacket(

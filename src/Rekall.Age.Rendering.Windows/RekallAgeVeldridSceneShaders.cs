@@ -1097,6 +1097,8 @@ internal static class RekallAgeVeldridSceneShaders
             mat4 InverseViewProjection;
             vec4 CameraPosition;
             vec4 EnvironmentParameters;
+            vec4 SolidBackgroundEncoded;
+            vec4 SolidBackgroundLinear;
         };
         layout(set = 1, binding = 1) uniform texture2D EnvironmentTexture;
         layout(set = 1, binding = 2) uniform sampler EnvironmentSampler;
@@ -1141,6 +1143,21 @@ internal static class RekallAgeVeldridSceneShaders
             vec3 logValue = clamp((log2(max(value, vec3(1e-6))) + 10.0) / 16.5, 0.0, 1.0);
             vec3 sigmoid = logValue * logValue * (3.0 - 2.0 * logValue);
             return sigmoid * sigmoid * (3.0 - 2.0 * sigmoid);
+        }
+
+        vec3 applyDisplayTransform(vec3 hdr)
+        {
+            hdr *= exp2(EnvironmentParameters.x);
+            // 11.2 is the conventional neutral scene-white reference; an authored white point
+            // moves highlight placement without crushing midtones.
+            hdr *= 11.2 / max(EnvironmentParameters.y, 0.0001);
+
+            // EnvironmentParameters.z selects AgX; anything else keeps the exponential curve
+            // this path used before, so scenes that never asked for AgX are unchanged.
+            vec3 graded = EnvironmentParameters.z > 0.5
+                ? agxCurve(hdr)
+                : vec3(1.0) - exp(-max(hdr, vec3(0.0)) * 1.15);
+            return pow(max(graded, vec3(0.0)), vec3(1.0 / 2.2));
         }
 
         float dirtHash(vec2 p)
@@ -1329,18 +1346,16 @@ internal static class RekallAgeVeldridSceneShaders
                 hdr *= 1.0 + lensDirtMask(fsin_UV) * EnvironmentParameters.w * 0.6;
             }
 
-            hdr *= exp2(EnvironmentParameters.x);
-            // 11.2 is the conventional neutral scene-white reference; an authored white point
-            // moves highlight placement without crushing midtones.
-            hdr *= 11.2 / max(EnvironmentParameters.y, 0.0001);
-
-            // EnvironmentParameters.z selects AgX; anything else keeps the exponential curve
-            // this path used before, so scenes that never asked for AgX are unchanged.
-            vec3 graded = EnvironmentParameters.z > 0.5
-                ? agxCurve(hdr)
-                : vec3(1.0) - exp(-max(hdr, vec3(0.0)) * 1.15);
-
-            vec3 color = pow(max(graded, vec3(0.0)), vec3(1.0 / 2.2));
+            vec3 color = applyDisplayTransform(hdr);
+            if (sceneDepth >= 0.99999 && SolidBackgroundLinear.w > 0.5)
+            {
+                // A solid clear/background colour is a display-referred authoring value. Keep
+                // exposure, tone-map, bloom and other effects available to the composed scene,
+                // but subtract the baseline display transform from untouched background pixels
+                // so their baseline appearance agrees with the Inspector swatch.
+                vec3 baseline = applyDisplayTransform(SolidBackgroundLinear.rgb);
+                color += SolidBackgroundEncoded.rgb - baseline;
+            }
             fsout_Color = vec4(clamp(color, 0.0, 1.0), resolved.a);
         }
         """;

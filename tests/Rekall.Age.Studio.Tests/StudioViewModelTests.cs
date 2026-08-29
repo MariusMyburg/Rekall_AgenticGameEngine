@@ -1787,6 +1787,43 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task SimulationIsBlockedWhenPreviewOmittedUnverifiedProjectModules()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-module-block-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession
+            {
+                ProjectModuleDiagnostic = new RekallAgeStudioProjectModuleDiagnostic(
+                    "REKALL_MODULE_RECEIPT_MISSING",
+                    "Module build receipt is missing. Rebuild the module.")
+            };
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview);
+            viewModel.ProjectPathInput = root;
+            viewModel.ProjectNameInput = "Module Block Test";
+            viewModel.SceneNameInput = "Main";
+            await ExecuteAsync(viewModel.CreateCommand);
+
+            await ExecuteAsync(viewModel.SimulateCommand);
+
+            Assert.Equal(RekallAgeStudioMode.Edit, viewModel.Mode);
+            Assert.False(viewModel.IsSimulating);
+            Assert.Equal(0, preview.StepCount);
+            Assert.Contains("REKALL_MODULE_RECEIPT_MISSING", viewModel.StatusText, StringComparison.Ordinal);
+            Assert.Contains(
+                viewModel.ValidationLines,
+                line => line.StartsWith("blocking: REKALL_MODULE_RECEIPT_MISSING", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task UnavailableVulkanPreviewSurfacesStructuredFailureWithoutChangingEditorMode()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-vulkan-unavailable-" + Guid.NewGuid().ToString("N"));
@@ -3322,6 +3359,7 @@ public sealed class StudioViewModelTests
         public bool IsDisposed { get; private set; }
         public bool IsDisposalComplete { get; private set; }
         public bool ReturnUnavailable { get; set; }
+        public RekallAgeStudioProjectModuleDiagnostic? ProjectModuleDiagnostic { get; set; }
         private bool _externalDependencyChangePending;
 
         public ValueTask<RekallAgeStudioPreviewFrame> ResetAsync(
@@ -3449,7 +3487,8 @@ public sealed class StudioViewModelTests
                 : RekallAgeVulkanPresentationFrame.Presented(runtimeFrame, "test-gpu");
             return new RekallAgeStudioPreviewFrame(
                 presentation,
-                new RekallAgeStudioViewportInteractionSnapshot(_width, _height, Regions));
+                new RekallAgeStudioViewportInteractionSnapshot(_width, _height, Regions),
+                ProjectModuleDiagnostic);
         }
     }
 

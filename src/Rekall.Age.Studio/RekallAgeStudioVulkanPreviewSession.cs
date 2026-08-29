@@ -11,7 +11,8 @@ namespace Rekall.Age.Studio;
 
 internal sealed record RekallAgeStudioPreviewFrame(
     RekallAgeVulkanPresentationFrame Presentation,
-    RekallAgeStudioViewportInteractionSnapshot Interaction)
+    RekallAgeStudioViewportInteractionSnapshot Interaction,
+    RekallAgeStudioProjectModuleDiagnostic? ProjectModuleDiagnostic = null)
 {
     public int FrameIndex => Presentation.FrameIndex;
 
@@ -23,6 +24,8 @@ internal sealed record RekallAgeStudioPreviewFrame(
 
     public bool HardwareAccelerated => Presentation.HardwareAccelerated;
 }
+
+internal sealed record RekallAgeStudioProjectModuleDiagnostic(string Code, string Message);
 
 internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPreviewSession
 {
@@ -45,6 +48,7 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
     private int _sceneRevision;
     private int _assetRevision;
     private bool _assetsDirty;
+    private RekallAgeStudioProjectModuleDiagnostic? _projectModuleDiagnostic;
     private IRekallAgeStudioViewportDependencyMonitor? _dependencyMonitor;
     private bool _disposeStarted;
     private bool _disposalComplete;
@@ -110,6 +114,7 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
                     || !string.Equals(_projectRoot, normalizedProjectRoot, StringComparison.OrdinalIgnoreCase);
                 if (replaceMonitor) candidateMonitor = _dependencyMonitorFactory(normalizedProjectRoot);
                 else await ApplyExternalDependencyChangesAsync(cancellationToken);
+                RekallAgeStudioProjectModuleDiagnostic? candidateModuleDiagnostic = null;
                 try
                 {
                     candidateLoop = RekallAgeRuntimeExecutionLoop.CreateDefault(projectRoot);
@@ -126,6 +131,9 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
                         exception.Code);
                     candidateLoop = RekallAgeRuntimeExecutionLoop.CreateDefaultWithoutProjectModules(
                         normalizedProjectRoot);
+                    candidateModuleDiagnostic = new RekallAgeStudioProjectModuleDiagnostic(
+                        exception.Code,
+                        exception.Message);
                 }
                 var candidateWorld = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(
                     projectRoot,
@@ -151,6 +159,7 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
                     projectRoot,
                     candidateSceneRevision,
                     candidateAssetRevision,
+                    candidateModuleDiagnostic,
                     cancellationToken);
                 if (!previewFrame.Presentation.PresentedFrame)
                 {
@@ -170,6 +179,7 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
                 _sceneRevision = candidateSceneRevision;
                 _assetRevision = candidateAssetRevision;
                 _assetsDirty = false;
+                _projectModuleDiagnostic = candidateModuleDiagnostic;
                 if (replaceMonitor)
                 {
                     var previousMonitor = _dependencyMonitor;
@@ -234,6 +244,7 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
                 _projectRoot,
                 _sceneRevision,
                 _assetRevision,
+                _projectModuleDiagnostic,
                 cancellationToken);
         }
         finally
@@ -275,6 +286,7 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
                 _projectRoot,
                 _sceneRevision,
                 _assetRevision,
+                _projectModuleDiagnostic,
                 cancellationToken);
         }
         finally
@@ -319,6 +331,7 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
                 _projectRoot,
                 _sceneRevision,
                 _assetRevision,
+                _projectModuleDiagnostic,
                 cancellationToken);
         }
         finally
@@ -368,6 +381,7 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
             _assets = null;
             _projectRoot = null;
             _assetsDirty = false;
+            _projectModuleDiagnostic = null;
             _dependencyMonitor?.Dispose();
             _dependencyMonitor = null;
         }
@@ -429,6 +443,7 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
         string projectRoot,
         int sceneRevision,
         int assetRevision,
+        RekallAgeStudioProjectModuleDiagnostic? projectModuleDiagnostic,
         CancellationToken cancellationToken)
     {
         var presentation = await _presenter.PresentAsync(
@@ -443,7 +458,8 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
             cancellationToken);
         return new RekallAgeStudioPreviewFrame(
             presentation,
-            RekallAgeStudioViewportInteractionBuilder.Build(viewportFrame, world.Entities));
+            RekallAgeStudioViewportInteractionBuilder.Build(viewportFrame, world.Entities),
+            projectModuleDiagnostic);
     }
 
     private async ValueTask<RekallAgeStudioViewportDependencyChange> ApplyExternalDependencyChangesAsync(

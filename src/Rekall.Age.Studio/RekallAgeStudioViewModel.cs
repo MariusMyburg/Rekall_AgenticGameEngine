@@ -4373,6 +4373,17 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             ApplyPreviewFrame(frame);
             ResetSimulationCadence();
             if (!ViewportAvailable) return;
+            if (frame.ProjectModuleDiagnostic is { } moduleDiagnostic)
+            {
+                Mode = RekallAgeStudioMode.Edit;
+                StatusText = $"Simulation blocked: {moduleDiagnostic.Code} - {moduleDiagnostic.Message}";
+                var blockingDiagnostic = $"blocking: {moduleDiagnostic.Code} - {moduleDiagnostic.Message}";
+                if (!ValidationLines.Contains(blockingDiagnostic, StringComparer.Ordinal))
+                {
+                    ValidationLines.Insert(0, blockingDiagnostic);
+                }
+                return;
+            }
             IsSimulationPaused = false;
             Mode = RekallAgeStudioMode.Simulate;
             StatusText = $"Simulating {_session.SceneName} in the live Studio viewport.";

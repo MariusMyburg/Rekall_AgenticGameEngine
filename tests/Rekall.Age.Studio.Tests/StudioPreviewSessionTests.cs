@@ -66,7 +66,10 @@ public sealed class StudioPreviewSessionTests
             Assert.True(initial.Presentation.PresentedFrame);
             Assert.Equal("vulkan", initial.Backend);
             Assert.True(initial.HardwareAccelerated);
+            Assert.NotNull(initial.ProjectModuleDiagnostic);
+            Assert.Equal("REKALL_MODULE_RECEIPT_MISSING", initial.ProjectModuleDiagnostic.Code);
             Assert.Equal(1, stepped.FrameIndex);
+            Assert.Equal(initial.ProjectModuleDiagnostic, stepped.ProjectModuleDiagnostic);
         }
         finally
         {

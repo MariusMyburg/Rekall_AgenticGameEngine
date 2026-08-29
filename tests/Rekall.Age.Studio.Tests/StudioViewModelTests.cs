@@ -2365,6 +2365,48 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task CodeWorkflowScaffoldsBuildsAndAttachesComponentToSelectedEntity()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-code-workflow-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Studio Code Workflow",
+                SceneNameInput = "Main",
+                CodeModuleNameInput = "Mover",
+                CodeComponentNameInput = "MoverState",
+                CodeSystemNameInput = "MoverSystem"
+            };
+
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.EntityNameInput = "Moving Entity";
+            await ExecuteAsync(viewModel.AddEntityCommand);
+            await ExecuteAsync(viewModel.CreateAttachCodeComponentCommand);
+
+            Assert.True(File.Exists(Path.Combine(root, "Modules", "Mover", "MoverModule.cs")));
+            Assert.Contains(viewModel.CodeOutputLines, line =>
+                line.Contains("Built", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal("MoverModule.cs", viewModel.SelectedCodeSource?.FileName);
+            Assert.Contains("public sealed class MoverState", viewModel.CodeSourceText, StringComparison.Ordinal);
+            Assert.Contains(viewModel.InspectorLines, line =>
+                line.Contains("Game.Modules.Mover.MoverState", StringComparison.Ordinal));
+
+            var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            var entity = Assert.Single(scene.Entities);
+            var component = Assert.Single(entity.Components, candidate =>
+                candidate.Type == "Game.Modules.Mover.MoverState");
+            Assert.True(component.Properties["enabled"]!.GetValue<bool>());
+            Assert.Equal(1, component.Properties["valuePerSecond"]!.GetValue<double>());
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ViewModelCreatesAndEditsProjectThroughSchemaGuidedCanonicalCommands()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-vm-" + Guid.NewGuid().ToString("N"));

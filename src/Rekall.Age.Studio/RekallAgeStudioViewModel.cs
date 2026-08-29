@@ -18,6 +18,7 @@ using Rekall.Age.Editor.Contracts;
 using Rekall.Age.LevelDesign.Commands;
 using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Contracts;
+using Rekall.Age.Modules.Commands;
 using Rekall.Age.Rendering;
 using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Rendering.Commands;
@@ -84,6 +85,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _cancelCodexSignInCommand;
     private readonly RekallAgeAsyncCommand _runAgentCommand;
     private readonly RekallAgeAsyncCommand _cancelAgentCommand;
+    private readonly RekallAgeStudioCodeSession _codeSession = new();
+    private readonly RekallAgeAsyncCommand _refreshCodeCommand;
+    private readonly RekallAgeAsyncCommand _saveCodeCommand;
+    private readonly RekallAgeAsyncCommand _buildCodeCommand;
+    private readonly RekallAgeAsyncCommand _createAttachCodeComponentCommand;
+    private readonly RekallAgeAsyncCommand _openCodeFileCommand;
+    private readonly RekallAgeAsyncCommand _openCodeProjectCommand;
+    private readonly RekallAgeAsyncCommand _openCodeSolutionCommand;
+    private readonly RekallAgeAsyncCommand _openCodeInVsCodeCommand;
     private readonly RekallAgeStudioModelingSession _modeling = new();
     private readonly RekallAgeMeshPrimitiveFactory _meshPrimitiveFactory = new();
     private readonly RekallAgeStudioModelingGraphSession _modelingGraph = new();
@@ -165,6 +175,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _providerStatus = string.Empty;
     private string _providerDisplayStatus = string.Empty;
     private string _agentTaskInput = string.Empty;
+    private RekallAgeModuleSourceInfo? _selectedCodeSource;
+    private string _codeSourceText = string.Empty;
+    private string _codeModuleNameInput = "GameRules";
+    private string _codeComponentNameInput = "GameState";
+    private string _codeSystemNameInput = "GameRulesSystem";
+    private string _codeStatusText = "Open a project to inspect C# gameplay modules.";
     private string? _selectedMeshAssetId;
     private string _modelAssetIdInput = string.Empty;
     private string _modelAssetDisplayNameInput = string.Empty;
@@ -396,6 +412,16 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             () => _activeCodexSignIn is { IsCompleted: false });
         _runAgentCommand = CreateAsyncCommand(RunAgentAsync, CanRunAgent);
         _cancelAgentCommand = CreateAsyncCommand(CancelAgentAsync, () => IsAgentRunning);
+        _refreshCodeCommand = CreateAsyncCommand(RefreshCodeSourcesAsync, () => HasOpenProject() && !IsCodeDirty);
+        _saveCodeCommand = CreateAsyncCommand(SaveCodeSourceAsync, () => HasOpenProject() && IsCodeDirty);
+        _buildCodeCommand = CreateAsyncCommand(BuildCodeAsync, () => HasOpenProject() && !IsCodeDirty);
+        _createAttachCodeComponentCommand = CreateAsyncCommand(
+            CreateAttachCodeComponentAsync,
+            CanCreateAttachCodeComponent);
+        _openCodeFileCommand = CreateAsyncCommand(OpenCodeFileAsync, () => SelectedCodeSource is not null);
+        _openCodeProjectCommand = CreateAsyncCommand(OpenCodeProjectAsync, () => SelectedCodeSource is not null);
+        _openCodeSolutionCommand = CreateAsyncCommand(OpenCodeSolutionAsync, HasOpenProject);
+        _openCodeInVsCodeCommand = CreateAsyncCommand(OpenCodeInVsCodeAsync, HasOpenProject);
         _refreshMeshAssetsCommand = CreateAsyncCommand(RefreshMeshAssetsAsync, HasOpenProject);
         _createMeshPrimitiveCommand = CreateAsyncCommand(CreateMeshPrimitiveAsync, CanCreateMeshPrimitive);
         _openMeshAssetCommand = CreateAsyncCommand(OpenMeshAssetAsync, CanOpenMeshAsset);
@@ -439,6 +465,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<string> SceneSummaryLines { get; } = [];
     public ObservableCollection<string> ActionLines { get; } = [];
     public ObservableCollection<string> RuntimeObservationLines { get; } = [];
+    public ObservableCollection<RekallAgeModuleSourceInfo> CodeSources { get; } = [];
+    public ObservableCollection<string> CodeOutputLines { get; } = [];
     public IReadOnlyList<RekallAgeLanguageModelProviderDescriptor> LanguageModelProviders =>
         _languageModelProviderCatalog.DescribeProviders(SessionLanguageModelProviderSettings());
     public ObservableCollection<string> LanguageModels { get; } = [];
@@ -522,6 +550,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand CancelCodexSignInCommand => _cancelCodexSignInCommand;
     public ICommand RunAgentCommand => _runAgentCommand;
     public ICommand CancelAgentCommand => _cancelAgentCommand;
+    public ICommand RefreshCodeCommand => _refreshCodeCommand;
+    public ICommand SaveCodeCommand => _saveCodeCommand;
+    public ICommand BuildCodeCommand => _buildCodeCommand;
+    public ICommand CreateAttachCodeComponentCommand => _createAttachCodeComponentCommand;
+    public ICommand OpenCodeFileCommand => _openCodeFileCommand;
+    public ICommand OpenCodeProjectCommand => _openCodeProjectCommand;
+    public ICommand OpenCodeSolutionCommand => _openCodeSolutionCommand;
+    public ICommand OpenCodeInVsCodeCommand => _openCodeInVsCodeCommand;
     public ICommand RefreshMeshAssetsCommand => _refreshMeshAssetsCommand;
     public ICommand CreateMeshPrimitiveCommand => _createMeshPrimitiveCommand;
     public ICommand OpenMeshAssetCommand => _openMeshAssetCommand;
@@ -1716,6 +1752,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         && _session.SelectedEntityId is not null
         && !string.IsNullOrWhiteSpace(ComponentTypeInput);
     private bool CanEditProperty() => CanEditComponent() && !string.IsNullOrWhiteSpace(PropertyNameInput);
+    private bool CanCreateAttachCodeComponent() => HasSelectedEntity()
+        && !string.IsNullOrWhiteSpace(CodeModuleNameInput)
+        && !string.IsNullOrWhiteSpace(CodeComponentNameInput)
+        && !string.IsNullOrWhiteSpace(CodeSystemNameInput);
     private bool CanRunAgent() => HasEditableProject()
         && !IsAgentRunning
         && _languageModelRunner is not null
@@ -1868,6 +1908,60 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             IsBusy = false;
         }
+    }
+
+    public RekallAgeModuleSourceInfo? SelectedCodeSource
+    {
+        get => _selectedCodeSource;
+        private set
+        {
+            if (!Set(ref _selectedCodeSource, value)) return;
+            OnPropertyChanged(nameof(SelectedCodeSourcePath));
+            OnPropertyChanged(nameof(SelectedCodeProjectPath));
+            RefreshCommands();
+        }
+    }
+
+    public string CodeSourceText
+    {
+        get => _codeSourceText;
+        set
+        {
+            if (!Set(ref _codeSourceText, value)) return;
+            _codeSession.SourceText = value;
+            OnPropertyChanged(nameof(IsCodeDirty));
+            RefreshCommands();
+        }
+    }
+
+    public bool IsCodeDirty => _codeSession.IsDirty;
+
+    public string? SelectedCodeSourcePath => SelectedCodeSource?.SourcePath;
+
+    public string? SelectedCodeProjectPath => _codeSession.SelectedProjectPath;
+
+    public string CodeModuleNameInput
+    {
+        get => _codeModuleNameInput;
+        set { if (Set(ref _codeModuleNameInput, value)) RefreshCommands(); }
+    }
+
+    public string CodeComponentNameInput
+    {
+        get => _codeComponentNameInput;
+        set { if (Set(ref _codeComponentNameInput, value)) RefreshCommands(); }
+    }
+
+    public string CodeSystemNameInput
+    {
+        get => _codeSystemNameInput;
+        set { if (Set(ref _codeSystemNameInput, value)) RefreshCommands(); }
+    }
+
+    public string CodeStatusText
+    {
+        get => _codeStatusText;
+        private set => Set(ref _codeStatusText, value);
     }
 
     private Task PublishModelAsync() => RunAsync(PublishModelOperationAsync, refreshPreviewAfter: true);
@@ -2605,6 +2699,235 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             propertyName = PropertyNameInput.Trim()
         },
         $"Remove {ComponentTypeInput.Trim()}.{PropertyNameInput.Trim()}");
+
+    public async Task OpenCodeSourceAsync(RekallAgeModuleSourceInfo source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        await RunCodeActionAsync(async () =>
+        {
+            await _codeSession.OpenAsync(source, _lifecycleCancellation.Token);
+            SelectedCodeSource = _codeSession.SelectedSource;
+            Set(ref _codeSourceText, _codeSession.SourceText, nameof(CodeSourceText));
+            OnPropertyChanged(nameof(IsCodeDirty));
+            OnPropertyChanged(nameof(SelectedCodeProjectPath));
+            CodeStatusText = $"Editing {source.ModuleName}/{source.FileName}.";
+        });
+    }
+
+    private Task RefreshCodeSourcesAsync() => RunCodeActionAsync(() => RefreshCodeSourcesCoreAsync());
+
+    private async Task RefreshCodeSourcesCoreAsync(string? selectSourcePath = null)
+    {
+        if (_session.ProjectRoot is null) return;
+        var sources = await _codeSession.RefreshAsync(_session.ProjectRoot, _lifecycleCancellation.Token);
+        Replace(CodeSources, sources);
+        var requestedPath = selectSourcePath ?? SelectedCodeSource?.SourcePath;
+        var source = requestedPath is null
+            ? CodeSources.FirstOrDefault()
+            : CodeSources.FirstOrDefault(candidate => PathsEqual(candidate.SourcePath, requestedPath));
+        if (source is not null)
+        {
+            await _codeSession.OpenAsync(source, _lifecycleCancellation.Token);
+            SelectedCodeSource = _codeSession.SelectedSource;
+            Set(ref _codeSourceText, _codeSession.SourceText, nameof(CodeSourceText));
+        }
+        else
+        {
+            SelectedCodeSource = null;
+            Set(ref _codeSourceText, string.Empty, nameof(CodeSourceText));
+        }
+        OnPropertyChanged(nameof(IsCodeDirty));
+        OnPropertyChanged(nameof(SelectedCodeProjectPath));
+        CodeStatusText = CodeSources.Count == 0
+            ? "No C# gameplay module sources exist yet."
+            : $"Found {CodeSources.Count} C# gameplay source file(s).";
+    }
+
+    private Task SaveCodeSourceAsync() => RunCodeActionAsync(async () =>
+    {
+        await _codeSession.SaveAsync(_session.ProjectRoot!, _lifecycleCancellation.Token);
+        OnPropertyChanged(nameof(IsCodeDirty));
+        CodeStatusText = $"Saved {SelectedCodeSource?.FileName}.";
+    });
+
+    private Task BuildCodeAsync() => RunCodeActionAsync(async () =>
+    {
+        if (_session.ProjectRoot is null) return;
+        CodeOutputLines.Clear();
+        var result = await _session.ExecuteAsync(
+            "rekall.build.modules",
+            JsonSerializer.Serialize(new { projectRoot = _session.ProjectRoot }),
+            "Build C# gameplay modules",
+            "studio-code",
+            _lifecycleCancellation.Token);
+        AddCodeOperationResult("Build", result);
+        if (_session.Model is not null) ApplyModel(_session.Model);
+        CodeStatusText = result.Summary;
+    });
+
+    private async Task CreateAttachCodeComponentAsync()
+    {
+        if (_session.ProjectRoot is null || _session.SceneName is null || _session.SelectedEntityId is null) return;
+        IsBusy = true;
+        CodeOutputLines.Clear();
+        try
+        {
+            var moduleName = CodeModuleNameInput.Trim();
+            var componentName = CodeComponentNameInput.Trim();
+            var systemName = CodeSystemNameInput.Trim();
+            var scaffold = await _session.ExecuteAsync(
+                "rekall.module.scaffold_runtime_system",
+                JsonSerializer.Serialize(new
+                {
+                    projectRoot = _session.ProjectRoot,
+                    moduleId = ToModuleId(moduleName),
+                    displayName = HumanizeIdentifier(moduleName),
+                    moduleName,
+                    componentName,
+                    systemName
+                }),
+                $"Scaffold {moduleName}",
+                "studio-code",
+                _lifecycleCancellation.Token);
+            AddCodeOperationResult("Scaffold", scaffold);
+            var scaffoldValue = scaffold.Value as ScaffoldRuntimeSystemModuleResult;
+            if (!scaffold.Ok)
+            {
+                await RefreshCodeSourcesCoreAsync(scaffoldValue?.SourcePath);
+                CodeStatusText = scaffold.Summary;
+                return;
+            }
+            if (scaffoldValue is null)
+            {
+                throw new InvalidOperationException("The runtime module scaffold did not return its generated component contract.");
+            }
+
+            var build = await _session.ExecuteAsync(
+                "rekall.build.modules",
+                JsonSerializer.Serialize(new { projectRoot = _session.ProjectRoot }),
+                $"Build {moduleName}",
+                "studio-code",
+                _lifecycleCancellation.Token);
+            AddCodeOperationResult("Build", build);
+            if (!build.Ok)
+            {
+                await RefreshCodeSourcesCoreAsync(scaffoldValue.SourcePath);
+                CodeStatusText = build.Summary;
+                return;
+            }
+
+            var componentType = $"{scaffoldValue.Namespace}.{scaffoldValue.ComponentClass}";
+            var attach = await _session.ExecuteAsync(
+                "rekall.component.add",
+                JsonSerializer.Serialize(new
+                {
+                    projectRoot = _session.ProjectRoot,
+                    sceneName = _session.SceneName,
+                    entityId = _session.SelectedEntityId,
+                    componentType,
+                    properties = new { enabled = true, valuePerSecond = 1d }
+                }),
+                $"Attach {componentType}",
+                "studio-code",
+                _lifecycleCancellation.Token);
+            AddCodeOperationResult("Attach", attach);
+            if (_session.Model is not null) ApplyModel(_session.Model);
+            await RefreshCodeSourcesCoreAsync(scaffoldValue.SourcePath);
+            CodeStatusText = attach.Ok
+                ? $"Created, built, and attached {componentType}."
+                : attach.Summary;
+            if (attach.Ok && IsLiveViewportEnabled && Mode == RekallAgeStudioMode.Edit)
+            {
+                await RefreshEditPreviewAsync(CodeStatusText);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
+        {
+            ReportCodeFailure(ex);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private Task OpenCodeFileAsync() => RunCodeActionAsync(() =>
+    {
+        _codeSession.OpenSelectedFile();
+        CodeStatusText = $"Opened {SelectedCodeSourcePath}.";
+        return Task.CompletedTask;
+    });
+
+    private Task OpenCodeProjectAsync() => RunCodeActionAsync(() =>
+    {
+        _codeSession.OpenSelectedProject();
+        CodeStatusText = $"Opened {SelectedCodeProjectPath}.";
+        return Task.CompletedTask;
+    });
+
+    private Task OpenCodeSolutionAsync() => OpenGeneratedCodeWorkspaceAsync(openVsCode: false);
+
+    private Task OpenCodeInVsCodeAsync() => OpenGeneratedCodeWorkspaceAsync(openVsCode: true);
+
+    private Task OpenGeneratedCodeWorkspaceAsync(bool openVsCode) => RunCodeActionAsync(async () =>
+    {
+        var player = ResolvePlayerExecutable()
+            ?? throw new InvalidOperationException("Player executable was not found. Build or install Rekall.Age.Player.Windows first.");
+        var workspace = await _codeSession.GenerateDevelopmentWorkspaceAsync(
+            _session.ProjectRoot!,
+            _session.SceneName!,
+            player,
+            ResolveCliExecutable(),
+            _lifecycleCancellation.Token);
+        if (openVsCode) _codeSession.OpenInVsCode();
+        else _codeSession.OpenSolution();
+        CodeStatusText = openVsCode
+            ? $"Opened VS Code at {_session.ProjectRoot}."
+            : $"Opened {workspace.SolutionPath}.";
+    });
+
+    private async Task RunCodeActionAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException or System.ComponentModel.Win32Exception)
+        {
+            ReportCodeFailure(ex);
+        }
+        finally
+        {
+            RefreshCommands();
+        }
+    }
+
+    private void AddCodeOperationResult(string stage, RekallAgeWorkbenchOperationResult result)
+    {
+        CodeOutputLines.Add($"{stage}: {result.Summary}");
+        foreach (var error in result.Errors)
+        {
+            CodeOutputLines.Add($"{error.Code}: {error.Message}{(error.Target is null ? string.Empty : $" ({error.Target})")}");
+        }
+        if (result.Value is Rekall.Age.Build.Commands.BuildModulesResult built)
+        {
+            foreach (var module in built.Modules)
+            {
+                CodeOutputLines.Add($"{module.ModuleName}: {(module.Succeeded ? "succeeded" : "failed")} (exit {module.ExitCode})");
+                foreach (var line in module.Output.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n')
+                             .Where(line => !string.IsNullOrWhiteSpace(line)))
+                {
+                    CodeOutputLines.Add(line);
+                }
+            }
+        }
+    }
+
+    private void ReportCodeFailure(Exception exception)
+    {
+        CodeStatusText = exception.Message;
+        CodeOutputLines.Add($"REKALL_STUDIO_CODE_FAILED: {exception.Message}");
+    }
 
     private Task ExecuteComponentCommandAsync(string commandName, object arguments, string transactionName) =>
         RunAsync(() => _session.ExecuteAsync(
@@ -4263,6 +4586,30 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private string NormalizeSceneName() => string.IsNullOrWhiteSpace(SceneNameInput) ? "Main" : SceneNameInput.Trim();
 
+    private static string ToModuleId(string moduleName)
+    {
+        var characters = moduleName.Trim().SelectMany((character, index) =>
+            index > 0 && char.IsUpper(character)
+                ? new[] { '-', char.ToLowerInvariant(character) }
+                : new[] { char.ToLowerInvariant(character) });
+        return "game." + new string(characters.ToArray()).Replace(' ', '-');
+    }
+
+    private static string HumanizeIdentifier(string value)
+    {
+        var text = new System.Text.StringBuilder();
+        foreach (var character in value.Trim())
+        {
+            if (text.Length > 0 && char.IsUpper(character) && text[^1] != ' ') text.Append(' ');
+            text.Append(character is '-' or '_' ? ' ' : character);
+        }
+        return text.ToString().Trim();
+    }
+
+    private static bool PathsEqual(string left, string right) => Path.GetFullPath(left).Equals(
+        Path.GetFullPath(right),
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+
     private static BitmapImage LoadBitmap(string path)
     {
         using var stream = new MemoryStream(File.ReadAllBytes(path));
@@ -4296,6 +4643,17 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             Path.Combine(AppContext.BaseDirectory, "Rekall.Age.Player.Windows.exe"),
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
                 "Rekall.Age.Player.Windows", "bin", "Debug", "net10.0-windows", "Rekall.Age.Player.Windows.exe"))
+        };
+        return candidates.FirstOrDefault(File.Exists);
+    }
+
+    private static string? ResolveCliExecutable()
+    {
+        var candidates = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "Rekall.Age.Cli.exe"),
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
+                "Rekall.Age.Cli", "bin", "Debug", "net10.0", "Rekall.Age.Cli.exe"))
         };
         return candidates.FirstOrDefault(File.Exists);
     }
@@ -4364,6 +4722,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _cancelCodexSignInCommand.RaiseCanExecuteChanged();
         _runAgentCommand.RaiseCanExecuteChanged();
         _cancelAgentCommand.RaiseCanExecuteChanged();
+        _refreshCodeCommand.RaiseCanExecuteChanged();
+        _saveCodeCommand.RaiseCanExecuteChanged();
+        _buildCodeCommand.RaiseCanExecuteChanged();
+        _createAttachCodeComponentCommand.RaiseCanExecuteChanged();
+        _openCodeFileCommand.RaiseCanExecuteChanged();
+        _openCodeProjectCommand.RaiseCanExecuteChanged();
+        _openCodeSolutionCommand.RaiseCanExecuteChanged();
+        _openCodeInVsCodeCommand.RaiseCanExecuteChanged();
         _refreshMeshAssetsCommand.RaiseCanExecuteChanged();
         _createMeshPrimitiveCommand.RaiseCanExecuteChanged();
         _openMeshAssetCommand.RaiseCanExecuteChanged();

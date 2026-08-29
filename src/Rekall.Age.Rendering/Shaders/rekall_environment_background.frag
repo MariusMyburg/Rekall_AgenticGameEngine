@@ -44,5 +44,7 @@ void main()
         environmentUv,
         0.0).rgb;
     vec3 radiance = pow(max(encoded, vec3(0.0)), vec3(2.2));
-    outColor = vec4(radiance, 1.0);
+    // Alpha is the explicit geometry-coverage channel consumed by tone mapping.
+    // A sky is background, not geometry, even though it is drawn fullscreen.
+    outColor = vec4(radiance, 0.0);
 }

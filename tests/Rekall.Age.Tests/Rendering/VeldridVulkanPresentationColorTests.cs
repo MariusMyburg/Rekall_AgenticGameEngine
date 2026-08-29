@@ -10,6 +10,105 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class VeldridVulkanPresentationColorTests
 {
     [Fact]
+    public async Task TransparentGeometryUsesCoverageInsteadOfDepthForBackgroundCorrection()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        const int width = 64;
+        const int height = 64;
+        // White matches the renderer's neutral fallback environment, keeping lighting equal
+        // while the solid/sky presentation policies differ.
+        var assets = AssetsWithImage("one-pixel-sky", 0xFF, 0xFF, 0xFF);
+        var hwnd = NativeWindow.Create(width, height);
+        try
+        {
+            var solid = Frame("#12203A", exposure: 2, renderables: [TransparentCube()]);
+            var sky = Frame(
+                "#12203A",
+                exposure: 2,
+                environmentBackground: "#12203A",
+                backgroundPolicy: "skybox",
+                skyAssetId: "one-pixel-sky",
+                renderables: [TransparentCube()]);
+            await using var session = new RekallAgeVeldridVulkanPresentationSession(
+                new RekallAgeWin32RenderSurfaceDescriptor(hwnd, width, height),
+                new RekallAgeVulkanPresentationOptions(
+                    Path.GetFullPath("."),
+                    SyncToVerticalBlank: false,
+                    SceneSupersampleFactor: 1,
+                    DebugHudEnabled: false),
+                solid,
+                assets);
+
+            var solidPixel = await CaptureCenterAsync(session, solid, assets, sceneRevision: 1);
+            var skyPixel = await CaptureCenterAsync(session, sky, assets, sceneRevision: 2);
+
+            Assert.True(solidPixel[0] > 10, $"Expected transparent geometry coverage, got {solidPixel[0]}.");
+            Assert.All(Enumerable.Range(0, 3), channel =>
+                Assert.InRange(solidPixel[channel], skyPixel[channel] - 6, skyPixel[channel] + 6));
+        }
+        finally
+        {
+            NativeWindow.Destroy(hwnd);
+        }
+    }
+
+    [Fact]
+    public async Task OnePixelSkyTextureIsRenderedAsSkyInsteadOfTreatedAsSolidSentinel()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        const int width = 64;
+        const int height = 64;
+        var assets = AssetsWithImage("one-pixel-sky", 0x10, 0xE0, 0x20);
+        var frame = Frame(
+            "#A01010",
+            environmentBackground: "#A01010",
+            backgroundPolicy: "skybox",
+            skyAssetId: "one-pixel-sky");
+        var hwnd = NativeWindow.Create(width, height);
+        try
+        {
+            await using var session = new RekallAgeVeldridVulkanPresentationSession(
+                new RekallAgeWin32RenderSurfaceDescriptor(hwnd, width, height),
+                new RekallAgeVulkanPresentationOptions(
+                    Path.GetFullPath("."),
+                    SyncToVerticalBlank: false,
+                    SceneSupersampleFactor: 1,
+                    DebugHudEnabled: false),
+                frame,
+                assets);
+
+            var pixel = await CaptureCenterAsync(session, frame, assets, sceneRevision: 1);
+
+            Assert.True(pixel[1] > pixel[0] + 40, $"Expected green 1x1 sky texel, got RGB ({pixel[0]}, {pixel[1]}, {pixel[2]}).");
+        }
+        finally
+        {
+            NativeWindow.Destroy(hwnd);
+        }
+    }
+
+    [Fact]
+    public void SolidBackgroundReconstructsAuthoredAlphaAfterUsingAlphaAsCoverage()
+    {
+        var frame = Frame("#12203A80");
+        var background = RekallAgeEnvironmentBackgroundResolver.ResolveForHdr(frame);
+
+        Assert.InRange(background.EncodedSrgb.W, 0.501f, 0.503f);
+        Assert.Contains(
+            "sceneCoverage + backgroundAlpha * (1.0 - sceneCoverage)",
+            RekallAgeVeldridSceneShaders.PresentFragmentShader,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task SolidBackgroundReadbackMatchesAuthoredSrgbAcrossDisplayTransformsAndMissingSkyFallback()
     {
         if (!OperatingSystem.IsWindows())
@@ -91,16 +190,17 @@ public sealed class VeldridVulkanPresentationColorTests
         string toneMapper = "exponential",
         string? environmentBackground = null,
         string backgroundPolicy = "camera",
-        string? skyAssetId = null) =>
+        string? skyAssetId = null,
+        IReadOnlyList<RekallAgeRuntimeViewportRenderable>? renderables = null) =>
         new RekallAgeRuntimeViewportFrame(
             "Main",
             1,
             1.0 / 60.0,
             64,
             64,
-            new RekallAgeRuntimeViewportCamera("camera", "Camera", "camera", true, ClearColor: cameraColor),
+            new RekallAgeRuntimeViewportCamera("camera", "Camera", "Camera3D", true, Z: -4, ClearColor: cameraColor),
             [],
-            [],
+            renderables ?? [],
             0,
             new RekallAgeRuntimeViewportOverlay(false, 0),
             [])
@@ -119,6 +219,48 @@ public sealed class VeldridVulkanPresentationColorTests
                 BackgroundColor = environmentBackground
             }
         };
+
+    private static RekallAgeRuntimeViewportRenderable TransparentCube() =>
+        new(
+            "transparent-cube",
+            "Transparent Cube",
+            "mesh",
+            "rekall.primitive.cube",
+            0,
+            0,
+            0,
+            0,
+            Variant: "rekall.geometry.cube",
+            ScaleX: 2,
+            ScaleY: 2,
+            ScaleZ: 2,
+            MaterialColor: "#FF603080")
+        {
+            AlphaMode = "blend"
+        };
+
+    private static RekallAgeRuntimeViewportAssetSet AssetsWithImage(string id, byte red, byte green, byte blue) =>
+        new(
+            new Dictionary<string, RekallAgeRgbaImage>(StringComparer.Ordinal)
+            {
+                [id] = new RekallAgeRgbaImage(1, 1, [red, green, blue, 255])
+            },
+            new Dictionary<string, IReadOnlyList<RekallAgeVulkanSceneMesh>>(StringComparer.Ordinal),
+            []);
+
+    private static async Task<byte[]> CaptureCenterAsync(
+        RekallAgeVeldridVulkanPresentationSession session,
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportAssetSet assets,
+        int sceneRevision)
+    {
+        await session.PresentAsync(
+            new RekallAgeVulkanSceneSubmission(frame, assets, [], 0, sceneRevision, 0),
+            CancellationToken.None);
+        var capture = await session.CapturePresentedRgbaAsync(CancellationToken.None);
+        var offset = ((capture.Height / 2 * capture.Width) + capture.Width / 2) * 4;
+        return capture.Rgba.Span.Slice(offset, 4).ToArray();
+    }
 
     private static class NativeWindow
     {

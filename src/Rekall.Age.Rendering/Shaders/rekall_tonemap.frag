@@ -17,6 +17,11 @@ layout(push_constant) uniform ToneMapParameters
     float bloomRadius;
     float lensDirtStrength;
     float lensDirtScale;
+    float padding0;
+    float padding1;
+    float padding2;
+    vec4 solidBackgroundEncoded;
+    vec4 solidBackgroundLinear;
 } parameters;
 
 vec3 agxCurve(vec3 value)
@@ -26,6 +31,18 @@ vec3 agxCurve(vec3 value)
     vec3 logValue = clamp((log2(max(value, vec3(1e-6))) + 10.0) / 16.5, 0.0, 1.0);
     vec3 sigmoid = logValue * logValue * (3.0 - 2.0 * logValue);
     return sigmoid * sigmoid * (3.0 - 2.0 * sigmoid);
+}
+
+vec3 applyDisplayTransform(vec3 hdr)
+{
+    hdr *= exp2(parameters.exposure);
+    hdr *= 11.2 / max(parameters.whitePoint, 0.0001);
+    vec3 ungraded = agxCurve(hdr);
+    float luminance = dot(ungraded, vec3(0.2126, 0.7152, 0.0722));
+    vec3 graded = mix(vec3(luminance), ungraded, max(parameters.saturation, 0.0));
+    graded = (graded - 0.5) * max(parameters.contrast, 0.0) + 0.5;
+    graded = mix(ungraded, graded, clamp(parameters.gradeStrength, 0.0, 1.0));
+    return pow(max(graded, vec3(0.0)), vec3(1.0 / 2.2));
 }
 
 vec3 upsampleBloom(vec2 uv)
@@ -129,7 +146,8 @@ vec3 veilingGlare(vec2 uv)
 
 void main()
 {
-    vec3 hdr = texture(sceneHdr, fragUv).rgb;
+    vec4 scene = texture(sceneHdr, fragUv);
+    vec3 hdr = scene.rgb;
     vec3 bloom = upsampleBloom(fragUv) * max(parameters.bloomIntensity, 0.0);
     // Dirt only scatters light that is already blooming, so it rides the bloom
     // term rather than being laid over the finished image: a clean lens
@@ -144,15 +162,16 @@ void main()
                  * max(parameters.bloomIntensity, 0.0) * 0.9;
     }
     hdr += bloom;
-    hdr *= exp2(parameters.exposure);
-    // 11.2 is the conventional neutral scene-white reference. Authored white
-    // points adjust highlight placement without crushing all midtones.
-    hdr *= 11.2 / max(parameters.whitePoint, 0.0001);
-    vec3 graded = agxCurve(hdr);
-    float luminance = dot(graded, vec3(0.2126, 0.7152, 0.0722));
-    graded = mix(vec3(luminance), graded, max(parameters.saturation, 0.0));
-    graded = (graded - 0.5) * max(parameters.contrast, 0.0) + 0.5;
-    graded = mix(agxCurve(hdr), graded, clamp(parameters.gradeStrength, 0.0, 1.0));
-    vec3 outputColor = pow(max(graded, vec3(0.0)), vec3(1.0 / 2.2));
-    outColor = vec4(clamp(outputColor, 0.0, 0.996), 1.0);
+    vec3 outputColor = applyDisplayTransform(hdr);
+    float sceneCoverage = scene.a;
+    if (sceneCoverage <= 0.00001 && parameters.solidBackgroundLinear.w > 0.5)
+    {
+        vec3 baseline = applyDisplayTransform(parameters.solidBackgroundLinear.rgb);
+        outputColor += parameters.solidBackgroundEncoded.rgb - baseline;
+    }
+    float backgroundAlpha = parameters.solidBackgroundLinear.w > 0.5
+        ? parameters.solidBackgroundEncoded.a
+        : 1.0;
+    float outputAlpha = sceneCoverage + backgroundAlpha * (1.0 - sceneCoverage);
+    outColor = vec4(clamp(outputColor, 0.0, 0.996), clamp(outputAlpha, 0.0, 1.0));
 }

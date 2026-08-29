@@ -266,8 +266,20 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
             _sceneSupersampleFactor,
             _presentTextureLayout);
         var sceneShaderSet = new ShaderSetDescription([sceneVertexLayout], sceneShaders);
+        var sceneCoverageBlend = new BlendStateDescription(
+            RgbaFloat.White,
+            [new BlendAttachmentDescription(
+                blendEnabled: true,
+                sourceColorFactor: BlendFactor.SourceAlpha,
+                destinationColorFactor: BlendFactor.InverseSourceAlpha,
+                colorFunction: BlendFunction.Add,
+                // Accumulate alpha as source-over coverage instead of the Veldrid
+                // SingleAlphaBlend default's sourceAlpha-squared equation.
+                sourceAlphaFactor: BlendFactor.One,
+                destinationAlphaFactor: BlendFactor.InverseSourceAlpha,
+                alphaFunction: BlendFunction.Add)]);
         _scenePipeline = _factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            BlendStateDescription.SingleAlphaBlend,
+            sceneCoverageBlend,
             DepthStencilStateDescription.DepthOnlyLessEqual,
             RasterizerStateDescription.CullNone,
             PrimitiveTopology.TriangleList,
@@ -275,7 +287,7 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
             [_frameLayout, _drawLayout, _materialLayout],
             _sceneTarget.Framebuffer.OutputDescription));
         _sceneTransparentPipeline = _factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            BlendStateDescription.SingleAlphaBlend,
+            sceneCoverageBlend,
             new DepthStencilStateDescription(true, false, ComparisonKind.LessEqual),
             RasterizerStateDescription.CullNone,
             PrimitiveTopology.TriangleList,
@@ -1032,6 +1044,8 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
                 _sceneTarget.Width,
                 _sceneTarget.Height,
                 background,
+                // A missing authored sky resolves to the neutral fallback texture and must
+                // retain the same display-referred background contract as an explicit color.
                 solidBackground: ReferenceEquals(_environmentTexture, _whiteTexture)));
 
         _commands.Begin();
@@ -1045,7 +1059,10 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
                 background.LinearRgba.X,
                 background.LinearRgba.Y,
                 background.LinearRgba.Z,
-                background.LinearRgba.W));
+                // The HDR target's alpha channel is an explicit geometry-coverage channel.
+                // Transparent materials intentionally leave depth writes disabled, so depth
+                // cannot distinguish them from untouched background in the present pass.
+                0));
         _commands.ClearDepthStencil(1f);
         if (packet.Vertices.Length > 0)
         {

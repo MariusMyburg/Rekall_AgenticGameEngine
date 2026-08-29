@@ -7,6 +7,63 @@ namespace Rekall.Age.Tests.Rendering;
 public sealed class VulkanHighFidelityCaptureTests
 {
     [Fact]
+    public async Task SolidBackgroundMatchesAuthoredSrgbAfterNativeToneMapping()
+    {
+        var camera = new RekallAgeRuntimeViewportCamera(
+            "camera", "Camera", "Camera3D", true, 0, 0, -4,
+            FieldOfViewDegrees: 55, ClearColor: "#B4203AFF");
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Native Clear Color", 0, 0, 64, 64, camera, [camera],
+            [new RekallAgeRuntimeViewportRenderable(
+                "subject", "Subject", "mesh", "rekall.primitive.cube", 0, 0, 1, 0,
+                Variant: "rekall.geometry.cube", ScaleX: 0.6, ScaleY: 0.6, ScaleZ: 0.6,
+                MaterialColor: "#ffffff")],
+            0, new(false, 0), [])
+        {
+            Environment = new RekallAgeRuntimeViewportEnvironment(
+                "environment", "Environment", null, 1, 2, "agx", 11.2, null, "camera"),
+            PostProcessStack = new RekallAgeRuntimeViewportPostProcessStack(
+                "post", "Tone Map", true,
+                [new RekallAgeRuntimeViewportPostProcessPass("Tone Map", "tone-map")])
+        };
+        frame = frame with
+        {
+            ResolvedQualityPlan = new RekallAgeRenderQualityProfileResolver().Resolve(
+                new RekallAgeRenderQualityIntent("High", Bloom: false),
+                RekallAgeRenderingDeviceCapabilities.DesktopBaseline("native-test"),
+                frame.Width,
+                frame.Height)
+        };
+        var output = TestPaths.CreateTempDirectory();
+
+        var result = await new RekallAgeNativeVulkanSceneCapture().CaptureSceneAsync(
+            frame, RekallAgeRuntimeViewportAssetSet.Empty, output, "discrete-gpu", CancellationToken.None);
+
+        Assert.True(result.Captured, string.Join(Environment.NewLine, result.Errors));
+        Assert.NotNull(result.HighFidelityFrame);
+        var image = await RekallAgePngReader.ReadRgbaAsync(result.OutputPath, CancellationToken.None);
+        var closest = Enumerable.Range(0, image.Width * image.Height)
+            .Select(pixel =>
+            {
+                var offset = pixel * 4;
+                var distance = Math.Abs(image.Rgba[offset] - 0xB4)
+                    + Math.Abs(image.Rgba[offset + 1] - 0x20)
+                    + Math.Abs(image.Rgba[offset + 2] - 0x3A);
+                return (distance, red: image.Rgba[offset], green: image.Rgba[offset + 1], blue: image.Rgba[offset + 2]);
+            })
+            .MinBy(item => item.distance);
+        Assert.True(closest.distance <= 3,
+            $"Closest background pixel was RGB ({closest.red}, {closest.green}, {closest.blue}), distance {closest.distance}.");
+        Assert.Contains(Enumerable.Range(0, image.Width * image.Height), pixel =>
+        {
+            var offset = pixel * 4;
+            return Math.Abs(image.Rgba[offset] - 0xB4) <= 1
+                && Math.Abs(image.Rgba[offset + 1] - 0x20) <= 1
+                && Math.Abs(image.Rgba[offset + 2] - 0x3A) <= 1;
+        });
+    }
+
+    [Fact]
     public async Task AuthoredEnvironmentImageRendersBehindSceneGeometry()
     {
         var camera = new RekallAgeRuntimeViewportCamera(

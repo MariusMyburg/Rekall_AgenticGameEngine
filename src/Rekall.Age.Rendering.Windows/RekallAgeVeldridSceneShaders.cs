@@ -1327,8 +1327,12 @@ internal static class RekallAgeVeldridSceneShaders
             vec2 texel = 1.0 / vec2(textureSize(sampler2D(SceneTexture, SceneSampler), 0));
             vec4 resolved = resolveFxaa(texel);
             float sceneDepth = texture(sampler2D(SceneDepthTexture, SceneDepthSampler), fsin_UV).r;
-            if (sceneDepth >= 0.99999
-                && textureSize(sampler2D(EnvironmentTexture, EnvironmentSampler), 0).x > 1)
+            // Scene alpha is an explicit accumulated geometry-coverage channel. Do not use
+            // depth here: blend-mode draws correctly disable depth writes. The uniform flag
+            // identifies a bound sky explicitly, so a valid 1x1 environment is not mistaken
+            // for the engine's fallback texture.
+            float sceneCoverage = resolved.a;
+            if (sceneCoverage <= 0.00001 && SolidBackgroundLinear.w < 0.5)
             {
                 resolved.rgb = environmentBackground(fsin_UV);
             }
@@ -1347,7 +1351,7 @@ internal static class RekallAgeVeldridSceneShaders
             }
 
             vec3 color = applyDisplayTransform(hdr);
-            if (sceneDepth >= 0.99999 && SolidBackgroundLinear.w > 0.5)
+            if (sceneCoverage <= 0.00001 && SolidBackgroundLinear.w > 0.5)
             {
                 // A solid clear/background colour is a display-referred authoring value. Keep
                 // exposure, tone-map, bloom and other effects available to the composed scene,
@@ -1356,7 +1360,11 @@ internal static class RekallAgeVeldridSceneShaders
                 vec3 baseline = applyDisplayTransform(SolidBackgroundLinear.rgb);
                 color += SolidBackgroundEncoded.rgb - baseline;
             }
-            fsout_Color = vec4(clamp(color, 0.0, 1.0), resolved.a);
+            float backgroundAlpha = SolidBackgroundLinear.w > 0.5
+                ? SolidBackgroundEncoded.a
+                : 1.0;
+            float outputAlpha = sceneCoverage + backgroundAlpha * (1.0 - sceneCoverage);
+            fsout_Color = vec4(clamp(color, 0.0, 1.0), clamp(outputAlpha, 0.0, 1.0));
         }
         """;
 

@@ -691,7 +691,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 }
 
                 CreatePipeline(state, frame, target, shaders);
-                if (state.EnvironmentTexture is not null)
+                if (state.HasAuthoredEnvironmentTexture)
                 {
                     var environmentShaders = new RekallAgeVulkanShaderCompiler().CompileEnvironmentBackgroundPipeline();
                     if (!environmentShaders.Compiled)
@@ -1763,6 +1763,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                         && texture.Id.Equals(environmentAssetId, StringComparison.Ordinal))
                     {
                         state.EnvironmentTexture = resource;
+                        state.HasAuthoredEnvironmentTexture = true;
                     }
                 }
             }
@@ -4511,9 +4512,15 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 gpuFrameQuery?.EndPass(state.CommandBuffer, "shadow-directional");
             }
 
-            var background = RekallAgeEnvironmentBackgroundResolver.Resolve(commandPlan.PreparedFrame.Frame);
+            var background = RekallAgeEnvironmentBackgroundResolver.ResolveForHdr(commandPlan.PreparedFrame.Frame);
             var sceneClears = stackalloc ClearValue[2];
-            sceneClears[0].Color = new ClearColorValue(background.X, background.Y, background.Z, background.W);
+            sceneClears[0].Color = new ClearColorValue(
+                background.LinearRgba.X,
+                background.LinearRgba.Y,
+                background.LinearRgba.Z,
+                // Explicit coverage starts empty. Opaque and transparent draws accumulate it
+                // with source-over alpha while keeping transparent depth writes disabled.
+                0);
             sceneClears[1].DepthStencil = new ClearDepthStencilValue(1f, 0);
             var pass = commandPlan.RenderPasses[0];
             var scenePass = new RenderPassBeginInfo
@@ -4695,7 +4702,16 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
                 checked((float)highFidelityPlan.PostSettings.BloomIntensity),
                 checked((float)highFidelityPlan.PostSettings.BloomRadius),
                 checked((float)highFidelityPlan.PostSettings.LensDirtStrength),
-                checked((float)highFidelityPlan.PostSettings.LensDirtScale));
+                checked((float)highFidelityPlan.PostSettings.LensDirtScale),
+                0,
+                0,
+                0,
+                background.EncodedSrgb,
+                new Vector4(
+                    background.LinearRgba.X,
+                    background.LinearRgba.Y,
+                    background.LinearRgba.Z,
+                    state.HasAuthoredEnvironmentTexture ? 0 : 1));
             state.Vk.CmdPushConstants(
                 state.CommandBuffer,
                 state.ToneMapPipelineLayout,
@@ -6544,7 +6560,12 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             float BloomIntensity,
             float BloomRadius,
             float LensDirtStrength,
-            float LensDirtScale);
+            float LensDirtScale,
+            float Padding0,
+            float Padding1,
+            float Padding2,
+            Vector4 SolidBackgroundEncoded,
+            Vector4 SolidBackgroundLinear);
 
         [StructLayout(LayoutKind.Sequential)]
         private readonly record struct AnalyticFogPushConstants(
@@ -7022,6 +7043,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             public VulkanTextureResource? FlatNormalTexture;
             public VulkanTextureResource? DefaultMetallicRoughnessTexture;
             public VulkanTextureResource? EnvironmentTexture;
+            public bool HasAuthoredEnvironmentTexture;
             public bool SamplerAnisotropyEnabled;
             public float MaximumSamplerAnisotropy = 1;
             public float RequestedSamplerAnisotropy = 1;

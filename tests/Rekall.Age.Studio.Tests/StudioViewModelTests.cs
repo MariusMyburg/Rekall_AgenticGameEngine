@@ -2411,6 +2411,30 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public void CodeWorkspaceFindsPlayerAndCliInPackagedDistributionLayout()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-distribution-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var studioRoot = Path.Combine(root, "tools", "studio");
+            var cliPath = Path.Combine(root, "tools", "cli", "Rekall.Age.Cli.exe");
+            var playerPath = Path.Combine(root, "players", "windows", "Rekall.Age.Player.Windows.exe");
+            Directory.CreateDirectory(studioRoot);
+            Directory.CreateDirectory(Path.GetDirectoryName(cliPath)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(playerPath)!);
+            File.WriteAllBytes(cliPath, [0]);
+            File.WriteAllBytes(playerPath, [0]);
+
+            Assert.Equal(Path.GetFullPath(cliPath), RekallAgeStudioViewModel.ResolveCliExecutable(studioRoot));
+            Assert.Equal(Path.GetFullPath(playerPath), RekallAgeStudioViewModel.ResolvePlayerExecutable(studioRoot));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ViewModelCreatesAndEditsProjectThroughSchemaGuidedCanonicalCommands()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-vm-" + Guid.NewGuid().ToString("N"));

@@ -108,6 +108,33 @@ public sealed class WriteModuleSourceCommandTests
         Assert.Equal("external edit", await File.ReadAllTextAsync(sourcePath));
     }
 
+    [Fact]
+    public async Task WriteModuleSourceRejectsAReparsePointThatEscapesTheModule()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var outside = TestPaths.CreateTempDirectory();
+        var moduleRoot = Path.Combine(root, "Modules", "Movement");
+        Directory.CreateDirectory(moduleRoot);
+        var link = Path.Combine(moduleRoot, "Linked");
+        try
+        {
+            Directory.CreateSymbolicLink(link, outside);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return;
+        }
+        var context = new RekallAgeCommandContext("agent", RekallAgeTransaction.Begin("reject linked source"), CancellationToken.None);
+
+        var write = await new WriteModuleSourceCommand().ExecuteAsync(
+            new WriteModuleSourceRequest(root, "Movement", Path.Combine("Linked", "Outside.cs"), "outside"),
+            context);
+
+        Assert.False(write.Ok);
+        Assert.Contains(write.Errors, error => error.Code == "REKALL_MODULE_SOURCE_PATH_OUTSIDE_PROJECT");
+        Assert.False(File.Exists(Path.Combine(outside, "Outside.cs")));
+    }
+
     private static string CreateAgentPlayableSource()
     {
         return """

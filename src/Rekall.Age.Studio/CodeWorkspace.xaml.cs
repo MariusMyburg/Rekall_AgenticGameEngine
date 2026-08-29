@@ -57,7 +57,7 @@ public partial class CodeWorkspace : UserControl
         {
             await ViewModel.OpenCodeSourceAsync(selected);
         }
-        return true;
+        return !ViewModel.IsCodeDirty;
     }
 
     private void SynchronizeSelection()

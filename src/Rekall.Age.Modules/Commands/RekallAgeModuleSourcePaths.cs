@@ -16,16 +16,45 @@ internal static class RekallAgeModuleSourcePaths
     {
         return IsSimplePathSegment(moduleName) &&
             IsSafeRelativePath(fileName) &&
-            IsInsideDirectory(sourcePath, Path.Combine(GetModulesRoot(projectRoot), moduleName));
+            IsInsideDirectory(sourcePath, Path.Combine(GetModulesRoot(projectRoot), moduleName)) &&
+            !ContainsReparsePoint(GetModulesRoot(projectRoot), sourcePath);
+    }
+
+    public static bool ContainsReparsePoint(string modulesRoot, string path)
+    {
+        var fullRoot = Path.GetFullPath(modulesRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var current = Path.GetFullPath(path);
+        if (!IsInsideDirectory(current, fullRoot) && !current.Equals(fullRoot, PathComparison))
+        {
+            return true;
+        }
+
+        while (true)
+        {
+            try
+            {
+                if ((File.Exists(current) || Directory.Exists(current))
+                    && File.GetAttributes(current).HasFlag(FileAttributes.ReparsePoint))
+                {
+                    return true;
+                }
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                return true;
+            }
+
+            if (current.Equals(fullRoot, PathComparison)) return false;
+            var parent = Path.GetDirectoryName(current);
+            if (parent is null) return true;
+            current = parent;
+        }
     }
 
     private static bool IsInsideDirectory(string path, string directory)
     {
-        var comparison = OperatingSystem.IsWindows()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
         var root = directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        return path.StartsWith(root, comparison);
+        return path.StartsWith(root, PathComparison);
     }
 
     private static bool IsSimplePathSegment(string value)
@@ -49,4 +78,8 @@ internal static class RekallAgeModuleSourcePaths
             StringSplitOptions.RemoveEmptyEntries);
         return segments.Length > 0 && segments.All(IsSimplePathSegment);
     }
+
+    private static StringComparison PathComparison => OperatingSystem.IsWindows()
+        ? StringComparison.OrdinalIgnoreCase
+        : StringComparison.Ordinal;
 }

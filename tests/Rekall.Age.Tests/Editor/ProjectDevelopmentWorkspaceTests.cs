@@ -48,6 +48,12 @@ public sealed class ProjectDevelopmentWorkspaceTests
         Assert.Contains("DisableFastUpToDateCheck", debugProject, StringComparison.Ordinal);
         Assert.Contains("build modules", debugProject, StringComparison.Ordinal);
         Assert.Contains(Path.GetFullPath(cliPath), debugProject, StringComparison.Ordinal);
+        using var solutionLaunch = JsonDocument.Parse(await File.ReadAllTextAsync(first.VisualStudioSolutionLaunchPath));
+        var launchProfile = Assert.Single(solutionLaunch.RootElement.EnumerateArray());
+        Assert.Equal("Rekall AGE Game", launchProfile.GetProperty("Name").GetString());
+        var launchProject = Assert.Single(launchProfile.GetProperty("Projects").EnumerateArray());
+        Assert.Equal("Rekall.Game.Debug\\Rekall.Game.Debug.csproj", launchProject.GetProperty("Path").GetString());
+        Assert.Equal("Start", launchProject.GetProperty("Action").GetString());
 
         using var visualStudio = JsonDocument.Parse(await File.ReadAllTextAsync(first.VisualStudioLaunchSettingsPath));
         var profile = visualStudio.RootElement.GetProperty("profiles").GetProperty("Rekall AGE Game");

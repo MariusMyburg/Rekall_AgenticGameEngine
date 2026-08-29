@@ -38,6 +38,7 @@ public sealed class ListModuleSourcesCommand
 
         var sources = Directory.EnumerateFiles(modulesRoot, "*.cs", SearchOption.AllDirectories)
             .Where(path => !ContainsGeneratedDirectory(modulesRoot, path))
+            .Where(path => !RekallAgeModuleSourcePaths.ContainsReparsePoint(modulesRoot, path))
             .Where(path => Path.GetRelativePath(modulesRoot, path).IndexOfAny(
                 [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]) >= 0)
             .Select(path =>

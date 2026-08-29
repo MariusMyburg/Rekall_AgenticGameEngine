@@ -14,6 +14,7 @@ public sealed record RekallAgeProjectDevelopmentWorkspaceRequest(
 
 public sealed record RekallAgeProjectDevelopmentWorkspaceResult(
     string SolutionPath,
+    string VisualStudioSolutionLaunchPath,
     string DebugProjectPath,
     string VisualStudioLaunchSettingsPath,
     string VsCodeLaunchPath,
@@ -44,6 +45,7 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
         var vscodeLaunchPath = Path.Combine(vscodeRoot, "launch.json");
         var vscodeTasksPath = Path.Combine(vscodeRoot, "tasks.json");
         var solutionPath = Path.Combine(workspaceRoot, $"{ToSafeFileName(manifest.Name)}.slnx");
+        var solutionLaunchPath = Path.ChangeExtension(solutionPath, ".slnLaunch");
 
         var moduleProjects = Directory.Exists(Path.Combine(projectRoot, "Modules"))
             ? Directory.EnumerateFiles(Path.Combine(projectRoot, "Modules"), "*.csproj", SearchOption.AllDirectories)
@@ -85,9 +87,16 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
             vscodeTasks,
             cancellationToken).ConfigureAwait(false);
         await WriteAsync(solutionPath, CreateSolution(Path.GetDirectoryName(solutionPath)!, debugProjectPath, moduleProjects), cancellationToken).ConfigureAwait(false);
+        await WriteAsync(
+            solutionLaunchPath,
+            JsonSerializer.Serialize(CreateVisualStudioSolutionLaunch(
+                Path.GetDirectoryName(solutionPath)!,
+                debugProjectPath), JsonOptions) + Environment.NewLine,
+            cancellationToken).ConfigureAwait(false);
 
         return new RekallAgeProjectDevelopmentWorkspaceResult(
             solutionPath,
+            solutionLaunchPath,
             debugProjectPath,
             launchSettingsPath,
             vscodeLaunchPath,
@@ -108,6 +117,22 @@ public sealed class RekallAgeProjectDevelopmentWorkspace
                 }
             }
         };
+
+    private static object[] CreateVisualStudioSolutionLaunch(string solutionDirectory, string debugProjectPath) =>
+    [
+        new
+        {
+            Name = "Rekall AGE Game",
+            Projects = new[]
+            {
+                new
+                {
+                    Path = Path.GetRelativePath(solutionDirectory, debugProjectPath).Replace('/', '\\'),
+                    Action = "Start"
+                }
+            }
+        }
+    ];
 
     private static object CreateVsCodeLaunchConfiguration(string playerPath, string projectRoot, string sceneName) => new
     {

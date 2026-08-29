@@ -4666,23 +4666,27 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
     }
 
-    private static string? ResolvePlayerExecutable()
+    internal static string? ResolvePlayerExecutable(string? baseDirectory = null)
     {
+        var studioDirectory = Path.GetFullPath(baseDirectory ?? AppContext.BaseDirectory);
         var candidates = new[]
         {
-            Path.Combine(AppContext.BaseDirectory, "Rekall.Age.Player.Windows.exe"),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
+            Path.Combine(studioDirectory, "Rekall.Age.Player.Windows.exe"),
+            Path.GetFullPath(Path.Combine(studioDirectory, "..", "..", "players", "windows", "Rekall.Age.Player.Windows.exe")),
+            Path.GetFullPath(Path.Combine(studioDirectory, "..", "..", "..", "..",
                 "Rekall.Age.Player.Windows", "bin", "Debug", "net10.0-windows", "Rekall.Age.Player.Windows.exe"))
         };
         return candidates.FirstOrDefault(File.Exists);
     }
 
-    private static string? ResolveCliExecutable()
+    internal static string? ResolveCliExecutable(string? baseDirectory = null)
     {
+        var studioDirectory = Path.GetFullPath(baseDirectory ?? AppContext.BaseDirectory);
         var candidates = new[]
         {
-            Path.Combine(AppContext.BaseDirectory, "Rekall.Age.Cli.exe"),
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
+            Path.Combine(studioDirectory, "Rekall.Age.Cli.exe"),
+            Path.GetFullPath(Path.Combine(studioDirectory, "..", "cli", "Rekall.Age.Cli.exe")),
+            Path.GetFullPath(Path.Combine(studioDirectory, "..", "..", "..", "..",
                 "Rekall.Age.Cli", "bin", "Debug", "net10.0", "Rekall.Age.Cli.exe"))
         };
         return candidates.FirstOrDefault(File.Exists);

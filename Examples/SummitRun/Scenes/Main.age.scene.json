@@ -472,8 +472,20 @@
       "locked": false
     },
     {
-      "id": "ent_e1b195deb0db4dbca412f84f9be13af6",
+      "id": "ent_6a8d3c921ff64d35b580f4f18d6ed9ac",
       "name": "Rover",
+      "tags": [
+        "vehicleAssembly"
+      ],
+      "components": [],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e1b195deb0db4dbca412f84f9be13af6",
+      "name": "Chassis",
       "tags": [
         "rover"
       ],
@@ -565,7 +577,7 @@
           }
         }
       ],
-      "parentId": null,
+      "parentId": "ent_6a8d3c921ff64d35b580f4f18d6ed9ac",
       "prefabSourceId": null,
       "visible": true,
       "locked": false
@@ -938,7 +950,7 @@
           }
         }
       ],
-      "parentId": null,
+      "parentId": "ent_6a8d3c921ff64d35b580f4f18d6ed9ac",
       "prefabSourceId": null,
       "visible": true,
       "locked": false
@@ -1011,7 +1023,7 @@
           }
         }
       ],
-      "parentId": null,
+      "parentId": "ent_6a8d3c921ff64d35b580f4f18d6ed9ac",
       "prefabSourceId": null,
       "visible": true,
       "locked": false

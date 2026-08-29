@@ -32,6 +32,14 @@ public sealed class SummitRunAcceptanceTests
         Assert.Equal(6, components.Count(component => Type(component) == "Rekall.BoxCollider2D"
             && entities.Any(entity => entity!["components"]!.AsArray().Contains(component)
                 && entity!["name"]!.GetValue<string>().StartsWith("Terrain", StringComparison.Ordinal))));
+
+        var roverAssembly = entities.Single(entity => entity!["name"]!.GetValue<string>() == "Rover")!;
+        var roverChildren = entities
+            .Where(entity => entity!["parentId"]?.GetValue<string>() == roverAssembly["id"]!.GetValue<string>())
+            .Select(entity => entity!["name"]!.GetValue<string>())
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(["Chassis", "WheelBack", "WheelFront"], roverChildren);
     }
 
     [Fact]
@@ -60,7 +68,7 @@ public sealed class SummitRunAcceptanceTests
             inputs.Length,
             inputs,
             CancellationToken.None);
-        var rover = world.Entities.Single(entity => entity.Name == "Rover");
+        var rover = world.Entities.Single(entity => entity.Tags.Contains("rover"));
         var state = rover.Components.Single(component =>
             component.Type == "Game.Modules.SummitRun.SummitRunState");
 
@@ -94,7 +102,7 @@ public sealed class SummitRunAcceptanceTests
                 .Properties["Collected"]!.GetValue<bool>());
         var world = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(
             projectRoot, "Main", inputs.Length, inputs, CancellationToken.None);
-        var rover = world.Entities.Single(entity => entity.Name == "Rover");
+        var rover = world.Entities.Single(entity => entity.Tags.Contains("rover"));
         var wheels = world.Entities.Where(entity => entity.Tags.Contains("wheel")).ToArray();
         var state = rover.Components.Single(component => component.Type == "Game.Modules.SummitRun.SummitRunState");
         var physics = rover.Components.Single(component => component.Type == "Rekall.PhysicsState2D");
@@ -155,7 +163,7 @@ public sealed class SummitRunAcceptanceTests
             ],
             CancellationToken.None);
         var runtimeCell = world.Entities.Single(entity => entity.Name == "CellA");
-        var roverState = world.Entities.Single(entity => entity.Name == "Rover").Components
+        var roverState = world.Entities.Single(entity => entity.Tags.Contains("rover")).Components
             .Single(component => component.Type == "Game.Modules.SummitRun.SummitRunState");
 
         Assert.True(runtimeCell.Visible);

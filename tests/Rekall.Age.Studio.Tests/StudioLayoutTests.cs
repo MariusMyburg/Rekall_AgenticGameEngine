@@ -111,6 +111,8 @@ public sealed class StudioLayoutTests
         Assert.Contains("Content=\"Cancel\"", author, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding AgentLines}\"", author, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"BrowseProjectButton\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"CreateProjectButton\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"OpenProjectButton\"", window, StringComparison.Ordinal);
         Assert.Contains("ToolTip=\"{Binding ProjectPathInput}\"", window, StringComparison.Ordinal);
         Assert.Contains("HasInspectorSelection", window, StringComparison.Ordinal);
         Assert.Contains("InspectorEmptyStateText", window, StringComparison.Ordinal);

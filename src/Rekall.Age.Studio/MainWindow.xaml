@@ -28,7 +28,13 @@
                 <TextBlock Grid.Column="4" Text="Scene" VerticalAlignment="Center" Margin="0,0,8,0" />
                 <ComboBox Grid.Column="5" ItemsSource="{Binding SceneNames}" SelectedItem="{Binding SceneNameInput}"
                           IsEditable="True" />
-                <Button Grid.Column="6" Content="Switch" Command="{Binding SwitchSceneCommand}" Padding="8,2" Margin="6,0" />
+                <StackPanel Grid.Column="6" Orientation="Horizontal" Margin="6,0">
+                    <Button x:Name="CreateProjectButton" Content="Create" Command="{Binding CreateCommand}"
+                            ToolTip="Create a new AGE project" />
+                    <Button x:Name="OpenProjectButton" Content="Open" Command="{Binding OpenCommand}"
+                            ToolTip="Open the selected project" />
+                    <Button Content="Switch" Command="{Binding SwitchSceneCommand}" Padding="8,2" />
+                </StackPanel>
                 <StackPanel Grid.Column="7" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Border CornerRadius="10" BorderBrush="{StaticResource Accent}" BorderThickness="1" Padding="9,3" Margin="8,0">
                         <TextBlock Text="{Binding ModeLabel}" Foreground="{StaticResource Accent}" FontWeight="SemiBold" FontSize="11" />
@@ -41,9 +47,6 @@
 
         <Border x:Name="MainToolbar" DockPanel.Dock="Top" Padding="7" Background="{StaticResource ChromeBackground}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
           <StackPanel Orientation="Horizontal">
-            <Button Content="Create" Command="{Binding CreateCommand}" ToolTip="Create a new AGE project" />
-            <Button Content="Open" Command="{Binding OpenCommand}" ToolTip="Open the selected project" />
-            <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
             <Button Content="Undo" Command="{Binding UndoCommand}" />
             <Button Content="Redo" Command="{Binding RedoCommand}" />
             <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />

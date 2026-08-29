@@ -175,6 +175,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _providerStatus = string.Empty;
     private string _providerDisplayStatus = string.Empty;
     private string _agentTaskInput = string.Empty;
+    private string _agentActivityText = "AI authoring is idle.";
     private RekallAgeModuleSourceInfo? _selectedCodeSource;
     private string _codeSourceText = string.Empty;
     private string _codeModuleNameInput = "GameRules";
@@ -1314,6 +1315,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         get => _statusText;
         private set => Set(ref _statusText, value);
+    }
+
+    public string AgentActivityText
+    {
+        get => _agentActivityText;
+        private set => Set(ref _agentActivityText, value);
     }
 
     public string ViewportTitle
@@ -3430,6 +3437,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         var cancellationToken = _agentCancellation.Token;
         IsAgentRunning = true;
         IsBusy = true;
+        AgentActivityText = $"Starting {providerId} · {model}…";
         AgentLines.Clear();
         _lastAgentToolExecutions.Clear();
         AppendAgentLine($"provider: {providerId}");
@@ -3503,6 +3511,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             StatusText = result.Succeeded && validation.Ok && capture.Ok
                 ? result.Summary
                 : $"{result.Summary} Review Validation and AI Agent output.";
+            AgentActivityText = StatusText;
         }
         catch (RekallAgeLanguageModelProviderException exception)
         {
@@ -3514,6 +3523,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 exception.Retryable);
             ReportLanguageModelProviderFailure(exception);
             AppendAgentLine(ProviderStatus);
+            AgentActivityText = ProviderStatus;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -3525,7 +3535,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             var reload = await _session.ReloadAsync(CancellationToken.None);
             if (reload.Ok && _session.Model is not null) ApplyModel(_session.Model);
             StatusText = "AI authoring cancelled.";
+            AgentActivityText = StatusText;
             AppendAgentLine("cancelled by user");
+        }
+        catch (Exception)
+        {
+            AgentActivityText = "AI authoring failed. See Validation for details.";
+            throw;
         }
         finally
         {
@@ -3540,6 +3556,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         _agentCancellation?.Cancel();
         StatusText = "Cancelling AI authoring…";
+        AgentActivityText = StatusText;
         Task? activeRun;
         lock (_languageModelLifecycleSync)
         {
@@ -4000,6 +4017,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             AppendAgentLine($"tool failure: {AgentToolFailureSummary(failed.ResultPreview)}");
         }
         StatusText = progress.Message;
+        var operation = progress.ToolExecution is { } activeTool
+            ? $"{progress.Phase} · {activeTool.Name} #{activeTool.Sequence}"
+            : progress.Phase;
+        AgentActivityText = $"Turn {progress.Turn} · {operation} — {progress.Message}";
     }
 
     private static string AgentToolFailureSummary(string resultPreview)

@@ -147,6 +147,20 @@ public sealed class StudioLayoutTests
         Assert.DoesNotContain("Content=\"{TemplateBinding SelectionBoxItem}\"", app, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void WorldWorkspaceKeepsAgentActivityAndPromptSubmissionVisible()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+
+        Assert.Contains("x:Name=\"WorldAuthoringStrip\"", window, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding AgentActivityText}\"", window, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding AgentTaskInput, UpdateSourceTrigger=PropertyChanged}\"", window, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding RunAgentCommand}\"", window, StringComparison.Ordinal);
+        Assert.Contains("Key=\"Enter\"", window, StringComparison.Ordinal);
+        Assert.Contains("IsIndeterminate=\"True\"", window, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("not-json")]
     [InlineData("{\"version\":999,\"panels\":[]}")]

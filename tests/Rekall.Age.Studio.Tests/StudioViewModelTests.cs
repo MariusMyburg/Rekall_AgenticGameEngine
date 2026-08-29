@@ -2311,6 +2311,40 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task WorldAuthoringActivityTracksTheRunningAgentAndItsCancellation()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-world-authoring-" + Guid.NewGuid().ToString("N"));
+        var model = new MutateThenBlockModel(root);
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                model);
+            viewModel.ProjectPathInput = root;
+            viewModel.ProjectNameInput = "World Authoring";
+            viewModel.SceneNameInput = "Main";
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.AgentTaskInput = "Add the authored marker, then wait.";
+
+            var run = ExecuteAsync(viewModel.RunAgentCommand);
+            await model.WaitForBlockingTurnAsync();
+
+            Assert.True(viewModel.IsAgentRunning);
+            Assert.StartsWith("Turn 2 · turn.started", viewModel.AgentActivityText, StringComparison.Ordinal);
+            Assert.Contains("Running agent turn 2", viewModel.AgentActivityText, StringComparison.Ordinal);
+
+            await ExecuteAsync(viewModel.CancelAgentCommand);
+            await run;
+
+            Assert.Equal("AI authoring cancelled.", viewModel.AgentActivityText);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task HeadlessAutomationContinuesAnExistingStudioProject()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-existing-" + Guid.NewGuid().ToString("N"));

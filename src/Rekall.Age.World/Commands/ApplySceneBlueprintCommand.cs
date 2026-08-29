@@ -46,7 +46,7 @@ public sealed class ApplySceneBlueprintCommand
 
     public RekallAgeCommandSchema Schema => new(
         Name,
-        "Applies a generic scene entity/component blueprint in one transaction for efficient agent world authoring. Exact compact shape: {\"projectRoot\":\"...\",\"sceneName\":\"Main\",\"entities\":[{\"name\":\"Entity\",\"components\":[{\"type\":\"Rekall.Transform3D\",\"properties\":{\"X\":0}}]}],\"clearExisting\":false}. entities and components are JSON arrays; each component uses type and properties. With clearExisting=false, a uniquely matched id/name is a safe partial upsert: supplied component types/properties are merged and unspecified identity, tags, hierarchy, flags, transforms, renderers, and other components are preserved. Use targeted component/entity removal commands for deletion. With clearExisting=true the supplied blueprint replaces the scene exactly. An empty entities array is valid for an empty scene or to clear a scene when clearExisting is true.",
+        "Applies a generic scene entity/component blueprint in one transaction for efficient agent world authoring. Exact compact shape: {\"projectRoot\":\"...\",\"sceneName\":\"Main\",\"entities\":[{\"name\":\"Entity\",\"components\":[{\"type\":\"Rekall.Transform3D\",\"properties\":{\"X\":0}}]}],\"clearExisting\":false}. entities and components are JSON arrays; each component uses type and properties. A child parentId may be an exact entity id or a unique entity name from the resulting scene; unique names are resolved to generated ids before saving. With clearExisting=false, a uniquely matched id/name is a safe partial upsert: supplied component types/properties are merged and unspecified identity, tags, hierarchy, flags, transforms, renderers, and other components are preserved. Use targeted component/entity removal commands for deletion. With clearExisting=true the supplied blueprint replaces the scene exactly. An empty entities array is valid for an empty scene or to clear a scene when clearExisting is true.",
         typeof(ApplySceneBlueprintRequest).FullName!,
         typeof(ApplySceneBlueprintResult).FullName!);
 
@@ -106,6 +106,8 @@ public sealed class ApplySceneBlueprintCommand
 
             upsertedCount++;
         }
+
+        ResolveUniqueParentNames(existing);
 
         var updated = scene with
         {
@@ -279,6 +281,27 @@ public sealed class ApplySceneBlueprintCommand
         }
 
         return merged;
+    }
+
+    private static void ResolveUniqueParentNames(List<RekallAgeEntityDocument> entities)
+    {
+        var ids = entities.Select(entity => entity.Id).ToHashSet(StringComparer.Ordinal);
+        var uniqueNames = entities
+            .GroupBy(entity => entity.Name, StringComparer.Ordinal)
+            .Where(group => group.Count() == 1)
+            .ToDictionary(group => group.Key, group => group.Single().Id, StringComparer.Ordinal);
+        for (var index = 0; index < entities.Count; index++)
+        {
+            var parentReference = entities[index].ParentId;
+            if (string.IsNullOrWhiteSpace(parentReference)
+                || ids.Contains(parentReference)
+                || !uniqueNames.TryGetValue(parentReference, out var resolvedParentId))
+            {
+                continue;
+            }
+
+            entities[index] = entities[index] with { ParentId = resolvedParentId };
+        }
     }
 
     private static ApplySceneBlueprintResult Empty()

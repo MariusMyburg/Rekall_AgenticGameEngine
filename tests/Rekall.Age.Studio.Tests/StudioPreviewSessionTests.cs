@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json.Nodes;
 using Rekall.Age.Studio;
 using Rekall.Age.World;
 using System.Windows.Media;
@@ -8,6 +9,38 @@ namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioPreviewSessionTests
 {
+    [Fact]
+    public async Task InitialEditPreviewIncludesAuthoredUiWithoutAdvancingGameplay()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-preview-ui-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var canvas = RekallAgeEntityDocument.Create("HUD", ["ui"])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.UiCanvas",
+                    new JsonObject { ["ReferenceWidth"] = 320, ["ReferenceHeight"] = 180 }));
+            var label = RekallAgeEntityDocument.Create("Status", ["ui"]) with { ParentId = canvas.Id };
+            label = label.AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.Label",
+                new JsonObject { ["Width"] = 120, ["Height"] = 24, ["Text"] = "READY" }));
+            await new RekallAgeSceneStore().SaveAsync(
+                root,
+                RekallAgeSceneDocument.Create("Main", ["ui"]).AddEntity(canvas).AddEntity(label),
+                CancellationToken.None);
+            await using var preview = new RekallAgeStudioPreviewSession();
+
+            var initial = await preview.ResetAsync(root, "Main", 320, 180, CancellationToken.None);
+
+            Assert.Equal(0, initial.FrameIndex);
+            Assert.Equal(1, initial.RenderableCount);
+            Assert.Equal(label.Id, initial.Interaction.Pick(10, 10));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task PreviewSessionPersistsRuntimeFramesUntilReset()
     {

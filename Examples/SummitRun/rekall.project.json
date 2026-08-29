@@ -1,0 +1,11 @@
+{
+  "name": "Summit Run",
+  "schemaVersion": 1,
+  "capabilities": [
+    "input",
+    "physics2d",
+    "rendering2d",
+    "ui",
+    "world"
+  ]
+}

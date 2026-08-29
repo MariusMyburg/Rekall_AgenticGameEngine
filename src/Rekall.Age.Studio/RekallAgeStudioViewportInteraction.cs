@@ -19,10 +19,50 @@ internal sealed record RekallAgeStudioViewportPickRegion(
     double Width,
     double Height,
     double Depth,
-    int SortKey)
+    int SortKey,
+    IReadOnlyList<RekallAgeStudioViewportPoint>? Vertices = null,
+    IReadOnlyList<uint>? Indices = null)
 {
-    public bool Contains(double x, double y) =>
-        x >= X && x <= X + Width && y >= Y && y <= Y + Height;
+    public bool Contains(double x, double y)
+    {
+        if (x < X || x > X + Width || y < Y || y > Y + Height)
+        {
+            return false;
+        }
+        if (Vertices is null || Indices is null || Indices.Count < 3)
+        {
+            return true;
+        }
+
+        for (var index = 0; index + 2 < Indices.Count; index += 3)
+        {
+            if (Indices[index] >= Vertices.Count || Indices[index + 1] >= Vertices.Count || Indices[index + 2] >= Vertices.Count)
+            {
+                continue;
+            }
+            if (PointInTriangle(new(x, y), Vertices[(int)Indices[index]], Vertices[(int)Indices[index + 1]], Vertices[(int)Indices[index + 2]]))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static bool PointInTriangle(
+        RekallAgeStudioViewportPoint point,
+        RekallAgeStudioViewportPoint a,
+        RekallAgeStudioViewportPoint b,
+        RekallAgeStudioViewportPoint c)
+    {
+        static double Sign(RekallAgeStudioViewportPoint p1, RekallAgeStudioViewportPoint p2, RekallAgeStudioViewportPoint p3) =>
+            (p1.X - p3.X) * (p2.Y - p3.Y) - (p2.X - p3.X) * (p1.Y - p3.Y);
+        var d1 = Sign(point, a, b);
+        var d2 = Sign(point, b, c);
+        var d3 = Sign(point, c, a);
+        const double epsilon = 0.000001;
+        return !((d1 < -epsilon || d2 < -epsilon || d3 < -epsilon)
+            && (d1 > epsilon || d2 > epsilon || d3 > epsilon));
+    }
 }
 
 internal sealed record RekallAgeStudioViewportInteractionSnapshot(
@@ -104,6 +144,13 @@ internal static class RekallAgeStudioViewportInteractionBuilder
                 continue;
             }
 
+            var geometryRegion = Project2DGeometry(frame, renderable);
+            if (geometryRegion is not null)
+            {
+                regions.Add(geometryRegion);
+                continue;
+            }
+
             var projection = Project(frame, renderable);
             if (projection is null)
             {
@@ -117,11 +164,94 @@ internal static class RekallAgeStudioViewportInteractionBuilder
         return new(frame.Width, frame.Height, regions);
     }
 
+    private static RekallAgeStudioViewportPickRegion? Project2DGeometry(
+        RekallAgeRuntimeViewportFrame frame,
+        RekallAgeRuntimeViewportRenderable renderable)
+    {
+        var camera = frame.ActiveCamera;
+        var mesh = renderable.GeometryMesh;
+        if (!renderable.Kind.Equals("mesh", StringComparison.Ordinal)
+            || camera is null
+            || !camera.Kind.Equals("Camera2D", StringComparison.OrdinalIgnoreCase)
+            || mesh is null
+            || mesh.Vertices.Count == 0
+            || mesh.Indices.Count < 3)
+        {
+            return null;
+        }
+
+        var rect = RekallAgeRuntimeViewportCameraRect.FromFrame(frame);
+        var pixelsPerUnit = rect.Height / Math.Max(0.001, camera.OrthographicSize);
+        var cameraRadians = ToRadians(camera.RotationZ);
+        var objectRadians = ToRadians(renderable.RotationZ);
+        var projected = mesh.Vertices.Select(vertex =>
+        {
+            var localX = vertex.X * renderable.ScaleX;
+            var localY = vertex.Y * renderable.ScaleY;
+            var rotatedX = localX * Math.Cos(objectRadians) - localY * Math.Sin(objectRadians);
+            var rotatedY = localX * Math.Sin(objectRadians) + localY * Math.Cos(objectRadians);
+            var deltaX = renderable.X + rotatedX - camera.X;
+            var deltaY = renderable.Y + rotatedY - camera.Y;
+            var cameraX = deltaX * Math.Cos(cameraRadians) + deltaY * Math.Sin(cameraRadians);
+            var cameraY = -deltaX * Math.Sin(cameraRadians) + deltaY * Math.Cos(cameraRadians);
+            return new RekallAgeStudioViewportPoint(
+                rect.X + rect.Width * 0.5 + cameraX * pixelsPerUnit,
+                rect.Y + rect.Height * 0.5 - cameraY * pixelsPerUnit);
+        }).ToArray();
+        var left = projected.Min(point => point.X);
+        var right = projected.Max(point => point.X);
+        var top = projected.Min(point => point.Y);
+        var bottom = projected.Max(point => point.Y);
+        var viewportRight = rect.X + rect.Width;
+        var viewportBottom = rect.Y + rect.Height;
+        if (right < rect.X || bottom < rect.Y || left > viewportRight || top > viewportBottom)
+        {
+            return null;
+        }
+        left = Math.Max(left, rect.X);
+        right = Math.Min(right, viewportRight);
+        top = Math.Max(top, rect.Y);
+        bottom = Math.Min(bottom, viewportBottom);
+
+        return new(
+            renderable.EntityId,
+            RekallAgeStudioViewportRegionKind.World,
+            left,
+            top,
+            Math.Max(0.001, right - left),
+            Math.Max(0.001, bottom - top),
+            renderable.Z - camera.Z,
+            renderable.SortKey,
+            projected,
+            mesh.Indices);
+    }
+
     private static (double X, double Y, double Depth, double Radius)? Project(
         RekallAgeRuntimeViewportFrame frame,
         RekallAgeRuntimeViewportRenderable renderable)
     {
         var camera = frame.ActiveCamera;
+        if (renderable.Kind.Equals("mesh", StringComparison.Ordinal)
+            && camera is not null
+            && camera.Kind.Equals("Camera2D", StringComparison.OrdinalIgnoreCase))
+        {
+            var rect = RekallAgeRuntimeViewportCameraRect.FromFrame(frame);
+            var pixelsPerUnit = rect.Height / Math.Max(0.001, camera.OrthographicSize);
+            var radians = ToRadians(camera.RotationZ);
+            var deltaX = renderable.X - camera.X;
+            var deltaY = renderable.Y - camera.Y;
+            var cameraX = deltaX * Math.Cos(radians) + deltaY * Math.Sin(radians);
+            var cameraY = -deltaX * Math.Sin(radians) + deltaY * Math.Cos(radians);
+            var x = rect.X + rect.Width * 0.5 + cameraX * pixelsPerUnit;
+            var y = rect.Y + rect.Height * 0.5 - cameraY * pixelsPerUnit;
+            var extent = Math.Max(0.25, Math.Max(Math.Abs(renderable.ScaleX), Math.Abs(renderable.ScaleY)));
+            var radius = Math.Clamp(pixelsPerUnit * extent * 0.6, 7,
+                Math.Max(7, Math.Min(frame.Width, frame.Height) * 0.25));
+            return x < -radius || y < -radius || x > frame.Width + radius || y > frame.Height + radius
+                ? null
+                : (x, y, renderable.Z - camera.Z, radius);
+        }
+
         if (renderable.Kind.Equals("mesh", StringComparison.Ordinal)
             && camera is not null
             && camera.Kind.Equals("Camera3D", StringComparison.OrdinalIgnoreCase)

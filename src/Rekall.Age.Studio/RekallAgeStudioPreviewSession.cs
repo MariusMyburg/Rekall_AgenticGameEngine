@@ -94,6 +94,14 @@ internal sealed class RekallAgeStudioPreviewSession : IRekallAgeStudioPreviewSes
                     sceneName,
                     0,
                     cancellationToken).ConfigureAwait(false);
+                candidateWorld = await new RekallAgeUiLayoutSystem().UpdateAsync(
+                    candidateWorld,
+                    new RekallAgeRuntimeWorldFrameContext(
+                        candidateWorld.FrameIndex,
+                        TimeSpan.Zero,
+                        candidateWorld.ElapsedTime,
+                        cancellationToken)).ConfigureAwait(false);
+                candidateWorld = new RekallAgeRuntimeProjectionBuilder().Project(candidateWorld);
                 candidateFrame = await _render(
                     candidateWorld,
                     projectRoot,

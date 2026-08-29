@@ -127,6 +127,11 @@
         "resolved": "13.0.3",
         "contentHash": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ=="
       },
+      "NLayer": {
+        "type": "Transitive",
+        "resolved": "3.0.0",
+        "contentHash": "aQrCT93NjIrJNXA7wiTSHMp9OUhGNb8YTJAwnsx2FtaNdAe74vwfguFExf6QFNU72XhNPb/bLAcdMbxvaNZgWg=="
+      },
       "SamuelRe.CSG.Sharp": {
         "type": "Transitive",
         "resolved": "1.0.0",
@@ -397,6 +402,7 @@
         "type": "Project",
         "dependencies": {
           "BepuPhysics": "[2.4.0, )",
+          "NLayer": "[3.0.0, )",
           "Rekall.Age.AssetPipeline": "[0.1.0-preview.1, )",
           "Rekall.Age.Assets": "[0.1.0-preview.1, )",
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
@@ -425,6 +431,7 @@
           "Rekall.Age.Editor.Contracts": "[0.1.0-preview.1, )",
           "Rekall.Age.Modeling": "[0.1.0-preview.1, )",
           "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )",
+          "Rekall.Age.Modules": "[0.1.0-preview.1, )",
           "Rekall.Age.Rendering": "[0.1.0-preview.1, )",
           "Rekall.Age.Runtime": "[0.1.0-preview.1, )",
           "Rekall.Age.Workflows": "[0.1.0-preview.1, )",

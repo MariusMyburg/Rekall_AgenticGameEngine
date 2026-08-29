@@ -104,7 +104,10 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                                 Variant: "rekall.shape2d",
                                 MaterialColor: ReadString(component.Properties, "color") ?? "#ffffff",
                                 Kind: "mesh",
-                                SortKey: 100,
+                                SortKey: 100 + (int)Math.Clamp(
+                                    Math.Round(ReadNumber(component.Properties, "sortOrder", 0)),
+                                    -1000,
+                                    1000),
                                 ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
                                 Layer: renderLayer));
                         }

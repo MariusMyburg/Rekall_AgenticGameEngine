@@ -34,17 +34,21 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             .Select(camera =>
             {
                 var transform = transformResolver.Resolve(camera.EntityId);
+                var isCamera2D = camera.Kind.Equals("Camera2D", StringComparison.OrdinalIgnoreCase);
+                var cameraZ = isCamera2D && Math.Abs(transform.Position3D.Z) < 0.0001
+                    ? -1
+                    : transform.Position3D.Z;
                 return new RekallAgeRuntimeViewportCamera(
                     camera.EntityId,
                     camera.EntityName,
                     camera.Kind,
                     camera.Active,
-                    transform.Position3D.X,
-                    transform.Position3D.Y,
-                    transform.Position3D.Z,
-                    transform.Rotation3D.X,
-                    transform.Rotation3D.Y,
-                    transform.Rotation3D.Z,
+                    isCamera2D ? transform.Position2D.X : transform.Position3D.X,
+                    isCamera2D ? transform.Position2D.Y : transform.Position3D.Y,
+                    cameraZ,
+                    isCamera2D ? 0 : transform.Rotation3D.X,
+                    isCamera2D ? 0 : transform.Rotation3D.Y,
+                    isCamera2D ? transform.Rotation2D : transform.Rotation3D.Z,
                     camera.ProjectionMode,
                     camera.FieldOfViewDegrees,
                     camera.OrthographicSize,
@@ -643,6 +647,9 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             var surfaceEntityId = orbitPathMesh is not null
                 ? $"{mesh.EntityId}:orbit-path"
                 : ringMesh is not null ? $"{mesh.EntityId}:ring" : markerMesh is not null ? $"{mesh.EntityId}:marker" : haloMesh is not null ? $"{mesh.EntityId}:halo" : isTextLabelRenderable ? $"{mesh.EntityId}:label" : mesh.EntityId;
+            var shape2DDepth = isShape2DRenderable
+                ? -Math.Clamp(mesh.SortKey - 100, -1000, 1000) * 0.0001
+                : renderTransform.Position3D.Z;
             yield return new RekallAgeRuntimeViewportRenderable(
                 surfaceEntityId,
                 mesh.EntityName,
@@ -650,7 +657,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 lodSelection?.AssetId ?? mesh.AssetId,
                 isShape2DRenderable ? transform.Position2D.X : renderTransform.Position3D.X,
                 isShape2DRenderable ? transform.Position2D.Y : renderTransform.Position3D.Y,
-                isShape2DRenderable ? 0 : renderTransform.Position3D.Z,
+                shape2DDepth,
                 sortKey,
                 Variant: lodSelection?.Variant ?? mesh.Variant ?? variant,
                 RotationX: isShape2DRenderable ? 0 : transform.Rotation3D.X,

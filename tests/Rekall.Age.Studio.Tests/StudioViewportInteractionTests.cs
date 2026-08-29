@@ -67,6 +67,82 @@ public sealed class StudioViewportInteractionTests
         Assert.DoesNotContain(snapshot.Regions, region => region.EntityId.Contains(':', StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void BuilderProjects2dEntityThroughTheActiveOrthographicCamera()
+    {
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main",
+            0,
+            0,
+            960,
+            540,
+            new(
+                "camera",
+                "Camera",
+                "Camera2D",
+                true,
+                X: 2.5,
+                Y: 6.9,
+                Z: -1,
+                ProjectionMode: "orthographic",
+                OrthographicSize: 6),
+            [],
+            [new("rover", "Rover", "mesh", null, 1, 5.9, -0.002, 120,
+                GeometryMesh: Rectangle(2.4, 1.1))],
+            0,
+            new(false, 0),
+            []);
+
+        var snapshot = RekallAgeStudioViewportInteractionBuilder.Build(frame, [Entity("rover", visible: true)]);
+
+        Assert.Equal("rover", snapshot.Pick(345, 360));
+        Assert.Null(snapshot.Pick(498, 164));
+    }
+
+    [Fact]
+    public void BuilderUsesRotated2dGeometryRatherThanTransformScaleAsPickBounds()
+    {
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main", 0, 0, 400, 200,
+            new("camera", "Camera", "Camera2D", true, Z: -1, ProjectionMode: "orthographic", OrthographicSize: 10),
+            [],
+            [new("terrain", "Terrain", "mesh", null, 0, 0, 0, 100,
+                RotationZ: 30, GeometryMesh: Rectangle(12, 1))],
+            0, new(false, 0), []);
+
+        var snapshot = RekallAgeStudioViewportInteractionBuilder.Build(frame, [Entity("terrain", true)]);
+
+        Assert.Equal("terrain", snapshot.Pick(300, 42));
+        Assert.Null(snapshot.Pick(300, 142));
+    }
+
+    [Fact]
+    public void BuilderClips2dGeometryPickingToTheActiveCameraViewport()
+    {
+        var frame = new RekallAgeRuntimeViewportFrame(
+            "Main", 0, 0, 400, 200,
+            new("camera", "Camera", "Camera2D", true,
+                Z: -1, ProjectionMode: "orthographic", OrthographicSize: 10,
+                ViewportX: 0.5, ViewportY: 0, ViewportWidth: 0.5, ViewportHeight: 1),
+            [],
+            [new("wide", "Wide", "mesh", null, 0, 0, 0, 100, GeometryMesh: Rectangle(20, 8))],
+            0, new(false, 0), []);
+
+        var snapshot = RekallAgeStudioViewportInteractionBuilder.Build(frame, [Entity("wide", true)]);
+
+        Assert.Null(snapshot.Pick(199, 100));
+        Assert.Equal("wide", snapshot.Pick(250, 100));
+    }
+
+    private static RekallAgeRuntimeViewportGeometryMesh Rectangle(double width, double height) => new(
+        [
+            new(-width / 2, -height / 2, 0),
+            new(width / 2, -height / 2, 0),
+            new(width / 2, height / 2, 0),
+            new(-width / 2, height / 2, 0)
+        ],
+        [0, 1, 2, 0, 2, 3]);
+
     private static RekallAgeRuntimeEntity Entity(string id, bool visible) => new(
         id,
         id,

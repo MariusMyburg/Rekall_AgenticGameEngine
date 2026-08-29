@@ -1470,6 +1470,9 @@ public sealed class RekallAgeShapeRenderer2DComponent : RekallAgeComponent
     [RekallAgeProperty(Kind = "color", Description = "Shape fill color in hexadecimal RGB or RGBA form.")]
     public string Color { get; init; } = "#ffffff";
 
+    [RekallAgeProperty(Description = "Painter order for overlapping 2D shapes. Higher values render in front; lower values render behind.")]
+    public int SortOrder { get; init; }
+
     [RekallAgeProperty]
     public bool Active { get; init; } = true;
 }
@@ -1507,6 +1510,15 @@ public sealed class RekallAgeRigidbody2DComponent : RekallAgeComponent
 
     [RekallAgeProperty(Description = "Initial angular velocity around the 2D plane's normal axis, in authored degrees per second.")]
     public double AngularVelocityZ { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Description = "Linear drag coefficient applied each physics step. 0 disables drag.")]
+    public double LinearDrag { get; init; }
+
+    [RekallAgeProperty(Minimum = 0, Description = "Angular drag coefficient applied each physics step. 0 disables drag.")]
+    public double AngularDrag { get; init; }
+
+    [RekallAgeProperty(Description = "A bounded gameplay correction around the 2D plane's normal axis, in degrees per second squared. Useful for authored balance controls; 0 disables correction.")]
+    public double AngularCorrectionZ { get; init; }
 }
 
 [RekallAgeComponent("Trigger", Description = "A generic overlap volume whose radius or box dimensions are explicit world-unit values. Transform2D/3D supplies position and rotation; transform scale does not resize the trigger.")]

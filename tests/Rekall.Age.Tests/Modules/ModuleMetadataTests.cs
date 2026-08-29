@@ -362,6 +362,10 @@ public sealed class ModuleMetadataTests
         Assert.Contains(physicsMaterial.Properties, property => property.Name == "DampingRatio" && property.Minimum == 0);
         var rigidbody = Assert.Single(module.Components, component => component.DisplayName == "Rigidbody 3D");
         Assert.Contains(rigidbody.Properties, property => property.Name == "Mass" && property.Minimum == 0.0001);
+        var rigidbody2D = Assert.Single(module.Components, component => component.DisplayName == "Rigidbody 2D");
+        Assert.Contains(rigidbody2D.Properties, property => property.Name == "LinearDrag" && property.Minimum == 0);
+        Assert.Contains(rigidbody2D.Properties, property => property.Name == "AngularDrag" && property.Minimum == 0);
+        Assert.Contains(rigidbody2D.Properties, property => property.Name == "AngularCorrectionZ" && property.Kind == "number");
         var boxCollider2D = Assert.Single(module.Components, component => component.DisplayName == "Box Collider 2D");
         Assert.Contains(boxCollider2D.Properties, property => property.Name == "Width" && property.Minimum == 0.0001);
         Assert.Contains(boxCollider2D.Properties, property => property.Name == "Height" && property.Minimum == 0.0001);

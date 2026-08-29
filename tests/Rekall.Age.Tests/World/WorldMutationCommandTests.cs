@@ -190,6 +190,36 @@ public sealed class WorldMutationCommandTests
     }
 
     [Fact]
+    public async Task ApplySceneBlueprintResolvesUniqueParentNameToGeneratedEntityId()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var store = new RekallAgeSceneStore();
+        await store.SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"]),
+            CancellationToken.None);
+
+        var result = await new ApplySceneBlueprintCommand().ExecuteAsync(
+            new ApplySceneBlueprintRequest(
+                root,
+                "Main",
+                [
+                    new RekallAgeSceneBlueprintEntity("Rover"),
+                    new RekallAgeSceneBlueprintEntity("Wheel", ParentId: "Rover")
+                ],
+                ClearExisting: true),
+            new RekallAgeCommandContext(
+                "agent",
+                RekallAgeTransaction.Begin("resolve blueprint parent name"),
+                CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        var parent = result.Value.Scene.Entities.Single(entity => entity.Name == "Rover");
+        var child = result.Value.Scene.Entities.Single(entity => entity.Name == "Wheel");
+        Assert.Equal(parent.Id, child.ParentId);
+    }
+
+    [Fact]
     public async Task ApplySceneBlueprintReturnsStructuredValidationWithoutChangingScene()
     {
         var root = TestPaths.CreateTempDirectory();

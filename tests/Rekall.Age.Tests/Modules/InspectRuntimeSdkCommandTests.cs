@@ -121,6 +121,21 @@ public sealed class InspectRuntimeSdkCommandTests
     }
 
     [Fact]
+    public async Task ReturnsDiscoverablePersistentPhysicsResetHelper()
+    {
+        var result = await new InspectRuntimeSdkCommand().ExecuteAsync(
+            new InspectRuntimeSdkRequest("physics reset respawn momentum", Limit: 16),
+            new RekallAgeCommandContext(
+                "agent", RekallAgeTransaction.Begin("inspect physics reset sdk"), CancellationToken.None));
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Contains(result.Value.Contracts, contract =>
+            contract.Name == "WithPhysicsPoseAndVelocity2D"
+            && contract.Description.Contains("persistent body", StringComparison.Ordinal)
+            && contract.Usage!.Contains("spawnPosition", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ReturnsGenericRuntimeSpawningAndDeterministicRandomContracts()
     {
         var context = new RekallAgeCommandContext(

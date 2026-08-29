@@ -410,6 +410,50 @@ public static class RekallAgeRuntimeModuleSdk
         });
     }
 
+    /// <summary>
+    /// Teleports a 2D physics body and replaces its persisted BEPU motion state.
+    /// Use this for authored respawn, checkpoint, and reset behavior so a persistent
+    /// body cannot carry velocity or orientation across the teleport.
+    /// </summary>
+    public static RekallAgeRuntimeEntity WithPhysicsPoseAndVelocity2D(
+        this RekallAgeRuntimeEntity entity,
+        RekallAgeRuntimeVector2 position,
+        double rotationDegrees,
+        RekallAgeRuntimeVector2 linearVelocity,
+        double angularVelocityDegrees)
+    {
+        var halfRadians = rotationDegrees * Math.PI / 360.0;
+        return entity
+            .WithPosition2D(position)
+            .WithRotation2D(rotationDegrees)
+            .UpsertComponent(
+                "Rekall.PhysicsState2D",
+                new JsonObject
+                {
+                    ["backend"] = "authored-reset",
+                    ["awake"] = true,
+                    ["linearVelocity"] = new JsonObject
+                    {
+                        ["x"] = linearVelocity.X,
+                        ["y"] = linearVelocity.Y,
+                        ["z"] = 0
+                    },
+                    ["angularVelocity"] = new JsonObject
+                    {
+                        ["x"] = 0,
+                        ["y"] = 0,
+                        ["z"] = angularVelocityDegrees
+                    },
+                    ["orientation"] = new JsonObject
+                    {
+                        ["x"] = 0,
+                        ["y"] = 0,
+                        ["z"] = Math.Sin(halfRadians),
+                        ["w"] = Math.Cos(halfRadians)
+                    }
+                });
+    }
+
     public static RekallAgeRuntimeEntity WithRotation2D(
         this RekallAgeRuntimeEntity entity,
         double rotation)

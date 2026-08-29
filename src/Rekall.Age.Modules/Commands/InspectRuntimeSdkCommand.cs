@@ -260,6 +260,8 @@ public sealed class InspectRuntimeSdkCommand
         nameof(RekallAgeRuntimeModuleSdk.WithRotation2D) or
         nameof(RekallAgeRuntimeModuleSdk.WithScale2D) =>
             "Returns a replacement immutable entity with the requested 2D transform value and updates Rekall.Transform2D. Use these for 2D scenes; they do not mutate Transform3D.",
+        nameof(RekallAgeRuntimeModuleSdk.WithPhysicsPoseAndVelocity2D) =>
+            "Returns a replacement 2D physics entity with an authored pose and complete persisted linear/angular motion state. Use for respawn, checkpoint, and reset so a persistent body cannot retain old momentum.",
         nameof(RekallAgeRuntimeModuleSdk.WithPosition3D) or
         nameof(RekallAgeRuntimeModuleSdk.WithRotation3D) or
         nameof(RekallAgeRuntimeModuleSdk.WithScale3D) =>
@@ -338,6 +340,8 @@ public sealed class InspectRuntimeSdkCommand
             "entity = entity.WithRotation2D(rotationDegrees);",
         nameof(RekallAgeRuntimeModuleSdk.WithScale2D) =>
             "entity = entity.WithScale2D(new RekallAgeRuntimeVector2(scaleX, scaleY));",
+        nameof(RekallAgeRuntimeModuleSdk.WithPhysicsPoseAndVelocity2D) =>
+            "entity = entity.WithPhysicsPoseAndVelocity2D(spawnPosition, 0, new RekallAgeRuntimeVector2(0, 0), 0);",
         nameof(RekallAgeRuntimeModuleSdk.FindEntity) =>
             "var player = world.FindEntity(\"Player\"); // exact id first, then one unique exact name; null when ambiguous",
         nameof(RekallAgeRuntimeModuleSdk.EntitiesNamed) =>

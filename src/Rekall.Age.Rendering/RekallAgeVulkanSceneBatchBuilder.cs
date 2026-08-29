@@ -478,7 +478,17 @@ public sealed class RekallAgeVulkanSceneBatchBuilder
         if (camera?.ProjectionMode.Equals("orthographic", StringComparison.OrdinalIgnoreCase) == true)
         {
             var height = MathF.Max(0.001f, (float)camera.OrthographicSize);
-            return Matrix4x4.CreateOrthographic(height * aspect, height, nearClip, farClip);
+            var projection = Matrix4x4.CreateOrthographic(height * aspect, height, nearClip, farClip);
+            // Camera2D observes the XY plane from negative Z so its zero-rotation
+            // forward vector points into the scene. A right-handed look-at matrix
+            // mirrors X for that pose; cancel that mirror so authored +X remains
+            // screen-right, matching Transform2D and editor conventions.
+            if (camera.Kind.Equals("Camera2D", StringComparison.OrdinalIgnoreCase))
+            {
+                projection.M11 *= -1f;
+            }
+
+            return projection;
         }
 
         var fieldOfView = Math.Clamp((float)(camera?.FieldOfViewDegrees ?? 65), 1f, 179f);

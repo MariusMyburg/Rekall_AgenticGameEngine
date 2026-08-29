@@ -229,6 +229,49 @@ public sealed class ViewportContractTests
     }
 
     [Fact]
+    public void RuntimeFrameComposesParented2DTransforms()
+    {
+        var parent = RekallAgeEntityDocument.Create("Vehicle", ["vehicle"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject
+            {
+                ["x"] = 10,
+                ["y"] = 5,
+                ["rotation"] = 90,
+                ["scaleX"] = 2,
+                ["scaleY"] = 2
+            }));
+        var child = RekallAgeEntityDocument.Create("Wheel", ["wheel"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.ShapeRenderer2D", new JsonObject
+            {
+                ["shape"] = "circle",
+                ["radius"] = 0.5
+            }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform2D", new JsonObject
+            {
+                ["x"] = 1,
+                ["y"] = 0.5,
+                ["rotation"] = 15,
+                ["scaleX"] = 0.5,
+                ["scaleY"] = 0.25
+            })) with { ParentId = parent.Id };
+        var world = new RekallAgeRuntimeProjectionBuilder().Project(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"])
+                    .AddEntity(parent)
+                    .AddEntity(child)));
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, debugOverlay: false);
+
+        var rendered = Assert.Single(frame.Renderables, item => item.EntityName == "Wheel");
+        Assert.Equal(9, rendered.X, precision: 5);
+        Assert.Equal(7, rendered.Y, precision: 5);
+        Assert.Equal(105, rendered.RotationZ, precision: 5);
+        Assert.Equal(1, rendered.ScaleX, precision: 5);
+        Assert.Equal(0.5, rendered.ScaleY, precision: 5);
+        Assert.DoesNotContain(frame.Observations, item => item.Subsystem == "transform");
+    }
+
+    [Fact]
     public void RuntimeFrameReportsInvalid3DTransformHierarchy()
     {
         var missingParent = RekallAgeEntityDocument.Create("Orphan Attachment", ["attachment"])

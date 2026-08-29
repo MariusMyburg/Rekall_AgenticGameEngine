@@ -116,8 +116,23 @@ internal sealed class RekallAgeRuntimeWorldTransformResolver
                 return Cache(entity.Id, new Resolution(entity.Transform, false));
             }
 
+            var parent2D = parentResolution.Transform;
+            var local2D = entity.Transform;
+            var parentRadians = ToRadians(parent2D.Rotation2D);
+            var scaledLocalX = local2D.Position2D.X * parent2D.Scale2D.X;
+            var scaledLocalY = local2D.Position2D.Y * parent2D.Scale2D.Y;
+            var cosine = Math.Cos(parentRadians);
+            var sine = Math.Sin(parentRadians);
+            var world2DX = parent2D.Position2D.X + scaledLocalX * cosine - scaledLocalY * sine;
+            var world2DY = parent2D.Position2D.Y + scaledLocalX * sine + scaledLocalY * cosine;
+
             return Cache(entity.Id, new Resolution(entity.Transform with
             {
+                Position2D = new RekallAgeRuntimeVector2(world2DX, world2DY),
+                Rotation2D = parent2D.Rotation2D + local2D.Rotation2D,
+                Scale2D = new RekallAgeRuntimeVector2(
+                    parent2D.Scale2D.X * local2D.Scale2D.X,
+                    parent2D.Scale2D.Y * local2D.Scale2D.Y),
                 Position3D = new RekallAgeRuntimeVector3(translation.X, translation.Y, translation.Z),
                 Rotation3D = new RekallAgeRuntimeVector3(euler.X, euler.Y, euler.Z),
                 Scale3D = new RekallAgeRuntimeVector3(scale.X, scale.Y, scale.Z)

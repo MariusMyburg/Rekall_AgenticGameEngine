@@ -200,7 +200,10 @@ public sealed class SearchComponentSchemasCommand
         }
         if (physics && typeName.Contains("Transform", StringComparison.Ordinal))
         {
-            score += 4;
+            // A physics family is not authorable without a transform. Keep the
+            // foundational 2D/3D pose contracts ahead of optional, richly
+            // described physics helpers when the result set is capped.
+            score += 10;
         }
         if (visible && typeName == "Rekall.MeshRenderer")
         {

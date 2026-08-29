@@ -1,0 +1,1020 @@
+{
+  "schemaVersion": 1,
+  "id": "scene_9679d34d7b6b4af89e737e35621c25f7",
+  "name": "Main",
+  "capabilities": [
+    "input",
+    "physics2d",
+    "rendering2d",
+    "ui",
+    "world"
+  ],
+  "entities": [
+    {
+      "id": "ent_b7d15ce5268f45c6ac4dee5c319657cc",
+      "name": "Camera",
+      "tags": [
+        "camera"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Camera2D",
+          "properties": {
+            "Active": true,
+            "ClearColor": "#12203a",
+            "CullingMask": "*",
+            "FarClip": 100,
+            "NearClip": 0.1,
+            "OrthographicSize": 6,
+            "RenderOrder": 0,
+            "ViewportHeight": 1,
+            "ViewportWidth": 1,
+            "ViewportX": 0,
+            "ViewportY": 0
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 2.5,
+            "Y": 8
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_74eebcc4d40f4c65875e0616d4ee5941",
+      "name": "CellA",
+      "tags": [
+        "cell"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.SummitRun.CellState",
+          "properties": {
+            "Collected": false
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#39e0c8",
+            "Radius": 0.45,
+            "Shape": "circle",
+            "SortOrder": 10
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 8,
+            "Y": 6.6
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_a8e6980e555a40bfae4c49e4f98d8696",
+      "name": "CellB",
+      "tags": [
+        "cell"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.SummitRun.CellState",
+          "properties": {
+            "Collected": false
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#39e0c8",
+            "Radius": 0.45,
+            "Shape": "circle",
+            "SortOrder": 10
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 18,
+            "Y": 4.4
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_51ab45b2e7d1479f830724d7e9231107",
+      "name": "CellC",
+      "tags": [
+        "cell"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.SummitRun.CellState",
+          "properties": {
+            "Collected": false
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#39e0c8",
+            "Radius": 0.45,
+            "Shape": "circle",
+            "SortOrder": 10
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 30,
+            "Y": 8
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_9fd8d336beba4abf8305222cde104a80",
+      "name": "CellD",
+      "tags": [
+        "cell"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.SummitRun.CellState",
+          "properties": {
+            "Collected": false
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#39e0c8",
+            "Radius": 0.45,
+            "Shape": "circle",
+            "SortOrder": 10
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 42,
+            "Y": 6.4
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_22d0150b01f746a9a7bd44fe82132835",
+      "name": "FinishBeacon",
+      "tags": [],
+      "components": [
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#ffcf3a",
+            "Height": 5,
+            "Shape": "rectangle",
+            "Width": 0.5,
+            "SortOrder": 5
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 71,
+            "Y": 6
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_a63e03e908774badb3838135868ae148",
+      "name": "HudCanvas",
+      "tags": [
+        "ui"
+      ],
+      "components": [
+        {
+          "type": "Rekall.UiCanvas",
+          "properties": {
+            "Layer": 10,
+            "LayoutDirection": "none",
+            "ReferenceHeight": 540,
+            "ReferenceWidth": 960
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_56e950b533c24f7e944d107af74ebabd",
+      "name": "HudCells",
+      "tags": [
+        "hudcells"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Label",
+          "properties": {
+            "LayoutOrder": 3,
+            "OffsetLeft": 16,
+            "OffsetTop": 108,
+            "AnchorMaxX": 0,
+            "AnchorMaxY": 0,
+            "AnchorMinX": 0,
+            "AnchorMinY": 0,
+            "BackgroundColor": "#00000000",
+            "FontFamily": "Segoe UI",
+            "FontSize": 16,
+            "FontWeight": "normal",
+            "ForegroundColor": "#7ad9ff",
+            "Height": 22,
+            "HorizontalAlignment": "start",
+            "Text": "CELLS  0",
+            "VerticalAlignment": "start",
+            "Width": 160,
+            "X": 16,
+            "Y": 98
+          }
+        }
+      ],
+      "parentId": "ent_a63e03e908774badb3838135868ae148",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_578c020bc3e346d18204b1796e9d5d32",
+      "name": "HudControls",
+      "tags": [],
+      "components": [
+        {
+          "type": "Rekall.Label",
+          "properties": {
+            "LayoutOrder": 5,
+            "OffsetRight": 16,
+            "OffsetTop": 12,
+            "AnchorMaxX": 0,
+            "AnchorMaxY": 0,
+            "AnchorMinX": 0,
+            "AnchorMinY": 0,
+            "BackgroundColor": "#00000000",
+            "FontFamily": "Segoe UI",
+            "FontSize": 13,
+            "FontWeight": "normal",
+            "ForegroundColor": "#b9c6de",
+            "Height": 20,
+            "HorizontalAlignment": "start",
+            "Text": "D/Right \u002B A/Left drive   W/Up S/Down lean   R reset",
+            "VerticalAlignment": "start",
+            "Width": 500,
+            "X": 16,
+            "Y": 514
+          }
+        }
+      ],
+      "parentId": "ent_a63e03e908774badb3838135868ae148",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_a39511e09d134437841aac34a0c33084",
+      "name": "HudDistance",
+      "tags": [
+        "huddistance"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Label",
+          "properties": {
+            "LayoutOrder": 2,
+            "OffsetLeft": 16,
+            "OffsetTop": 78,
+            "AnchorMaxX": 0,
+            "AnchorMaxY": 0,
+            "AnchorMinX": 0,
+            "AnchorMinY": 0,
+            "BackgroundColor": "#00000000",
+            "FontFamily": "Segoe UI",
+            "FontSize": 16,
+            "FontWeight": "normal",
+            "ForegroundColor": "#ffd37a",
+            "Height": 22,
+            "HorizontalAlignment": "start",
+            "Text": "DIST  0 m",
+            "VerticalAlignment": "start",
+            "Width": 160,
+            "X": 16,
+            "Y": 72
+          }
+        }
+      ],
+      "parentId": "ent_a63e03e908774badb3838135868ae148",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_0865f63c107641b7bf6a1d807495c764",
+      "name": "HudFuel",
+      "tags": [
+        "hudfuel"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Label",
+          "properties": {
+            "LayoutOrder": 1,
+            "OffsetLeft": 16,
+            "OffsetTop": 48,
+            "AnchorMaxX": 0,
+            "AnchorMaxY": 0,
+            "AnchorMinX": 0,
+            "AnchorMinY": 0,
+            "BackgroundColor": "#00000000",
+            "FontFamily": "Segoe UI",
+            "FontSize": 16,
+            "FontWeight": "normal",
+            "ForegroundColor": "#8fe6a0",
+            "Height": 22,
+            "HorizontalAlignment": "start",
+            "Text": "FUEL  100%",
+            "VerticalAlignment": "start",
+            "Width": 160,
+            "X": 16,
+            "Y": 46
+          }
+        }
+      ],
+      "parentId": "ent_a63e03e908774badb3838135868ae148",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_cfdc051195aa4c0d8bde8e92c3ebb15c",
+      "name": "HudPanel",
+      "tags": [],
+      "components": [
+        {
+          "type": "Rekall.Label",
+          "properties": {
+            "LayoutOrder": 0,
+            "OffsetLeft": 14,
+            "OffsetTop": 10,
+            "AnchorMaxX": 0,
+            "AnchorMaxY": 0,
+            "AnchorMinX": 0,
+            "AnchorMinY": 0,
+            "BackgroundColor": "#00000000",
+            "FontFamily": "Segoe UI",
+            "FontSize": 22,
+            "FontWeight": "bold",
+            "ForegroundColor": "#ffffff",
+            "Height": 28,
+            "HorizontalAlignment": "start",
+            "Text": "SUMMIT RUN",
+            "VerticalAlignment": "start",
+            "Width": 180,
+            "X": 16,
+            "Y": 12
+          }
+        }
+      ],
+      "parentId": "ent_a63e03e908774badb3838135868ae148",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_bc481f694574469b81f4e5d6614eb388",
+      "name": "HudStatus",
+      "tags": [
+        "hudstatus"
+      ],
+      "components": [
+        {
+          "type": "Rekall.Label",
+          "properties": {
+            "LayoutOrder": 4,
+            "OffsetLeft": 16,
+            "OffsetTop": 138,
+            "AnchorMaxX": 0,
+            "AnchorMaxY": 0,
+            "AnchorMinX": 0,
+            "AnchorMinY": 0,
+            "BackgroundColor": "#00000000",
+            "FontFamily": "Segoe UI",
+            "FontSize": 16,
+            "FontWeight": "normal",
+            "ForegroundColor": "#ffffff",
+            "Height": 22,
+            "HorizontalAlignment": "start",
+            "Text": "STATUS  READY",
+            "VerticalAlignment": "start",
+            "Width": 160,
+            "X": 16,
+            "Y": 124
+          }
+        }
+      ],
+      "parentId": "ent_a63e03e908774badb3838135868ae148",
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e1b195deb0db4dbca412f84f9be13af6",
+      "name": "Rover",
+      "tags": [
+        "rover"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.SummitRun.SummitRunState",
+          "properties": {
+            "Cells": 0,
+            "Distance": 0,
+            "Enabled": true,
+            "Fuel": 1,
+            "Lean": 0,
+            "RoverVel": 0,
+            "RoverX": 1,
+            "Status": "ready",
+            "WheelSpin": 0,
+            "ResetCount": 0
+          }
+        },
+        {
+          "type": "Rekall.BoxCollider2D",
+          "properties": {
+            "Width": 2.4,
+            "Height": 1.1
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "Layer": "vehicle",
+            "CollidesWith": [
+              "terrain"
+            ]
+          }
+        },
+        {
+          "type": "Rekall.InputActionMap",
+          "properties": {
+            "Actions": [
+              {
+                "name": "drive",
+                "negativeKey": "A",
+                "negativeKey2": "Left",
+                "positiveKey": "D",
+                "positiveKey2": "Right"
+              },
+              {
+                "name": "lean",
+                "negativeKey": "S",
+                "negativeKey2": "Down",
+                "positiveKey": "W",
+                "positiveKey2": "Up"
+              },
+              {
+                "key": "R",
+                "name": "reset"
+              }
+            ],
+            "Active": true
+          }
+        },
+        {
+          "type": "Rekall.Rigidbody2D",
+          "properties": {
+            "Mass": 8,
+            "LinearDrag": 0.15,
+            "AngularDrag": 0.8
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#ff6a2b",
+            "Height": 1.1,
+            "Shape": "rectangle",
+            "Width": 2.4,
+            "SortOrder": 20
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "Rotation": 0,
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 1,
+            "Y": 5.967
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_079446aad2784e75b00603821dd40ab3",
+      "name": "Terrain1",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider2D",
+          "properties": {
+            "Width": 12.37,
+            "Height": 1.4
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "Layer": "terrain",
+            "CollidesWith": [
+              "vehicle"
+            ]
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#3f6b52",
+            "Height": 1.4,
+            "Shape": "rectangle",
+            "Width": 12.17,
+            "SortOrder": -10
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 6,
+            "Y": 5,
+            "Rotation": 9.46
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_b4a8ffc6536e4ce4952bae220d0b6c94",
+      "name": "Terrain2",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider2D",
+          "properties": {
+            "Width": 12.37,
+            "Height": 1.4
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "Layer": "terrain",
+            "CollidesWith": [
+              "vehicle"
+            ]
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#3f6b52",
+            "Height": 1.4,
+            "Shape": "rectangle",
+            "Width": 12.37,
+            "SortOrder": -10
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "Rotation": -14.04,
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 18,
+            "Y": 4.5
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_25f41680cd7345c595305127b98fbc9f",
+      "name": "Terrain3",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider2D",
+          "properties": {
+            "Width": 12.37,
+            "Height": 1.4
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "Layer": "terrain",
+            "CollidesWith": [
+              "vehicle"
+            ]
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#3f6b52",
+            "Height": 1.4,
+            "Shape": "rectangle",
+            "Width": 12.65,
+            "SortOrder": -10
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "Rotation": 18.43,
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 30,
+            "Y": 5
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_c2eac340346e4ee2a1d5835ee652e7ef",
+      "name": "Terrain4",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider2D",
+          "properties": {
+            "Width": 12.37,
+            "Height": 1.4
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "Layer": "terrain",
+            "CollidesWith": [
+              "vehicle"
+            ]
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#3f6b52",
+            "Height": 1.4,
+            "Shape": "rectangle",
+            "Width": 12.37,
+            "SortOrder": -10
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "Rotation": -14.04,
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 42,
+            "Y": 5.5
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_2f34faf10a854848b9a8a49bb7a48b7d",
+      "name": "Terrain5",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider2D",
+          "properties": {
+            "Width": 12.37,
+            "Height": 1.4
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "Layer": "terrain",
+            "CollidesWith": [
+              "vehicle"
+            ]
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#3f6b52",
+            "Height": 1.4,
+            "Shape": "rectangle",
+            "Width": 12.65,
+            "SortOrder": -10
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "Rotation": 18.43,
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 54,
+            "Y": 6
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_dc6002918fbb4ea3b0fb9f00be9e3c71",
+      "name": "Terrain6",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider2D",
+          "properties": {
+            "Width": 12.37,
+            "Height": 1.4
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "Layer": "terrain",
+            "CollidesWith": [
+              "vehicle"
+            ]
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#3f6b52",
+            "Height": 1.4,
+            "Shape": "rectangle",
+            "Width": 12.37,
+            "SortOrder": -10
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "Rotation": -14.04,
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 66,
+            "Y": 6.5
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_f1ac065fcfd843d9a2cae2f5fd168f27",
+      "name": "WheelBack",
+      "tags": [
+        "wheel"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CircleCollider2D",
+          "properties": {
+            "Radius": 0.55
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "Layer": "vehicle",
+            "CollidesWith": [
+              "terrain"
+            ]
+          }
+        },
+        {
+          "type": "Rekall.HingeJoint",
+          "properties": {
+            "ConnectedEntityId": "ent_e1b195deb0db4dbca412f84f9be13af6",
+            "AnchorAX": 0,
+            "AnchorAY": 0,
+            "AnchorAZ": 0,
+            "AnchorBX": -0.85,
+            "AnchorBY": -0.75,
+            "AnchorBZ": 0,
+            "AxisX": 0,
+            "AxisY": 0,
+            "AxisZ": 1,
+            "SpringFrequency": 45,
+            "DampingRatio": 3,
+            "MotorTargetVelocity": 0,
+            "MotorMaximumTorque": 30
+          }
+        },
+        {
+          "type": "Rekall.Rigidbody2D",
+          "properties": {
+            "Mass": 2
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#e8eefc",
+            "Shape": "circle",
+            "SortOrder": 25,
+            "Radius": 0.55
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "Rotation": 0,
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 0.15,
+            "Y": 5.217
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_30f1e4c6ffc4410a9411c03392c1f145",
+      "name": "WheelFront",
+      "tags": [
+        "wheel"
+      ],
+      "components": [
+        {
+          "type": "Rekall.CircleCollider2D",
+          "properties": {
+            "Radius": 0.55
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "Layer": "vehicle",
+            "CollidesWith": [
+              "terrain"
+            ]
+          }
+        },
+        {
+          "type": "Rekall.HingeJoint",
+          "properties": {
+            "ConnectedEntityId": "ent_e1b195deb0db4dbca412f84f9be13af6",
+            "AnchorAX": 0,
+            "AnchorAY": 0,
+            "AnchorAZ": 0,
+            "AnchorBX": 0.85,
+            "AnchorBY": -0.75,
+            "AnchorBZ": 0,
+            "AxisX": 0,
+            "AxisY": 0,
+            "AxisZ": 1,
+            "SpringFrequency": 45,
+            "DampingRatio": 3,
+            "MotorTargetVelocity": 0,
+            "MotorMaximumTorque": 30
+          }
+        },
+        {
+          "type": "Rekall.Rigidbody2D",
+          "properties": {
+            "Mass": 2
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#e8eefc",
+            "Shape": "circle",
+            "SortOrder": 25,
+            "Radius": 0.55
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "Rotation": 0,
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 1.85,
+            "Y": 5.217
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    }
+  ]
+}

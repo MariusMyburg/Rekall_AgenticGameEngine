@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Modules;
 using Rekall.Age.Modules.BuiltIns;
+using Rekall.Age.Modules.Security;
 using Rekall.Age.World.Commands;
 
 namespace Rekall.Age.Validation;
@@ -10,9 +11,12 @@ namespace Rekall.Age.Validation;
 public sealed class RekallAgeBuiltInComponentPropertyAdmissionPolicy
     : IRekallAgeComponentPropertyAdmissionPolicy
 {
-    private static readonly IReadOnlyDictionary<string, RekallAgeComponentSchema> Schemas =
+    private static readonly IReadOnlyDictionary<string, RekallAgeComponentSchema> BuiltInSchemas =
         RekallAgeModuleIndexer.IndexAssembly(typeof(RekallAgeBuiltInModule).Assembly)
             .Components.ToDictionary(component => component.TypeName, StringComparer.Ordinal);
+    private readonly object _projectSchemaGate = new();
+    private readonly Dictionary<string, ProjectSchemaCacheEntry> _projectSchemas =
+        new(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
     public ValueTask<IReadOnlyList<RekallAgeCommandError>> ValidateAsync(
         string projectRoot,
@@ -22,7 +26,19 @@ public sealed class RekallAgeBuiltInComponentPropertyAdmissionPolicy
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!Schemas.TryGetValue(componentType.Trim(), out var schema))
+        var normalizedComponentType = componentType.Trim();
+        var resolution = TryGetSchema(projectRoot, normalizedComponentType, out var schema);
+        if (resolution == SchemaResolution.Unavailable)
+        {
+            return ValueTask.FromResult<IReadOnlyList<RekallAgeCommandError>>([
+                new RekallAgeCommandError(
+                    "REKALL_PROJECT_COMPONENT_SCHEMA_UNAVAILABLE",
+                    $"Project component schema validation is unavailable for '{normalizedComponentType}' because the module sources or verified build receipt changed. Build the project modules before authoring component properties.",
+                    target,
+                    [new RekallAgeSuggestedCommand("rekall.build.modules", new Dictionary<string, object?> { ["projectRoot"] = projectRoot })])
+            ]);
+        }
+        if (resolution == SchemaResolution.NotFound)
         {
             return ValueTask.FromResult<IReadOnlyList<RekallAgeCommandError>>([]);
         }
@@ -63,6 +79,16 @@ public sealed class RekallAgeBuiltInComponentPropertyAdmissionPolicy
                 continue;
             }
 
+            if (!HasExpectedPrimitiveType(authoredProperty.Value, propertySchema.Kind))
+            {
+                errors.Add(Error(
+                    "REKALL_COMPONENT_PROPERTY_TYPE_INVALID",
+                    $"Component '{schema.TypeName}' property '{propertySchema.Name}' must be a native JSON {ExpectedPrimitiveDescription(propertySchema.Kind)}.",
+                    $"{target}.properties.{authoredProperty.Key}",
+                    schema.TypeName));
+                continue;
+            }
+
             if (TryReadNumber(authoredProperty.Value, out var number)
                 && ((propertySchema.Minimum is not null && number < propertySchema.Minimum)
                     || (propertySchema.Maximum is not null && number > propertySchema.Maximum)))
@@ -76,6 +102,159 @@ public sealed class RekallAgeBuiltInComponentPropertyAdmissionPolicy
         }
 
         return ValueTask.FromResult<IReadOnlyList<RekallAgeCommandError>>(errors);
+    }
+
+    private SchemaResolution TryGetSchema(
+        string projectRoot,
+        string componentType,
+        out RekallAgeComponentSchema schema)
+    {
+        if (BuiltInSchemas.TryGetValue(componentType, out schema!))
+        {
+            return SchemaResolution.Found;
+        }
+
+        var fingerprint = ProjectSchemaFingerprint(projectRoot);
+        lock (_projectSchemaGate)
+        {
+            if (_projectSchemas.TryGetValue(projectRoot, out var cached)
+                && cached.Fingerprint.Equals(fingerprint, StringComparison.Ordinal))
+            {
+                return cached.Schemas.TryGetValue(componentType, out schema!)
+                    ? SchemaResolution.Found
+                    : SchemaResolution.NotFound;
+            }
+
+            try
+            {
+                var discovered = RekallAgeModuleIndexer
+                    .IndexAssemblies(RekallAgeProjectModuleAssemblyLoader.LoadBuiltModuleAssemblies(projectRoot))
+                    .Components
+                    .GroupBy(component => component.TypeName, StringComparer.Ordinal)
+                    .ToDictionary(group => group.Key, group => group.Last(), StringComparer.Ordinal);
+                _projectSchemas[projectRoot] = new ProjectSchemaCacheEntry(fingerprint, discovered);
+                return discovered.TryGetValue(componentType, out schema!)
+                    ? SchemaResolution.Found
+                    : SchemaResolution.NotFound;
+            }
+            catch (RekallAgeModuleTrustException)
+            {
+                schema = null!;
+                return ProjectContainsModules(projectRoot)
+                    ? SchemaResolution.Unavailable
+                    : SchemaResolution.NotFound;
+            }
+        }
+    }
+
+    private static bool ProjectContainsModules(string projectRoot)
+    {
+        var modulesRoot = Path.Combine(projectRoot, "Modules");
+        if (IsReparsePoint(modulesRoot))
+        {
+            return true;
+        }
+        return Directory.Exists(modulesRoot) && Directory.EnumerateFiles(
+            modulesRoot,
+            "*.csproj",
+            new EnumerationOptions
+            {
+                RecurseSubdirectories = true,
+                AttributesToSkip = FileAttributes.ReparsePoint,
+                IgnoreInaccessible = true
+            }).Any();
+    }
+
+    private static string ProjectSchemaFingerprint(string projectRoot)
+    {
+        var modulesRoot = Path.Combine(projectRoot, "Modules");
+        if (!Directory.Exists(modulesRoot))
+        {
+            return "none";
+        }
+        if (IsReparsePoint(modulesRoot))
+        {
+            return "reparse-root";
+        }
+
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            AttributesToSkip = FileAttributes.ReparsePoint,
+            IgnoreInaccessible = true
+        };
+        return string.Join('|', Directory
+            .EnumerateFiles(modulesRoot, "*", options)
+            .Where(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)
+                || Path.GetFileName(path).Equals(RekallAgeModuleBuildReceiptService.ReceiptFileName, StringComparison.Ordinal))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .Select(path =>
+            {
+                var info = new FileInfo(path);
+                return $"{path}:{info.Length}:{info.LastWriteTimeUtc.Ticks}";
+            }));
+    }
+
+    private static bool IsReparsePoint(string path) =>
+        Directory.Exists(path) && File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint);
+
+    private static bool HasExpectedPrimitiveType(JsonNode? node, string kind)
+    {
+        if (ExpectedStructuredShapeKind(kind))
+        {
+            return true;
+        }
+
+        if (node is null)
+        {
+            return kind is not ("number" or "integer" or "boolean" or "string" or "color" or "assetRef");
+        }
+
+        return kind switch
+        {
+            "number" => TryReadNativeNumber(node, out _),
+            "integer" => TryReadNativeInteger(node),
+            "boolean" => node is JsonValue boolean && boolean.TryGetValue<bool>(out _),
+            "string" or "color" or "assetRef" =>
+                node is JsonValue text && text.TryGetValue<string>(out _),
+            _ => true
+        };
+    }
+
+    private static bool ExpectedStructuredShapeKind(string kind) =>
+        kind is "animationGraphParameters"
+        || kind.EndsWith("s", StringComparison.Ordinal) && kind is not "string";
+
+    private static string ExpectedPrimitiveDescription(string kind) => kind switch
+    {
+        "number" => "number",
+        "integer" => "integer",
+        "boolean" => "boolean",
+        _ => "string"
+    };
+
+    private static bool TryReadNativeNumber(JsonNode? node, out double number)
+    {
+        if (node is JsonValue value
+            && !value.TryGetValue<string>(out _)
+            && TryReadNumber(value, out number))
+        {
+            return true;
+        }
+
+        number = default;
+        return false;
+    }
+
+    private static bool TryReadNativeInteger(JsonNode? node)
+    {
+        if (!TryReadNativeNumber(node, out var number))
+        {
+            return false;
+        }
+
+        return number == Math.Truncate(number);
     }
 
     private static RekallAgeCommandError Error(string code, string message, string target, string componentType) =>
@@ -137,5 +316,16 @@ public sealed class RekallAgeBuiltInComponentPropertyAdmissionPolicy
 
         number = default;
         return false;
+    }
+
+    private sealed record ProjectSchemaCacheEntry(
+        string Fingerprint,
+        IReadOnlyDictionary<string, RekallAgeComponentSchema> Schemas);
+
+    private enum SchemaResolution
+    {
+        NotFound,
+        Found,
+        Unavailable
     }
 }

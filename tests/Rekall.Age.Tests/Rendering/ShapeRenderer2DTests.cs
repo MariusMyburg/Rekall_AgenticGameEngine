@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Text.Json.Nodes;
 using Rekall.Age.Modules;
 using Rekall.Age.Modules.BuiltIns;
@@ -30,6 +31,7 @@ public sealed class ShapeRenderer2DTests
         Assert.Contains(schema.Properties, property => property.Name == "Height" && property.Minimum == 0.0001);
         Assert.Contains(schema.Properties, property => property.Name == "Radius" && property.Minimum == 0.0001);
         Assert.Contains(schema.Properties, property => property.Name == "Color" && property.Kind == "color");
+        Assert.Contains(schema.Properties, property => property.Name == "SortOrder" && property.Kind == "integer");
         Assert.Contains(schema.Properties, property => property.Name == "Active" && property.Kind == "boolean");
         Assert.True(RekallAgeBuiltInComponentTypeCatalog.IsKnown("Rekall.ShapeRenderer2D"));
 
@@ -39,6 +41,7 @@ public sealed class ShapeRenderer2DTests
         Assert.Equal(1, defaults.Height);
         Assert.Equal(0.5, defaults.Radius);
         Assert.Equal("#ffffff", defaults.Color);
+        Assert.Equal(0, defaults.SortOrder);
         Assert.True(defaults.Active);
     }
 
@@ -57,6 +60,7 @@ public sealed class ShapeRenderer2DTests
                     {
                         ["shape"] = "circle",
                         ["color"] = "#f97316",
+                        ["sortOrder"] = 7,
                         ["active"] = true
                     })));
 
@@ -67,7 +71,7 @@ public sealed class ShapeRenderer2DTests
         Assert.Null(mesh.AssetId);
         Assert.Equal("rekall.shape2d", mesh.Variant);
         Assert.Equal("mesh", mesh.Kind);
-        Assert.Equal(100, mesh.SortKey);
+        Assert.Equal(107, mesh.SortKey);
         Assert.Equal("#f97316", mesh.MaterialColor);
         Assert.Equal("foreground", mesh.Layer);
         Assert.Equal(RekallAgeRuntimeProjectionSources.BuiltIn, mesh.ProjectionSource);
@@ -152,6 +156,20 @@ public sealed class ShapeRenderer2DTests
     }
 
     [Fact]
+    public void ShapeSortOrderProvidesStablePainterDepth()
+    {
+        var frame = BuildShapeFrame(new JsonObject
+        {
+            ["shape"] = "rectangle",
+            ["sortOrder"] = 25
+        });
+
+        var renderable = Assert.Single(frame.Renderables, item => item.EntityName == "Shape");
+        Assert.Equal(125, renderable.SortKey);
+        Assert.Equal(-0.0025, renderable.Z, 8);
+    }
+
+    [Fact]
     public void CircleShapeBuildsClosedFiniteTriangleFanAndRendersWithoutFallback()
     {
         var frame = BuildShapeFrame(new JsonObject
@@ -186,6 +204,52 @@ public sealed class ShapeRenderer2DTests
         Assert.Equal(0, rendered.FallbackRenderableCount);
         Assert.Equal(0, rendered.MissingAssetCount);
         Assert.True(rendered.NonBlank);
+    }
+
+    [Fact]
+    public void Camera2DUsesTransform2DPositionToFrameWorldShapes()
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", [])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform2D",
+                    new JsonObject { ["x"] = 40, ["y"] = 12 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Camera2D",
+                    new JsonObject { ["active"] = true, ["orthographicSize"] = 10 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Shape", [])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform2D",
+                    new JsonObject { ["x"] = 41, ["y"] = 12 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.ShapeRenderer2D",
+                    new JsonObject
+                    {
+                        ["shape"] = "rectangle",
+                        ["width"] = 4,
+                        ["height"] = 2,
+                        ["color"] = "#f97316"
+                    })));
+        var world = new RekallAgeRuntimeProjectionBuilder()
+            .Project(new RekallAgeRuntimeWorldBuilder().Build(scene));
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, false);
+
+        var camera = Assert.IsType<RekallAgeRuntimeViewportCamera>(frame.ActiveCamera);
+        Assert.Equal((40d, 12d), (camera.X, camera.Y));
+        var rendered = new RekallAgeRuntimeSoftwareRenderer().RenderRgba(
+            frame,
+            RekallAgeRuntimeViewportAssetSet.Empty);
+        Assert.Equal(0, rendered.FallbackRenderableCount);
+        Assert.Equal(0, rendered.MissingAssetCount);
+        Assert.True(rendered.NonBlank);
+
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+        var cameraPlan = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes).EffectiveCamera;
+        var clip = Vector4.Transform(
+            new Vector4(41, 12, 0, 1),
+            cameraPlan.SoftwareViewProjection);
+        Assert.True(clip.X / clip.W > 0, "World +X must appear on the right side of a Camera2D viewport.");
     }
 
     [Theory]

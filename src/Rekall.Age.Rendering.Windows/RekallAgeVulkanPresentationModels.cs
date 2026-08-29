@@ -105,7 +105,7 @@ public sealed record RekallAgeVulkanPresentationFrame
         AccelerationStatus = accelerationStatus;
         SelectedDeviceName = string.IsNullOrWhiteSpace(selectedDeviceName) ? null : selectedDeviceName.Trim();
         FailureReason = failureReason;
-        Errors = errors;
+        Errors = errors.Count == 0 ? Array.Empty<string>() : errors.ToArray();
     }
 
     public string SceneName { get; }

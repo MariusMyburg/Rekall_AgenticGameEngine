@@ -115,6 +115,22 @@ public sealed class VulkanPresentationContractTests
         Assert.Equal(["VK_ERROR_INITIALIZATION_FAILED"], frame.Errors);
     }
 
+    [Fact]
+    public void UnavailableFrameCopiesErrorsToPreventLaterMutation()
+    {
+        var sourceErrors = new List<string> { "VK_ERROR_DEVICE_LOST" };
+
+        var frame = RekallAgeVulkanPresentationFrame.Unavailable(
+            ViewportFrame(320, 180),
+            "Presentation failed.",
+            sourceErrors);
+
+        sourceErrors[0] = "CHANGED";
+        sourceErrors.Add("VK_ERROR_OUT_OF_DATE_KHR");
+
+        Assert.Equal(["VK_ERROR_DEVICE_LOST"], frame.Errors);
+    }
+
     private static RekallAgeRuntimeViewportFrame ViewportFrame(int width, int height) =>
         new(
             "Main",

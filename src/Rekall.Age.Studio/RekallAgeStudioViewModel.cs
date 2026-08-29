@@ -62,6 +62,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _removeComponentCommand;
     private readonly RekallAgeAsyncCommand _setPropertyCommand;
     private readonly RekallAgeAsyncCommand _removePropertyCommand;
+    private readonly RekallAgeAsyncCommand _commitInspectorPropertyCommand;
+    private readonly RekallAgeAsyncCommand _resetInspectorPropertyCommand;
     private readonly RekallAgeAsyncCommand _validateCommand;
     private readonly RekallAgeAsyncCommand _captureCommand;
     private readonly RekallAgeAsyncCommand _attachQualityProfileCommand;
@@ -107,6 +109,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeStudioModelingGraphCanvasRenderer _modelingGraphCanvasRenderer = new();
     private readonly RekallAgeModelingNodeCatalog _modelingGraphCatalog = RekallAgeModelingNodeCatalog.CreateDefault();
     private readonly Dictionary<string, System.Windows.Point> _modelingGraphNodePositions = new(StringComparer.Ordinal);
+    private readonly Dictionary<RekallAgeStudioInspectorPropertyEditorModel, InspectorPropertyEditorKey> _inspectorPropertyEditorKeys = [];
     private RekallAgeStudioModelingGraphCanvasFrame? _modelingGraphCanvasFrame;
     private string? _modelingGraphDragNodeId;
     private System.Windows.Point _modelingGraphDragOrigin;
@@ -415,6 +418,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _removeComponentCommand = CreateAsyncCommand(RemoveComponentAsync, CanEditComponent);
         _setPropertyCommand = CreateAsyncCommand(SetPropertyAsync, CanEditProperty);
         _removePropertyCommand = CreateAsyncCommand(RemovePropertyAsync, CanEditProperty);
+        _commitInspectorPropertyCommand = CreateAsyncCommand(CommitInspectorPropertyAsync, parameter =>
+            parameter is RekallAgeStudioInspectorPropertyEditorModel row && CanCommitInspectorProperty(row));
+        _resetInspectorPropertyCommand = CreateAsyncCommand(ResetInspectorPropertyAsync, parameter =>
+            parameter is RekallAgeStudioInspectorPropertyEditorModel row && CanResetInspectorProperty(row));
         _validateCommand = CreateAsyncCommand(ValidateAsync, HasOpenProject);
         _captureCommand = CreateAsyncCommand(CaptureAsync, HasEditableProject);
         _attachQualityProfileCommand = CreateAsyncCommand(AttachQualityProfileAsync, CanAttachQualityProfile);
@@ -495,6 +502,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<string> SceneNames { get; } = [];
     public ObservableCollection<string> InspectorLines { get; } = [];
     public ObservableCollection<RekallAgeInspectorComponentModel> InspectorComponents { get; } = [];
+    public ObservableCollection<RekallAgeStudioInspectorComponentEditorModel> InspectorComponentEditors { get; } = [];
+    public ObservableCollection<RekallAgeStudioInspectorPropertyEditorModel> InspectorPropertyEditors { get; } = [];
     public ObservableCollection<string> AssetLines { get; } = [];
     public ObservableCollection<string> ValidationLines { get; } = [];
     public ObservableCollection<string> TransactionLines { get; } = [];
@@ -561,6 +570,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand RemoveComponentCommand => _removeComponentCommand;
     public ICommand SetPropertyCommand => _setPropertyCommand;
     public ICommand RemovePropertyCommand => _removePropertyCommand;
+    public ICommand CommitInspectorPropertyCommand => _commitInspectorPropertyCommand;
+    public ICommand ResetInspectorPropertyCommand => _resetInspectorPropertyCommand;
     public ICommand ValidateCommand => _validateCommand;
     public ICommand CaptureCommand => _captureCommand;
     public ICommand AttachQualityProfileCommand => _attachQualityProfileCommand;
@@ -1904,6 +1915,19 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         && _session.SelectedEntityId is not null
         && !string.IsNullOrWhiteSpace(ComponentTypeInput);
     private bool CanEditProperty() => CanEditComponent() && !string.IsNullOrWhiteSpace(PropertyNameInput);
+    private bool CanCommitInspectorProperty(RekallAgeStudioInspectorPropertyEditorModel row) =>
+        HasEditableProject()
+        && IsInspectorPropertyEditorForSelection(row)
+        && row.IsDirty
+        && row.IsValid;
+    private bool CanResetInspectorProperty(RekallAgeStudioInspectorPropertyEditorModel row) =>
+        HasEditableProject()
+        && IsInspectorPropertyEditorForSelection(row)
+        && row.IsDefined;
+    private bool IsInspectorPropertyEditorForSelection(RekallAgeStudioInspectorPropertyEditorModel row) =>
+        _session.SelectedEntityId is { } entityId
+        && _inspectorPropertyEditorKeys.TryGetValue(row, out var key)
+        && key.EntityId.Equals(entityId, StringComparison.Ordinal);
     private bool CanCreateAttachCodeComponent() => HasSelectedEntity()
         && !IsCodeDirty
         && !string.IsNullOrWhiteSpace(CodeModuleNameInput)
@@ -2845,6 +2869,46 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             $"Set {ComponentTypeInput.Trim()}.{PropertyNameInput.Trim()}");
     }
 
+    private Task CommitInspectorPropertyAsync(object? parameter)
+    {
+        if (parameter is not RekallAgeStudioInspectorPropertyEditorModel row
+            || !row.TryCreateValue(out var value, out _))
+        {
+            return Task.CompletedTask;
+        }
+
+        return ExecuteComponentCommandAsync(
+            "rekall.component.set_property",
+            new
+            {
+                projectRoot = _session.ProjectRoot,
+                sceneName = _session.SceneName,
+                entityId = _session.SelectedEntityId,
+                componentType = row.ComponentType,
+                propertyName = row.Name,
+                value
+            },
+            $"Set {row.ComponentType}.{row.Name}",
+            row);
+    }
+
+    private Task ResetInspectorPropertyAsync(object? parameter)
+    {
+        if (parameter is not RekallAgeStudioInspectorPropertyEditorModel row) return Task.CompletedTask;
+        return ExecuteComponentCommandAsync(
+            "rekall.component.remove_property",
+            new
+            {
+                projectRoot = _session.ProjectRoot,
+                sceneName = _session.SceneName,
+                entityId = _session.SelectedEntityId,
+                componentType = row.ComponentType,
+                propertyName = row.Name
+            },
+            $"Remove {row.ComponentType}.{row.Name}",
+            row);
+    }
+
     private Task RemovePropertyAsync() => ExecuteComponentCommandAsync(
         "rekall.component.remove_property",
         new
@@ -3111,13 +3175,17 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         CodeOutputLines.Add($"REKALL_STUDIO_CODE_FAILED: {exception.Message}");
     }
 
-    private Task ExecuteComponentCommandAsync(string commandName, object arguments, string transactionName) =>
+    private Task ExecuteComponentCommandAsync(
+        string commandName,
+        object arguments,
+        string transactionName,
+        RekallAgeStudioInspectorPropertyEditorModel? rejectedInspectorRow = null) =>
         RunAsync(() => _session.ExecuteAsync(
             commandName,
             JsonSerializer.Serialize(arguments),
             transactionName,
             "studio",
-            CancellationToken.None).AsTask(), refreshPreviewAfter: true);
+            CancellationToken.None).AsTask(), refreshPreviewAfter: true, rejectedInspectorRow: rejectedInspectorRow);
 
     private Task AttachQualityProfileAsync() => RunAsync(() => _session.ExecuteAsync(
         "rekall.component.add",
@@ -4567,7 +4635,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
     }
 
-    private async Task RunAsync(Func<Task<RekallAgeWorkbenchOperationResult>> operation, bool refreshPreviewAfter = false)
+    private async Task RunAsync(
+        Func<Task<RekallAgeWorkbenchOperationResult>> operation,
+        bool refreshPreviewAfter = false,
+        RekallAgeStudioInspectorPropertyEditorModel? rejectedInspectorRow = null)
     {
         if (IsBusy) return;
         IsBusy = true;
@@ -4577,7 +4648,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             StatusText = result.Summary;
             if (_session.Model is not null)
             {
-                ApplyModel(_session.Model);
+                ApplyModel(
+                    _session.Model,
+                    preserveInspectorDrafts: !result.Ok || rejectedInspectorRow is not null,
+                    discardInspectorDraft: result.Ok ? rejectedInspectorRow : null);
             }
             if (result.Ok)
             {
@@ -4593,12 +4667,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             else if (!result.Ok)
             {
                 Replace(ValidationLines, result.Errors.Select(error => $"error: {error.Code} - {error.Message}"));
+                FindCurrentInspectorPropertyEditor(rejectedInspectorRow)?.SetServerValidation(
+                    string.Join(Environment.NewLine, result.Errors.Select(error => $"{error.Code} - {error.Message}")));
             }
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or ArgumentException)
         {
             StatusText = ex.Message;
             Replace(ValidationLines, [$"error: REKALL_STUDIO_OPERATION_FAILED - {ex.Message}"]);
+            FindCurrentInspectorPropertyEditor(rejectedInspectorRow)?.SetServerValidation(ex.Message);
         }
         catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
         {
@@ -4677,7 +4754,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
     }
 
-    private void ApplyModel(RekallAgeWorkbenchModel model)
+    private void ApplyModel(
+        RekallAgeWorkbenchModel model,
+        bool preserveInspectorDrafts = false,
+        RekallAgeStudioInspectorPropertyEditorModel? discardInspectorDraft = null)
     {
         _currentModel = model;
         OnPropertyChanged(nameof(SelectedEntityId));
@@ -4720,6 +4800,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
         if (selectedNode is not null) RefreshPropertySchemas();
         RefreshInspectorComponents();
+        RebuildInspectorPropertyEditors(model, preserveInspectorDrafts, discardInspectorDraft);
         Replace(AssetLines, model.Assets.Assets.Select(asset => $"{asset.Kind}: {asset.DisplayName} ({asset.AssetId})"));
         if (_session.ProjectRoot is not null)
         {
@@ -4877,6 +4958,94 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         Replace(InspectorComponents, result.Components);
         SelectedInspectorComponent = result.SelectedComponent;
         OnPropertyChanged(nameof(InspectorComponentBrowserEmptyText));
+    }
+
+    private void RebuildInspectorPropertyEditors(
+        RekallAgeWorkbenchModel model,
+        bool preserveDirtyDrafts,
+        RekallAgeStudioInspectorPropertyEditorModel? discardDraft)
+    {
+        var preserved = preserveDirtyDrafts
+            ? _inspectorPropertyEditorKeys
+                .Where(entry => entry.Key.IsDirty && !ReferenceEquals(entry.Key, discardDraft))
+                .ToDictionary(entry => entry.Value, entry => entry.Key)
+            : [];
+        var entityChoices = FlattenEntityNodes(model.Scene.RootEntities)
+            .Select(entity => new RekallAgeStudioInspectorPropertyChoice(
+                $"{entity.Name} ({entity.EntityId})",
+                entity.EntityId))
+            .ToArray();
+        var entityId = model.Inspector.SelectedEntityId ?? string.Empty;
+        var editors = new List<RekallAgeStudioInspectorPropertyEditorModel>();
+        var groups = new List<RekallAgeStudioInspectorComponentEditorModel>();
+        var keys = new Dictionary<RekallAgeStudioInspectorPropertyEditorModel, InspectorPropertyEditorKey>();
+
+        foreach (var component in model.Inspector.Components)
+        {
+            var componentEditors = new List<RekallAgeStudioInspectorPropertyEditorModel>();
+            foreach (var property in component.Properties)
+            {
+                var key = new InspectorPropertyEditorKey(entityId, component.Type, property.Name);
+                if (!preserved.TryGetValue(key, out var editor))
+                {
+                    var assetChoices = model.Assets.Assets
+                        .Where(asset => property.AssetKind is null
+                            || asset.Kind.Equals(property.AssetKind, StringComparison.OrdinalIgnoreCase))
+                        .Select(asset => asset.AssetId)
+                        .Distinct(StringComparer.Ordinal)
+                        .ToArray();
+                    editor = new RekallAgeStudioInspectorPropertyEditorModel(
+                        component.Type,
+                        property,
+                        assetChoices,
+                        entityChoices);
+                    editor.PropertyChanged += InspectorPropertyEditorChanged;
+                }
+
+                componentEditors.Add(editor);
+                editors.Add(editor);
+                keys[editor] = key;
+            }
+
+            groups.Add(new RekallAgeStudioInspectorComponentEditorModel(component, componentEditors));
+        }
+
+        Replace(InspectorPropertyEditors, editors);
+        Replace(InspectorComponentEditors, groups);
+        _inspectorPropertyEditorKeys.Clear();
+        foreach (var entry in keys) _inspectorPropertyEditorKeys.Add(entry.Key, entry.Value);
+        _commitInspectorPropertyCommand.RaiseCanExecuteChanged();
+        _resetInspectorPropertyCommand.RaiseCanExecuteChanged();
+    }
+
+    private void InspectorPropertyEditorChanged(object? sender, PropertyChangedEventArgs eventArgs)
+    {
+        if (eventArgs.PropertyName is nameof(RekallAgeStudioInspectorPropertyEditorModel.IsDirty)
+            or nameof(RekallAgeStudioInspectorPropertyEditorModel.IsValid)
+            or nameof(RekallAgeStudioInspectorPropertyEditorModel.IsDefined))
+        {
+            _commitInspectorPropertyCommand.RaiseCanExecuteChanged();
+            _resetInspectorPropertyCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    private RekallAgeStudioInspectorPropertyEditorModel? FindCurrentInspectorPropertyEditor(
+        RekallAgeStudioInspectorPropertyEditorModel? requested)
+    {
+        if (requested is null) return null;
+        return InspectorPropertyEditors.FirstOrDefault(row =>
+            row.ComponentType.Equals(requested.ComponentType, StringComparison.Ordinal)
+            && row.Name.Equals(requested.Name, StringComparison.Ordinal));
+    }
+
+    private static IEnumerable<RekallAgeSceneEntityNode> FlattenEntityNodes(
+        IEnumerable<RekallAgeSceneEntityNode> roots)
+    {
+        foreach (var root in roots)
+        {
+            yield return root;
+            foreach (var child in FlattenEntityNodes(root.Children)) yield return child;
+        }
     }
 
     private void SynchronizeInspectorSelectionToComponentType()
@@ -5039,6 +5208,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _removeComponentCommand.RaiseCanExecuteChanged();
         _setPropertyCommand.RaiseCanExecuteChanged();
         _removePropertyCommand.RaiseCanExecuteChanged();
+        _commitInspectorPropertyCommand.RaiseCanExecuteChanged();
+        _resetInspectorPropertyCommand.RaiseCanExecuteChanged();
         _validateCommand.RaiseCanExecuteChanged();
         _captureCommand.RaiseCanExecuteChanged();
         _attachQualityProfileCommand.RaiseCanExecuteChanged();
@@ -5099,6 +5270,16 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private RekallAgeAsyncCommand CreateAsyncCommand(Func<Task> execute, Func<bool> canExecute) =>
         new(execute, canExecute, ReportUnexpectedFailure);
 
+    private RekallAgeAsyncCommand CreateAsyncCommand(
+        Func<object?, Task> execute,
+        Func<object?, bool> canExecute) =>
+        new(execute, canExecute, ReportUnexpectedFailure);
+
+    private readonly record struct InspectorPropertyEditorKey(
+        string EntityId,
+        string ComponentType,
+        string PropertyName);
+
     private void ReportUnexpectedFailure(Exception exception)
     {
         Log.Error(exception, "Studio operation failed unexpectedly.");
@@ -5113,14 +5294,33 @@ internal sealed class ImmediateProgress<T>(Action<T> report) : IProgress<T>
     public void Report(T value) => report(value);
 }
 
-internal sealed class RekallAgeAsyncCommand(
-    Func<Task> execute,
-    Func<bool> canExecute,
-    Action<Exception> onError) : ICommand
+internal sealed class RekallAgeAsyncCommand : ICommand
 {
+    private readonly Func<object?, Task> _execute;
+    private readonly Func<object?, bool> _canExecute;
+    private readonly Action<Exception> _onError;
     private bool _executing;
+
+    public RekallAgeAsyncCommand(
+        Func<Task> execute,
+        Func<bool> canExecute,
+        Action<Exception> onError)
+        : this(_ => execute(), _ => canExecute(), onError)
+    {
+    }
+
+    public RekallAgeAsyncCommand(
+        Func<object?, Task> execute,
+        Func<object?, bool> canExecute,
+        Action<Exception> onError)
+    {
+        _execute = execute;
+        _canExecute = canExecute;
+        _onError = onError;
+    }
+
     public event EventHandler? CanExecuteChanged;
-    public bool CanExecute(object? parameter) => !_executing && canExecute();
+    public bool CanExecute(object? parameter) => !_executing && _canExecute(parameter);
 
     public async void Execute(object? parameter) => await ExecuteAsync(parameter);
 
@@ -5131,11 +5331,11 @@ internal sealed class RekallAgeAsyncCommand(
         RaiseCanExecuteChanged();
         try
         {
-            await execute();
+            await _execute(parameter);
         }
         catch (Exception ex)
         {
-            onError(ex);
+            _onError(ex);
         }
         finally
         {

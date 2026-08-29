@@ -2837,8 +2837,144 @@ public sealed class StudioViewModelTests
         }
     }
 
+    [Fact]
+    public async Task InlineInspectorRowsGroupUndefinedPropertiesAndCommitAndResetThroughCanonicalCommands()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-inline-inspector-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Inline Inspector",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+            viewModel.ComponentTypeInput = "Rekall.Transform2D";
+            await ExecuteAsync(viewModel.AddComponentCommand);
+
+            var group = Assert.Single(viewModel.InspectorComponentEditors);
+            Assert.Equal("Rekall.Transform2D", group.Type);
+            Assert.Equal(group.PropertyEditors.Count, viewModel.InspectorPropertyEditors.Count);
+            var x = group.PropertyEditors.Single(row => row.Name == "x");
+            var y = group.PropertyEditors.Single(row => row.Name == "y");
+            Assert.False(x.IsDefined);
+            Assert.False(viewModel.ResetInspectorPropertyCommand.CanExecute(x));
+
+            y.TextValue = "7";
+            x.TextValue = "12.5";
+            Assert.True(viewModel.CommitInspectorPropertyCommand.CanExecute(x));
+            await ExecuteAsync(viewModel.CommitInspectorPropertyCommand, x);
+
+            var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            var transform = Assert.Single(Assert.Single(scene.Entities).Components, component => component.Type == "Rekall.Transform2D");
+            Assert.Equal(12.5, transform.Properties["x"]!.GetValue<double>());
+            var persistedX = viewModel.InspectorPropertyEditors.Single(row => row.ComponentType == "Rekall.Transform2D" && row.Name == "x");
+            Assert.True(persistedX.IsDefined);
+            Assert.False(persistedX.IsDirty);
+            Assert.Same(y, viewModel.InspectorPropertyEditors.Single(row => row.Name == "y"));
+            Assert.Equal("7", y.TextValue);
+            Assert.True(y.IsDirty);
+            Assert.Contains(viewModel.TransactionLines, line => line.StartsWith("Set Rekall.Transform2D.x:", StringComparison.Ordinal));
+
+            Assert.True(viewModel.ResetInspectorPropertyCommand.CanExecute(persistedX));
+            await ExecuteAsync(viewModel.ResetInspectorPropertyCommand, persistedX);
+
+            scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            transform = Assert.Single(Assert.Single(scene.Entities).Components, component => component.Type == "Rekall.Transform2D");
+            Assert.False(transform.Properties.ContainsKey("x"));
+            var resetX = viewModel.InspectorPropertyEditors.Single(row => row.ComponentType == "Rekall.Transform2D" && row.Name == "x");
+            Assert.False(resetX.IsDefined);
+            Assert.False(resetX.IsDirty);
+            Assert.Contains(viewModel.TransactionLines, line => line.StartsWith("Remove Rekall.Transform2D.x:", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task InlineInspectorLocalValidationLeavesTheSceneAndTransactionHistoryUntouched()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-inline-local-validation-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Inline Local Validation",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+            viewModel.ComponentTypeInput = "Rekall.Transform2D";
+            await ExecuteAsync(viewModel.AddComponentCommand);
+            var transactionCount = viewModel.TransactionLines.Count;
+            var x = viewModel.InspectorPropertyEditors.Single(row => row.Name == "x");
+
+            x.TextValue = "not-a-number";
+
+            Assert.True(x.IsDirty);
+            Assert.False(x.IsValid);
+            Assert.Contains("finite number", x.ValidationMessage, StringComparison.OrdinalIgnoreCase);
+            Assert.False(viewModel.CommitInspectorPropertyCommand.CanExecute(x));
+            await ExecuteAsync(viewModel.CommitInspectorPropertyCommand, x);
+            Assert.Equal(transactionCount, viewModel.TransactionLines.Count);
+            var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            var transform = Assert.Single(Assert.Single(scene.Entities).Components, component => component.Type == "Rekall.Transform2D");
+            Assert.False(transform.Properties.ContainsKey("x"));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task InlineInspectorServerRejectionPreservesTheStructuredDraftAndAttachesTheError()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-inline-server-validation-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Inline Server Validation",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+            viewModel.ComponentTypeInput = "Rekall.AnimationClip";
+            await ExecuteAsync(viewModel.AddComponentCommand);
+            var transactionCount = viewModel.TransactionLines.Count;
+            var tracks = viewModel.InspectorPropertyEditors.Single(row => row.Name == "tracks");
+            Assert.Equal("json", tracks.TemplateKind);
+
+            tracks.TextValue = "{}";
+            Assert.True(tracks.IsDirty);
+            Assert.True(tracks.IsValid);
+            await ExecuteAsync(viewModel.CommitInspectorPropertyCommand, tracks);
+
+            Assert.Same(tracks, viewModel.InspectorPropertyEditors.Single(row => row.Name == "tracks"));
+            Assert.Equal("{}", tracks.TextValue);
+            Assert.True(tracks.IsDirty);
+            Assert.Contains("array", tracks.ValidationMessage, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(viewModel.ValidationLines, line => line.Contains("REKALL_COMPONENT_PROPERTY_SHAPE_INVALID", StringComparison.Ordinal));
+            Assert.Equal(transactionCount, viewModel.TransactionLines.Count);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static Task ExecuteAsync(System.Windows.Input.ICommand command) =>
         ((RekallAgeAsyncCommand)command).ExecuteAsync(null);
+
+    private static Task ExecuteAsync(System.Windows.Input.ICommand command, object? parameter) =>
+        ((RekallAgeAsyncCommand)command).ExecuteAsync(parameter);
 
     private static async Task CreateQualityProjectAsync(string root)
     {

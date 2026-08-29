@@ -31,4 +31,13 @@
     <PackageReference Include="Veldrid" Version="4.9.0" />
     <PackageReference Include="Veldrid.SPIRV" Version="1.0.15" />
   </ItemGroup>
+  <ItemGroup>
+    <StudioExampleFile Include="$(MSBuildProjectDirectory)\..\..\Examples\**\*"
+                       Exclude="$(MSBuildProjectDirectory)\..\..\Examples\**\.git\**;$(MSBuildProjectDirectory)\..\..\Examples\**\.rekall\**;$(MSBuildProjectDirectory)\..\..\Examples\**\.vs\**;$(MSBuildProjectDirectory)\..\..\Examples\**\bin\**;$(MSBuildProjectDirectory)\..\..\Examples\**\obj\**;$(MSBuildProjectDirectory)\..\..\Examples\**\TestResults\**" />
+  </ItemGroup>
+  <Target Name="CopyBundledExamples" AfterTargets="Publish">
+    <Copy SourceFiles="@(StudioExampleFile)"
+          DestinationFiles="@(StudioExampleFile->'$(PublishDir)Examples\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>

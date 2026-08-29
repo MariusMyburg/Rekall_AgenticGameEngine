@@ -14,6 +14,8 @@ public partial class MainWindow : Window
 {
     private readonly RekallAgeStudioViewModel _viewModel;
     private readonly IRekallAgeStudioLayoutStore _layoutStore = new RekallAgeStudioLayoutStore();
+    private readonly RekallAgeStudioExampleCatalog _exampleCatalog = RekallAgeStudioExampleCatalog.CreateDefault();
+    private readonly RekallAgeStudioExampleLibrary _exampleLibrary = new();
     private readonly DispatcherTimer _previewTimer;
     private readonly RekallAgeStudioViewportRecoveryState _viewportRecovery =
         new(TimeSpan.FromSeconds(1));
@@ -53,6 +55,7 @@ public partial class MainWindow : Window
         };
         _previewTimer.Tick += OnPreviewTick;
         Loaded += OnLoaded;
+        PopulateExamplesMenu();
         ApplyViewportAvailabilityVisual();
     }
 
@@ -68,6 +71,7 @@ public partial class MainWindow : Window
             _layout = await _layoutStore.LoadAsync(CancellationToken.None);
             ApplyLayout(_layout);
             await _viewModel.InitializeAsync(projectRoot, sceneName);
+            if (_viewModel.HasProject) SelectWorkspace("World");
             if (_viewModel.HasProject && SceneVulkanViewportHost.Metrics.IsPresentable)
             {
                 await _viewModel.PresentViewportAtHostSizeAsync(SceneVulkanViewportHost.Metrics);
@@ -319,6 +323,7 @@ public partial class MainWindow : Window
         _viewModel.ProjectNameInput = dialog.Request.ProjectName;
         _viewModel.SceneNameInput = dialog.Request.SceneName;
         await ((RekallAgeAsyncCommand)_viewModel.CreateCommand).ExecuteAsync(null);
+        if (_viewModel.HasProject) SelectWorkspace("World");
     }
 
     private async void OnOpenProjectClick(object sender, RoutedEventArgs e)
@@ -333,6 +338,116 @@ public partial class MainWindow : Window
         if (!await ResolveDirtyCodeAsync()) return;
 
         await _viewModel.OpenProjectAsync(dialog.FolderName);
+        if (_viewModel.HasProject) SelectWorkspace("World");
+    }
+
+    private void OnExitClick(object sender, RoutedEventArgs e) => Close();
+
+    private void PopulateExamplesMenu()
+    {
+        ExamplesMenu.Items.Clear();
+        var result = _exampleCatalog.Discover();
+        foreach (var issue in result.Issues)
+        {
+            Log.Warning(
+                "Bundled Studio example was ignored. Folder={Folder} Manifest={Manifest} Issue={Issue}",
+                issue.FolderName,
+                issue.ManifestPath,
+                issue.Message);
+        }
+
+        if (result.Examples.Count == 0)
+        {
+            ExamplesMenu.Items.Add(new MenuItem
+            {
+                Header = "No bundled examples found",
+                IsEnabled = false
+            });
+            return;
+        }
+
+        foreach (var example in result.Examples)
+        {
+            var capabilitySummary = example.Capabilities.Count == 0
+                ? "AGE project"
+                : string.Join(", ", example.Capabilities);
+            var item = new MenuItem
+            {
+                Header = example.DisplayName.Replace("_", "__", StringComparison.Ordinal),
+                ToolTip = $"Open a writable copy · {capabilitySummary}",
+                Tag = example
+            };
+            item.Click += OnOpenExampleClick;
+            ExamplesMenu.Items.Add(item);
+        }
+    }
+
+    private async void OnOpenExampleClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: RekallAgeStudioExample example } menuItem) return;
+
+        var destination = Path.Combine(RekallAgeStudioExampleLibrary.DefaultRoot, example.FolderName);
+        if (Directory.Exists(destination))
+        {
+            if (File.Exists(Path.Combine(destination, "rekall.project.json")))
+            {
+                var choice = MessageBox.Show(
+                    this,
+                    $"A writable copy of {example.DisplayName} already exists at:\n\n{destination}\n\n" +
+                    "Yes: open the existing copy\nNo: create and open a fresh copy\nCancel: do nothing",
+                    "Open example",
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Question);
+                if (choice == MessageBoxResult.Cancel) return;
+                if (choice == MessageBoxResult.No)
+                {
+                    destination = RekallAgeStudioExampleLibrary.FindFreshDestination(
+                        RekallAgeStudioExampleLibrary.DefaultRoot,
+                        example.FolderName);
+                }
+            }
+            else
+            {
+                destination = RekallAgeStudioExampleLibrary.FindFreshDestination(
+                    RekallAgeStudioExampleLibrary.DefaultRoot,
+                    example.FolderName);
+            }
+        }
+
+        if (!await ResolveDirtyCodeAsync()) return;
+
+        var previousCursor = Cursor;
+        menuItem.IsEnabled = false;
+        Cursor = Cursors.Wait;
+        try
+        {
+            if (!Directory.Exists(destination))
+            {
+                await _exampleLibrary.CopyAsync(example, destination, CancellationToken.None);
+            }
+
+            await _viewModel.OpenProjectAsync(destination);
+            if (_viewModel.HasProject) SelectWorkspace("World");
+        }
+        catch (Exception exception)
+        {
+            Log.Error(
+                exception,
+                "Failed to create or open writable Studio example. Example={Example} Destination={Destination}",
+                example.FolderName,
+                destination);
+            MessageBox.Show(
+                this,
+                $"Studio could not open the example.\n\n{exception.Message}",
+                "Open example",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        finally
+        {
+            Cursor = previousCursor;
+            menuItem.IsEnabled = true;
+        }
     }
 
     private void ApplyLayout(RekallAgeStudioLayout layout)
@@ -490,7 +605,7 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(RekallAgeStudioViewModel.HasProject))
         {
-            if (!_initializing && !_hadProject && _viewModel.HasProject) SelectWorkspace("Author");
+            if (!_initializing && !_hadProject && _viewModel.HasProject) SelectWorkspace("World");
             _hadProject = _viewModel.HasProject;
             ApplyViewportAvailabilityVisual();
         }

@@ -66,8 +66,13 @@ public sealed class StudioWorkbenchSourceTests
 
         Assert.Contains("Content=\"Open Project…\" Click=\"OnOpenProjectClick\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("Content=\"Create Project…\" Click=\"OnCreateProjectClick\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ExamplesMenu\" Header=\"_Examples\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("PopulateExamplesMenu();", mainWindowCode, StringComparison.Ordinal);
+        Assert.Contains("Tag = example", mainWindowCode, StringComparison.Ordinal);
         Assert.Contains("_viewModel.OpenProjectAsync(dialog.FolderName)", mainWindowCode, StringComparison.Ordinal);
         Assert.Contains("_viewModel.CreateCommand", mainWindowCode, StringComparison.Ordinal);
+        Assert.Contains("if (_viewModel.HasProject) SelectWorkspace(\"World\");", mainWindowCode, StringComparison.Ordinal);
+        Assert.DoesNotContain("_viewModel.HasProject) SelectWorkspace(\"Author\")", mainWindowCode, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding AddEntityCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding AddComponentCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding RemoveComponentCommand}\"", xaml, StringComparison.Ordinal);

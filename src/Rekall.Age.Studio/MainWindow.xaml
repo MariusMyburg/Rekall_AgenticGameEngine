@@ -120,6 +120,18 @@
             StringTemplate="{StaticResource InspectorStringEditorTemplate}" />
     </Window.Resources>
     <DockPanel>
+        <Menu x:Name="MainMenu" DockPanel.Dock="Top"
+              Background="{StaticResource ChromeBackground}"
+              Foreground="{StaticResource WorkbenchText}"
+              BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
+            <MenuItem Header="_File">
+                <MenuItem Header="_Create Project…" Click="OnCreateProjectClick" />
+                <MenuItem Header="_Open Project…" Click="OnOpenProjectClick" />
+                <Separator />
+                <MenuItem Header="E_xit" Click="OnExitClick" />
+            </MenuItem>
+            <MenuItem x:Name="ExamplesMenu" Header="_Examples" />
+        </Menu>
         <Border x:Name="ProjectBar" DockPanel.Dock="Top" Background="{StaticResource ChromeBackground}" Padding="12,9" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
             <Grid>
                 <Grid.ColumnDefinitions>

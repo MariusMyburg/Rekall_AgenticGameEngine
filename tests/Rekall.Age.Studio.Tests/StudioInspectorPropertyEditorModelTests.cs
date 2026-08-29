@@ -18,6 +18,30 @@ public sealed class StudioInspectorPropertyEditorModelTests
         Assert.Equal(expectedJson, value!.ToJsonString());
     }
 
+    [Theory]
+    [InlineData("line one\\nline two", "line one\nline two")]
+    [InlineData("say \\\"hello\\\"", "say \"hello\"")]
+    [InlineData("folder\\\\child", "folder\\child")]
+    public void StringRowDecodesInspectorJsonEscapesAndRestoresTheNativeValue(
+        string inspectorDisplay,
+        string nativeValue)
+    {
+        var row = Row("string", inspectorDisplay);
+
+        Assert.Equal(nativeValue, row.TextValue);
+        Assert.True(row.TryCreateValue(out var value, out var error), error);
+        Assert.Equal(nativeValue, value!.GetValue<string>());
+
+        row.TextValue = "temporary edit";
+        row.AcceptPersistedValue(Property("string", inspectorDisplay));
+        Assert.Equal(nativeValue, row.TextValue);
+        row.TextValue = "another temporary edit";
+        row.RestoreOriginalDraft();
+        Assert.Equal(nativeValue, row.TextValue);
+        Assert.True(row.TryCreateValue(out value, out error), error);
+        Assert.Equal(nativeValue, value!.GetValue<string>());
+    }
+
     [Fact]
     public void NumericParsingUsesInvariantCultureAndRejectsFractionsNonFiniteValuesAndRanges()
     {

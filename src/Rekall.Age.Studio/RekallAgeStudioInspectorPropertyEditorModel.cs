@@ -211,11 +211,12 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
 
     private void InitializeDraft(string displayValue, bool isDefined)
     {
+        var draftValue = DecodeStringDisplayValue(displayValue, isDefined);
         OriginalDisplayValue = displayValue;
         IsDefined = isDefined;
-        _textValue = InitialTextValue(displayValue, isDefined);
+        _textValue = InitialTextValue(draftValue, isDefined);
         _booleanValue = isDefined && bool.TryParse(displayValue, out var boolean) ? boolean : null;
-        _colorValue = isDefined ? displayValue : string.Empty;
+        _colorValue = isDefined ? draftValue : string.Empty;
         _vectorX = string.Empty;
         _vectorY = string.Empty;
         _vectorZ = string.Empty;
@@ -237,6 +238,23 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
         OnPropertyChanged(nameof(VectorW));
         OnPropertyChanged(nameof(IsDirty));
         OnPropertyChanged(nameof(IsValid));
+    }
+
+    private string DecodeStringDisplayValue(string displayValue, bool isDefined)
+    {
+        if (!isDefined || TemplateKind is not ("string" or "enum" or "assetRef" or "entityRef" or "color"))
+        {
+            return displayValue;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<string>($"\"{displayValue}\"") ?? string.Empty;
+        }
+        catch (JsonException)
+        {
+            return displayValue;
+        }
     }
 
     private string InitialTextValue(string displayValue, bool isDefined)

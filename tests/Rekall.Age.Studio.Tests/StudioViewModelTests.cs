@@ -2970,6 +2970,45 @@ public sealed class StudioViewModelTests
         }
     }
 
+    [Fact]
+    public async Task InlineInspectorStringEditPreservesEscapedPersistedContentAcrossCommits()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-inline-string-roundtrip-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Inline String Roundtrip",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+            viewModel.ComponentTypeInput = "Rekall.AudioBus";
+            await ExecuteAsync(viewModel.AddComponentCommand);
+            var name = viewModel.InspectorPropertyEditors.Single(row => row.Name == "name");
+            const string initial = "primary\n\"route\"\\main";
+
+            name.TextValue = initial;
+            await ExecuteAsync(viewModel.CommitInspectorPropertyCommand, name);
+
+            var persisted = viewModel.InspectorPropertyEditors.Single(row => row.Name == "name");
+            Assert.Equal(initial, persisted.TextValue);
+            const string edited = "primary\n\"route\"\\main\n\"secondary\"\\tail";
+            persisted.TextValue = edited;
+            await ExecuteAsync(viewModel.CommitInspectorPropertyCommand, persisted);
+
+            var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);
+            var audioBus = Assert.Single(Assert.Single(scene.Entities).Components, component => component.Type == "Rekall.AudioBus");
+            Assert.Equal(edited, audioBus.Properties["name"]!.GetValue<string>());
+            Assert.Equal(edited, viewModel.InspectorPropertyEditors.Single(row => row.Name == "name").TextValue);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static Task ExecuteAsync(System.Windows.Input.ICommand command) =>
         ((RekallAgeAsyncCommand)command).ExecuteAsync(null);
 

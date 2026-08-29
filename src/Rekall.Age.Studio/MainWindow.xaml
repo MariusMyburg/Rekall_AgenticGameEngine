@@ -92,7 +92,7 @@
             <local:CodeWorkspace x:Name="CodeWorkspaceHost" Grid.Row="1" Visibility="Collapsed" />
             <Grid x:Name="WorldWorkspace" Grid.Row="1" Visibility="Collapsed">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="HierarchyColumn" Width="290" /><ColumnDefinition Width="*" /><ColumnDefinition x:Name="InspectorColumn" Width="370" />
+                <ColumnDefinition x:Name="HierarchyColumn" Width="340" /><ColumnDefinition Width="*" /><ColumnDefinition x:Name="InspectorColumn" Width="460" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" MinHeight="300" />
@@ -178,42 +178,46 @@
                 </Grid>
             </Border>
 
-            <Border x:Name="InspectorPanel" Grid.Column="2" Grid.Row="0" Margin="8" Padding="8"
+            <Border x:Name="InspectorPanel" Grid.Column="2" Grid.Row="0" Grid.RowSpan="2" Margin="8" Padding="0"
                     Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="1">
-                <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Inspector" FontWeight="SemiBold" Margin="0,0,0,8" />
-                    <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-                        <TextBlock Text="Component type" Foreground="#9FB0C4" />
-                        <ComboBox ItemsSource="{Binding ComponentSchemas}" DisplayMemberPath="DisplayName" SelectedValuePath="Type"
-                                  SelectedValue="{Binding ComponentTypeInput, UpdateSourceTrigger=PropertyChanged}"
-                                  IsEditable="True" TextSearch.TextPath="Type" Margin="0,3,0,6" />
-                        <UniformGrid Columns="2" Margin="0,0,0,8">
-                            <Button Content="Add / Replace" Command="{Binding AddComponentCommand}" Padding="8,4" Margin="0,0,3,0" />
-                            <Button Content="Remove" Command="{Binding RemoveComponentCommand}" Padding="8,4" Margin="3,0,0,0" />
-                        </UniformGrid>
-                        <TextBlock Text="Property name" Foreground="#9FB0C4" />
-                        <ComboBox ItemsSource="{Binding PropertySchemas}" DisplayMemberPath="Name" SelectedValuePath="Name"
-                                  SelectedValue="{Binding PropertyNameInput, UpdateSourceTrigger=PropertyChanged}"
-                                  IsEditable="True" Margin="0,3,0,4" />
-                        <TextBlock Text="{Binding PropertySchemaHelp}" Foreground="#9FB0C4" TextWrapping="Wrap" Margin="0,0,0,3" />
-                        <ComboBox ItemsSource="{Binding PropertyValueChoices}"
-                                  Text="{Binding PropertyValueInput, UpdateSourceTrigger=PropertyChanged}"
-                                  IsEditable="True" Margin="0,3,0,6" />
-                        <UniformGrid Columns="2">
-                            <Button Content="Set" Command="{Binding SetPropertyCommand}" Padding="8,4" Margin="0,0,3,0" />
-                            <Button Content="Remove" Command="{Binding RemovePropertyCommand}" Padding="8,4" Margin="3,0,0,0" />
-                        </UniformGrid>
-                    </StackPanel>
-                    <Grid>
-                        <ListBox ItemsSource="{Binding InspectorLines}" />
-                        <TextBlock Text="{Binding InspectorEmptyStateText}" Foreground="{StaticResource MutedText}"
-                                   TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Margin="20" TextAlignment="Center">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" MinHeight="120" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Border Style="{StaticResource EditorHeader}" Padding="12,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="INSPECTOR" Style="{StaticResource SectionLabel}" />
+                                <TextBlock Text="{Binding InspectorSelectionName}" FontSize="16" FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis" Margin="0,3,0,0" />
+                                <TextBlock Text="{Binding InspectorSelectionId}" Foreground="{StaticResource MutedText}"
+                                           FontFamily="Cascadia Mono, Consolas" FontSize="10" TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding InspectorSelectionId}" />
+                            </StackPanel>
+                            <Border Grid.Column="1" CornerRadius="10" BorderBrush="{StaticResource Accent}" BorderThickness="1"
+                                    Padding="9,3" VerticalAlignment="Center" Margin="8,0,0,0">
+                                <TextBlock Text="{Binding InspectorComponentCountText}" Foreground="{StaticResource Accent}" FontSize="11" />
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="1" Margin="10,9,10,7">
+                        <TextBox x:Name="InspectorSearchBox"
+                                 Text="{Binding InspectorSearchInput, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="Search attached components"
+                                 Padding="9,5" />
+                        <TextBlock Text="Search components and values…" Foreground="#68798C" Margin="11,0"
+                                   VerticalAlignment="Center" IsHitTestVisible="False">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasInspectorSelection}" Value="False">
+                                        <DataTrigger Binding="{Binding InspectorSearchInput}" Value="">
                                             <Setter Property="Visibility" Value="Visible" />
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -221,10 +225,127 @@
                             </TextBlock.Style>
                         </TextBlock>
                     </Grid>
-                </DockPanel>
+
+                    <Grid Grid.Row="2" Margin="10,0,10,8">
+                        <ListBox x:Name="InspectorComponentList"
+                                 ItemsSource="{Binding InspectorComponents}"
+                                 SelectedItem="{Binding SelectedInspectorComponent, Mode=TwoWay}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 Padding="0" BorderThickness="0" Background="Transparent">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0,0,0,7" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="#354354" BorderThickness="1" CornerRadius="4" Padding="10,8">
+                                        <StackPanel>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                                <Border Grid.Column="1" CornerRadius="8" Background="#233140" Padding="7,2" Margin="6,0,0,0">
+                                                    <TextBlock FontSize="9" Foreground="#AFC2D8">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="REGISTERED" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding SchemaKnown}" Value="False">
+                                                                        <Setter Property="Text" Value="CUSTOM" />
+                                                                        <Setter Property="Foreground" Value="#F2B36F" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
+                                            </Grid>
+                                            <TextBlock Text="{Binding Type}" FontFamily="Cascadia Mono, Consolas" FontSize="10"
+                                                       Foreground="{StaticResource Accent}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Description}" Foreground="{StaticResource MutedText}"
+                                                       TextWrapping="Wrap" FontSize="10" Margin="0,4,0,5" />
+                                            <ItemsControl ItemsSource="{Binding Properties}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="0,2">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="120" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{Binding Name}" Foreground="#B9C7D6" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Value}" FontFamily="Cascadia Mono, Consolas"
+                                                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Value}" />
+                                                            <TextBlock Grid.Column="2" Text="{Binding ValueKind}" Foreground="#71859B"
+                                                                       FontSize="9" Margin="8,0,0,0" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock Text="{Binding InspectorComponentBrowserEmptyText}" Foreground="{StaticResource MutedText}"
+                                   TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Margin="24" TextAlignment="Center" IsHitTestVisible="False">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding HasItems, ElementName=InspectorComponentList}" Value="False">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+
+                    <Border Grid.Row="3" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,1,0,0"
+                            Background="#171E27" Padding="11,9">
+                        <StackPanel>
+                            <TextBlock Text="COMPONENT EDITOR" Style="{StaticResource SectionLabel}" />
+                            <TextBlock Text="{Binding SelectedInspectorComponentDescription}" Foreground="{StaticResource MutedText}"
+                                       TextWrapping="Wrap" FontSize="10" Margin="0,4,0,7" MaxHeight="42" />
+                            <ComboBox ItemsSource="{Binding ComponentSchemas}" DisplayMemberPath="DisplayName" SelectedValuePath="Type"
+                                      SelectedValue="{Binding ComponentTypeInput, UpdateSourceTrigger=PropertyChanged}"
+                                      IsEditable="True" TextSearch.TextPath="Type" Margin="0,0,0,5" />
+                            <UniformGrid Columns="2" Margin="0,0,0,8">
+                                <Button Content="Add / Replace" Command="{Binding AddComponentCommand}" Padding="8,4" Margin="0,0,3,0" />
+                                <Button Content="Remove Component" Command="{Binding RemoveComponentCommand}" Padding="8,4" Margin="3,0,0,0" />
+                            </UniformGrid>
+                            <Grid Margin="0,1,0,4">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,3,0">
+                                    <TextBlock Text="PROPERTY" Style="{StaticResource SectionLabel}" />
+                                    <ComboBox ItemsSource="{Binding PropertySchemas}" DisplayMemberPath="Name" SelectedValuePath="Name"
+                                              SelectedValue="{Binding PropertyNameInput, UpdateSourceTrigger=PropertyChanged}"
+                                              IsEditable="True" Margin="0,3,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="3,0,0,0">
+                                    <TextBlock Text="VALUE" Style="{StaticResource SectionLabel}" />
+                                    <ComboBox ItemsSource="{Binding PropertyValueChoices}"
+                                              Text="{Binding PropertyValueInput, UpdateSourceTrigger=PropertyChanged}"
+                                              IsEditable="True" Margin="0,3,0,0" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Text="{Binding PropertySchemaHelp}" Foreground="#91A3B7" TextWrapping="Wrap"
+                                       FontSize="10" Margin="0,0,0,6" MaxHeight="45" />
+                            <UniformGrid Columns="2">
+                                <Button Content="Set Value" Command="{Binding SetPropertyCommand}" Style="{StaticResource AccentButton}"
+                                        Padding="8,4" Margin="0,0,3,0" />
+                                <Button Content="Reset" Command="{Binding RemovePropertyCommand}" Padding="8,4" Margin="3,0,0,0" />
+                            </UniformGrid>
+                        </StackPanel>
+                    </Border>
+                </Grid>
             </Border>
 
-            <TabControl x:Name="OutputTabs" Grid.Column="1" Grid.ColumnSpan="2" Grid.Row="1" Margin="0,0,8,8">
+            <TabControl x:Name="OutputTabs" Grid.Column="1" Grid.Row="1" Margin="0,0,0,8">
                 <TabItem Header="Modeling" Visibility="Collapsed">
                     <TabControl>
                     <TabItem Header="Mesh Edit">

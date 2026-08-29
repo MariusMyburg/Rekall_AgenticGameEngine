@@ -35,7 +35,7 @@ internal sealed record RekallAgeStudioLayout(
     string ActiveOutputTab,
     IReadOnlyList<RekallAgeStudioDockPanelLayout> Panels)
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     private static readonly string[] PanelIds = ["Hierarchy", "Inspector", "Output"];
     private static readonly HashSet<string> OutputTabs = new(
@@ -53,8 +53,8 @@ internal sealed record RekallAgeStudioLayout(
         false,
         "Validation",
         [
-            new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 290, 0),
-            new("Inspector", RekallAgeStudioDockRegion.Right, true, 370, 0),
+            new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 340, 0),
+            new("Inspector", RekallAgeStudioDockRegion.Right, true, 460, 0),
             new("Output", RekallAgeStudioDockRegion.Bottom, true, 260, 0)
         ])
     {
@@ -72,8 +72,8 @@ internal sealed record RekallAgeStudioLayout(
             ActiveOutputTab = "Validation",
             Panels =
             [
-                new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 300, 0),
-                new("Inspector", RekallAgeStudioDockRegion.Right, true, 390, 0),
+                new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 360, 0),
+                new("Inspector", RekallAgeStudioDockRegion.Right, true, 500, 0),
                 new("Output", RekallAgeStudioDockRegion.Bottom, true, 280, 0)
             ]
         },
@@ -83,8 +83,8 @@ internal sealed record RekallAgeStudioLayout(
             ActiveOutputTab = "Runtime",
             Panels =
             [
-                new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 270, 0),
-                new("Inspector", RekallAgeStudioDockRegion.Right, true, 340, 0),
+                new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 330, 0),
+                new("Inspector", RekallAgeStudioDockRegion.Right, true, 460, 0),
                 new("Output", RekallAgeStudioDockRegion.Bottom, true, 420, 0)
             ]
         },
@@ -93,12 +93,13 @@ internal sealed record RekallAgeStudioLayout(
 
     public static RekallAgeStudioLayout? Normalize(RekallAgeStudioLayout? candidate)
     {
-        if (candidate is null || candidate.Version is not (1 or CurrentVersion) || candidate.Panels is null)
+        if (candidate is null || candidate.Version is not (1 or 2 or CurrentVersion) || candidate.Panels is null)
         {
             return null;
         }
 
-        var legacyAuthoringLayout = candidate.Version == 1
+        var sourceVersion = candidate.Version;
+        var legacyAuthoringLayout = sourceVersion == 1
             && string.Equals(candidate.ActiveOutputTab, "AI Agent", StringComparison.Ordinal);
         candidate = candidate with
         {
@@ -114,6 +115,10 @@ internal sealed record RekallAgeStudioLayout(
             || PanelIds.Any(id => panels.All(panel => !panel.Id.Equals(id, StringComparison.Ordinal))))
         {
             return null;
+        }
+        if (sourceVersion < CurrentVersion)
+        {
+            panels = MigrateLegacyPanelWidths(panels);
         }
 
         var normalizedPanels = panels
@@ -142,6 +147,28 @@ internal sealed record RekallAgeStudioLayout(
 
     private static double NormalizeDimension(double value, double fallback, double minimum, double maximum) =>
         double.IsFinite(value) ? Math.Clamp(value, minimum, maximum) : fallback;
+
+    private static RekallAgeStudioDockPanelLayout[] MigrateLegacyPanelWidths(
+        RekallAgeStudioDockPanelLayout[] panels)
+    {
+        var hierarchy = panels.FirstOrDefault(panel => panel.Id.Equals("Hierarchy", StringComparison.Ordinal));
+        var inspector = panels.FirstOrDefault(panel => panel.Id.Equals("Inspector", StringComparison.Ordinal));
+        var replacement = (hierarchy?.Size, inspector?.Size) switch
+        {
+            (290, 370) => (Hierarchy: 340d, Inspector: 460d),
+            (300, 390) => (Hierarchy: 360d, Inspector: 500d),
+            (270, 340) => (Hierarchy: 330d, Inspector: 460d),
+            _ => (
+                Hierarchy: Math.Max(hierarchy!.Size, Default.Panel("Hierarchy").Size),
+                Inspector: Math.Max(inspector!.Size, Default.Panel("Inspector").Size))
+        };
+        return panels.Select(panel => panel.Id switch
+        {
+            "Hierarchy" => panel with { Size = replacement.Hierarchy },
+            "Inspector" => panel with { Size = replacement.Inspector },
+            _ => panel
+        }).ToArray();
+    }
 
     private static double NormalizePanelSize(string id, double value)
     {

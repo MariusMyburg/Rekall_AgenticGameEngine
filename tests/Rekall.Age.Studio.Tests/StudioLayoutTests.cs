@@ -13,11 +13,14 @@ public sealed class StudioLayoutTests
         var layout = RekallAgeStudioLayout.Default;
 
         Assert.Equal(RekallAgeStudioLayout.CurrentVersion, layout.Version);
+        Assert.Equal(3, layout.Version);
         Assert.Equal("Author", layout.ActiveWorkspace);
         Assert.Equal(["Hierarchy", "Inspector", "Output"], layout.Panels.Select(panel => panel.Id).Order().ToArray());
         Assert.All(layout.Panels, panel => Assert.True(panel.Visible));
         Assert.InRange(layout.WindowWidth, 1120, 3840);
         Assert.InRange(layout.WindowHeight, 700, 2160);
+        Assert.Equal(340, layout.Panel("Hierarchy").Size);
+        Assert.Equal(460, layout.Panel("Inspector").Size);
 
         var authoring = RekallAgeStudioLayout.CreatePreset(RekallAgeStudioLayoutPreset.Authoring);
         Assert.Equal(RekallAgeStudioDockRegion.Left, authoring.Panel("Hierarchy").Region);
@@ -30,6 +33,56 @@ public sealed class StudioLayoutTests
         Assert.True(debug.Panel("Output").Size > authoring.Panel("Output").Size);
         Assert.Equal("Runtime", debug.ActiveOutputTab);
         Assert.Equal("World", debug.ActiveWorkspace);
+        Assert.Equal(330, debug.Panel("Hierarchy").Size);
+        Assert.Equal(460, debug.Panel("Inspector").Size);
+    }
+
+    [Fact]
+    public void LayoutVersionThreeWidensKnownLegacyAndUndersizedPanelsButPreservesWiderCustomPanels()
+    {
+        var legacyDefault = RekallAgeStudioLayout.Default with
+        {
+            Version = 2,
+            Panels =
+            [
+                new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 290, 0),
+                new("Inspector", RekallAgeStudioDockRegion.Right, true, 370, 0),
+                new("Output", RekallAgeStudioDockRegion.Bottom, true, 260, 0)
+            ]
+        };
+        var migrated = RekallAgeStudioLayout.Normalize(legacyDefault)!;
+
+        Assert.Equal(3, migrated.Version);
+        Assert.Equal(340, migrated.Panel("Hierarchy").Size);
+        Assert.Equal(460, migrated.Panel("Inspector").Size);
+
+        var undersized = legacyDefault with
+        {
+            Panels =
+            [
+                new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 180, 0),
+                new("Inspector", RekallAgeStudioDockRegion.Right, true, 180, 0),
+                new("Output", RekallAgeStudioDockRegion.Bottom, true, 260, 0)
+            ]
+        };
+        var migratedUndersized = RekallAgeStudioLayout.Normalize(undersized)!;
+
+        Assert.Equal(340, migratedUndersized.Panel("Hierarchy").Size);
+        Assert.Equal(460, migratedUndersized.Panel("Inspector").Size);
+
+        var custom = legacyDefault with
+        {
+            Panels =
+            [
+                new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 380, 0),
+                new("Inspector", RekallAgeStudioDockRegion.Right, true, 520, 0),
+                new("Output", RekallAgeStudioDockRegion.Bottom, true, 260, 0)
+            ]
+        };
+        var normalizedCustom = RekallAgeStudioLayout.Normalize(custom)!;
+
+        Assert.Equal(380, normalizedCustom.Panel("Hierarchy").Size);
+        Assert.Equal(520, normalizedCustom.Panel("Inspector").Size);
     }
 
     [Fact]
@@ -142,7 +195,7 @@ public sealed class StudioLayoutTests
         Assert.Contains("Text=\"{Binding ProjectContextText}\"", author, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"{Binding ProjectNameInput}\"", author, StringComparison.Ordinal);
         Assert.Contains("HasInspectorSelection", window, StringComparison.Ordinal);
-        Assert.Contains("InspectorEmptyStateText", window, StringComparison.Ordinal);
+        Assert.Contains("InspectorComponentBrowserEmptyText", window, StringComparison.Ordinal);
         Assert.Contains("Text=\"{TemplateBinding Text}\"", app, StringComparison.Ordinal);
         Assert.DoesNotContain("Content=\"{TemplateBinding SelectionBoxItem}\"", app, StringComparison.Ordinal);
     }
@@ -161,10 +214,30 @@ public sealed class StudioLayoutTests
         Assert.Contains("IsIndeterminate=\"True\"", window, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void WorldWorkspaceExposesTheAdvancedInspectorSurface()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+
+        Assert.Contains("x:Name=\"InspectorSearchBox\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"InspectorComponentList\"", window, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding InspectorSelectionName}\"", window, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding InspectorSelectionId}\"", window, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding InspectorComponentCountText}\"", window, StringComparison.Ordinal);
+        Assert.Contains("SelectedItem=\"{Binding SelectedInspectorComponent, Mode=TwoWay}\"", window, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding SelectedInspectorComponentDescription}\"", window, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding Properties}\"", window, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Add / Replace\"", window, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Set Value\"", window, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Reset\"", window, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("not-json")]
     [InlineData("{\"version\":999,\"panels\":[]}")]
     [InlineData("{\"version\":1,\"windowWidth\":0,\"windowHeight\":0,\"panels\":[]}")]
+    [InlineData("{\"version\":2,\"windowWidth\":1500,\"windowHeight\":940,\"activeOutputTab\":\"Validation\",\"panels\":[null]}")]
     public async Task LayoutStoreFallsBackForCorruptFutureOrIncompleteDocuments(string content)
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-layout-invalid-" + Guid.NewGuid().ToString("N"));

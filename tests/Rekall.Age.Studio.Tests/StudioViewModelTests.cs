@@ -2096,6 +2096,58 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task AdvancedInspectorProjectsSearchesAndSelectsAttachedComponents()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-advanced-inspector-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Advanced Inspector",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            await ExecuteAsync(viewModel.AddEntityCommand);
+            viewModel.ComponentTypeInput = "Rekall.Transform2D";
+            await ExecuteAsync(viewModel.AddComponentCommand);
+            viewModel.ComponentTypeInput = "Rekall.ShapeRenderer2D";
+            await ExecuteAsync(viewModel.AddComponentCommand);
+
+            Assert.Equal(2, viewModel.InspectorComponents.Count);
+            Assert.Equal(viewModel.EntityNameInput, viewModel.InspectorSelectionName);
+            Assert.Equal(viewModel.SelectedEntityId, viewModel.InspectorSelectionId);
+            Assert.Equal("2 components", viewModel.InspectorComponentCountText);
+
+            viewModel.InspectorSearchInput = "shape";
+
+            var shape = Assert.Single(viewModel.InspectorComponents);
+            Assert.Equal("Rekall.ShapeRenderer2D", shape.Type);
+            Assert.Same(shape, viewModel.SelectedInspectorComponent);
+            Assert.Equal(shape.Type, viewModel.ComponentTypeInput);
+            Assert.False(string.IsNullOrWhiteSpace(viewModel.SelectedInspectorComponentDescription));
+
+            viewModel.InspectorSearchInput = "not-present";
+            Assert.Empty(viewModel.InspectorComponents);
+            Assert.Null(viewModel.SelectedInspectorComponent);
+            Assert.Contains("No attached components match", viewModel.InspectorComponentBrowserEmptyText, StringComparison.Ordinal);
+
+            viewModel.InspectorSearchInput = string.Empty;
+            var transform = viewModel.InspectorComponents.Single(component => component.Type == "Rekall.Transform2D");
+            viewModel.SelectedInspectorComponent = transform;
+            Assert.Equal("Rekall.Transform2D", viewModel.ComponentTypeInput);
+            Assert.NotEmpty(viewModel.PropertySchemas);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ManualMeshPreviewPreservesTheSelectedOperationForApply()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-manual-preview-" + Guid.NewGuid().ToString("N"));

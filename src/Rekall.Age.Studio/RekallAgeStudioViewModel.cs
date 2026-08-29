@@ -164,6 +164,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _projectNameInput = "New Rekall Game";
     private string _sceneNameInput = "Main";
     private string _componentTypeInput = "Rekall.Transform";
+    private string _inspectorSearchInput = string.Empty;
+    private RekallAgeInspectorComponentModel? _selectedInspectorComponent;
     private string _entityNameInput = string.Empty;
     private string _parentEntityIdInput = string.Empty;
     private string _propertyNameInput = "position";
@@ -459,6 +461,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<RekallAgeSceneEntityNode> EntityNodes { get; } = [];
     public ObservableCollection<string> SceneNames { get; } = [];
     public ObservableCollection<string> InspectorLines { get; } = [];
+    public ObservableCollection<RekallAgeInspectorComponentModel> InspectorComponents { get; } = [];
     public ObservableCollection<string> AssetLines { get; } = [];
     public ObservableCollection<string> ValidationLines { get; } = [];
     public ObservableCollection<string> TransactionLines { get; } = [];
@@ -760,10 +763,57 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             if (Set(ref _componentTypeInput, value))
             {
                 RefreshPropertySchemas();
+                SynchronizeInspectorSelectionToComponentType();
                 RefreshCommands();
             }
         }
     }
+
+    public string InspectorSearchInput
+    {
+        get => _inspectorSearchInput;
+        set
+        {
+            if (Set(ref _inspectorSearchInput, value)) RefreshInspectorComponents();
+        }
+    }
+
+    public RekallAgeInspectorComponentModel? SelectedInspectorComponent
+    {
+        get => _selectedInspectorComponent;
+        set
+        {
+            if (!Set(ref _selectedInspectorComponent, value)) return;
+            OnPropertyChanged(nameof(SelectedInspectorComponentDescription));
+            if (value is not null && !ComponentTypeInput.Equals(value.Type, StringComparison.Ordinal))
+            {
+                ComponentTypeInput = value.Type;
+            }
+        }
+    }
+
+    public string InspectorSelectionName => _currentModel?.Inspector.SelectedEntityName ?? "No entity selected";
+
+    public string InspectorSelectionId => _currentModel?.Inspector.SelectedEntityId ?? "No stable entity ID";
+
+    public string InspectorComponentCountText
+    {
+        get
+        {
+            var count = _currentModel?.Inspector.Components.Count ?? 0;
+            return count == 1 ? "1 component" : $"{count} components";
+        }
+    }
+
+    public string InspectorComponentBrowserEmptyText => !HasInspectorSelection
+        ? InspectorEmptyStateText
+        : (_currentModel?.Inspector.Components.Count ?? 0) == 0
+            ? "This entity has no attached components. Add one below."
+            : $"No attached components match ‘{InspectorSearchInput.Trim()}’.";
+
+    public string SelectedInspectorComponentDescription => SelectedInspectorComponent?.Description
+        ?? ComponentSchemas.FirstOrDefault(schema => schema.Type.Equals(ComponentTypeInput, StringComparison.Ordinal))?.Description
+        ?? "Custom or unregistered component. Properties remain editable as JSON.";
 
     public string PropertyNameInput
     {
@@ -4417,6 +4467,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         OnPropertyChanged(nameof(ProjectContextText));
         OnPropertyChanged(nameof(HasInspectorSelection));
         OnPropertyChanged(nameof(CanEditSelectedLinkedModel));
+        OnPropertyChanged(nameof(InspectorSelectionName));
+        OnPropertyChanged(nameof(InspectorSelectionId));
+        OnPropertyChanged(nameof(InspectorComponentCountText));
+        OnPropertyChanged(nameof(InspectorComponentBrowserEmptyText));
         // Populate the choices before assigning the selected value. Replacing an
         // ItemsSource first prevents WPF's editable ComboBox from writing a
         // transient null selection back into SceneNameInput during model refreshes.
@@ -4447,6 +4501,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 ?? ComponentTypeInput;
         }
         if (selectedNode is not null) RefreshPropertySchemas();
+        RefreshInspectorComponents();
         Replace(AssetLines, model.Assets.Assets.Select(asset => $"{asset.Kind}: {asset.DisplayName} ({asset.AssetId})"));
         if (_session.ProjectRoot is not null)
         {
@@ -4592,6 +4647,31 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         else
         {
             RefreshSelectedPropertySchema();
+        }
+    }
+
+    private void RefreshInspectorComponents()
+    {
+        var result = RekallAgeStudioInspectorBrowser.Project(
+            _currentModel?.Inspector.Components ?? [],
+            InspectorSearchInput,
+            SelectedInspectorComponent?.Type ?? ComponentTypeInput);
+        Replace(InspectorComponents, result.Components);
+        SelectedInspectorComponent = result.SelectedComponent;
+        OnPropertyChanged(nameof(InspectorComponentBrowserEmptyText));
+    }
+
+    private void SynchronizeInspectorSelectionToComponentType()
+    {
+        var matching = InspectorComponents.FirstOrDefault(component =>
+            component.Type.Equals(ComponentTypeInput, StringComparison.Ordinal));
+        if (matching is not null && !ReferenceEquals(matching, SelectedInspectorComponent))
+        {
+            SelectedInspectorComponent = matching;
+        }
+        else
+        {
+            OnPropertyChanged(nameof(SelectedInspectorComponentDescription));
         }
     }
 

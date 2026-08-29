@@ -17,13 +17,17 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _previewTimer;
     private readonly RekallAgeStudioViewportRecoveryState _viewportRecovery =
         new(TimeSpan.FromSeconds(1));
+    private readonly RekallAgeStudioShutdownCoordinator _shutdownCoordinator = new(
+        maximumAttempts: 2,
+        retryDelay: TimeSpan.FromMilliseconds(100),
+        static (delay, cancellationToken) => new ValueTask(Task.Delay(delay, cancellationToken)));
     private RekallAgeStudioLayout _layout = RekallAgeStudioLayout.Default;
     private bool _shutdownComplete;
     private bool _meshTransformDragging;
     private bool _sceneTransformDragging;
     private bool _initializing = true;
     private bool _hadProject;
-    private Task? _shutdownTask;
+    private bool _shutdownPrepared;
 
     public MainWindow()
     {
@@ -465,9 +469,16 @@ public partial class MainWindow : Window
 
     protected override async void OnClosing(CancelEventArgs e)
     {
-        if (!_shutdownComplete)
+        if (_shutdownComplete)
         {
-            e.Cancel = true;
+            base.OnClosing(e);
+            return;
+        }
+
+        e.Cancel = true;
+        if (_shutdownCoordinator.IsAttemptInProgress) return;
+        if (!_shutdownPrepared)
+        {
             if (!await ResolveDirtyCodeAsync()) return;
             _previewTimer.Stop();
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
@@ -482,23 +493,26 @@ public partial class MainWindow : Window
             {
                 Log.Warning(exception, "Failed to persist the Studio window layout.");
             }
-            _shutdownTask ??= _viewModel.DisposeAsync().AsTask();
-            try
-            {
-                await _shutdownTask;
-            }
-            catch (Exception exception)
-            {
-                Log.Error(exception, "Failed to shut down the Studio workspace cleanly.");
-            }
-            if (!_shutdownComplete)
-            {
-                _shutdownComplete = true;
-                Close();
-            }
+            _shutdownPrepared = true;
+        }
+
+        var result = await _shutdownCoordinator.TryShutdownAsync(_viewModel, CancellationToken.None);
+        if (!result.TerminalCleanupComplete)
+        {
+            SceneVulkanViewportHost.SetPresentationVisible(false);
+            VulkanUnavailablePlaceholder.Visibility = Visibility.Visible;
+            Log.Error(
+                result.Failure,
+                "Studio shutdown stopped before HWND destruction because Vulkan cleanup remains incomplete.");
             return;
         }
-        base.OnClosing(e);
+
+        if (result.Failure is not null)
+        {
+            Log.Warning(result.Failure, "Studio renderer cleanup completed with diagnostics.");
+        }
+        _shutdownComplete = true;
+        Close();
     }
 
     private async Task<bool> ResolveDirtyCodeAsync()

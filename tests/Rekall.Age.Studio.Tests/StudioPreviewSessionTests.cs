@@ -433,6 +433,8 @@ public sealed class StudioPreviewSessionTests
 
         public RekallAgeStudioViewportMetrics Metrics { get; } = new(320, 180, 320, 180, true);
 
+        public bool IsDisposalComplete { get; private set; }
+
         public int AssetInvalidationCount { get; private set; }
 
         public int ShaderInvalidationCount { get; private set; }
@@ -462,7 +464,11 @@ public sealed class StudioPreviewSessionTests
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public ValueTask DisposeAsync()
+        {
+            IsDisposalComplete = true;
+            return ValueTask.CompletedTask;
+        }
 
         internal sealed record Presentation(
             RekallAgeRuntimeViewportFrame Frame,

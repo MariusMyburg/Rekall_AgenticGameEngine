@@ -44,7 +44,8 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
     private int _assetRevision;
     private bool _assetsDirty;
     private IRekallAgeStudioViewportDependencyMonitor? _dependencyMonitor;
-    private bool _disposed;
+    private bool _disposeStarted;
+    private bool _disposalComplete;
 
     internal RekallAgeStudioVulkanPreviewSession(IRekallAgeStudioViewportPresenter presenter)
         : this(
@@ -79,6 +80,8 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
     }
 
     public RekallAgeStudioViewportMetrics Metrics => _presenter.Metrics;
+
+    public bool IsDisposalComplete => _disposalComplete;
 
     public async ValueTask<RekallAgeStudioPreviewFrame> ResetAsync(
         string projectRoot,
@@ -361,15 +364,39 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
         await _gate.WaitAsync();
         try
         {
-            if (_disposed) return;
-            _disposed = true;
-            _loop?.Dispose();
-            _loop = null;
-            _world = null;
-            _assets = null;
-            _dependencyMonitor?.Dispose();
-            _dependencyMonitor = null;
-            await _presenter.DisposeAsync();
+            if (_disposalComplete) return;
+            if (!_disposeStarted)
+            {
+                _disposeStarted = true;
+                _loop?.Dispose();
+                _loop = null;
+                _world = null;
+                _assets = null;
+                _dependencyMonitor?.Dispose();
+                _dependencyMonitor = null;
+            }
+
+            Exception? failure = null;
+            try
+            {
+                await _presenter.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+
+            if (_presenter.IsDisposalComplete)
+            {
+                _disposalComplete = true;
+            }
+            else
+            {
+                failure ??= new InvalidOperationException(
+                    "The Studio Vulkan presenter returned from disposal without proving terminal cleanup.");
+            }
+
+            if (failure is not null) throw failure;
         }
         finally
         {
@@ -418,5 +445,5 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
         return change;
     }
 
-    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
+    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposeStarted, this);
 }

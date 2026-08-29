@@ -2981,6 +2981,7 @@ public sealed class StudioViewModelTests
         public List<(int Width, int Height)> ResetSizes { get; } = [];
         public List<RekallAgeStudioViewportPickRegion> Regions { get; } = [];
         public bool IsDisposed { get; private set; }
+        public bool IsDisposalComplete { get; private set; }
         public bool ReturnUnavailable { get; set; }
         private bool _externalDependencyChangePending;
 
@@ -3040,11 +3041,12 @@ public sealed class StudioViewModelTests
             return ValueTask.FromResult<RekallAgeStudioPreviewFrame?>(CreateFrame(_frame));
         }
 
-        public ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             IsDisposed = true;
             _disposeEntered?.TrySetResult();
-            return _disposeBlocked is null ? ValueTask.CompletedTask : new ValueTask(_disposeBlocked.Task);
+            if (_disposeBlocked is not null) await _disposeBlocked.Task;
+            IsDisposalComplete = true;
         }
 
         public ValueTask ClearAsync(CancellationToken cancellationToken)

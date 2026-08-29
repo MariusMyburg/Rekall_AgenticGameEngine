@@ -4,6 +4,8 @@ internal interface IRekallAgeStudioPreviewSession : IAsyncDisposable
 {
     RekallAgeStudioViewportMetrics Metrics => default;
 
+    bool IsDisposalComplete { get; }
+
     ValueTask<RekallAgeStudioPreviewFrame> ResetAsync(
         string projectRoot,
         string sceneName,
@@ -43,6 +45,9 @@ internal sealed class RekallAgeStudioPreviewSession : IRekallAgeStudioPreviewSes
 {
     private const string HostRequired =
         "REKALL_STUDIO_VULKAN_UNAVAILABLE: The Studio World viewport host is not attached.";
+    private bool _disposalComplete;
+
+    public bool IsDisposalComplete => _disposalComplete;
 
     public ValueTask<RekallAgeStudioPreviewFrame> ResetAsync(
         string projectRoot,
@@ -59,5 +64,9 @@ internal sealed class RekallAgeStudioPreviewSession : IRekallAgeStudioPreviewSes
 
     public ValueTask ClearAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        _disposalComplete = true;
+        return ValueTask.CompletedTask;
+    }
 }

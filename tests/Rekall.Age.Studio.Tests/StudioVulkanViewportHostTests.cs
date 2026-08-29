@@ -437,6 +437,95 @@ public sealed class StudioVulkanViewportHostTests
         await presenter.DisposeAsync();
     }
 
+    [Fact]
+    public async Task ProductionShutdownChainRetriesIncompleteRendererBeforeAllowingHwndDestruction()
+    {
+        var session = new IncompleteThenTerminalPresentationSession();
+        var presenter = new RekallAgeStudioVulkanViewportPresenter((_, _, _, _, _) => session);
+        var native = new RecordingNativeWindow();
+        var core = new RekallAgeVulkanViewportHostCore(native, presenter);
+        var child = core.BuildWindow(new IntPtr(17));
+        core.QueueResize(320, 180, 1, 1, isVisible: true);
+        await core.ApplyPendingResizeAsync(CancellationToken.None);
+        await presenter.PresentAsync(
+            ViewportFrame(),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            PresentationContext(),
+            CancellationToken.None);
+        var preview = new RekallAgeStudioVulkanPreviewSession(presenter);
+        var viewModel = new RekallAgeStudioViewModel(preview);
+        var observedIncompleteBoundary = false;
+        RekallAgeStudioShutdownCoordinator coordinator = null!;
+        coordinator = new RekallAgeStudioShutdownCoordinator(
+            maximumAttempts: 2,
+            retryDelay: TimeSpan.Zero,
+            (_, _) =>
+            {
+                observedIncompleteBoundary = true;
+                Assert.False(coordinator.IsDisposalComplete);
+                Assert.False(viewModel.IsDisposalComplete);
+                Assert.False(preview.IsDisposalComplete);
+                Assert.Throws<InvalidOperationException>(() => core.DestroyWindow(child));
+                return ValueTask.CompletedTask;
+            });
+
+        var result = await coordinator.TryShutdownAsync(viewModel, CancellationToken.None);
+
+        Assert.True(observedIncompleteBoundary);
+        Assert.True(result.TerminalCleanupComplete);
+        Assert.Equal(2, result.Attempts);
+        Assert.True(coordinator.IsDisposalComplete);
+        Assert.True(viewModel.IsDisposalComplete);
+        Assert.True(preview.IsDisposalComplete);
+        Assert.Equal(2, session.DisposeCount);
+        core.DestroyWindow(child);
+        Assert.Equal(1, native.DestroyCount);
+    }
+
+    [Fact]
+    public async Task ProductionShutdownChainRefusesHwndDestructionAfterBoundedPersistentFailure()
+    {
+        var session = new PersistentIncompletePresentationSession();
+        var presenter = new RekallAgeStudioVulkanViewportPresenter((_, _, _, _, _) => session);
+        var native = new RecordingNativeWindow();
+        var core = new RekallAgeVulkanViewportHostCore(native, presenter);
+        var child = core.BuildWindow(new IntPtr(17));
+        core.QueueResize(320, 180, 1, 1, isVisible: true);
+        await core.ApplyPendingResizeAsync(CancellationToken.None);
+        await presenter.PresentAsync(
+            ViewportFrame(),
+            RekallAgeRuntimeViewportAssetSet.Empty,
+            PresentationContext(),
+            CancellationToken.None);
+        var preview = new RekallAgeStudioVulkanPreviewSession(presenter);
+        var viewModel = new RekallAgeStudioViewModel(preview);
+        var coordinator = new RekallAgeStudioShutdownCoordinator(
+            maximumAttempts: 2,
+            retryDelay: TimeSpan.Zero,
+            (_, _) => ValueTask.CompletedTask);
+
+        var result = await coordinator.TryShutdownAsync(viewModel, CancellationToken.None);
+
+        Assert.False(result.TerminalCleanupComplete);
+        Assert.Equal(2, result.Attempts);
+        Assert.Contains("REKALL_STUDIO_VULKAN_SHUTDOWN_INCOMPLETE", result.Failure?.ToString(), StringComparison.Ordinal);
+        Assert.False(coordinator.IsDisposalComplete);
+        Assert.False(viewModel.IsDisposalComplete);
+        Assert.False(preview.IsDisposalComplete);
+        Assert.Contains(
+            "REKALL_STUDIO_VULKAN_SHUTDOWN_INCOMPLETE",
+            viewModel.ViewportUnavailableReason,
+            StringComparison.Ordinal);
+        Assert.Equal(2, session.DisposeCount);
+        Assert.Throws<InvalidOperationException>(() => core.DestroyWindow(child));
+        Assert.Equal(0, native.DestroyCount);
+
+        session.AllowCompletion = true;
+        await viewModel.DisposeAsync();
+        Assert.True(viewModel.IsDisposalComplete);
+        core.DestroyWindow(child);
+    }
+
     private static IntPtr MakeLParam(short x, short y) =>
         new(unchecked((int)((ushort)x | ((uint)(ushort)y << 16))));
 
@@ -502,6 +591,33 @@ public sealed class StudioVulkanViewportHostTests
             IsDisposalComplete = true;
             return ValueTask.FromException(
                 new AggregateException("terminal cleanup issue", new InvalidOperationException("native cleanup issue")));
+        }
+    }
+
+    private sealed class PersistentIncompletePresentationSession : IRekallAgeVulkanPresentationSession
+    {
+        public int DisposeCount { get; private set; }
+
+        public bool AllowCompletion { get; set; }
+
+        public bool IsDisposalComplete { get; private set; }
+
+        public ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
+            RekallAgeVulkanSceneSubmission submission,
+            CancellationToken cancellationToken) =>
+            ValueTask.FromResult(RekallAgeVulkanPresentationFrame.Presented(submission.Frame, "test-gpu"));
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            if (AllowCompletion)
+            {
+                IsDisposalComplete = true;
+                return ValueTask.CompletedTask;
+            }
+
+            return ValueTask.FromException(
+                new InvalidOperationException("session cleanup remains incomplete"));
         }
     }
 

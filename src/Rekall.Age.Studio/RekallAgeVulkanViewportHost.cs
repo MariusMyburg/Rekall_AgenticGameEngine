@@ -53,6 +53,8 @@ internal interface IRekallAgeStudioViewportPresenter : IAsyncDisposable
 {
     RekallAgeStudioViewportMetrics Metrics { get; }
 
+    bool IsDisposalComplete { get; }
+
     ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
         RekallAgeRuntimeViewportFrame frame,
         RekallAgeRuntimeViewportAssetSet assets,
@@ -806,6 +808,8 @@ internal sealed class RekallAgeVulkanViewportHost : HwndHost, IRekallAgeStudioVi
     internal event EventHandler<RekallAgeStudioViewportMetrics>? MetricsChanged;
 
     public RekallAgeStudioViewportMetrics Metrics => _presenter.Metrics;
+
+    public bool IsDisposalComplete => _presenter.IsDisposalComplete;
 
     internal Task<RekallAgeStudioViewportMetrics> WaitForSurfaceReadyAsync(CancellationToken cancellationToken) =>
         _surfaceReady.Task.WaitAsync(cancellationToken);

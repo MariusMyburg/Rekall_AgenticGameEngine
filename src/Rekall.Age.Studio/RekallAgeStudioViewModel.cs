@@ -157,6 +157,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private bool _isLiveViewportEnabled = true;
     private bool _isSimulationPaused;
     private Task? _disposeTask;
+    private bool _shutdownPrerequisitesComplete;
+    private bool _disposalComplete;
     private int _previewAdvancing;
     private int _previewFrameIndex;
     private RekallAgeStudioMode _mode;
@@ -1677,12 +1679,72 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         lock (_disposeSync)
         {
-            _disposeTask ??= DisposeCoreAsync();
+            if (_disposalComplete) return ValueTask.CompletedTask;
+            if (_disposeTask is not { IsCompleted: false }) _disposeTask = DisposeCoreAsync();
             return new ValueTask(_disposeTask);
         }
     }
 
+    internal bool IsDisposalComplete
+    {
+        get
+        {
+            lock (_disposeSync)
+            {
+                return _disposalComplete;
+            }
+        }
+    }
+
     private async Task DisposeCoreAsync()
+    {
+        if (!_shutdownPrerequisitesComplete)
+        {
+            await DisposeShutdownPrerequisitesAsync();
+            _shutdownPrerequisitesComplete = true;
+        }
+
+        Exception? previewFailure = null;
+        try
+        {
+            await _previewSession.DisposeAsync();
+        }
+        catch (Exception exception)
+        {
+            previewFailure = exception;
+        }
+
+        var terminalCleanupComplete = _previewSession.IsDisposalComplete;
+        if (terminalCleanupComplete)
+        {
+            lock (_disposeSync)
+            {
+                _disposalComplete = true;
+            }
+        }
+
+        if (previewFailure is null && terminalCleanupComplete) return;
+
+        const string incompleteCode = "REKALL_STUDIO_VULKAN_SHUTDOWN_INCOMPLETE";
+        var diagnostic = terminalCleanupComplete
+            ? "REKALL_STUDIO_VULKAN_SHUTDOWN_DIAGNOSTIC: Renderer cleanup completed with diagnostics."
+            : $"{incompleteCode}: Renderer cleanup is incomplete; the Vulkan child window must remain alive.";
+        var failure = new AggregateException(
+            diagnostic,
+            previewFailure ?? new InvalidOperationException(
+                "The preview session did not prove terminal renderer cleanup."));
+        if (!terminalCleanupComplete)
+        {
+            ViewportAvailable = false;
+            ViewportBackendLabel = "Vulkan · cleanup incomplete";
+            ViewportUnavailableReason = diagnostic;
+        }
+        StatusText = diagnostic;
+        Replace(ValidationLines, [$"error: {diagnostic}"]);
+        throw failure;
+    }
+
+    private async Task DisposeShutdownPrerequisitesAsync()
     {
         try
         {
@@ -1753,15 +1815,6 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             try
             {
                 await StopCoreAsync(resetEditPreview: false, CancellationToken.None);
-            }
-            catch (Exception)
-            {
-                ReportLanguageModelShutdownFailure();
-            }
-
-            try
-            {
-                await _previewSession.DisposeAsync();
             }
             catch (Exception)
             {

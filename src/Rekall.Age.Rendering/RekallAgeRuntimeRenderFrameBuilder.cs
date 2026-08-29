@@ -434,6 +434,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             RekallAgeRuntimeComponent? virtualGeometryComponent = null;
             RekallAgeRuntimeComponent? geometry = null;
             RekallAgeRuntimeComponent? geometryMeshComponent = null;
+            RekallAgeRuntimeComponent? shapeRenderer2DComponent = null;
             RekallAgeRuntimeComponent? meshAssetReferenceComponent = null;
             RekallAgeRuntimeComponent? modelAssetReferenceComponent = null;
             RekallAgeRuntimeComponent? lineSegmentsComponent = null;
@@ -462,6 +463,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                         case "Rekall.VirtualGeometry": virtualGeometryComponent ??= component; break;
                         case "Rekall.GeometryPrimitive": geometry ??= component; break;
                         case "Rekall.GeometryMesh": geometryMeshComponent ??= component; break;
+                        case "Rekall.ShapeRenderer2D": shapeRenderer2DComponent ??= component; break;
                         case "Rekall.MeshAssetReference": meshAssetReferenceComponent ??= component; break;
                         case "Rekall.ModelAssetReference": modelAssetReferenceComponent ??= component; break;
                         case "Rekall.LineSegments": lineSegmentsComponent ??= component; break;
@@ -488,6 +490,8 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             var isMarkerRenderable = mesh.Variant?.Equals("rekall.marker", StringComparison.OrdinalIgnoreCase) == true;
             var isHaloRenderable = mesh.Variant?.Equals("rekall.halo", StringComparison.OrdinalIgnoreCase) == true;
             var isTextLabelRenderable = mesh.Variant?.Equals("rekall.text.label", StringComparison.OrdinalIgnoreCase) == true;
+            var isShape2DRenderable = mesh.Variant?.Equals("rekall.shape2d", StringComparison.OrdinalIgnoreCase) == true
+                && shapeRenderer2DComponent is not null;
             if (isOrbitPathRenderable && !ReadBoolean(orbitPathComponent, "active", true))
             {
                 continue;
@@ -558,6 +562,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             }
             var compiledMesh = compiledMeshResolution.Mesh;
             var geometryMesh = orbitPathMesh ?? ringMesh ?? starfieldMesh ?? markerMesh ?? haloMesh
+                ?? ReadShape2DGeometry(shapeRenderer2DComponent)
                 ?? compiledMesh?.Geometry
                 ?? ReadGeometryMesh(geometryMeshComponent);
             var lineSegments = isTextLabelRenderable
@@ -604,7 +609,7 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             var variant = geometryMesh is not null
                 ? orbitPathMesh is not null
                     ? "rekall.orbit.path"
-                    : ringMesh is not null ? "rekall.planet.ring" : starfieldMesh is not null ? "rekall.space.starfield" : markerMesh is not null ? "rekall.marker" : haloMesh is not null ? "rekall.halo" : "rekall.geometry.mesh"
+                    : ringMesh is not null ? "rekall.planet.ring" : starfieldMesh is not null ? "rekall.space.starfield" : markerMesh is not null ? "rekall.marker" : haloMesh is not null ? "rekall.halo" : shapeRenderer2DComponent is not null ? "rekall.shape2d" : "rekall.geometry.mesh"
                 : planetComponent is not null
                 ? "rekall.planet.surface"
                 : isTextLabelRenderable
@@ -616,9 +621,15 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
             var renderTransform = orbitPathMesh is null ? transform : FindOrbitParentTransform(world, orbitComponent);
             var scaleMultiplier = Math.Max(0.0001, lodSelection?.ScaleMultiplier ?? 1);
             var usesAuthoredGeometryScale = orbitPathMesh is not null || ringMesh is not null || starfieldMesh is not null || markerMesh is not null || haloMesh is not null;
-            var scaleX = (usesAuthoredGeometryScale ? 1 : planetComponent is null ? transform.Scale3D.X : transform.Scale3D.X * radius * 2) * scaleMultiplier;
-            var scaleY = (usesAuthoredGeometryScale ? 1 : planetComponent is null ? transform.Scale3D.Y : transform.Scale3D.Y * radius * 2) * scaleMultiplier;
-            var scaleZ = (usesAuthoredGeometryScale ? 1 : planetComponent is null ? transform.Scale3D.Z : transform.Scale3D.Z * radius * 2) * scaleMultiplier;
+            var scaleX = (isShape2DRenderable
+                ? transform.Scale2D.X
+                : usesAuthoredGeometryScale ? 1 : planetComponent is null ? transform.Scale3D.X : transform.Scale3D.X * radius * 2) * scaleMultiplier;
+            var scaleY = (isShape2DRenderable
+                ? transform.Scale2D.Y
+                : usesAuthoredGeometryScale ? 1 : planetComponent is null ? transform.Scale3D.Y : transform.Scale3D.Y * radius * 2) * scaleMultiplier;
+            var scaleZ = (isShape2DRenderable
+                ? 1
+                : usesAuthoredGeometryScale ? 1 : planetComponent is null ? transform.Scale3D.Z : transform.Scale3D.Z * radius * 2) * scaleMultiplier;
             var atmosphereHeight = planetComponent is not null && atmosphereComponent is not null && orbitPathMesh is null && markerMesh is null && haloMesh is null && !isTextLabelRenderable && lodSelection?.AssetId is null
                 ? Math.Max(0, ReadNumber(atmosphereComponent, "height", 0.08))
                 : 0;
@@ -637,14 +648,14 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
                 mesh.EntityName,
                 string.IsNullOrWhiteSpace(mesh.Kind) ? "mesh" : mesh.Kind,
                 lodSelection?.AssetId ?? mesh.AssetId,
-                renderTransform.Position3D.X,
-                renderTransform.Position3D.Y,
-                renderTransform.Position3D.Z,
+                isShape2DRenderable ? transform.Position2D.X : renderTransform.Position3D.X,
+                isShape2DRenderable ? transform.Position2D.Y : renderTransform.Position3D.Y,
+                isShape2DRenderable ? 0 : renderTransform.Position3D.Z,
                 sortKey,
                 Variant: lodSelection?.Variant ?? mesh.Variant ?? variant,
-                RotationX: transform.Rotation3D.X,
-                RotationY: transform.Rotation3D.Y,
-                RotationZ: transform.Rotation3D.Z,
+                RotationX: isShape2DRenderable ? 0 : transform.Rotation3D.X,
+                RotationY: isShape2DRenderable ? 0 : transform.Rotation3D.Y,
+                RotationZ: isShape2DRenderable ? transform.Rotation2D : transform.Rotation3D.Z,
                 ScaleX: scaleX,
                 ScaleY: scaleY,
                 ScaleZ: scaleZ,
@@ -1923,6 +1934,84 @@ public sealed class RekallAgeRuntimeRenderFrameBuilder
     }
 
     private sealed record ParsedGeometryMeshBox(RekallAgeRuntimeViewportGeometryMesh? Mesh);
+
+    private static RekallAgeRuntimeViewportGeometryMesh? ReadShape2DGeometry(
+        RekallAgeRuntimeComponent? component)
+    {
+        if (component is null || !ReadBoolean(component, "active", true))
+        {
+            return null;
+        }
+
+        var shape = ReadString(component, "shape")?.Trim().ToLowerInvariant();
+        return shape == "circle"
+            ? CreateCircle2DGeometry(Math.Max(0.0001, ReadNumber(component, "radius", 0.5)))
+            : CreateRectangle2DGeometry(
+                Math.Max(0.0001, ReadNumber(component, "width", 1)),
+                Math.Max(0.0001, ReadNumber(component, "height", 1)));
+    }
+
+    private static RekallAgeRuntimeViewportGeometryMesh CreateRectangle2DGeometry(
+        double width,
+        double height)
+    {
+        var halfWidth = width * 0.5;
+        var halfHeight = height * 0.5;
+        var vertices = new[]
+        {
+            Shape2DVertex(-halfWidth, -halfHeight, 0, 1),
+            Shape2DVertex(-halfWidth, halfHeight, 0, 0),
+            Shape2DVertex(halfWidth, halfHeight, 1, 0),
+            Shape2DVertex(halfWidth, -halfHeight, 1, 1)
+        };
+        return new RekallAgeRuntimeViewportGeometryMesh(vertices, [0, 1, 2, 0, 2, 3]);
+    }
+
+    private static RekallAgeRuntimeViewportGeometryMesh CreateCircle2DGeometry(double radius)
+    {
+        const int segmentCount = 48;
+        var vertices = new List<RekallAgeRuntimeViewportGeometryVertex>(segmentCount + 2)
+        {
+            Shape2DVertex(0, 0, 0.5, 0.5)
+        };
+        for (var index = 0; index <= segmentCount; index++)
+        {
+            // Decreasing angle makes the fan counter-clockwise when viewed by the
+            // Camera2D convention from negative Z toward the XY plane.
+            var angle = -index / (double)segmentCount * Math.PI * 2;
+            var x = Math.Cos(angle) * radius;
+            var y = Math.Sin(angle) * radius;
+            vertices.Add(Shape2DVertex(
+                x,
+                y,
+                0.5 + x / (radius * 2),
+                0.5 - y / (radius * 2)));
+        }
+
+        var indices = new List<uint>(segmentCount * 3);
+        for (var index = 0; index < segmentCount; index++)
+        {
+            indices.Add(0);
+            indices.Add(checked((uint)(index + 1)));
+            indices.Add(checked((uint)(index + 2)));
+        }
+
+        return new RekallAgeRuntimeViewportGeometryMesh(vertices, indices);
+    }
+
+    private static RekallAgeRuntimeViewportGeometryVertex Shape2DVertex(
+        double x,
+        double y,
+        double u,
+        double v) => new(
+            x,
+            y,
+            0,
+            0,
+            0,
+            -1,
+            U: u,
+            V: v);
 
     private static RekallAgeRuntimeViewportGeometryMesh? ParseGeometryMesh(RekallAgeRuntimeComponent component)
     {

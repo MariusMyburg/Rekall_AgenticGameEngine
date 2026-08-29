@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
 using Rekall.Age.Modules;
 using Rekall.Age.Modules.BuiltIns;
+using Rekall.Age.Rendering;
+using Rekall.Age.Rendering.Abstractions;
 using Rekall.Age.Runtime;
 using Rekall.Age.Runtime.Abstractions;
 using Rekall.Age.World;
@@ -121,5 +123,117 @@ public sealed class ShapeRenderer2DTests
         Assert.Contains(projected.Subsystems.Rendering.Meshes, mesh =>
             mesh.EntityName == "Shape"
             && mesh.ProjectionSource == RekallAgeRuntimeProjectionSources.BuiltIn);
+    }
+
+    [Fact]
+    public void RectangleShapeBuildsExpectedXyGeometryAndPreservesTransform()
+    {
+        var frame = BuildShapeFrame(new JsonObject
+        {
+            ["shape"] = "rectangle",
+            ["width"] = 4,
+            ["height"] = 2,
+            ["color"] = "#22c55e"
+        });
+
+        var renderable = Assert.Single(frame.Renderables, item => item.EntityName == "Shape");
+        var geometry = Assert.IsType<RekallAgeRuntimeViewportGeometryMesh>(renderable.GeometryMesh);
+
+        Assert.Equal(4, geometry.Vertices.Count);
+        Assert.Equal(6, geometry.Indices.Count);
+        Assert.Equal(-2, geometry.Vertices.Min(vertex => vertex.X));
+        Assert.Equal(2, geometry.Vertices.Max(vertex => vertex.X));
+        Assert.Equal(-1, geometry.Vertices.Min(vertex => vertex.Y));
+        Assert.Equal(1, geometry.Vertices.Max(vertex => vertex.Y));
+        Assert.All(geometry.Vertices, vertex => Assert.Equal(0, vertex.Z));
+        Assert.Equal((3d, 5d, 15d), (renderable.X, renderable.Y, renderable.RotationZ));
+        Assert.Equal((2d, 0.5d), (renderable.ScaleX, renderable.ScaleY));
+        Assert.Equal("#22c55e", renderable.MaterialColor);
+    }
+
+    [Fact]
+    public void CircleShapeBuildsClosedFiniteTriangleFanAndRendersWithoutFallback()
+    {
+        var frame = BuildShapeFrame(new JsonObject
+        {
+            ["shape"] = "circle",
+            ["radius"] = 1.5,
+            ["color"] = "#38bdf8"
+        });
+        var renderable = Assert.Single(frame.Renderables, item => item.EntityName == "Shape");
+        var geometry = Assert.IsType<RekallAgeRuntimeViewportGeometryMesh>(renderable.GeometryMesh);
+
+        Assert.Equal(50, geometry.Vertices.Count);
+        Assert.Equal(144, geometry.Indices.Count);
+        Assert.All(geometry.Vertices, vertex =>
+        {
+            Assert.True(double.IsFinite(vertex.X));
+            Assert.True(double.IsFinite(vertex.Y));
+            Assert.True(double.IsFinite(vertex.Z));
+        });
+        Assert.InRange(geometry.Vertices.Min(vertex => vertex.X), -1.501, -1.499);
+        Assert.InRange(geometry.Vertices.Max(vertex => vertex.X), 1.499, 1.501);
+        Assert.InRange(geometry.Vertices.Min(vertex => vertex.Y), -1.501, -1.499);
+        Assert.InRange(geometry.Vertices.Max(vertex => vertex.Y), 1.499, 1.501);
+        Assert.Equal(geometry.Vertices[1].X, geometry.Vertices[^1].X, 8);
+        Assert.Equal(geometry.Vertices[1].Y, geometry.Vertices[^1].Y, 8);
+
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame);
+        Assert.Single(meshes);
+        var rendered = new RekallAgeRuntimeSoftwareRenderer().RenderRgba(
+            frame,
+            RekallAgeRuntimeViewportAssetSet.Empty);
+        Assert.Equal(0, rendered.FallbackRenderableCount);
+        Assert.Equal(0, rendered.MissingAssetCount);
+        Assert.True(rendered.NonBlank);
+    }
+
+    [Theory]
+    [InlineData("triangle")]
+    [InlineData("")]
+    public void UnknownShapeNormalizesToClampedRectangle(string shape)
+    {
+        var frame = BuildShapeFrame(new JsonObject
+        {
+            ["shape"] = shape,
+            ["width"] = 0,
+            ["height"] = -2
+        });
+        var geometry = Assert.IsType<RekallAgeRuntimeViewportGeometryMesh>(
+            Assert.Single(frame.Renderables, item => item.EntityName == "Shape").GeometryMesh);
+
+        Assert.Equal(4, geometry.Vertices.Count);
+        Assert.Equal(0.0001, geometry.Vertices.Max(vertex => vertex.X) - geometry.Vertices.Min(vertex => vertex.X), 8);
+        Assert.Equal(0.0001, geometry.Vertices.Max(vertex => vertex.Y) - geometry.Vertices.Min(vertex => vertex.Y), 8);
+    }
+
+    private static RekallAgeRuntimeViewportFrame BuildShapeFrame(JsonObject shapeProperties)
+    {
+        var scene = RekallAgeSceneDocument.Create("Main", ["world", "rendering2d"])
+            .AddEntity(RekallAgeEntityDocument.Create("Camera", [])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform3D",
+                    new JsonObject { ["z"] = -20 }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Camera2D",
+                    new JsonObject { ["active"] = true, ["orthographicSize"] = 20 })))
+            .AddEntity(RekallAgeEntityDocument.Create("Shape", [])
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.Transform2D",
+                    new JsonObject
+                    {
+                        ["x"] = 3,
+                        ["y"] = 5,
+                        ["rotation"] = 15,
+                        ["scaleX"] = 2,
+                        ["scaleY"] = 0.5
+                    }))
+                .AddComponent(RekallAgeComponentDocument.Create(
+                    "Rekall.ShapeRenderer2D",
+                    shapeProperties)));
+        var world = new RekallAgeRuntimeProjectionBuilder()
+            .Project(new RekallAgeRuntimeWorldBuilder().Build(scene));
+
+        return new RekallAgeRuntimeRenderFrameBuilder().Build(world, 320, 180, false);
     }
 }

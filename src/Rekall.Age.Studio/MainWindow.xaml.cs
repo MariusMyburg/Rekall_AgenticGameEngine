@@ -62,6 +62,14 @@ public partial class MainWindow : Window
             _hadProject = _viewModel.HasProject;
             _initializing = false;
             _previewTimer.Start();
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() =>
+            {
+                if (_viewModel.LanguageModels.Count == 0
+                    && _viewModel.RefreshLanguageModelsCommand.CanExecute(null))
+                {
+                    _viewModel.RefreshLanguageModelsCommand.Execute(null);
+                }
+            }));
         }
         catch (Exception exception)
         {
@@ -90,6 +98,9 @@ public partial class MainWindow : Window
     }
 
     private void OnWorkspaceChanged(object sender, SelectionChangedEventArgs e)
+        => ApplyWorkspaceVisibility(refreshModeling: true);
+
+    private void ApplyWorkspaceVisibility(bool refreshModeling)
     {
         if (AuthorWorkspaceHost is null || WorldWorkspace is null || ModelingWorkspaceHost is null
             || ProjectBar is null || MainToolbar is null) return;
@@ -102,12 +113,7 @@ public partial class MainWindow : Window
         ModelingWorkspaceHost.Visibility = modeling ? Visibility.Visible : Visibility.Collapsed;
         ProjectBar.Visibility = modeling ? Visibility.Collapsed : Visibility.Visible;
         MainToolbar.Visibility = world ? Visibility.Visible : Visibility.Collapsed;
-        if (author && _viewModel.LanguageModels.Count == 0
-            && _viewModel.RefreshLanguageModelsCommand.CanExecute(null))
-        {
-            _viewModel.RefreshLanguageModelsCommand.Execute(null);
-        }
-        if (modeling)
+        if (modeling && refreshModeling)
         {
             if (_viewModel.RefreshMeshAssetsCommand.CanExecute(null)) _viewModel.RefreshMeshAssetsCommand.Execute(null);
             if (_viewModel.RefreshModelingGraphsCommand.CanExecute(null)) _viewModel.RefreshModelingGraphsCommand.Execute(null);
@@ -172,6 +178,7 @@ public partial class MainWindow : Window
             }
         }
         SelectWorkspace(layout.ActiveWorkspace);
+        ApplyWorkspaceVisibility(refreshModeling: false);
         WindowState = layout.WindowMaximized ? WindowState.Maximized : WindowState.Normal;
     }
 

@@ -152,7 +152,25 @@ public static class RekallAgeStudioAutomation
                 providerFailure = viewModel.ProviderStatus;
             }
         }
-        viewModel.SelectedLanguageModel = options.Model;
+        if (languageModelClient is not null)
+        {
+            viewModel.SelectAutomationLanguageModel(options.Model);
+        }
+        else if (providerFailure is null && !viewModel.LanguageModels.Contains(options.Model, StringComparer.Ordinal)
+                 && viewModel.RefreshLanguageModelsCommand.CanExecute(null))
+        {
+            await ((RekallAgeAsyncCommand)viewModel.RefreshLanguageModelsCommand).ExecuteAsync(null);
+            viewModel.SelectedLanguageModel = options.Model;
+        }
+        else if (languageModelClient is null)
+        {
+            viewModel.SelectedLanguageModel = options.Model;
+        }
+        if (languageModelClient is null && providerFailure is null
+            && !viewModel.SelectedLanguageModel.Equals(options.Model, StringComparison.Ordinal))
+        {
+            providerFailure = $"REKALL_STUDIO_AUTOMATION_MODEL_UNAVAILABLE: Model '{options.Model}' was not returned by provider '{options.Provider}'.";
+        }
         viewModel.AgentTaskInput = options.Task;
         viewModel.TreatGauntletAsTerminalSuccess = options.TreatGauntletAsTerminalSuccess;
         viewModel.AgentMaxTurns = options.MaxTurns;

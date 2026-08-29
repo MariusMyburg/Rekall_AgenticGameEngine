@@ -32,6 +32,10 @@ public sealed class StudioModelingGraphRenderingTests
                 window.Height = 940;
                 window.Show();
                 window.UpdateLayout();
+                var workspaceSelector = Assert.IsType<TabControl>(window.FindName("WorkspaceSelector"));
+                workspaceSelector.SelectedItem = workspaceSelector.Items.OfType<TabItem>().Single(
+                    item => string.Equals(item.Header as string, "World", StringComparison.Ordinal));
+                window.UpdateLayout();
                 var outputTabs = Assert.IsType<TabControl>(window.FindName("OutputTabs"));
                 var renderingTab = outputTabs.Items.OfType<TabItem>().Single(item =>
                     item.Header?.ToString() == "Rendering");
@@ -119,13 +123,16 @@ public sealed class StudioModelingGraphRenderingTests
                 window.Height = 820;
                 window.Show();
                 window.UpdateLayout();
+                var workspaceSelector = Assert.IsType<TabControl>(window.FindName("WorkspaceSelector"));
+                workspaceSelector.SelectedItem = workspaceSelector.Items.OfType<TabItem>().Single(
+                    item => string.Equals(item.Header as string, "World", StringComparison.Ordinal));
+                window.UpdateLayout();
                 var graphTabs = Descendants<TabControl>(window).Single(item =>
                     item.Items.OfType<TabItem>().Any(tab => string.Equals(tab.Header as string, "Mesh Edit", StringComparison.Ordinal)));
                 graphTabs.SelectedIndex = 1;
                 window.UpdateLayout();
-
-                var workspaceSelector = Assert.IsType<TabControl>(window.FindName("WorkspaceSelector"));
-                workspaceSelector.SelectedIndex = 1;
+                workspaceSelector.SelectedItem = workspaceSelector.Items.OfType<TabItem>().Single(
+                    item => string.Equals(item.Header as string, "Modeling", StringComparison.Ordinal));
                 window.UpdateLayout();
                 var host = Assert.IsType<ModelingWorkspace>(window.FindName("ModelingWorkspaceHost"));
                 var projectBar = Assert.IsType<Border>(window.FindName("ProjectBar"));

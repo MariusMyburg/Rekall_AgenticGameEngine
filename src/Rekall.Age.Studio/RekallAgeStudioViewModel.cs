@@ -785,6 +785,16 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
     }
 
+    internal void SelectAutomationLanguageModel(string model)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(model);
+        if (Set(ref _selectedLanguageModel, model.Trim()))
+        {
+            OnPropertyChanged(nameof(HasUsableLanguageModel));
+            RefreshCommands();
+        }
+    }
+
     public bool IsOllamaSelected => SelectedLanguageModelProvider.Id == "ollama";
 
     public bool IsOpenAiSelected => SelectedLanguageModelProvider.Id == "openai";

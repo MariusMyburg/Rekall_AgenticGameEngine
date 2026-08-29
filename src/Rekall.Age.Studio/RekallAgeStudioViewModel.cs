@@ -110,6 +110,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeModelingNodeCatalog _modelingGraphCatalog = RekallAgeModelingNodeCatalog.CreateDefault();
     private readonly Dictionary<string, System.Windows.Point> _modelingGraphNodePositions = new(StringComparer.Ordinal);
     private readonly Dictionary<RekallAgeStudioInspectorPropertyEditorModel, InspectorPropertyEditorKey> _inspectorPropertyEditorKeys = [];
+    private readonly List<RekallAgeStudioInspectorComponentEditorModel> _allInspectorComponentEditors = [];
     private RekallAgeStudioModelingGraphCanvasFrame? _modelingGraphCanvasFrame;
     private string? _modelingGraphDragNodeId;
     private System.Windows.Point _modelingGraphDragOrigin;
@@ -4956,6 +4957,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             InspectorSearchInput,
             SelectedInspectorComponent?.Type ?? ComponentTypeInput);
         Replace(InspectorComponents, result.Components);
+        var visibleTypes = result.Components.Select(component => component.Type).ToHashSet(StringComparer.Ordinal);
+        Replace(InspectorComponentEditors, _allInspectorComponentEditors.Where(group => visibleTypes.Contains(group.Type)));
         SelectedInspectorComponent = result.SelectedComponent;
         OnPropertyChanged(nameof(InspectorComponentBrowserEmptyText));
     }
@@ -5011,7 +5014,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
 
         Replace(InspectorPropertyEditors, editors);
-        Replace(InspectorComponentEditors, groups);
+        _allInspectorComponentEditors.Clear();
+        _allInspectorComponentEditors.AddRange(groups);
+        var visibleTypes = InspectorComponents.Select(component => component.Type).ToHashSet(StringComparer.Ordinal);
+        Replace(InspectorComponentEditors, groups.Where(group => visibleTypes.Contains(group.Type)));
         _inspectorPropertyEditorKeys.Clear();
         foreach (var entry in keys) _inspectorPropertyEditorKeys.Add(entry.Key, entry.Value);
         _commitInspectorPropertyCommand.RaiseCanExecuteChanged();

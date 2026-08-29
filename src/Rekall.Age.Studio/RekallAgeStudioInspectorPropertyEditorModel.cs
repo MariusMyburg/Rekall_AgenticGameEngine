@@ -19,6 +19,11 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
     private string _textValue = string.Empty;
     private bool? _booleanValue;
     private string _colorValue = string.Empty;
+    private string _colorRed = string.Empty;
+    private string _colorGreen = string.Empty;
+    private string _colorBlue = string.Empty;
+    private string _colorAlpha = string.Empty;
+    private bool _colorChannelsAreActive;
     private string _vectorX = string.Empty;
     private string _vectorY = string.Empty;
     private string _vectorZ = string.Empty;
@@ -82,7 +87,39 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
     public string ColorValue
     {
         get => _colorValue;
-        set => SetDraft(ref _colorValue, value ?? string.Empty);
+        set
+        {
+            var next = value ?? string.Empty;
+            if (string.Equals(_colorValue, next, StringComparison.Ordinal) && !_colorChannelsAreActive) return;
+            _colorValue = next;
+            _colorChannelsAreActive = false;
+            SynchronizeColorChannels(next);
+            NotifyDraftChanged(nameof(ColorValue));
+        }
+    }
+
+    public string ColorRed
+    {
+        get => _colorRed;
+        set => SetColorChannel(ref _colorRed, value, nameof(ColorRed));
+    }
+
+    public string ColorGreen
+    {
+        get => _colorGreen;
+        set => SetColorChannel(ref _colorGreen, value, nameof(ColorGreen));
+    }
+
+    public string ColorBlue
+    {
+        get => _colorBlue;
+        set => SetColorChannel(ref _colorBlue, value, nameof(ColorBlue));
+    }
+
+    public string ColorAlpha
+    {
+        get => _colorAlpha;
+        set => SetColorChannel(ref _colorAlpha, value, nameof(ColorAlpha));
     }
 
     public string VectorX
@@ -217,6 +254,12 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
         _textValue = InitialTextValue(draftValue, isDefined);
         _booleanValue = isDefined && bool.TryParse(displayValue, out var boolean) ? boolean : null;
         _colorValue = isDefined ? draftValue : string.Empty;
+        _colorRed = string.Empty;
+        _colorGreen = string.Empty;
+        _colorBlue = string.Empty;
+        _colorAlpha = string.Empty;
+        _colorChannelsAreActive = false;
+        SynchronizeColorChannels(_colorValue);
         _vectorX = string.Empty;
         _vectorY = string.Empty;
         _vectorZ = string.Empty;
@@ -232,6 +275,10 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
         OnPropertyChanged(nameof(TextValue));
         OnPropertyChanged(nameof(BooleanValue));
         OnPropertyChanged(nameof(ColorValue));
+        OnPropertyChanged(nameof(ColorRed));
+        OnPropertyChanged(nameof(ColorGreen));
+        OnPropertyChanged(nameof(ColorBlue));
+        OnPropertyChanged(nameof(ColorAlpha));
         OnPropertyChanged(nameof(VectorX));
         OnPropertyChanged(nameof(VectorY));
         OnPropertyChanged(nameof(VectorZ));
@@ -327,7 +374,7 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
                 return true;
 
             case "color":
-                if (!TryParseColor(ColorValue, out var color, out error))
+                if (!TryCreateColor(out var color, out error))
                 {
                     value = null;
                     return false;
@@ -437,6 +484,51 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
         return false;
     }
 
+    private bool TryCreateColor(out string color, out string? error)
+    {
+        if (!_colorChannelsAreActive) return TryParseColor(ColorValue, out color, out error);
+
+        var channelTexts = new[] { ColorRed, ColorGreen, ColorBlue, ColorAlpha };
+        var channels = new byte[channelTexts.Length];
+        for (var index = 0; index < channelTexts.Length; index++)
+        {
+            if (!byte.TryParse(channelTexts[index], NumberStyles.None, CultureInfo.InvariantCulture, out channels[index]))
+            {
+                color = string.Empty;
+                error = "Color channels must be whole numbers between 0 and 255.";
+                return false;
+            }
+        }
+
+        color = $"#{channels[0]:X2}{channels[1]:X2}{channels[2]:X2}{channels[3]:X2}";
+        error = null;
+        return true;
+    }
+
+    private void SynchronizeColorChannels(string text)
+    {
+        if (!TryParseColor(text, out var normalized, out _)) return;
+        _colorRed = Convert.ToByte(normalized.Substring(1, 2), 16).ToString(CultureInfo.InvariantCulture);
+        _colorGreen = Convert.ToByte(normalized.Substring(3, 2), 16).ToString(CultureInfo.InvariantCulture);
+        _colorBlue = Convert.ToByte(normalized.Substring(5, 2), 16).ToString(CultureInfo.InvariantCulture);
+        _colorAlpha = normalized.Length == 9
+            ? Convert.ToByte(normalized.Substring(7, 2), 16).ToString(CultureInfo.InvariantCulture)
+            : byte.MaxValue.ToString(CultureInfo.InvariantCulture);
+        OnPropertyChanged(nameof(ColorRed));
+        OnPropertyChanged(nameof(ColorGreen));
+        OnPropertyChanged(nameof(ColorBlue));
+        OnPropertyChanged(nameof(ColorAlpha));
+    }
+
+    private void SetColorChannel(ref string field, string? value, string propertyName)
+    {
+        var next = value ?? string.Empty;
+        if (string.Equals(field, next, StringComparison.Ordinal) && _colorChannelsAreActive) return;
+        field = next;
+        _colorChannelsAreActive = true;
+        NotifyDraftChanged(propertyName);
+    }
+
     private static bool TryReadFiniteJsonNumber(JsonNode? node, out double number)
     {
         if (node is JsonValue value && value.TryGetValue<double>(out number) && double.IsFinite(number)) return true;
@@ -451,7 +543,9 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
     private string DraftSignature() => TemplateKind switch
     {
         "boolean" => BooleanValue?.ToString() ?? "<null>",
-        "color" => ColorValue,
+        "color" => _colorChannelsAreActive
+            ? $"channels\u001f{ColorRed}\u001f{ColorGreen}\u001f{ColorBlue}\u001f{ColorAlpha}"
+            : $"hex\u001f{ColorValue}",
         "vector2" => $"{VectorX}\u001f{VectorY}",
         "vector3" => $"{VectorX}\u001f{VectorY}\u001f{VectorZ}",
         "vector4" => $"{VectorX}\u001f{VectorY}\u001f{VectorZ}\u001f{VectorW}",
@@ -462,6 +556,14 @@ public sealed class RekallAgeStudioInspectorPropertyEditorModel : INotifyPropert
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return;
         field = value;
+        OnPropertyChanged(propertyName);
+        ValidationMessage = TryCreateValueCore(out _, out var error) ? null : error;
+        OnPropertyChanged(nameof(IsDirty));
+        OnPropertyChanged(nameof(IsValid));
+    }
+
+    private void NotifyDraftChanged(string propertyName)
+    {
         OnPropertyChanged(propertyName);
         ValidationMessage = TryCreateValueCore(out _, out var error) ? null : error;
         OnPropertyChanged(nameof(IsDirty));

@@ -124,6 +124,29 @@ public sealed class StudioInspectorPropertyEditorModelTests
     }
 
     [Fact]
+    public void ColorChannelDraftsProduceCanonicalColorAndRetainInvalidChannelFeedback()
+    {
+        var row = Row("color", "#10203040");
+
+        Assert.Equal("16", row.ColorRed);
+        Assert.Equal("32", row.ColorGreen);
+        Assert.Equal("48", row.ColorBlue);
+        Assert.Equal("64", row.ColorAlpha);
+
+        row.ColorRed = "255";
+        row.ColorGreen = "102";
+        row.ColorBlue = "204";
+        row.ColorAlpha = "255";
+        Assert.True(row.TryCreateValue(out var value, out var error), error);
+        Assert.Equal("\"#FF66CCFF\"", value!.ToJsonString());
+
+        row.ColorRed = "256";
+        Assert.False(row.TryCreateValue(out _, out var invalidError));
+        Assert.Contains("0 and 255", invalidError, StringComparison.Ordinal);
+        Assert.Equal("256", row.ColorRed);
+    }
+
+    [Fact]
     public void Vector3RowBuildsNativeArrayAndRejectsNaNWrongArityAndRangeViolations()
     {
         var row = Row("vector3", "[0,0,0]", minimum: -10, maximum: 10);

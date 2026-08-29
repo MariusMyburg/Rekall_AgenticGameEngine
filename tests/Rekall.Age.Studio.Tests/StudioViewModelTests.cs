@@ -2854,6 +2854,9 @@ public sealed class StudioViewModelTests
             viewModel.ComponentTypeInput = "Rekall.Transform2D";
             await ExecuteAsync(viewModel.AddComponentCommand);
 
+            viewModel.InspectorSearchInput = "does-not-match";
+            Assert.Empty(viewModel.InspectorComponentEditors);
+            viewModel.InspectorSearchInput = string.Empty;
             var group = Assert.Single(viewModel.InspectorComponentEditors);
             Assert.Equal("Rekall.Transform2D", group.Type);
             Assert.Equal(group.PropertyEditors.Count, viewModel.InspectorPropertyEditors.Count);

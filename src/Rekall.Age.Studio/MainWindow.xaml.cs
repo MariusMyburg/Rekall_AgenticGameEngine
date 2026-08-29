@@ -133,6 +133,80 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnInspectorTextEditorKeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: RekallAgeStudioInspectorPropertyEditorModel row }) return;
+        if (e.Key == Key.Escape)
+        {
+            row.RestoreOriginalDraft();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            CommitInspectorRow(row);
+            e.Handled = true;
+        }
+    }
+
+    private void OnInspectorJsonEditorKeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: RekallAgeStudioInspectorPropertyEditorModel row }) return;
+        if (e.Key == Key.Escape)
+        {
+            row.RestoreOriginalDraft();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Enter && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            CommitInspectorRow(row);
+            e.Handled = true;
+        }
+    }
+
+    private void OnInspectorChoiceEditorKeyDown(object sender, KeyEventArgs e) =>
+        OnInspectorTextEditorKeyDown(sender, e);
+
+    private void OnInspectorTextEditorLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: RekallAgeStudioInspectorPropertyEditorModel row }) return;
+        if (e.NewFocus is FrameworkElement { DataContext: RekallAgeStudioInspectorPropertyEditorModel nextRow }
+            && ReferenceEquals(row, nextRow))
+        {
+            return;
+        }
+
+        CommitInspectorRow(row);
+    }
+
+    private void OnInspectorBooleanChanged(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: RekallAgeStudioInspectorPropertyEditorModel row })
+        {
+            CommitInspectorRow(row);
+        }
+    }
+
+    private void OnInspectorChoiceChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: RekallAgeStudioInspectorPropertyEditorModel row })
+        {
+            CommitInspectorRow(row);
+        }
+    }
+
+    private void CommitInspectorRow(RekallAgeStudioInspectorPropertyEditorModel row)
+    {
+        row.TryCreateValue(out _, out _);
+        if (_viewModel.CommitInspectorPropertyCommand.CanExecute(row))
+        {
+            _viewModel.CommitInspectorPropertyCommand.Execute(row);
+        }
+    }
+
     private void OnWorkspaceChanged(object sender, SelectionChangedEventArgs e)
         => ApplyWorkspaceVisibility(refreshModeling: true);
 

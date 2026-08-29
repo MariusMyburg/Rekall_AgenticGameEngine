@@ -3,6 +3,55 @@ namespace Rekall.Age.Tests.Editor;
 public sealed class StudioWorkbenchSourceTests
 {
     [Fact]
+    public async Task StudioInspectorUsesTypedInlineEditorsAsPrimaryPropertyWorkflow()
+    {
+        var root = FindRepositoryRoot();
+        var studioDirectory = Path.Combine(root, "src", "Rekall.Age.Studio");
+        var xaml = await File.ReadAllTextAsync(Path.Combine(studioDirectory, "MainWindow.xaml"));
+        var windowCode = await File.ReadAllTextAsync(Path.Combine(studioDirectory, "MainWindow.xaml.cs"));
+        var selectorCode = await File.ReadAllTextAsync(Path.Combine(
+            studioDirectory,
+            "RekallAgeStudioInspectorEditorTemplateSelector.cs"));
+        var viewModelCode = await File.ReadAllTextAsync(Path.Combine(studioDirectory, "RekallAgeStudioViewModel.cs"));
+
+        Assert.Contains("ItemsSource=\"{Binding InspectorComponentEditors}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding PropertyEditors}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ContentTemplateSelector=\"{StaticResource InspectorEditorTemplateSelector}\"", xaml, StringComparison.Ordinal);
+
+        foreach (var templateKind in new[]
+                 {
+                     "Boolean", "Number", "Integer", "Enum", "AssetRef", "EntityRef", "Color",
+                     "Vector2", "Vector3", "Vector4", "Json", "String"
+                 })
+        {
+            Assert.Contains($"{templateKind}Template=\"{{StaticResource Inspector{templateKind}EditorTemplate}}\"", xaml, StringComparison.Ordinal);
+            Assert.Contains($"public DataTemplate? {templateKind}Template", selectorCode, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("Command=\"{Binding DataContext.CommitInspectorPropertyCommand, RelativeSource={RelativeSource AncestorType=Window}}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding DataContext.ResetInspectorPropertyCommand, RelativeSource={RelativeSource AncestorType=Window}}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("CommandParameter=\"{Binding}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ValidationMessage", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsDefined", xaml, StringComparison.Ordinal);
+        Assert.Contains("Description", xaml, StringComparison.Ordinal);
+        Assert.Contains("OnInspectorTextEditorKeyDown", xaml, StringComparison.Ordinal);
+        Assert.Contains("OnInspectorTextEditorLostKeyboardFocus", xaml, StringComparison.Ordinal);
+        Assert.Contains("OnInspectorBooleanChanged", xaml, StringComparison.Ordinal);
+        Assert.Contains("OnInspectorChoiceChanged", xaml, StringComparison.Ordinal);
+        Assert.Contains("OnInspectorJsonEditorKeyDown", xaml, StringComparison.Ordinal);
+        Assert.Contains("RestoreOriginalDraft", windowCode, StringComparison.Ordinal);
+        Assert.Contains("CommitInspectorPropertyCommand", windowCode, StringComparison.Ordinal);
+
+        Assert.Contains("COMPONENTS &amp; ADVANCED JSON", xaml, StringComparison.Ordinal);
+        Assert.Contains("Add custom JSON property", xaml, StringComparison.Ordinal);
+        Assert.Contains("Attached properties are edited above", xaml, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding SetPropertyCommand}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding RemovePropertyCommand}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("rekall.component.set_property", viewModelCode, StringComparison.Ordinal);
+        Assert.Contains("rekall.component.remove_property", viewModelCode, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task StudioWorkspaceWiresCanonicalGameCreationCommandsAndRenderedViewport()
     {
         var root = FindRepositoryRoot();
@@ -45,9 +94,8 @@ public sealed class StudioWorkbenchSourceTests
         Assert.Contains("Command=\"{Binding RedoCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding SceneNames}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding ComponentSchemas}\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("ItemsSource=\"{Binding PropertySchemas}\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("ItemsSource=\"{Binding PropertyValueChoices}\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{Binding PropertySchemaHelp}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding InspectorComponentEditors}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding PropertyEditors}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding RefreshLanguageModelsCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding RunAgentCommand}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding CancelAgentCommand}\"", xaml, StringComparison.Ordinal);
@@ -63,7 +111,7 @@ public sealed class StudioWorkbenchSourceTests
         Assert.Contains("Text=\"{Binding AgentTaskInput", xaml, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding AgentLines}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("SelectedItemChanged=\"OnSelectedEntityChanged\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Source=\"{Binding ViewportImage}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<local:RekallAgeVulkanViewportHost x:Name=\"SceneVulkanViewportHost\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"{Binding ViewportSummary}\" FontSize=\"14\" VerticalAlignment=\"Center\"", xaml, StringComparison.Ordinal);
 
         Assert.Contains("RekallAgeDefaultCommandRegistry.Create()", code, StringComparison.Ordinal);

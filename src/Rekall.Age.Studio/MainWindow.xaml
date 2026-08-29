@@ -5,6 +5,120 @@
         Title="Rekall AGE Studio" Width="1500" Height="940" MinWidth="1120" MinHeight="700"
         Background="{StaticResource WorkbenchBackground}" Foreground="{StaticResource WorkbenchText}"
         FontFamily="Segoe UI" UseLayoutRounding="True">
+    <Window.Resources>
+        <local:RekallAgeStudioColorBrushConverter x:Key="InspectorColorBrushConverter" />
+
+        <DataTemplate x:Key="InspectorBooleanEditorTemplate">
+            <CheckBox Content="Enabled" IsThreeState="False"
+                      IsChecked="{Binding BooleanValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                      Checked="OnInspectorBooleanChanged" Unchecked="OnInspectorBooleanChanged" />
+        </DataTemplate>
+        <DataTemplate x:Key="InspectorNumberEditorTemplate">
+            <TextBox Text="{Binding TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Enter a finite number within the declared minimum and maximum."
+                     KeyDown="OnInspectorTextEditorKeyDown"
+                     LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" />
+        </DataTemplate>
+        <DataTemplate x:Key="InspectorIntegerEditorTemplate">
+            <TextBox Text="{Binding TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="Enter a whole number within the declared minimum and maximum."
+                     KeyDown="OnInspectorTextEditorKeyDown"
+                     LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" />
+        </DataTemplate>
+        <DataTemplate x:Key="InspectorEnumEditorTemplate">
+            <ComboBox ItemsSource="{Binding ChoiceItems}" DisplayMemberPath="DisplayName" SelectedValuePath="Value"
+                      SelectedValue="{Binding TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                      IsEditable="False" SelectionChanged="OnInspectorChoiceChanged" />
+        </DataTemplate>
+        <DataTemplate x:Key="InspectorAssetRefEditorTemplate">
+            <ComboBox ItemsSource="{Binding ChoiceItems}" DisplayMemberPath="DisplayName" SelectedValuePath="Value"
+                      SelectedValue="{Binding TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                      Text="{Binding TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                      IsEditable="True" IsTextSearchEnabled="True" TextSearch.TextPath="DisplayName"
+                      SelectionChanged="OnInspectorChoiceChanged" KeyDown="OnInspectorChoiceEditorKeyDown"
+                      LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" />
+        </DataTemplate>
+        <DataTemplate x:Key="InspectorEntityRefEditorTemplate">
+            <ComboBox ItemsSource="{Binding ChoiceItems}" DisplayMemberPath="DisplayName" SelectedValuePath="Value"
+                      SelectedValue="{Binding TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                      Text="{Binding TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                      IsEditable="True" IsTextSearchEnabled="True" TextSearch.TextPath="DisplayName"
+                      SelectionChanged="OnInspectorChoiceChanged" KeyDown="OnInspectorChoiceEditorKeyDown"
+                      LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" />
+        </DataTemplate>
+        <DataTemplate x:Key="InspectorColorEditorTemplate">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="30" /></Grid.ColumnDefinitions>
+                    <TextBox Text="{Binding ColorValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="#RRGGBB or #RRGGBBAA" KeyDown="OnInspectorTextEditorKeyDown"
+                             LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" />
+                    <Border Grid.Column="1" Margin="5,0,0,0" CornerRadius="3" BorderThickness="1"
+                            BorderBrush="#64778C" Background="{Binding ColorValue, Converter={StaticResource InspectorColorBrushConverter}}"
+                            ToolTip="Color preview; transparent indicates invalid color text." />
+                </Grid>
+                <UniformGrid Columns="4" Margin="0,4,0,0">
+                    <StackPanel Margin="0,0,2,0"><TextBlock Text="R" FontSize="9" Foreground="{StaticResource MutedText}" /><TextBox Text="{Binding ColorRed, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnInspectorTextEditorKeyDown" LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" /></StackPanel>
+                    <StackPanel Margin="2,0"><TextBlock Text="G" FontSize="9" Foreground="{StaticResource MutedText}" /><TextBox Text="{Binding ColorGreen, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnInspectorTextEditorKeyDown" LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" /></StackPanel>
+                    <StackPanel Margin="2,0"><TextBlock Text="B" FontSize="9" Foreground="{StaticResource MutedText}" /><TextBox Text="{Binding ColorBlue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnInspectorTextEditorKeyDown" LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" /></StackPanel>
+                    <StackPanel Margin="2,0,0,0"><TextBlock Text="A" FontSize="9" Foreground="{StaticResource MutedText}" /><TextBox Text="{Binding ColorAlpha, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnInspectorTextEditorKeyDown" LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" /></StackPanel>
+                </UniformGrid>
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:Key="InspectorVector2EditorTemplate">
+            <UniformGrid Columns="2">
+                <StackPanel Margin="0,0,2,0"><TextBlock Text="X" FontSize="9" Foreground="{StaticResource MutedText}" /><TextBox Text="{Binding VectorX, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnInspectorTextEditorKeyDown" LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" /></StackPanel>
+                <StackPanel Margin="2,0,0,0"><TextBlock Text="Y" FontSize="9" Foreground="{StaticResource MutedText}" /><TextBox Text="{Binding VectorY, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnInspectorTextEditorKeyDown" LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" /></StackPanel>
+            </UniformGrid>
+        </DataTemplate>
+        <DataTemplate x:Key="InspectorVector3EditorTemplate">
+            <UniformGrid Columns="3">
+                <StackPanel Margin="0,0,2,0"><TextBlock Text="X" FontSize="9" Foreground="{StaticResource MutedText}" /><TextBox Text="{Binding VectorX, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnInspectorTextEditorKeyDown" LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" /></StackPanel>
+                <StackPanel Margin="2,0"><TextBlock Text="Y" FontSize="9" Foreground="{StaticResource MutedText}" /><TextBox Text="{Binding VectorY, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnInspectorTextEditorKeyDown" LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" /></StackPanel>
+                <StackPanel Margin="2,0,0,0"><TextBlock Text="Z" FontSize="9" Foreground="{StaticResource MutedText}" /><TextBox Text="{Binding VectorZ, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnInspectorTextEditorKeyDown" LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" /></StackPanel>
+            </UniformGrid>
+        </DataTemplate>
+        <DataTemplate x:Key="InspectorVector4EditorTemplate">
+            <UniformGrid Columns="4">
+                <StackPanel Margin="0,0,2,0"><TextBlock Text="X" FontSize="9" Foreground="{StaticResource MutedText}" /><TextBox Text="{Binding VectorX, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnInspectorTextEditorKeyDown" LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" /></StackPanel>
+                <StackPanel Margin="2,0"><TextBlock Text="Y" FontSize="9" Foreground="{StaticResource MutedText}" /><TextBox Text="{Binding VectorY, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnInspectorTextEditorKeyDown" LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" /></StackPanel>
+                <StackPanel Margin="2,0"><TextBlock Text="Z" FontSize="9" Foreground="{StaticResource MutedText}" /><TextBox Text="{Binding VectorZ, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnInspectorTextEditorKeyDown" LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" /></StackPanel>
+                <StackPanel Margin="2,0,0,0"><TextBlock Text="W" FontSize="9" Foreground="{StaticResource MutedText}" /><TextBox Text="{Binding VectorW, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" KeyDown="OnInspectorTextEditorKeyDown" LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" /></StackPanel>
+            </UniformGrid>
+        </DataTemplate>
+        <DataTemplate x:Key="InspectorJsonEditorTemplate">
+            <Expander Header="Structured JSON" IsExpanded="False">
+                <StackPanel Margin="0,4,0,0">
+                    <TextBox Text="{Binding TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             FontFamily="Cascadia Mono, Consolas" AcceptsReturn="True" AcceptsTab="True"
+                             MinHeight="64" MaxHeight="180" VerticalScrollBarVisibility="Auto"
+                             KeyDown="OnInspectorJsonEditorKeyDown" />
+                    <Button Content="Apply JSON" HorizontalAlignment="Right" Style="{StaticResource AccentButton}"
+                            Command="{Binding DataContext.CommitInspectorPropertyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}" Padding="8,3" Margin="0,4,0,0" />
+                </StackPanel>
+            </Expander>
+        </DataTemplate>
+        <DataTemplate x:Key="InspectorStringEditorTemplate">
+            <TextBox Text="{Binding TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                     KeyDown="OnInspectorTextEditorKeyDown"
+                     LostKeyboardFocus="OnInspectorTextEditorLostKeyboardFocus" />
+        </DataTemplate>
+
+        <local:RekallAgeStudioInspectorEditorTemplateSelector x:Key="InspectorEditorTemplateSelector"
+            BooleanTemplate="{StaticResource InspectorBooleanEditorTemplate}"
+            NumberTemplate="{StaticResource InspectorNumberEditorTemplate}"
+            IntegerTemplate="{StaticResource InspectorIntegerEditorTemplate}"
+            EnumTemplate="{StaticResource InspectorEnumEditorTemplate}"
+            AssetRefTemplate="{StaticResource InspectorAssetRefEditorTemplate}"
+            EntityRefTemplate="{StaticResource InspectorEntityRefEditorTemplate}"
+            ColorTemplate="{StaticResource InspectorColorEditorTemplate}"
+            Vector2Template="{StaticResource InspectorVector2EditorTemplate}"
+            Vector3Template="{StaticResource InspectorVector3EditorTemplate}"
+            Vector4Template="{StaticResource InspectorVector4EditorTemplate}"
+            JsonTemplate="{StaticResource InspectorJsonEditorTemplate}"
+            StringTemplate="{StaticResource InspectorStringEditorTemplate}" />
+    </Window.Resources>
     <DockPanel>
         <Border x:Name="ProjectBar" DockPanel.Dock="Top" Background="{StaticResource ChromeBackground}" Padding="12,9" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
             <Grid>
@@ -235,8 +349,9 @@
 
                     <Grid Grid.Row="2" Margin="10,0,10,8">
                         <ListBox x:Name="InspectorComponentList"
-                                 ItemsSource="{Binding InspectorComponents}"
-                                 SelectedItem="{Binding SelectedInspectorComponent, Mode=TwoWay}"
+                                 ItemsSource="{Binding InspectorComponentEditors}"
+                                 SelectedValue="{Binding SelectedInspectorComponent, Mode=TwoWay}"
+                                 SelectedValuePath="Component"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  Padding="0" BorderThickness="0" Background="Transparent">
                             <ListBox.ItemContainerStyle>
@@ -273,21 +388,55 @@
                                                        Foreground="{StaticResource Accent}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Text="{Binding Description}" Foreground="{StaticResource MutedText}"
                                                        TextWrapping="Wrap" FontSize="10" Margin="0,4,0,5" />
-                                            <ItemsControl ItemsSource="{Binding Properties}">
+                                            <ItemsControl ItemsSource="{Binding PropertyEditors}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Grid Margin="0,2">
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="120" />
-                                                                <ColumnDefinition Width="*" />
-                                                                <ColumnDefinition Width="Auto" />
-                                                            </Grid.ColumnDefinitions>
-                                                            <TextBlock Text="{Binding Name}" Foreground="#B9C7D6" TextTrimming="CharacterEllipsis" />
-                                                            <TextBlock Grid.Column="1" Text="{Binding Value}" FontFamily="Cascadia Mono, Consolas"
-                                                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Value}" />
-                                                            <TextBlock Grid.Column="2" Text="{Binding ValueKind}" Foreground="#71859B"
-                                                                       FontSize="9" Margin="8,0,0,0" />
-                                                        </Grid>
+                                                        <Border BorderBrush="#2E3A49" BorderThickness="0,1,0,0" Padding="0,6,0,4">
+                                                            <StackPanel ToolTip="{Binding Description}">
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="112" />
+                                                                        <ColumnDefinition Width="*" />
+                                                                        <ColumnDefinition Width="Auto" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <StackPanel Margin="0,2,7,0">
+                                                                        <TextBlock Text="{Binding Name}" Foreground="#B9C7D6" TextTrimming="CharacterEllipsis" />
+                                                                        <StackPanel Orientation="Horizontal">
+                                                                            <TextBlock Text="UNSET" Foreground="#F2B36F" FontSize="9" Margin="0,0,5,0">
+                                                                                <TextBlock.Style>
+                                                                                    <Style TargetType="TextBlock">
+                                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                                        <Style.Triggers><DataTrigger Binding="{Binding IsDefined}" Value="False"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
+                                                                                    </Style>
+                                                                                </TextBlock.Style>
+                                                                            </TextBlock>
+                                                                            <TextBlock Text="{Binding TypeName}" Foreground="#71859B" FontSize="9" TextTrimming="CharacterEllipsis" />
+                                                                        </StackPanel>
+                                                                    </StackPanel>
+                                                                    <ContentControl Grid.Column="1" Content="{Binding}"
+                                                                                    ContentTemplateSelector="{StaticResource InspectorEditorTemplateSelector}" />
+                                                                    <Button Grid.Column="2" Content="↶" ToolTip="Reset this property to unset"
+                                                                            Command="{Binding DataContext.ResetInspectorPropertyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}" Padding="6,2" Margin="5,0,0,0" VerticalAlignment="Top">
+                                                                        <Button.Style>
+                                                                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                                <Style.Triggers><DataTrigger Binding="{Binding IsDefined}" Value="False"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
+                                                                            </Style>
+                                                                        </Button.Style>
+                                                                    </Button>
+                                                                </Grid>
+                                                                <TextBlock Text="{Binding ValidationMessage}" Foreground="#FF8A8A" FontSize="10"
+                                                                           TextWrapping="Wrap" Margin="112,3,0,0">
+                                                                    <TextBlock.Style>
+                                                                        <Style TargetType="TextBlock">
+                                                                            <Setter Property="Visibility" Value="Visible" />
+                                                                            <Style.Triggers><DataTrigger Binding="{Binding ValidationMessage}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
+                                                                        </Style>
+                                                                    </TextBlock.Style>
+                                                                </TextBlock>
+                                                            </StackPanel>
+                                                        </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
@@ -315,7 +464,7 @@
                     <Border Grid.Row="3" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,1,0,0"
                             Background="#171E27" Padding="11,9">
                         <StackPanel>
-                            <TextBlock Text="COMPONENT EDITOR" Style="{StaticResource SectionLabel}" />
+                            <TextBlock Text="COMPONENTS &amp; ADVANCED JSON" Style="{StaticResource SectionLabel}" />
                             <TextBlock Text="{Binding SelectedInspectorComponentDescription}" Foreground="{StaticResource MutedText}"
                                        TextWrapping="Wrap" FontSize="10" Margin="0,4,0,7" MaxHeight="42" />
                             <ComboBox ItemsSource="{Binding ComponentSchemas}" DisplayMemberPath="DisplayName" SelectedValuePath="Type"
@@ -325,28 +474,23 @@
                                 <Button Content="Add / Replace" Command="{Binding AddComponentCommand}" Padding="8,4" Margin="0,0,3,0" />
                                 <Button Content="Remove Component" Command="{Binding RemoveComponentCommand}" Padding="8,4" Margin="3,0,0,0" />
                             </UniformGrid>
-                            <Grid Margin="0,1,0,4">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                                <StackPanel Margin="0,0,3,0">
-                                    <TextBlock Text="PROPERTY" Style="{StaticResource SectionLabel}" />
-                                    <ComboBox ItemsSource="{Binding PropertySchemas}" DisplayMemberPath="Name" SelectedValuePath="Name"
-                                              SelectedValue="{Binding PropertyNameInput, UpdateSourceTrigger=PropertyChanged}"
-                                              IsEditable="True" Margin="0,3,0,0" />
+                            <Expander Header="Add custom JSON property" IsExpanded="False">
+                                <StackPanel Margin="0,6,0,0">
+                                    <TextBlock Text="Attached properties are edited above. Use this fallback only for a new custom property or raw JSON shape."
+                                               Foreground="#91A3B7" TextWrapping="Wrap" FontSize="10" Margin="0,0,0,6" />
+                                    <TextBlock Text="PROPERTY NAME" Style="{StaticResource SectionLabel}" />
+                                    <TextBox Text="{Binding PropertyNameInput, UpdateSourceTrigger=PropertyChanged}" Margin="0,3,0,5" />
+                                    <TextBlock Text="JSON VALUE" Style="{StaticResource SectionLabel}" />
+                                    <TextBox Text="{Binding PropertyValueInput, UpdateSourceTrigger=PropertyChanged}"
+                                             FontFamily="Cascadia Mono, Consolas" AcceptsReturn="True" MinHeight="48"
+                                             VerticalScrollBarVisibility="Auto" Margin="0,3,0,5" />
+                                    <UniformGrid Columns="2">
+                                        <Button Content="Set custom JSON" Command="{Binding SetPropertyCommand}" Style="{StaticResource AccentButton}"
+                                                Padding="8,4" Margin="0,0,3,0" />
+                                        <Button Content="Remove custom property" Command="{Binding RemovePropertyCommand}" Padding="8,4" Margin="3,0,0,0" />
+                                    </UniformGrid>
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" Margin="3,0,0,0">
-                                    <TextBlock Text="VALUE" Style="{StaticResource SectionLabel}" />
-                                    <ComboBox ItemsSource="{Binding PropertyValueChoices}"
-                                              Text="{Binding PropertyValueInput, UpdateSourceTrigger=PropertyChanged}"
-                                              IsEditable="True" Margin="0,3,0,0" />
-                                </StackPanel>
-                            </Grid>
-                            <TextBlock Text="{Binding PropertySchemaHelp}" Foreground="#91A3B7" TextWrapping="Wrap"
-                                       FontSize="10" Margin="0,0,0,6" MaxHeight="45" />
-                            <UniformGrid Columns="2">
-                                <Button Content="Set Value" Command="{Binding SetPropertyCommand}" Style="{StaticResource AccentButton}"
-                                        Padding="8,4" Margin="0,0,3,0" />
-                                <Button Content="Reset" Command="{Binding RemovePropertyCommand}" Padding="8,4" Margin="3,0,0,0" />
-                            </UniformGrid>
+                            </Expander>
                         </StackPanel>
                     </Border>
                 </Grid>

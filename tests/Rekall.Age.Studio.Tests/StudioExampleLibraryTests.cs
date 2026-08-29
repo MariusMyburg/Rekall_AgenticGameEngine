@@ -104,6 +104,24 @@ public sealed class StudioExampleLibraryTests
     }
 
     [Fact]
+    public async Task ProjectTransitionExcludesConflictingWorkAndShutdownCancelsThenWaits()
+    {
+        var coordinator = new RekallAgeStudioProjectTransitionCoordinator();
+        var transition = coordinator.TryBegin();
+
+        Assert.NotNull(transition);
+        Assert.Null(coordinator.TryBegin());
+        var shutdown = coordinator.CancelAndWaitAsync().AsTask();
+        Assert.True(transition.CancellationToken.IsCancellationRequested);
+        Assert.False(shutdown.IsCompleted);
+
+        transition.Dispose();
+        await shutdown;
+        using var nextTransition = coordinator.TryBegin();
+        Assert.NotNull(nextTransition);
+    }
+
+    [Fact]
     public async Task LibraryRejectsDestinationInsidePackagedExample()
     {
         var root = CreateTempDirectory();

@@ -81,13 +81,13 @@ internal sealed class RekallAgeStudioExampleCatalog
                 }
 
                 var manifestPath = Path.Combine(directory, ProjectManifestFileName);
-                if (!File.Exists(manifestPath))
-                {
-                    continue;
-                }
-
                 try
                 {
+                    if (new DirectoryInfo(directory).Attributes.HasFlag(FileAttributes.ReparsePoint)
+                        || !File.Exists(manifestPath))
+                    {
+                        continue;
+                    }
                     using var manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
                     var rootElement = manifest.RootElement;
                     if (rootElement.ValueKind != JsonValueKind.Object ||

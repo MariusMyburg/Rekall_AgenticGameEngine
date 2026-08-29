@@ -119,7 +119,7 @@
             JsonTemplate="{StaticResource InspectorJsonEditorTemplate}"
             StringTemplate="{StaticResource InspectorStringEditorTemplate}" />
     </Window.Resources>
-    <DockPanel>
+    <DockPanel x:Name="WorkbenchRoot">
         <Menu x:Name="MainMenu" DockPanel.Dock="Top"
               Background="{StaticResource ChromeBackground}"
               Foreground="{StaticResource WorkbenchText}"

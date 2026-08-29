@@ -16,7 +16,7 @@ public partial class MainWindow : Window
     private readonly IRekallAgeStudioLayoutStore _layoutStore = new RekallAgeStudioLayoutStore();
     private readonly RekallAgeStudioExampleCatalog _exampleCatalog = RekallAgeStudioExampleCatalog.CreateDefault();
     private readonly RekallAgeStudioExampleLibrary _exampleLibrary = new();
-    private bool _projectTransitionInProgress;
+    private readonly RekallAgeStudioProjectTransitionCoordinator _projectTransitions = new();
     private readonly DispatcherTimer _previewTimer;
     private readonly RekallAgeStudioViewportRecoveryState _viewportRecovery =
         new(TimeSpan.FromSeconds(1));
@@ -323,7 +323,9 @@ public partial class MainWindow : Window
         _viewModel.ProjectPathInput = dialog.Request.ProjectRoot;
         _viewModel.ProjectNameInput = dialog.Request.ProjectName;
         _viewModel.SceneNameInput = dialog.Request.SceneName;
-        if (!TryBeginProjectTransition()) return;
+        var transition = _projectTransitions.TryBegin();
+        if (transition is null) return;
+        SetProjectTransitionVisual(active: true);
         try
         {
             await ((RekallAgeAsyncCommand)_viewModel.CreateCommand).ExecuteAsync(null);
@@ -331,7 +333,8 @@ public partial class MainWindow : Window
         }
         finally
         {
-            EndProjectTransition();
+            transition.Dispose();
+            SetProjectTransitionVisual(active: false);
         }
     }
 
@@ -346,7 +349,9 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) != true) return;
         if (!await ResolveDirtyCodeAsync()) return;
 
-        if (!TryBeginProjectTransition()) return;
+        var transition = _projectTransitions.TryBegin();
+        if (transition is null) return;
+        SetProjectTransitionVisual(active: true);
         try
         {
             await _viewModel.OpenProjectAsync(dialog.FolderName);
@@ -354,7 +359,8 @@ public partial class MainWindow : Window
         }
         finally
         {
-            EndProjectTransition();
+            transition.Dispose();
+            SetProjectTransitionVisual(active: false);
         }
     }
 
@@ -432,7 +438,9 @@ public partial class MainWindow : Window
         }
 
         if (!await ResolveDirtyCodeAsync()) return;
-        if (!TryBeginProjectTransition()) return;
+        var transition = _projectTransitions.TryBegin();
+        if (transition is null) return;
+        SetProjectTransitionVisual(active: true);
 
         var previousCursor = Cursor;
         menuItem.IsEnabled = false;
@@ -441,11 +449,15 @@ public partial class MainWindow : Window
         {
             if (!Directory.Exists(destination))
             {
-                await _exampleLibrary.CopyAsync(example, destination, CancellationToken.None);
+                await _exampleLibrary.CopyAsync(example, destination, transition.CancellationToken);
             }
 
             await _viewModel.OpenProjectAsync(destination);
             if (_viewModel.HasProject) SelectWorkspace("World");
+        }
+        catch (OperationCanceledException) when (transition.CancellationToken.IsCancellationRequested)
+        {
+            Log.Information("Opening Studio example was cancelled. Example={Example}", example.FolderName);
         }
         catch (Exception exception)
         {
@@ -465,24 +477,14 @@ public partial class MainWindow : Window
         {
             Cursor = previousCursor;
             menuItem.IsEnabled = true;
-            EndProjectTransition();
+            transition.Dispose();
+            SetProjectTransitionVisual(active: false);
         }
     }
 
-    private bool TryBeginProjectTransition()
+    private void SetProjectTransitionVisual(bool active)
     {
-        if (_projectTransitionInProgress) return false;
-        _projectTransitionInProgress = true;
-        MainMenu.IsEnabled = false;
-        ProjectBar.IsEnabled = false;
-        return true;
-    }
-
-    private void EndProjectTransition()
-    {
-        _projectTransitionInProgress = false;
-        MainMenu.IsEnabled = true;
-        ProjectBar.IsEnabled = true;
+        WorkbenchRoot.IsEnabled = !active;
     }
 
     private void ApplyLayout(RekallAgeStudioLayout layout)
@@ -745,6 +747,7 @@ public partial class MainWindow : Window
 
         e.Cancel = true;
         if (_shutdownCoordinator.IsAttemptInProgress) return;
+        await _projectTransitions.CancelAndWaitAsync();
         if (!_shutdownPrepared)
         {
             if (!await ResolveDirtyCodeAsync()) return;

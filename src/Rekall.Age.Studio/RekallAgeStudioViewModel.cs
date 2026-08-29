@@ -4203,7 +4203,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
         try
         {
-            ApplyPreviewFrame(await _previewSession.StepAsync(6, _lifecycleCancellation.Token));
+            ApplyPreviewFrame(await _previewSession.StepAsync(
+                RekallAgeStudioPreviewCadence.FramesPerPresentation,
+                _lifecycleCancellation.Token));
         }
         catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
         {

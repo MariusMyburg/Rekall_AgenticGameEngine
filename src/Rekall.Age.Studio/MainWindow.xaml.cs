@@ -41,7 +41,7 @@ public partial class MainWindow : Window
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _previewTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
-            Interval = TimeSpan.FromMilliseconds(100)
+            Interval = RekallAgeStudioPreviewCadence.PresentationInterval
         };
         _previewTimer.Tick += OnPreviewTick;
         Loaded += OnLoaded;

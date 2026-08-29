@@ -1762,7 +1762,7 @@ public sealed class StudioViewModelTests
             Assert.Equal(RekallAgeStudioMode.Simulate, viewModel.Mode);
             Assert.True(viewModel.IsSimulating);
             Assert.False(viewModel.PlayCommand.CanExecute(null));
-            Assert.Equal(6, viewModel.PreviewFrameIndex);
+            Assert.Equal(1, viewModel.PreviewFrameIndex);
             Assert.Equal(2, preview.ResetCount);
             Assert.Equal(1, preview.StepCount);
 
@@ -1810,7 +1810,7 @@ public sealed class StudioViewModelTests
             await ExecuteAsync(viewModel.PauseSimulationCommand);
             Assert.False(viewModel.IsSimulationPaused);
             await viewModel.AdvanceLivePreviewAsync();
-            Assert.Equal(7, viewModel.PreviewFrameIndex);
+            Assert.Equal(2, viewModel.PreviewFrameIndex);
             Assert.Equal(2, preview.StepCount);
 
             await ExecuteAsync(viewModel.StopCommand);

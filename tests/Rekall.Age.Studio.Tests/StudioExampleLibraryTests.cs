@@ -18,6 +18,12 @@ public sealed class StudioExampleLibraryTests
         Directory.CreateDirectory(Path.Combine(installed, "not-a-project"));
         Directory.CreateDirectory(Path.Combine(installed, "broken"));
         File.WriteAllText(Path.Combine(installed, "broken", "rekall.project.json"), "{ no");
+        Directory.CreateDirectory(Path.Combine(installed, "missing-name"));
+        File.WriteAllText(Path.Combine(installed, "missing-name", "rekall.project.json"), "{\"schemaVersion\":1}");
+        Directory.CreateDirectory(Path.Combine(installed, "non-string-name"));
+        File.WriteAllText(Path.Combine(installed, "non-string-name", "rekall.project.json"), "{\"name\":42}");
+        Directory.CreateDirectory(Path.Combine(installed, "empty-name"));
+        File.WriteAllText(Path.Combine(installed, "empty-name", "rekall.project.json"), "{\"name\":\"  \"}");
 
         var result = new RekallAgeStudioExampleCatalog([installed, repository]).Discover();
 
@@ -25,8 +31,9 @@ public sealed class StudioExampleLibraryTests
         var summit = Assert.Single(result.Examples, example => example.FolderName == "summit");
         Assert.Equal(Path.GetFullPath(Path.Combine(installed, "summit")), summit.SourceRoot);
         Assert.Equal(["world", "physics2d"], summit.Capabilities);
-        Assert.Single(result.Issues);
-        Assert.Equal("broken", result.Issues[0].FolderName);
+        Assert.Equal(
+            ["broken", "empty-name", "missing-name", "non-string-name"],
+            result.Issues.Select(issue => issue.FolderName).Order());
     }
 
     [Fact]
@@ -78,6 +85,22 @@ public sealed class StudioExampleLibraryTests
         Assert.Equal(Path.Combine(libraryRoot, "pong-3"), fresh);
         Assert.Contains("already exists", error.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("mine", await File.ReadAllTextAsync(Path.Combine(original, "keep.txt")));
+    }
+
+    [Fact]
+    public void LibraryTreatsAnExistingFileAsAnOccupiedExampleDestination()
+    {
+        var root = CreateTempDirectory();
+        var libraryRoot = Path.Combine(root, "library");
+        Directory.CreateDirectory(libraryRoot);
+        var collision = Path.Combine(libraryRoot, "pong");
+        File.WriteAllText(collision, "user-owned");
+
+        Assert.True(RekallAgeStudioExampleLibrary.IsOccupied(collision));
+        Assert.Equal(
+            Path.Combine(libraryRoot, "pong-2"),
+            RekallAgeStudioExampleLibrary.FindFreshDestination(libraryRoot, "pong"));
+        Assert.Equal("user-owned", File.ReadAllText(collision));
     }
 
     [Fact]

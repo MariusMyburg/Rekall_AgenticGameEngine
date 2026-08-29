@@ -38,13 +38,14 @@ internal sealed class RekallAgeStudioExampleCatalog
         var applicationRoot = Path.GetFullPath(AppContext.BaseDirectory);
         var roots = new List<string>
         {
-            Path.Combine(applicationRoot, "Examples"),
-            Path.GetFullPath(Path.Combine(applicationRoot, "..", "..", "examples"))
+            Path.Combine(applicationRoot, "Examples")
         };
 
         for (var ancestor = new DirectoryInfo(applicationRoot); ancestor is not null; ancestor = ancestor.Parent)
         {
+            if (!File.Exists(Path.Combine(ancestor.FullName, "Rekall.AGE.sln"))) continue;
             roots.Add(Path.Combine(ancestor.FullName, "Examples"));
+            break;
         }
 
         return new RekallAgeStudioExampleCatalog(roots);
@@ -56,7 +57,21 @@ internal sealed class RekallAgeStudioExampleCatalog
         var issues = new List<RekallAgeStudioExampleCatalogIssue>();
         foreach (var root in _searchRoots.Where(Directory.Exists))
         {
-            foreach (var directory in Directory.EnumerateDirectories(root)
+            string[] directories;
+            try
+            {
+                directories = Directory.GetDirectories(root);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                issues.Add(new RekallAgeStudioExampleCatalogIssue(
+                    Path.GetFileName(root),
+                    root,
+                    exception.Message));
+                continue;
+            }
+
+            foreach (var directory in directories
                          .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase))
             {
                 var folderName = Path.GetFileName(directory);
@@ -92,7 +107,7 @@ internal sealed class RekallAgeStudioExampleCatalog
                             Path.GetFullPath(directory),
                             capabilities));
                 }
-                catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
+                catch (Exception exception) when (exception is JsonException or InvalidDataException or IOException or UnauthorizedAccessException)
                 {
                     issues.Add(new RekallAgeStudioExampleCatalogIssue(
                         folderName,

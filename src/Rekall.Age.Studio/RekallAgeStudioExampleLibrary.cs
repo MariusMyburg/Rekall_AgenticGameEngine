@@ -40,6 +40,12 @@ internal sealed class RekallAgeStudioExampleLibrary
         }
     }
 
+    public static bool IsOccupied(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        return Directory.Exists(path) || File.Exists(path);
+    }
+
     public async ValueTask CopyAsync(
         RekallAgeStudioExample example,
         string destinationRoot,

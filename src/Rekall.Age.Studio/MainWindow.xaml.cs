@@ -16,6 +16,7 @@ public partial class MainWindow : Window
     private readonly IRekallAgeStudioLayoutStore _layoutStore = new RekallAgeStudioLayoutStore();
     private readonly RekallAgeStudioExampleCatalog _exampleCatalog = RekallAgeStudioExampleCatalog.CreateDefault();
     private readonly RekallAgeStudioExampleLibrary _exampleLibrary = new();
+    private bool _projectTransitionInProgress;
     private readonly DispatcherTimer _previewTimer;
     private readonly RekallAgeStudioViewportRecoveryState _viewportRecovery =
         new(TimeSpan.FromSeconds(1));
@@ -322,8 +323,16 @@ public partial class MainWindow : Window
         _viewModel.ProjectPathInput = dialog.Request.ProjectRoot;
         _viewModel.ProjectNameInput = dialog.Request.ProjectName;
         _viewModel.SceneNameInput = dialog.Request.SceneName;
-        await ((RekallAgeAsyncCommand)_viewModel.CreateCommand).ExecuteAsync(null);
-        if (_viewModel.HasProject) SelectWorkspace("World");
+        if (!TryBeginProjectTransition()) return;
+        try
+        {
+            await ((RekallAgeAsyncCommand)_viewModel.CreateCommand).ExecuteAsync(null);
+            if (_viewModel.HasProject) SelectWorkspace("World");
+        }
+        finally
+        {
+            EndProjectTransition();
+        }
     }
 
     private async void OnOpenProjectClick(object sender, RoutedEventArgs e)
@@ -337,8 +346,16 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) != true) return;
         if (!await ResolveDirtyCodeAsync()) return;
 
-        await _viewModel.OpenProjectAsync(dialog.FolderName);
-        if (_viewModel.HasProject) SelectWorkspace("World");
+        if (!TryBeginProjectTransition()) return;
+        try
+        {
+            await _viewModel.OpenProjectAsync(dialog.FolderName);
+            if (_viewModel.HasProject) SelectWorkspace("World");
+        }
+        finally
+        {
+            EndProjectTransition();
+        }
     }
 
     private void OnExitClick(object sender, RoutedEventArgs e) => Close();
@@ -387,9 +404,9 @@ public partial class MainWindow : Window
         if (sender is not MenuItem { Tag: RekallAgeStudioExample example } menuItem) return;
 
         var destination = Path.Combine(RekallAgeStudioExampleLibrary.DefaultRoot, example.FolderName);
-        if (Directory.Exists(destination))
+        if (RekallAgeStudioExampleLibrary.IsOccupied(destination))
         {
-            if (File.Exists(Path.Combine(destination, "rekall.project.json")))
+            if (Directory.Exists(destination) && File.Exists(Path.Combine(destination, "rekall.project.json")))
             {
                 var choice = MessageBox.Show(
                     this,
@@ -415,6 +432,7 @@ public partial class MainWindow : Window
         }
 
         if (!await ResolveDirtyCodeAsync()) return;
+        if (!TryBeginProjectTransition()) return;
 
         var previousCursor = Cursor;
         menuItem.IsEnabled = false;
@@ -447,7 +465,24 @@ public partial class MainWindow : Window
         {
             Cursor = previousCursor;
             menuItem.IsEnabled = true;
+            EndProjectTransition();
         }
+    }
+
+    private bool TryBeginProjectTransition()
+    {
+        if (_projectTransitionInProgress) return false;
+        _projectTransitionInProgress = true;
+        MainMenu.IsEnabled = false;
+        ProjectBar.IsEnabled = false;
+        return true;
+    }
+
+    private void EndProjectTransition()
+    {
+        _projectTransitionInProgress = false;
+        MainMenu.IsEnabled = true;
+        ProjectBar.IsEnabled = true;
     }
 
     private void ApplyLayout(RekallAgeStudioLayout layout)

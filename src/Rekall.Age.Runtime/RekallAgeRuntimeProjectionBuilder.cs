@@ -94,6 +94,22 @@ public sealed class RekallAgeRuntimeProjectionBuilder
                             RekallAgeRuntimeProjectionSources.BuiltIn,
                             renderLayer));
                         break;
+                    case "Rekall.ShapeRenderer2D":
+                        if (ReadBoolean(component.Properties, "active", true))
+                        {
+                            meshes.Add(new RekallAgeRuntimeRenderMesh(
+                                entity.Id,
+                                entity.Name,
+                                null,
+                                Variant: "rekall.shape2d",
+                                MaterialColor: ReadString(component.Properties, "color") ?? "#ffffff",
+                                Kind: "mesh",
+                                SortKey: 100,
+                                ProjectionSource: RekallAgeRuntimeProjectionSources.BuiltIn,
+                                Layer: renderLayer));
+                        }
+
+                        break;
                     case "Rekall.MeshRenderer":
                     case "Rekall.MeshSet":
                         meshes.Add(new RekallAgeRuntimeRenderMesh(
@@ -999,6 +1015,7 @@ public sealed class RekallAgeRuntimeProjectionBuilder
             "Rekall.Camera3D" or
             "Rekall.RenderLayer" or
             "Rekall.SpriteRenderer" or
+            "Rekall.ShapeRenderer2D" or
             "Rekall.MeshRenderer" or
             "Rekall.MeshSet" or
             "Rekall.GeometryPrimitive" or

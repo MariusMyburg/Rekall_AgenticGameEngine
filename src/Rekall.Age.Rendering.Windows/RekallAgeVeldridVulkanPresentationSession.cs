@@ -266,20 +266,8 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
             _sceneSupersampleFactor,
             _presentTextureLayout);
         var sceneShaderSet = new ShaderSetDescription([sceneVertexLayout], sceneShaders);
-        var sceneCoverageBlend = new BlendStateDescription(
-            RgbaFloat.White,
-            [new BlendAttachmentDescription(
-                blendEnabled: true,
-                sourceColorFactor: BlendFactor.SourceAlpha,
-                destinationColorFactor: BlendFactor.InverseSourceAlpha,
-                colorFunction: BlendFunction.Add,
-                // Accumulate alpha as source-over coverage instead of the Veldrid
-                // SingleAlphaBlend default's sourceAlpha-squared equation.
-                sourceAlphaFactor: BlendFactor.One,
-                destinationAlphaFactor: BlendFactor.InverseSourceAlpha,
-                alphaFunction: BlendFunction.Add)]);
         _scenePipeline = _factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            sceneCoverageBlend,
+            RekallAgeVeldridBlendStates.SceneCoverage,
             DepthStencilStateDescription.DepthOnlyLessEqual,
             RasterizerStateDescription.CullNone,
             PrimitiveTopology.TriangleList,
@@ -287,7 +275,7 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
             [_frameLayout, _drawLayout, _materialLayout],
             _sceneTarget.Framebuffer.OutputDescription));
         _sceneTransparentPipeline = _factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            sceneCoverageBlend,
+            RekallAgeVeldridBlendStates.SceneCoverage,
             new DepthStencilStateDescription(true, false, ComparisonKind.LessEqual),
             RasterizerStateDescription.CullNone,
             PrimitiveTopology.TriangleList,

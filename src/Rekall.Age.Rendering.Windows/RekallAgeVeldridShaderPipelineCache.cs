@@ -135,7 +135,7 @@ internal sealed class RekallAgeVeldridShaderPipelineCache : IDisposable
         {
             var shaderSet = new ShaderSetDescription([_vertexLayout], shaders);
             var opaque = _factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-                BlendStateDescription.SingleAlphaBlend,
+                RekallAgeVeldridBlendStates.SceneCoverage,
                 DepthStencilStateDescription.DepthOnlyLessEqual,
                 RasterizerStateDescription.CullNone,
                 PrimitiveTopology.TriangleList,
@@ -145,7 +145,7 @@ internal sealed class RekallAgeVeldridShaderPipelineCache : IDisposable
             try
             {
                 var transparent = _factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-                    BlendStateDescription.SingleAlphaBlend,
+                    RekallAgeVeldridBlendStates.SceneCoverage,
                     new DepthStencilStateDescription(true, false, ComparisonKind.LessEqual),
                     RasterizerStateDescription.CullNone,
                     PrimitiveTopology.TriangleList,

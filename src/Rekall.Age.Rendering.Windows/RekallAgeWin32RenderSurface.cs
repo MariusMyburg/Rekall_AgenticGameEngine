@@ -4,17 +4,9 @@ using System.Threading;
 
 namespace Rekall.Age.Rendering.Windows;
 
-public sealed class RekallAgeWin32RenderSurface : IDisposable
+public readonly record struct RekallAgeWin32RenderSurfaceDescriptor
 {
-    private readonly Func<IntPtr, bool> _destroyHandle;
-    private int _disposed;
-
-    public RekallAgeWin32RenderSurface(
-        IntPtr hwnd,
-        int width,
-        int height,
-        bool ownsHandle = false,
-        Func<IntPtr, bool>? destroyHandle = null)
+    public RekallAgeWin32RenderSurfaceDescriptor(IntPtr hwnd, int width, int height)
     {
         if (hwnd == IntPtr.Zero)
         {
@@ -34,8 +26,6 @@ public sealed class RekallAgeWin32RenderSurface : IDisposable
         Hwnd = hwnd;
         Width = width;
         Height = height;
-        OwnsHandle = ownsHandle;
-        _destroyHandle = destroyHandle ?? DestroyWindow;
     }
 
     public IntPtr Hwnd { get; }
@@ -43,26 +33,49 @@ public sealed class RekallAgeWin32RenderSurface : IDisposable
     public int Width { get; }
 
     public int Height { get; }
+}
+
+public sealed class RekallAgeWin32RenderSurface : IDisposable
+{
+    private readonly Func<IntPtr, bool> _destroyHandle;
+    private int _disposed;
+
+    private RekallAgeWin32RenderSurface(
+        IntPtr hwnd,
+        bool ownsHandle = false,
+        Func<IntPtr, bool>? destroyHandle = null)
+    {
+        if (hwnd == IntPtr.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(hwnd));
+        }
+
+        Hwnd = hwnd;
+        OwnsHandle = ownsHandle;
+        _destroyHandle = destroyHandle ?? DestroyWindow;
+    }
+
+    public IntPtr Hwnd { get; }
 
     public bool OwnsHandle { get; }
 
     public bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
-    public static RekallAgeWin32RenderSurface CreateExternal(IntPtr hwnd, int width, int height) =>
-        new(hwnd, width, height, ownsHandle: false);
+    public static RekallAgeWin32RenderSurface CreateExternal(
+        IntPtr hwnd,
+        Func<IntPtr, bool>? destroyHandle = null) =>
+        new(hwnd, ownsHandle: false, destroyHandle);
 
     public static RekallAgeWin32RenderSurface CreateOwned(
         IntPtr hwnd,
-        int width,
-        int height,
         Func<IntPtr, bool>? destroyHandle = null) =>
-        new(hwnd, width, height, ownsHandle: true, destroyHandle);
+        new(hwnd, ownsHandle: true, destroyHandle);
 
-    public RekallAgeWin32RenderSurface WithSize(int width, int height) =>
-        new(Hwnd, width, height, OwnsHandle, _destroyHandle);
-
-    public RekallAgeWin32RenderSurface Clone() =>
-        new(Hwnd, Width, Height, OwnsHandle, _destroyHandle);
+    public RekallAgeWin32RenderSurfaceDescriptor Describe(int width, int height)
+    {
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+        return new RekallAgeWin32RenderSurfaceDescriptor(Hwnd, width, height);
+    }
 
     public void Dispose()
     {

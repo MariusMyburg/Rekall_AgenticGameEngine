@@ -6,7 +6,7 @@ namespace Rekall.Age.Rendering.Windows;
 public interface IRekallAgeVulkanPresentationSession : IAsyncDisposable
 {
     ValueTask<RekallAgeVulkanPresentationFrame> PresentAsync(
-        RekallAgeWin32RenderSurface surface,
+        RekallAgeWin32RenderSurfaceDescriptor surface,
         RekallAgeRuntimeViewportFrame frame,
         RekallAgeRuntimeViewportAssetSet assets,
         CancellationToken cancellationToken);
@@ -18,7 +18,11 @@ public interface IRekallAgeVulkanPresentationSession : IAsyncDisposable
 
 public sealed record RekallAgeVulkanPresentationFrame
 {
-    public RekallAgeVulkanPresentationFrame(
+    private const string VulkanBackendId = "vulkan";
+    private const string HardwareAccelerationStatus = "hardware";
+    private const string UnavailableAccelerationStatus = "unavailable";
+
+    private RekallAgeVulkanPresentationFrame(
         string sceneName,
         int frameIndex,
         double elapsedSeconds,
@@ -26,10 +30,12 @@ public sealed record RekallAgeVulkanPresentationFrame
         int height,
         int renderableCount,
         int observationCount,
-        string backendId = "vulkan",
-        bool hardwareAccelerated = true,
-        string accelerationStatus = "hardware",
-        string? selectedDeviceName = null)
+        bool presentedFrame,
+        bool hardwareAccelerated,
+        string accelerationStatus,
+        string? selectedDeviceName,
+        string? failureReason,
+        IReadOnlyList<string> errors)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sceneName);
         if (width <= 0)
@@ -52,8 +58,39 @@ public sealed record RekallAgeVulkanPresentationFrame
             throw new ArgumentOutOfRangeException(nameof(observationCount));
         }
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(backendId);
         ArgumentException.ThrowIfNullOrWhiteSpace(accelerationStatus);
+        ArgumentNullException.ThrowIfNull(errors);
+
+        if (presentedFrame)
+        {
+            if (!hardwareAccelerated)
+            {
+                throw new ArgumentException("Successful Vulkan presentation must be hardware accelerated.", nameof(hardwareAccelerated));
+            }
+
+            if (!accelerationStatus.Equals(HardwareAccelerationStatus, StringComparison.Ordinal))
+            {
+                throw new ArgumentException("Successful Vulkan presentation must report hardware acceleration.", nameof(accelerationStatus));
+            }
+
+            if (failureReason is not null)
+            {
+                throw new ArgumentException("Successful Vulkan presentation cannot include a failure reason.", nameof(failureReason));
+            }
+
+            if (errors.Count > 0)
+            {
+                throw new ArgumentException("Successful Vulkan presentation cannot include errors.", nameof(errors));
+            }
+        }
+        else
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(failureReason);
+            if (!accelerationStatus.Equals(UnavailableAccelerationStatus, StringComparison.Ordinal))
+            {
+                throw new ArgumentException("Unavailable Vulkan presentation must report unavailable acceleration.", nameof(accelerationStatus));
+            }
+        }
 
         SceneName = sceneName;
         FrameIndex = frameIndex;
@@ -62,10 +99,13 @@ public sealed record RekallAgeVulkanPresentationFrame
         Height = height;
         RenderableCount = renderableCount;
         ObservationCount = observationCount;
-        BackendId = backendId.Trim().ToLowerInvariant();
+        PresentedFrame = presentedFrame;
+        BackendId = VulkanBackendId;
         HardwareAccelerated = hardwareAccelerated;
-        AccelerationStatus = accelerationStatus.Trim().ToLowerInvariant();
+        AccelerationStatus = accelerationStatus;
         SelectedDeviceName = string.IsNullOrWhiteSpace(selectedDeviceName) ? null : selectedDeviceName.Trim();
+        FailureReason = failureReason;
+        Errors = errors;
     }
 
     public string SceneName { get; }
@@ -82,6 +122,8 @@ public sealed record RekallAgeVulkanPresentationFrame
 
     public int ObservationCount { get; }
 
+    public bool PresentedFrame { get; }
+
     public string BackendId { get; }
 
     public bool HardwareAccelerated { get; }
@@ -90,15 +132,16 @@ public sealed record RekallAgeVulkanPresentationFrame
 
     public string? SelectedDeviceName { get; }
 
+    public string? FailureReason { get; }
+
+    public IReadOnlyList<string> Errors { get; }
+
     public RekallAgeRgbaImage? PresentedImage { get; init; }
 
     public RekallAgeVulkanPresentationInteropMetadata? VulkanInterop { get; init; }
 
-    public static RekallAgeVulkanPresentationFrame FromViewportFrame(
+    public static RekallAgeVulkanPresentationFrame Presented(
         RekallAgeRuntimeViewportFrame frame,
-        string backendId = "vulkan",
-        bool hardwareAccelerated = true,
-        string accelerationStatus = "hardware",
         string? selectedDeviceName = null)
     {
         ArgumentNullException.ThrowIfNull(frame);
@@ -120,10 +163,45 @@ public sealed record RekallAgeVulkanPresentationFrame
             frame.Height,
             frame.Renderables.Count,
             frame.Observations.Count,
-            backendId,
-            hardwareAccelerated,
-            accelerationStatus,
-            selectedDeviceName);
+            presentedFrame: true,
+            hardwareAccelerated: true,
+            accelerationStatus: HardwareAccelerationStatus,
+            selectedDeviceName,
+            failureReason: null,
+            errors: Array.Empty<string>());
+    }
+
+    public static RekallAgeVulkanPresentationFrame Unavailable(
+        RekallAgeRuntimeViewportFrame frame,
+        string failureReason,
+        IReadOnlyList<string>? errors = null,
+        string? selectedDeviceName = null)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        if (frame.Width <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(frame), "Viewport frame width must be positive.");
+        }
+
+        if (frame.Height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(frame), "Viewport frame height must be positive.");
+        }
+
+        return new RekallAgeVulkanPresentationFrame(
+            frame.SceneName,
+            frame.FrameIndex,
+            frame.ElapsedSeconds,
+            frame.Width,
+            frame.Height,
+            frame.Renderables.Count,
+            frame.Observations.Count,
+            presentedFrame: false,
+            hardwareAccelerated: false,
+            accelerationStatus: UnavailableAccelerationStatus,
+            selectedDeviceName,
+            failureReason,
+            errors ?? Array.Empty<string>());
     }
 }
 

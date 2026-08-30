@@ -74,6 +74,47 @@ public sealed class LanguageModelReadinessProbeTests
     }
 
     [Fact]
+    public async Task OllamaHttpStatusResponseIsInvalidEndpointRatherThanUnreachable()
+    {
+        const string privateDetail = "private status response detail";
+        var fixture = new ProbeFixture
+        {
+            IdentityFailure = new HttpRequestException(
+                privateDetail,
+                inner: null,
+                HttpStatusCode.NotFound)
+        };
+
+        var result = await fixture.ProbeAsync("ollama");
+
+        AssertResult(result, "ollama", RekallAgeLanguageModelReadinessState.Blocked,
+            "REKALL_ONBOARDING_OLLAMA_ENDPOINT_INVALID", "edit-endpoint", canRetry: false);
+        Assert.DoesNotContain(privateDetail, ResultText(result), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task IdentityDependencyTimeoutIsTypedFailureWhenCallerRemainsActive()
+    {
+        const string privateDetail = "private dependency timeout";
+        var fixture = new ProbeFixture
+        {
+            IdentityFailure = new TaskCanceledException(privateDetail)
+        };
+
+        var result = await fixture.ProbeAsync(
+            "ollama",
+            settings: new RekallAgeLanguageModelProviderSettings
+            {
+                OllamaUrl = "https://models.example.test"
+            },
+            cancellationToken: CancellationToken.None);
+
+        AssertResult(result, "ollama", RekallAgeLanguageModelReadinessState.Blocked,
+            "REKALL_ONBOARDING_OLLAMA_ENDPOINT_UNREACHABLE", "edit-endpoint", canRetry: true);
+        Assert.DoesNotContain(privateDetail, ResultText(result), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task OllamaWithoutModelsIsBlocked()
     {
         var fixture = new ProbeFixture { Models = [] };

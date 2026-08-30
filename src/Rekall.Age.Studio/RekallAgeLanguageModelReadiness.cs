@@ -223,12 +223,34 @@ internal sealed class RekallAgeLanguageModelReadinessProbe : IRekallAgeLanguageM
             checks.Add(Check("ollama-endpoint", "The Ollama service is reachable and identified."));
             return null;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
+        catch (OperationCanceledException)
+        {
+            return Failure(
+                providerId,
+                "REKALL_ONBOARDING_OLLAMA_ENDPOINT_UNREACHABLE",
+                "The configured Ollama endpoint could not be reached.",
+                checks,
+                "ollama-endpoint",
+                isDefaultEndpoint ? "retry" : "edit-endpoint",
+                canRetry: true);
+        }
         catch (RekallAgeLanguageModelProviderException exception)
             when (exception.Code == "REKALL_OLLAMA_ENDPOINT_INVALID")
+        {
+            return Failure(
+                providerId,
+                "REKALL_ONBOARDING_OLLAMA_ENDPOINT_INVALID",
+                "The configured endpoint is not an Ollama service.",
+                checks,
+                "ollama-endpoint",
+                "edit-endpoint",
+                canRetry: false);
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode is not null)
         {
             return Failure(
                 providerId,

@@ -109,6 +109,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupStore : IRekallAgeStudioL
 {
     internal const string SetupRootEnvironmentVariable = "REKALL_AGE_STUDIO_SETUP_ROOT";
     private const string SetupFileName = "language-model-setup-v1.json";
+    private static readonly char[] AdditionalWindowsInvalidPathChars = ['<', '>', '"', '?', '*'];
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true,
@@ -213,8 +214,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupStore : IRekallAgeStudioL
         {
             try
             {
-                if (System.IO.Path.IsPathFullyQualified(overrideRoot)
-                    && overrideRoot.IndexOfAny(System.IO.Path.GetInvalidPathChars()) < 0)
+                if (IsValidWindowsFullPath(overrideRoot))
                 {
                     return System.IO.Path.GetFullPath(overrideRoot);
                 }
@@ -230,5 +230,18 @@ internal sealed class RekallAgeStudioLanguageModelSetupStore : IRekallAgeStudioL
             "Rekall",
             "AGE",
             "Studio");
+    }
+
+    private static bool IsValidWindowsFullPath(string value)
+    {
+        if (!System.IO.Path.IsPathFullyQualified(value)
+            || value.IndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0
+            || value.IndexOfAny(AdditionalWindowsInvalidPathChars) >= 0)
+        {
+            return false;
+        }
+
+        var firstColon = value.IndexOf(':');
+        return firstColon < 0 || firstColon == 1 && value.IndexOf(':', firstColon + 1) < 0;
     }
 }

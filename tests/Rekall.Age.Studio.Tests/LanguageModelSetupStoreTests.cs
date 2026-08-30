@@ -140,13 +140,17 @@ public sealed class LanguageModelSetupStoreTests
         }
     }
 
-    [Fact]
-    public void DefaultStoreIgnoresAMalformedAbsoluteSetupRootOverride()
+    [Theory]
+    [InlineData("C:\\invalid|path")]
+    [InlineData("C:\\invalid<path")]
+    [InlineData("C:\\invalid>path")]
+    [InlineData("C:\\invalid\"path")]
+    public void DefaultStoreIgnoresAMalformedAbsoluteSetupRootOverride(string malformedOverride)
     {
         var previous = Environment.GetEnvironmentVariable("REKALL_AGE_STUDIO_SETUP_ROOT");
         try
         {
-            Environment.SetEnvironmentVariable("REKALL_AGE_STUDIO_SETUP_ROOT", "C:\\invalid|path");
+            Environment.SetEnvironmentVariable("REKALL_AGE_STUDIO_SETUP_ROOT", malformedOverride);
 
             var store = new RekallAgeStudioLanguageModelSetupStore();
 

@@ -117,7 +117,7 @@ public sealed class OpenAiLanguageModelClientTests
             authorizationScheme = request.Headers.Authorization?.Scheme;
             authorizationParameter = request.Headers.Authorization?.Parameter;
             return Task.FromResult(JsonResponse(
-                """{"object":"list","data":[{"id":"z-model"},{"id":"gpt-5.6-sol"},{"id":"a-model"}]}"""));
+                """{"object":"list","data":[{"id":"z-model"},{"id":"gpt-5.6-sol-preview"},{"id":"gpt-5.6-sol"},{"id":"a-model"}]}"""));
         });
         using var httpClient = new HttpClient(handler);
         var client = new RekallAgeOpenAiLanguageModelClient(httpClient, "test-api-key");
@@ -126,8 +126,18 @@ public sealed class OpenAiLanguageModelClientTests
 
         Assert.Equal("Bearer", authorizationScheme);
         Assert.Equal("test-api-key", authorizationParameter);
-        Assert.Equal(["a-model", "gpt-5.6-sol", "z-model"], models.Select(model => model.Id));
+        Assert.Equal(["a-model", "gpt-5.6-sol", "gpt-5.6-sol-preview", "z-model"], models.Select(model => model.Id));
         Assert.All(models, model => Assert.Equal(0, model.SizeBytes));
+        var configuredModel = models.Single(model => model.Id == "gpt-5.6-sol");
+        Assert.True(configuredModel.SupportsCompletion);
+        Assert.True(configuredModel.SupportsTools);
+        Assert.All(
+            models.Where(model => model.Id != "gpt-5.6-sol"),
+            model =>
+            {
+                Assert.Null(model.SupportsCompletion);
+                Assert.Null(model.SupportsTools);
+            });
     }
 
     [Fact]

@@ -23,6 +23,33 @@ public sealed class RekallAgeOllamaLanguageModelClient : IRekallAgeLanguageModel
 
     public string ProviderId => "ollama";
 
+    public async ValueTask<string> GetVersionAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await _httpClient.GetAsync(new Uri(_baseUri, "api/version"), cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException(
+                    $"Ollama version detection returned HTTP {(int)response.StatusCode}.",
+                    null,
+                    response.StatusCode);
+            }
+            var root = await ReadObjectAsync(response, cancellationToken);
+            var version = ReadString(root, "version");
+            if (string.IsNullOrWhiteSpace(version) || version.Length > 128)
+            {
+                throw CreateInvalidEndpointException();
+            }
+
+            return version;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidDataException or InvalidOperationException)
+        {
+            throw CreateInvalidEndpointException();
+        }
+    }
+
     public async ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken)
     {
         using var response = await _httpClient.GetAsync(new Uri(_baseUri, "api/tags"), cancellationToken);
@@ -250,4 +277,9 @@ public sealed class RekallAgeOllamaLanguageModelClient : IRekallAgeLanguageModel
 
     private static long ReadInt64(JsonObject value, string name) =>
         value[name] is JsonValue node && node.TryGetValue<long>(out var number) ? number : 0;
+
+    private static RekallAgeLanguageModelProviderException CreateInvalidEndpointException() => new(
+        "REKALL_OLLAMA_ENDPOINT_INVALID",
+        "ollama",
+        "The configured endpoint did not identify itself as Ollama.");
 }

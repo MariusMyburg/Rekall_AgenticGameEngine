@@ -67,7 +67,15 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(id => id, StringComparer.Ordinal)
-            .Select(id => new RekallAgeLanguageModelInfo(id!, 0))
+            .Select(id =>
+            {
+                var supportsResponsesTools = SupportsResponsesTools(id!);
+                return new RekallAgeLanguageModelInfo(
+                    id!,
+                    0,
+                    SupportsTools: supportsResponsesTools ? true : null,
+                    SupportsCompletion: supportsResponsesTools ? true : null);
+            })
             .ToArray();
     }
 
@@ -722,6 +730,9 @@ public sealed class RekallAgeOpenAiLanguageModelClient :
                 sensitiveValues: sensitiveValues);
         }
     }
+
+    private static bool SupportsResponsesTools(string modelId) =>
+        string.Equals(modelId, ModelId, StringComparison.Ordinal);
 
     private static string AliasFor(
         RekallAgeOpenAiToolNameMap toolNameMap,

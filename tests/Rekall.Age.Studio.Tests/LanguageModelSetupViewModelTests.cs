@@ -182,6 +182,7 @@ public sealed class LanguageModelSetupViewModelTests
         await using var viewModel = CreateViewModel(store: store, probe: probe, utcNow: () => now);
 
         Assert.False(viewModel.CanFinish);
+        await viewModel.InitializeAsync(CancellationToken.None);
         await viewModel.SelectProviderAsync("ollama");
         Assert.True(viewModel.CanFinish);
         viewModel.SelectedModelId = "invented-model";
@@ -189,7 +190,9 @@ public sealed class LanguageModelSetupViewModelTests
 
         await ExecuteAsync(viewModel.FinishCommand);
 
-        var saved = Assert.Single(store.Saved);
+        Assert.Equal(2, store.Saved.Count);
+        Assert.False(store.Saved[0].IsComplete);
+        var saved = store.Saved[^1];
         Assert.True(saved.IsComplete);
         Assert.Equal(RekallAgeStudioLanguageModelSetup.CurrentVersion, saved.Version);
         Assert.Equal(RekallAgeStudioLanguageModelSetup.CurrentReadinessVersion, saved.ReadinessVersion);
@@ -210,6 +213,179 @@ public sealed class LanguageModelSetupViewModelTests
 
         Assert.False(viewModel.CanFinish);
         Assert.False(viewModel.FinishCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task StoreLoadSuccessButWriteVerificationFailureKeepsFinishDisabled()
+    {
+        var store = new RecordingSetupStore { SaveFailure = new IOException("read-only setup root") };
+        var probe = new RecordingProbe((request, _) => Task.FromResult(Ready("ollama", "qwen3.8:27b")));
+        await using var viewModel = CreateViewModel(store: store, probe: probe);
+
+        await viewModel.InitializeAsync(CancellationToken.None);
+        await viewModel.SelectProviderAsync("ollama");
+
+        Assert.False(viewModel.CanFinish);
+        Assert.False(viewModel.FinishCommand.CanExecute(null));
+        Assert.Empty(store.Saved);
+    }
+
+    [Fact]
+    public async Task EndpointMutationImmediatelyInvalidatesReadinessAndFreshProbeUsesCurrentEndpoint()
+    {
+        var freshProbeStarted = new TaskCompletionSource<RekallAgeLanguageModelReadinessRequest>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var freshProbeRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        var probe = new RecordingProbe(async (request, cancellationToken) =>
+        {
+            if (Interlocked.Increment(ref calls) == 1) return Ready("ollama", "qwen3.8:27b");
+            freshProbeStarted.SetResult(request);
+            await freshProbeRelease.Task.WaitAsync(cancellationToken);
+            return Ready("ollama", "qwen3.8:27b");
+        });
+        await using var viewModel = CreateViewModel(probe: probe);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        await viewModel.SelectProviderAsync("ollama");
+        Assert.True(viewModel.CanFinish);
+
+        viewModel.OllamaUrl = "http://127.0.0.1:22444";
+
+        Assert.False(viewModel.CanFinish);
+        var request = await freshProbeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("http://127.0.0.1:22444", request.Settings.OllamaUrl);
+        freshProbeRelease.SetResult();
+        await viewModel.WaitForActiveOperationAsync();
+        Assert.True(viewModel.CanFinish);
+    }
+
+    [Fact]
+    public async Task SlowCredentialApplyAndRemoveWindowsKeepFinishDisabledUntilFreshResultsPublish()
+    {
+        var credentials = new RecordingCredentialStore();
+        credentials.Values["openai"] = "remembered-old-key";
+        credentials.BlockWrites();
+        var probe = new RecordingProbe((request, _) => Task.FromResult(
+            string.IsNullOrWhiteSpace(request.Settings.OpenAiApiKey)
+                ? Blocked("openai", "REKALL_ONBOARDING_API_KEY_REQUIRED", "enter-api-key")
+                : Ready("openai", "gpt-5.6-sol")));
+        await using var viewModel = CreateViewModel(credentials: credentials, probe: probe);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        await viewModel.SelectProviderAsync("openai");
+        Assert.True(viewModel.CanFinish);
+
+        var apply = viewModel.ApplyApiKeyAsync("openai", "replacement-key", rememberSecurely: true);
+        Assert.False(viewModel.CanFinish);
+        await credentials.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        credentials.ReleaseWrites();
+        await apply;
+        Assert.True(viewModel.CanFinish);
+
+        credentials.BlockRemoves();
+        var remove = viewModel.RemoveRememberedApiKeyAsync("openai");
+        Assert.False(viewModel.CanFinish);
+        await credentials.RemoveStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        credentials.ReleaseRemoves();
+        await remove;
+        Assert.False(viewModel.CanFinish);
+    }
+
+    [Fact]
+    public async Task SlowRemediationImmediatelyInvalidatesReadyStateAndRebuildsCurrentSettings()
+    {
+        var actionRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        var probe = new RecordingProbe((request, _) => Task.FromResult(
+            Interlocked.Increment(ref calls) == 1
+                ? Ready(request.ProviderId, "qwen3.8:27b") with
+                {
+                    RecommendedActionId = "pull-qwen3.8:27b"
+                }
+                : Ready(request.ProviderId, "qwen3.8:27b")));
+        var actions = new RecordingActions(async (_, _, cancellationToken) =>
+            await actionRelease.Task.WaitAsync(cancellationToken));
+        await using var viewModel = CreateViewModel(probe: probe, actions: actions);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        await viewModel.SelectProviderAsync("ollama");
+        Assert.True(viewModel.CanFinish);
+
+        var action = viewModel.ExecuteRemediationAsync("pull-qwen3.8:27b");
+
+        Assert.False(viewModel.CanFinish);
+        await actions.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        viewModel.OllamaUrl = "http://127.0.0.1:33444";
+        Assert.False(viewModel.CanFinish);
+        actionRelease.SetResult();
+        await action;
+        await viewModel.WaitForActiveOperationAsync();
+        Assert.Equal("http://127.0.0.1:33444", probe.Requests.Last().Settings.OllamaUrl);
+    }
+
+    [Fact]
+    public async Task HostileReadinessStringsAreSanitizedBeforeAnyPublicProjection()
+    {
+        var hostile = $"hostile-{SentinelSecret}";
+        var environment = new RecordingEnvironment(new Dictionary<string, string>
+        {
+            ["OPENAI_API_KEY"] = SentinelSecret
+        });
+        var probe = new RecordingProbe((request, _) => Task.FromResult(new RekallAgeLanguageModelReadinessResult(
+            request.ProviderId,
+            RekallAgeLanguageModelReadinessState.Blocked,
+            hostile,
+            hostile,
+            [new RekallAgeLanguageModelReadinessCheck(hostile, RekallAgeLanguageModelReadinessState.Blocked, hostile, hostile)],
+            [hostile],
+            hostile,
+            true)));
+        await using var viewModel = CreateViewModel(probe: probe, environment: environment);
+
+        await viewModel.SelectProviderAsync("openai");
+
+        AssertNoSecretInInspectableState(viewModel, SentinelSecret);
+        Assert.All(viewModel.ReadinessRows, row =>
+            Assert.DoesNotContain(SentinelSecret, row.ToString(), StringComparison.Ordinal));
+        Assert.DoesNotContain(SentinelSecret, viewModel.RecommendedActionId ?? string.Empty, StringComparison.Ordinal);
+        Assert.False(viewModel.RemediationCommand(hostile).CanExecute(null));
+    }
+
+    [Fact]
+    public async Task AsyncReadinessPublicationIsMarshaledThroughCapturedSynchronizationContext()
+    {
+        var context = new QueueingSynchronizationContext();
+        var previousContext = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(context);
+        RekallAgeStudioLanguageModelSetupViewModel viewModel;
+        try
+        {
+            var probe = new RecordingProbe(async (request, _) =>
+            {
+                await Task.Run(static () => { });
+                return Ready(request.ProviderId, "qwen3.8:27b");
+            });
+            viewModel = CreateViewModel(probe: probe);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previousContext);
+        }
+
+        try
+        {
+            var transition = viewModel.SelectProviderAsync("ollama");
+            await context.WaitForPostAsync();
+            Assert.Equal(RekallAgeLanguageModelReadinessState.Blocked, viewModel.ReadinessState);
+            Assert.False(transition.IsCompleted);
+
+            await context.DrainUntilCompletedAsync(transition);
+
+            Assert.True(context.PostCount > 0);
+            Assert.Equal(RekallAgeLanguageModelReadinessState.Ready, viewModel.ReadinessState);
+        }
+        finally
+        {
+            await context.DrainUntilCompletedAsync(viewModel.DisposeAsync().AsTask());
+        }
     }
 
     [Fact]
@@ -322,6 +498,7 @@ public sealed class LanguageModelSetupViewModelTests
     private sealed class RecordingSetupStore : IRekallAgeStudioLanguageModelSetupStore
     {
         public Exception? LoadFailure { get; set; }
+        public Exception? SaveFailure { get; set; }
         public List<RekallAgeStudioLanguageModelSetup> Saved { get; } = [];
 
         public ValueTask<RekallAgeStudioLanguageModelSetup> LoadAsync(CancellationToken cancellationToken)
@@ -335,6 +512,7 @@ public sealed class LanguageModelSetupViewModelTests
         public ValueTask SaveAsync(RekallAgeStudioLanguageModelSetup setup, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (SaveFailure is not null) return ValueTask.FromException(SaveFailure);
             Saved.Add(setup);
             return ValueTask.CompletedTask;
         }
@@ -342,7 +520,13 @@ public sealed class LanguageModelSetupViewModelTests
 
     private sealed class RecordingCredentialStore : IRekallAgeStudioCredentialStore
     {
+        private TaskCompletionSource? _writeRelease;
+        private TaskCompletionSource? _removeRelease;
         public Dictionary<string, string> Values { get; } = new(StringComparer.Ordinal);
+        public TaskCompletionSource WriteStarted { get; private set; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource RemoveStarted { get; private set; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public ValueTask<string?> ReadAsync(string providerId, CancellationToken cancellationToken)
         {
@@ -350,19 +534,37 @@ public sealed class LanguageModelSetupViewModelTests
             return ValueTask.FromResult(Values.GetValueOrDefault(providerId));
         }
 
-        public ValueTask WriteAsync(string providerId, string credential, CancellationToken cancellationToken)
+        public async ValueTask WriteAsync(string providerId, string credential, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            WriteStarted.TrySetResult();
+            if (_writeRelease is not null) await _writeRelease.Task.WaitAsync(cancellationToken);
             Values[providerId] = credential;
-            return ValueTask.CompletedTask;
         }
 
-        public ValueTask RemoveAsync(string providerId, CancellationToken cancellationToken)
+        public async ValueTask RemoveAsync(string providerId, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            RemoveStarted.TrySetResult();
+            if (_removeRelease is not null) await _removeRelease.Task.WaitAsync(cancellationToken);
             Values.Remove(providerId);
-            return ValueTask.CompletedTask;
         }
+
+        public void BlockWrites()
+        {
+            WriteStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _writeRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        public void ReleaseWrites() => _writeRelease?.TrySetResult();
+
+        public void BlockRemoves()
+        {
+            RemoveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _removeRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        public void ReleaseRemoves() => _removeRelease?.TrySetResult();
     }
 
     private sealed class RecordingProbe(
@@ -371,12 +573,14 @@ public sealed class LanguageModelSetupViewModelTests
     {
         private readonly Dictionary<string, TaskCompletionSource> _calls = new(StringComparer.Ordinal);
         public int CallCount { get; private set; }
+        public List<RekallAgeLanguageModelReadinessRequest> Requests { get; } = [];
 
         public async ValueTask<RekallAgeLanguageModelReadinessResult> ProbeAsync(
             RekallAgeLanguageModelReadinessRequest request,
             CancellationToken cancellationToken)
         {
             CallCount++;
+            Requests.Add(request);
             lock (_calls)
             {
                 if (!_calls.TryGetValue(request.ProviderId, out var call))
@@ -420,5 +624,65 @@ public sealed class LanguageModelSetupViewModelTests
         : IRekallAgeEnvironmentValueSource
     {
         public string? GetValue(string name) => values.GetValueOrDefault(name);
+    }
+
+    private sealed class QueueingSynchronizationContext : SynchronizationContext
+    {
+        private readonly Queue<(SendOrPostCallback Callback, object? State)> _work = new();
+        private TaskCompletionSource _posted = NewSignal();
+
+        public int PostCount { get; private set; }
+
+        public override void Post(SendOrPostCallback d, object? state)
+        {
+            lock (_work)
+            {
+                _work.Enqueue((d, state));
+                PostCount++;
+                _posted.TrySetResult();
+            }
+        }
+
+        public Task WaitForPostAsync()
+        {
+            lock (_work)
+            {
+                return _work.Count > 0
+                    ? Task.CompletedTask
+                    : _posted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+        }
+
+        public async Task DrainUntilCompletedAsync(Task task)
+        {
+            while (!task.IsCompleted)
+            {
+                await WaitForPostAsync();
+                Drain();
+                await Task.Yield();
+            }
+            await task;
+        }
+
+        private void Drain()
+        {
+            while (true)
+            {
+                (SendOrPostCallback Callback, object? State) work;
+                lock (_work)
+                {
+                    if (_work.Count == 0)
+                    {
+                        _posted = NewSignal();
+                        return;
+                    }
+                    work = _work.Dequeue();
+                }
+                work.Callback(work.State);
+            }
+        }
+
+        private static TaskCompletionSource NewSignal() =>
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 }

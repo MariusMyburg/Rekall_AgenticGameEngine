@@ -51,6 +51,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     private readonly IRekallAgeStudioLanguageModelSetupActions _actions;
     private readonly IRekallAgeEnvironmentValueSource _environment;
     private readonly Func<DateTimeOffset> _utcNow;
+    private readonly SynchronizationContext? _synchronizationContext;
     private readonly CancellationTokenSource _lifecycleCancellation = new();
     private readonly object _operationSync = new();
     private readonly Dictionary<string, RekallAgeAsyncCommand> _remediationCommands;
@@ -72,7 +73,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     private string _credentialSourceLabel = "No credential required";
     private string _errorSummary = string.Empty;
     private RekallAgeStudioLanguageModelSetup? _completedSetup;
-    private bool _setupStoreAvailable = true;
+    private bool _setupStoreAvailable;
     private bool _disposed;
 
     internal RekallAgeStudioLanguageModelSetupViewModel(
@@ -89,6 +90,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         _actions = actions ?? NoOpActions.Instance;
         _environment = environment ?? SystemEnvironment.Instance;
         _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
+        _synchronizationContext = SynchronizationContext.Current;
 
         NextCommand = CreateCommand(MoveNextAsync, () => CurrentStep < RekallAgeStudioLanguageModelSetupStep.Summary);
         BackCommand = CreateCommand(MoveBackAsync, () => CurrentStep > RekallAgeStudioLanguageModelSetupStep.Welcome);
@@ -168,19 +170,19 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     public string? OllamaUrl
     {
         get => _ollamaUrl;
-        set => Set(ref _ollamaUrl, NormalizeEndpoint(value));
+        set => SetEndpoint(ref _ollamaUrl, NormalizeEndpoint(value));
     }
 
     public string? OpenAiUrl
     {
         get => _openAiUrl;
-        set => Set(ref _openAiUrl, NormalizeEndpoint(value));
+        set => SetEndpoint(ref _openAiUrl, NormalizeEndpoint(value));
     }
 
     public string? KimiUrl
     {
         get => _kimiUrl;
-        set => Set(ref _kimiUrl, NormalizeEndpoint(value));
+        set => SetEndpoint(ref _kimiUrl, NormalizeEndpoint(value));
     }
 
     public RekallAgeLanguageModelReadinessState ReadinessState
@@ -253,15 +255,25 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
             _lifecycleCancellation.Token);
         try
         {
-            var setup = await _setupStore.LoadAsync(linkedCancellation.Token).ConfigureAwait(false);
-            _setupStoreAvailable = true;
-            _selectedProviderId = setup.ProviderId;
-            _selectedModelId = setup.ModelId;
-            ReasoningEffort = setup.ReasoningEffort;
-            OllamaUrl = setup.OllamaUrl;
-            OpenAiUrl = setup.OpenAiUrl;
-            KimiUrl = setup.KimiUrl;
-            OnProviderSelectionChanged();
+            var loaded = await _setupStore.LoadAsync(linkedCancellation.Token).ConfigureAwait(false);
+            var setup = RekallAgeStudioLanguageModelSetup.Normalize(loaded)
+                ?? RekallAgeStudioLanguageModelSetup.Incomplete;
+            await _setupStore.SaveAsync(setup, linkedCancellation.Token).ConfigureAwait(false);
+            await PublishOnUiAsync(() =>
+            {
+                _setupStoreAvailable = true;
+                _selectedProviderId = setup.ProviderId;
+                _selectedModelId = setup.ModelId;
+                _reasoningEffort = setup.ReasoningEffort;
+                _ollamaUrl = setup.OllamaUrl;
+                _openAiUrl = setup.OpenAiUrl;
+                _kimiUrl = setup.KimiUrl;
+                OnPropertyChanged(nameof(ReasoningEffort));
+                OnPropertyChanged(nameof(OllamaUrl));
+                OnPropertyChanged(nameof(OpenAiUrl));
+                OnPropertyChanged(nameof(KimiUrl));
+                OnProviderSelectionChanged();
+            }).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -269,10 +281,13 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         }
         catch (Exception)
         {
-            _setupStoreAvailable = false;
-            ErrorSummary = "Language-model setup settings are unavailable on this PC.";
-            OnPropertyChanged(nameof(CanFinish));
-            RaiseCommands();
+            await PublishOnUiAsync(() =>
+            {
+                _setupStoreAvailable = false;
+                ErrorSummary = "Language-model setup settings are unavailable on this PC.";
+                OnPropertyChanged(nameof(CanFinish));
+                RaiseCommands();
+            }).ConfigureAwait(false);
         }
     }
 
@@ -307,6 +322,13 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         }
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
+        var settings = SettingsWithCredential(providerId, key);
+        _activeProviderSettings = settings;
+        CredentialSourceLabel = rememberSecurely
+            ? "Verifying protected credential"
+            : "Verifying session credential";
+        ClearReadiness();
+
         return QueueOperationAsync(async (generation, cancellationToken) =>
         {
             if (rememberSecurely)
@@ -314,11 +336,14 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
                 await _credentialStore.WriteAsync(providerId, key, cancellationToken).ConfigureAwait(false);
             }
             if (!IsCurrentOperation(providerId, generation)) return;
-            var settings = SettingsWithCredential(providerId, key);
-            _activeProviderSettings = settings;
-            CredentialSourceLabel = rememberSecurely
-                ? "Remembered securely on this PC"
-                : "This Studio session";
+            if (!TrySetActiveProviderSettings(providerId, generation, settings)) return;
+            await PublishOnUiAsync(() =>
+            {
+                if (!IsCurrentOperation(providerId, generation)) return;
+                CredentialSourceLabel = rememberSecurely
+                    ? "Remembered securely on this PC"
+                    : "This Studio session";
+            }).ConfigureAwait(false);
             await ProbeAndPublishAsync(providerId, SelectedModelId, settings, generation, cancellationToken)
                 .ConfigureAwait(false);
         });
@@ -337,14 +362,20 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
             throw new InvalidOperationException("A key can only be removed from the selected provider.");
         }
 
+        CredentialSourceLabel = "Removing remembered credential";
+        ClearReadiness();
+
         return QueueOperationAsync(async (generation, cancellationToken) =>
         {
             await _credentialStore.RemoveAsync(providerId, cancellationToken).ConfigureAwait(false);
             if (!IsCurrentOperation(providerId, generation)) return;
             var (credential, sourceLabel) = EnvironmentCredential(providerId);
             var settings = SettingsWithCredential(providerId, credential);
-            _activeProviderSettings = settings;
-            CredentialSourceLabel = sourceLabel;
+            if (!TrySetActiveProviderSettings(providerId, generation, settings)) return;
+            await PublishOnUiAsync(() =>
+            {
+                if (IsCurrentOperation(providerId, generation)) CredentialSourceLabel = sourceLabel;
+            }).ConfigureAwait(false);
             await ProbeAndPublishAsync(providerId, SelectedModelId, settings, generation, cancellationToken)
                 .ConfigureAwait(false);
         });
@@ -367,14 +398,17 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
             return Task.CompletedTask;
         }
         var providerId = SelectedProviderId;
+        ClearReadiness();
         return QueueOperationAsync(async (generation, cancellationToken) =>
         {
             await _actions.ExecuteAsync(actionId, providerId, cancellationToken).ConfigureAwait(false);
             if (!IsCurrentOperation(providerId, generation)) return;
+            var settings = RebuildActiveProviderSettings();
+            if (!TrySetActiveProviderSettings(providerId, generation, settings)) return;
             await ProbeAndPublishAsync(
                     providerId,
                     SelectedModelId,
-                    _activeProviderSettings,
+                    settings,
                     generation,
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -409,7 +443,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
             _activeProviderSettings = new RekallAgeLanguageModelProviderSettings();
             _activeOperationCancellation?.Dispose();
             _lifecycleCancellation.Dispose();
-            RaiseCommands();
+            await PublishOnUiAsync(RaiseCommands).ConfigureAwait(false);
         }
     }
 
@@ -454,11 +488,11 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         }
         catch (RekallAgeStudioCredentialStoreException)
         {
-            PublishCredentialStoreFailure(generation);
+            await PublishOnUiAsync(() => PublishCredentialStoreFailure(generation)).ConfigureAwait(false);
         }
         catch (Exception)
         {
-            PublishOperationFailure(generation);
+            await PublishOnUiAsync(() => PublishOperationFailure(generation)).ConfigureAwait(false);
         }
     }
 
@@ -484,8 +518,11 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         }
         if (!IsCurrentOperation(providerId, generation)) return;
         var settings = SettingsWithCredential(providerId, credential);
-        _activeProviderSettings = settings;
-        CredentialSourceLabel = sourceLabel;
+        if (!TrySetActiveProviderSettings(providerId, generation, settings)) return;
+        await PublishOnUiAsync(() =>
+        {
+            if (IsCurrentOperation(providerId, generation)) CredentialSourceLabel = sourceLabel;
+        }).ConfigureAwait(false);
         await ProbeAndPublishAsync(providerId, preferredModel, settings, generation, cancellationToken)
             .ConfigureAwait(false);
     }
@@ -504,13 +541,19 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         cancellationToken.ThrowIfCancellationRequested();
         if (!providerId.Equals(result.ProviderId, StringComparison.Ordinal)
             || !IsCurrentOperation(providerId, generation)) return;
-        PublishReadiness(result, SensitiveValues(settings));
+        var sensitiveValues = SensitiveValues(settings);
+        await PublishOnUiAsync(() =>
+        {
+            if (IsCurrentOperation(providerId, generation)) PublishReadiness(result, sensitiveValues);
+        }).ConfigureAwait(false);
     }
 
     private Task RetryAsync()
     {
         var providerId = SelectedProviderId;
-        var settings = _activeProviderSettings;
+        var settings = RebuildActiveProviderSettings();
+        _activeProviderSettings = settings;
+        ClearReadiness();
         return QueueOperationAsync((generation, cancellationToken) =>
             ProbeAndPublishAsync(providerId, SelectedModelId, settings, generation, cancellationToken));
     }
@@ -533,21 +576,30 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         try
         {
             await _setupStore.SaveAsync(setup, _lifecycleCancellation.Token).ConfigureAwait(false);
-            _setupStoreAvailable = true;
-            CompletedSetup = setup;
+            await PublishOnUiAsync(() =>
+            {
+                _setupStoreAvailable = true;
+                CompletedSetup = setup;
+            }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
         {
         }
         catch (Exception)
         {
-            _setupStoreAvailable = false;
-            ErrorSummary = "Language-model setup could not be saved.";
+            await PublishOnUiAsync(() =>
+            {
+                _setupStoreAvailable = false;
+                ErrorSummary = "Language-model setup could not be saved.";
+            }).ConfigureAwait(false);
         }
         finally
         {
-            OnPropertyChanged(nameof(CanFinish));
-            RaiseCommands();
+            await PublishOnUiAsync(() =>
+            {
+                OnPropertyChanged(nameof(CanFinish));
+                RaiseCommands();
+            }).ConfigureAwait(false);
         }
     }
 
@@ -558,21 +610,30 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         try
         {
             await _setupStore.SaveAsync(setup, _lifecycleCancellation.Token).ConfigureAwait(false);
-            _setupStoreAvailable = true;
-            CompletedSetup = setup;
+            await PublishOnUiAsync(() =>
+            {
+                _setupStoreAvailable = true;
+                CompletedSetup = setup;
+            }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
         {
         }
         catch (Exception)
         {
-            _setupStoreAvailable = false;
-            ErrorSummary = "Language-model setup could not be saved.";
+            await PublishOnUiAsync(() =>
+            {
+                _setupStoreAvailable = false;
+                ErrorSummary = "Language-model setup could not be saved.";
+            }).ConfigureAwait(false);
         }
         finally
         {
-            OnPropertyChanged(nameof(CanFinish));
-            RaiseCommands();
+            await PublishOnUiAsync(() =>
+            {
+                OnPropertyChanged(nameof(CanFinish));
+                RaiseCommands();
+            }).ConfigureAwait(false);
         }
     }
 
@@ -597,7 +658,10 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         ReadinessState = result.State;
         ReadinessCode = Redact(result.Code, sensitiveValues);
         ReadinessSummary = Redact(result.Summary, sensitiveValues);
-        RecommendedActionId = NormalizeRemediationActionId(result);
+        var remediationActionId = NormalizeRemediationActionId(result);
+        RecommendedActionId = remediationActionId is null
+            ? null
+            : Redact(remediationActionId, sensitiveValues);
         Replace(
             CompatibleModels,
             result.CompatibleModels
@@ -605,12 +669,16 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
                 .Distinct(StringComparer.Ordinal));
         Replace(
             ReadinessRows,
-            result.Checks.Select(check => new RekallAgeStudioLanguageModelReadinessRow(
-                Redact(check.Id, sensitiveValues),
-                Glyph(check.State),
-                CheckLabel(check.Id),
-                Redact(check.Summary, sensitiveValues),
-                check.State)));
+            result.Checks.Select(check =>
+            {
+                var safeId = Redact(check.Id, sensitiveValues);
+                return new RekallAgeStudioLanguageModelReadinessRow(
+                    safeId,
+                    Glyph(check.State),
+                    CheckLabel(safeId),
+                    Redact(check.Summary, sensitiveValues),
+                    check.State);
+            }));
         if (!CompatibleModels.Contains(SelectedModelId, StringComparer.Ordinal))
         {
             SelectedModelId = string.Empty;
@@ -675,6 +743,30 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         KimiUrl = KimiUrl
     };
 
+    private RekallAgeLanguageModelProviderSettings RebuildActiveProviderSettings() => new()
+    {
+        OllamaUrl = OllamaUrl,
+        OpenAiUrl = OpenAiUrl,
+        OpenAiApiKey = SelectedProviderId == "openai" ? _activeProviderSettings.OpenAiApiKey : null,
+        KimiUrl = KimiUrl,
+        KimiApiKey = SelectedProviderId == "kimi" ? _activeProviderSettings.KimiApiKey : null
+    };
+
+    private bool TrySetActiveProviderSettings(
+        string providerId,
+        long generation,
+        RekallAgeLanguageModelProviderSettings settings)
+    {
+        lock (_operationSync)
+        {
+            if (_disposed
+                || generation != _operationGeneration
+                || !providerId.Equals(SelectedProviderId, StringComparison.Ordinal)) return false;
+            _activeProviderSettings = settings;
+            return true;
+        }
+    }
+
     private RekallAgeLanguageModelProviderSettings SettingsWithCredential(string providerId, string? credential) => new()
     {
         OllamaUrl = OllamaUrl,
@@ -700,6 +792,18 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         return string.IsNullOrWhiteSpace(moonshotKey)
             ? (null, "No credential configured")
             : (moonshotKey, "Environment variable MOONSHOT_API_KEY");
+    }
+
+    private void SetEndpoint(ref string? field, string? value, [CallerMemberName] string? propertyName = null)
+    {
+        if (!Set(ref field, value, propertyName)) return;
+        if (_disposed) return;
+        var providerId = SelectedProviderId;
+        var settings = RebuildActiveProviderSettings();
+        _activeProviderSettings = settings;
+        ClearReadiness();
+        _ = QueueOperationAsync((generation, cancellationToken) =>
+            ProbeAndPublishAsync(providerId, SelectedModelId, settings, generation, cancellationToken));
     }
 
     private bool IsCurrentOperation(string providerId, long generation) =>
@@ -752,6 +856,33 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+
+    private Task PublishOnUiAsync(Action publish)
+    {
+        ArgumentNullException.ThrowIfNull(publish);
+        if (_synchronizationContext is null
+            || ReferenceEquals(SynchronizationContext.Current, _synchronizationContext))
+        {
+            publish();
+            return Task.CompletedTask;
+        }
+
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _synchronizationContext.Post(static state =>
+        {
+            var (action, signal) = ((Action, TaskCompletionSource))state!;
+            try
+            {
+                action();
+                signal.SetResult();
+            }
+            catch (Exception exception)
+            {
+                signal.SetException(exception);
+            }
+        }, (publish, completion));
+        return completion.Task;
+    }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 

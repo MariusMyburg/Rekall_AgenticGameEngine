@@ -202,8 +202,8 @@ For each checked example:
 - [ ] Inspect the SDK's current example app/depot build scripts before creating app `1577830` scripts.
 - [ ] Keep Steam credentials and sentry/auth files outside the repository and depot.
 - [ ] Configure only the intended depots and content roots.
-- [ ] Upload first to a private testing branch.
-- [ ] Record the resulting build ID and depot manifest IDs.
+- [x] Upload the accepted payload first as a private, unassigned SteamPipe build; do not make it live or customer-visible.
+- [x] Record the resulting build ID. SteamPipe build `25016850` was uploaded successfully for app `1577830`, depot `1577831`; SteamCMD did not print the depot manifest ID, so retrieve that value from Steamworks before branch assignment.
 - [ ] Install the build through Steam onto a clean library directory.
 - [ ] Launch Studio from Steam and exercise create, open, Examples, World, Inspector, Author, Code, Simulate, Play, documentation, package, and exit.
 - [ ] Run at least one deterministic gameplay assertion and one real Windows Player session from the installed Steam build.

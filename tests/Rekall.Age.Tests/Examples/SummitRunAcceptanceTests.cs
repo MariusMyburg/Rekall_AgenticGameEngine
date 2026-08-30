@@ -96,10 +96,14 @@ public sealed class SummitRunAcceptanceTests
             .ToArray();
         var drivenWorld = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(
             projectRoot, "Main", inputs.Length - 1, inputs[..^1], CancellationToken.None);
-        Assert.Contains(drivenWorld.Entities.Where(entity => entity.Tags.Contains("cell")), cell =>
+        var drivenRover = drivenWorld.Entities.Single(entity => entity.Tags.Contains("rover"));
+        var drivenCells = drivenWorld.Entities.Where(entity => entity.Tags.Contains("cell")).ToArray();
+        Assert.True(drivenCells.Any(cell =>
             !cell.Visible
             && cell.Components.Single(component => component.Type == "Game.Modules.SummitRun.CellState")
-                .Properties["Collected"]!.GetValue<bool>());
+                .Properties["Collected"]!.GetValue<bool>()),
+            $"Expected a collected cell after driving; rover=({drivenRover.Transform.Position2D.X:0.000},{drivenRover.Transform.Position2D.Y:0.000}), " +
+            $"cells={string.Join(", ", drivenCells.Select(cell => $"{cell.Name}=({cell.Transform.Position2D.X:0.000},{cell.Transform.Position2D.Y:0.000})"))}.");
         var world = await new RekallAgeRuntimeSnapshotService().InspectSceneAsync(
             projectRoot, "Main", inputs.Length, inputs, CancellationToken.None);
         var rover = world.Entities.Single(entity => entity.Tags.Contains("rover"));
@@ -111,7 +115,9 @@ public sealed class SummitRunAcceptanceTests
 
         Assert.InRange(rover.Transform.Position2D.X, 0.7, 1.3);
         Assert.InRange(rover.Transform.Position2D.Y, 5.5, 6.3);
-        Assert.All(wheels, wheel => Assert.InRange(wheel.Transform.Position2D.Y, 4.8, 5.6));
+        Assert.All(wheels, wheel => Assert.InRange(wheel.Transform.Position2D.Y, 5.4, 5.9));
+        Assert.InRange(wheels.Single(wheel => wheel.Name == "WheelBack").Transform.Position2D.X, 0.4, 0.9);
+        Assert.InRange(wheels.Single(wheel => wheel.Name == "WheelFront").Transform.Position2D.X, 1.1, 1.6);
         Assert.InRange(Math.Abs(ReadNumber(linearVelocity["x"])), 0, 3);
         Assert.InRange(Math.Abs(ReadNumber(linearVelocity["y"])), 0, 3);
         Assert.InRange(Math.Abs(ReadNumber(angularVelocity["z"])), 0, 30);

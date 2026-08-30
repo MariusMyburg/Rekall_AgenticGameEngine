@@ -43,6 +43,11 @@ crashdumps/
 
 # Local assets and large ad-hoc captures
 Examples/AetherfallCitadel/Builds/
+Examples/StellarDominion/Builds/
+Examples/StellarDominion/Captures/vulkan-*.png
+Examples/StellarDominion/Tools/tex_*.png
+/scene_Debrief.json
+/scene_Mission1.json
 Examples/**/Assets/Models/Compiled/
 Examples/**/Assets/texture/
 Examples/**/Proof/Captures/

@@ -104,6 +104,8 @@ public sealed class RuntimeViewportAssetRenderingTests
         Assert.Equal(0, capture.FallbackRenderableCount);
         Assert.True(CountPixels(output, 0, 60, pixel => pixel.R > 120 && pixel.G < 90 && pixel.B < 90) > 0);
         Assert.True(CountPixels(output, 60, 120, pixel => pixel.G > 120 && pixel.R < 90 && pixel.B < 90) > 0);
+        Assert.True(CountPixels(output, 10, 50, pixel => pixel.R > 120 && pixel.G < 90 && pixel.B < 90) > 0);
+        Assert.True(CountPixels(output, 70, 110, pixel => pixel.G > 120 && pixel.R < 90 && pixel.B < 90) > 0);
         Assert.Equal(0, CountPixels(output, 0, 60, pixel => pixel.G > 120 && pixel.R < 90 && pixel.B < 90));
         Assert.Equal(0, CountPixels(output, 60, 120, pixel => pixel.R > 120 && pixel.G < 90 && pixel.B < 90));
     }

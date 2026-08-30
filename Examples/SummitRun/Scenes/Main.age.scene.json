@@ -21,7 +21,6 @@
           "type": "Rekall.Camera2D",
           "properties": {
             "Active": true,
-            "ClearColor": "#12203a",
             "CullingMask": "*",
             "FarClip": 100,
             "NearClip": 0.1,
@@ -30,7 +29,8 @@
             "ViewportHeight": 1,
             "ViewportWidth": 1,
             "ViewportX": 0,
-            "ViewportY": 0
+            "ViewportY": 0,
+            "ClearColor": "#20203AFF"
           }
         },
         {
@@ -76,8 +76,8 @@
           "properties": {
             "ScaleX": 1,
             "ScaleY": 1,
-            "X": 8,
-            "Y": 6.6
+            "X": 5,
+            "Y": 6.5
           }
         }
       ],
@@ -196,6 +196,105 @@
         }
       ],
       "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_e1b195deb0db4dbca412f84f9be13af6",
+      "name": "Chassis",
+      "tags": [
+        "rover"
+      ],
+      "components": [
+        {
+          "type": "Game.Modules.SummitRun.SummitRunState",
+          "properties": {
+            "Cells": 0,
+            "Distance": 0,
+            "Enabled": true,
+            "Fuel": 1,
+            "Lean": 0,
+            "RoverVel": 0,
+            "RoverX": 1,
+            "Status": "ready",
+            "WheelSpin": 0,
+            "ResetCount": 0
+          }
+        },
+        {
+          "type": "Rekall.BoxCollider2D",
+          "properties": {
+            "Height": 0.44,
+            "Width": 0.96
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "Layer": "vehicle",
+            "CollidesWith": [
+              "terrain"
+            ]
+          }
+        },
+        {
+          "type": "Rekall.InputActionMap",
+          "properties": {
+            "Actions": [
+              {
+                "name": "drive",
+                "negativeKey": "A",
+                "negativeKey2": "Left",
+                "positiveKey": "D",
+                "positiveKey2": "Right"
+              },
+              {
+                "name": "lean",
+                "negativeKey": "S",
+                "negativeKey2": "Down",
+                "positiveKey": "W",
+                "positiveKey2": "Up"
+              },
+              {
+                "key": "R",
+                "name": "reset"
+              }
+            ],
+            "Active": true
+          }
+        },
+        {
+          "type": "Rekall.Rigidbody2D",
+          "properties": {
+            "AngularDrag": 0.6,
+            "LinearDrag": 0.1,
+            "Mass": 4
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#ff6a2b",
+            "Shape": "rectangle",
+            "SortOrder": 20,
+            "Height": 0.44,
+            "Width": 0.96
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "Rotation": 0,
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 1,
+            "Y": 5.967
+          }
+        }
+      ],
+      "parentId": "ent_6a8d3c921ff64d35b580f4f18d6ed9ac",
       "prefabSourceId": null,
       "visible": true,
       "locked": false
@@ -472,6 +571,156 @@
       "locked": false
     },
     {
+      "id": "ent_b99b58aaca13425aa1098ff25cc52d41",
+      "name": "Ramp1",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider2D",
+          "properties": {
+            "Height": 1.2,
+            "Width": 6
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "CollidesWith": [
+              "vehicle"
+            ],
+            "Layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#5a8a6a",
+            "Height": 1.2,
+            "Shape": "rectangle",
+            "SortOrder": -10,
+            "Width": 6
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "Rotation": 30,
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 24,
+            "Y": 4.8
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_8cd9f7328c1f44ce94b6e72b81ec4b1e",
+      "name": "Ramp2",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider2D",
+          "properties": {
+            "Height": 1,
+            "Width": 5
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "CollidesWith": [
+              "vehicle"
+            ],
+            "Layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#5a8a6a",
+            "Height": 1,
+            "Shape": "rectangle",
+            "SortOrder": -10,
+            "Width": 5
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "Rotation": 35,
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 48,
+            "Y": 5.5
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
+      "id": "ent_89cbed29b8e84428945e041ba859b48b",
+      "name": "Ramp3",
+      "tags": [
+        "terrain"
+      ],
+      "components": [
+        {
+          "type": "Rekall.BoxCollider2D",
+          "properties": {
+            "Height": 1.2,
+            "Width": 7
+          }
+        },
+        {
+          "type": "Rekall.CollisionFilter",
+          "properties": {
+            "CollidesWith": [
+              "vehicle"
+            ],
+            "Layer": "terrain"
+          }
+        },
+        {
+          "type": "Rekall.ShapeRenderer2D",
+          "properties": {
+            "Active": true,
+            "Color": "#5a8a6a",
+            "Height": 1.2,
+            "Shape": "rectangle",
+            "SortOrder": -10,
+            "Width": 7
+          }
+        },
+        {
+          "type": "Rekall.Transform2D",
+          "properties": {
+            "Rotation": 28,
+            "ScaleX": 1,
+            "ScaleY": 1,
+            "X": 60,
+            "Y": 6.2
+          }
+        }
+      ],
+      "parentId": null,
+      "prefabSourceId": null,
+      "visible": true,
+      "locked": false
+    },
+    {
       "id": "ent_6a8d3c921ff64d35b580f4f18d6ed9ac",
       "name": "Rover",
       "tags": [
@@ -479,105 +728,6 @@
       ],
       "components": [],
       "parentId": null,
-      "prefabSourceId": null,
-      "visible": true,
-      "locked": false
-    },
-    {
-      "id": "ent_e1b195deb0db4dbca412f84f9be13af6",
-      "name": "Chassis",
-      "tags": [
-        "rover"
-      ],
-      "components": [
-        {
-          "type": "Game.Modules.SummitRun.SummitRunState",
-          "properties": {
-            "Cells": 0,
-            "Distance": 0,
-            "Enabled": true,
-            "Fuel": 1,
-            "Lean": 0,
-            "RoverVel": 0,
-            "RoverX": 1,
-            "Status": "ready",
-            "WheelSpin": 0,
-            "ResetCount": 0
-          }
-        },
-        {
-          "type": "Rekall.BoxCollider2D",
-          "properties": {
-            "Width": 2.4,
-            "Height": 1.1
-          }
-        },
-        {
-          "type": "Rekall.CollisionFilter",
-          "properties": {
-            "Layer": "vehicle",
-            "CollidesWith": [
-              "terrain"
-            ]
-          }
-        },
-        {
-          "type": "Rekall.InputActionMap",
-          "properties": {
-            "Actions": [
-              {
-                "name": "drive",
-                "negativeKey": "A",
-                "negativeKey2": "Left",
-                "positiveKey": "D",
-                "positiveKey2": "Right"
-              },
-              {
-                "name": "lean",
-                "negativeKey": "S",
-                "negativeKey2": "Down",
-                "positiveKey": "W",
-                "positiveKey2": "Up"
-              },
-              {
-                "key": "R",
-                "name": "reset"
-              }
-            ],
-            "Active": true
-          }
-        },
-        {
-          "type": "Rekall.Rigidbody2D",
-          "properties": {
-            "Mass": 8,
-            "LinearDrag": 0.15,
-            "AngularDrag": 0.8
-          }
-        },
-        {
-          "type": "Rekall.ShapeRenderer2D",
-          "properties": {
-            "Active": true,
-            "Color": "#ff6a2b",
-            "Height": 1.1,
-            "Shape": "rectangle",
-            "Width": 2.4,
-            "SortOrder": 20
-          }
-        },
-        {
-          "type": "Rekall.Transform2D",
-          "properties": {
-            "Rotation": 0,
-            "ScaleX": 1,
-            "ScaleY": 1,
-            "X": 1,
-            "Y": 5.967
-          }
-        }
-      ],
-      "parentId": "ent_6a8d3c921ff64d35b580f4f18d6ed9ac",
       "prefabSourceId": null,
       "visible": true,
       "locked": false
@@ -892,7 +1042,7 @@
         {
           "type": "Rekall.CircleCollider2D",
           "properties": {
-            "Radius": 0.55
+            "Radius": 0.22
           }
         },
         {
@@ -911,8 +1061,6 @@
             "AnchorAX": 0,
             "AnchorAY": 0,
             "AnchorAZ": 0,
-            "AnchorBX": -0.85,
-            "AnchorBY": -0.75,
             "AnchorBZ": 0,
             "AxisX": 0,
             "AxisY": 0,
@@ -920,23 +1068,25 @@
             "SpringFrequency": 45,
             "DampingRatio": 3,
             "MotorTargetVelocity": 0,
-            "MotorMaximumTorque": 30
+            "AnchorBX": -0.34,
+            "AnchorBY": -0.3,
+            "MotorMaximumTorque": 50
           }
         },
         {
           "type": "Rekall.Rigidbody2D",
           "properties": {
-            "Mass": 2
+            "Mass": 1
           }
         },
         {
           "type": "Rekall.ShapeRenderer2D",
           "properties": {
             "Active": true,
-            "Color": "#e8eefc",
             "Shape": "circle",
             "SortOrder": 25,
-            "Radius": 0.55
+            "Color": "#d0d8e8",
+            "Radius": 0.22
           }
         },
         {
@@ -945,8 +1095,8 @@
             "Rotation": 0,
             "ScaleX": 1,
             "ScaleY": 1,
-            "X": 0.15,
-            "Y": 5.217
+            "X": 0.66,
+            "Y": 5.667
           }
         }
       ],
@@ -965,7 +1115,7 @@
         {
           "type": "Rekall.CircleCollider2D",
           "properties": {
-            "Radius": 0.55
+            "Radius": 0.22
           }
         },
         {
@@ -984,8 +1134,6 @@
             "AnchorAX": 0,
             "AnchorAY": 0,
             "AnchorAZ": 0,
-            "AnchorBX": 0.85,
-            "AnchorBY": -0.75,
             "AnchorBZ": 0,
             "AxisX": 0,
             "AxisY": 0,
@@ -993,23 +1141,25 @@
             "SpringFrequency": 45,
             "DampingRatio": 3,
             "MotorTargetVelocity": 0,
-            "MotorMaximumTorque": 30
+            "AnchorBX": 0.34,
+            "AnchorBY": -0.3,
+            "MotorMaximumTorque": 50
           }
         },
         {
           "type": "Rekall.Rigidbody2D",
           "properties": {
-            "Mass": 2
+            "Mass": 1
           }
         },
         {
           "type": "Rekall.ShapeRenderer2D",
           "properties": {
             "Active": true,
-            "Color": "#e8eefc",
             "Shape": "circle",
             "SortOrder": 25,
-            "Radius": 0.55
+            "Color": "#d0d8e8",
+            "Radius": 0.22
           }
         },
         {
@@ -1018,8 +1168,8 @@
             "Rotation": 0,
             "ScaleX": 1,
             "ScaleY": 1,
-            "X": 1.85,
-            "Y": 5.217
+            "X": 1.34,
+            "Y": 5.667
           }
         }
       ],

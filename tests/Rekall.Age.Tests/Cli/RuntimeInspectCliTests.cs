@@ -384,9 +384,11 @@ public sealed class RuntimeInspectCliTests
             CancellationToken.None);
         var outputDirectory = Path.Combine(root, "ViewportCaptures");
 
-        var result = await RunAsync(FindCliAssemblyPath(), "render", "viewport", "capture", root, "Main", "3", outputDirectory);
+        var result = await RunAsync(
+            FindCliAssemblyPath(),
+            "render", "viewport", "capture", root, "Main", "3", outputDirectory, "320", "180", "software");
 
-        Assert.Equal(0, result.ExitCode);
+        Assert.True(result.ExitCode == 0, result.Output);
         Assert.Contains("Runtime viewport Main frame 3", result.Output);
         Assert.Contains("Backend: software", result.Output);
         Assert.Contains("Hardware accelerated: False", result.Output);

@@ -30,8 +30,13 @@ public sealed class VulkanSceneBatchBuilderTests
         var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, []);
 
         Assert.Equal(new Vector4(0.55f, -0.35f, 11.2f, 1), batch.Frame.EnvironmentParameters);
-        Assert.Equal(new Vector4(128 / 255f, 160 / 255f, 192 / 255f, 1), batch.Frame.EnvironmentAmbientSkyColor);
+        Assert.Equal(new Vector4(128 / 255f, 160 / 255f, 192 / 255f, 0), batch.Frame.EnvironmentAmbientSkyColor);
         Assert.Equal(new Vector4(96 / 255f, 64 / 255f, 32 / 255f, 1), batch.Frame.EnvironmentAmbientGroundColor);
+
+        var imageBatch = new RekallAgeVulkanSceneBatchBuilder().Build(
+            frame with { Environment = frame.Environment with { SkyAssetId = "sky.hdr" } },
+            []);
+        Assert.Equal(1, imageBatch.Frame.EnvironmentAmbientSkyColor.W);
     }
 
     [Fact]

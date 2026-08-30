@@ -1264,11 +1264,11 @@ public sealed class StudioViewModelTests
             await ExecuteAsync(viewModel.CreateCommand);
             await ExecuteAsync(viewModel.AddEntityCommand);
             var entity = Assert.Single(viewModel.EntityNodes);
-            preview.Regions.Add(new(entity.EntityId, RekallAgeStudioViewportRegionKind.World, 40, 40, 20, 20, 2, 0));
+            preview.Regions.Add(new(entity.EntityId, RekallAgeStudioViewportRegionKind.World, 390, 215, 20, 20, 2, 0));
 
             Assert.True(await viewModel.SelectViewportEntityAsync(200, 100, 100, 50));
             Assert.Equal(entity.EntityId, viewModel.SelectedEntityId);
-            Assert.False(await viewModel.SelectViewportEntityAsync(200, 100, 20, 50));
+            Assert.False(await viewModel.SelectViewportEntityAsync(200, 100, 5, 50));
             Assert.Equal(entity.EntityId, viewModel.SelectedEntityId);
         }
         finally
@@ -1328,12 +1328,12 @@ public sealed class StudioViewModelTests
             var entity = Assert.Single(viewModel.EntityNodes);
             viewModel.ComponentTypeInput = "Rekall.Transform3D";
             await ExecuteAsync(viewModel.AddComponentCommand);
-            preview.Regions.Add(new(entity.EntityId, RekallAgeStudioViewportRegionKind.World, 40, 40, 20, 20, 2, 0));
+            preview.Regions.Add(new(entity.EntityId, RekallAgeStudioViewportRegionKind.World, 510, 215, 20, 20, 2, 0));
             await viewModel.SelectEntityAsync(entity);
             var transactionsBefore = viewModel.TransactionLines.Count;
 
-            Assert.True(viewModel.BeginSceneTransform(100, 100, 65, 50));
-            Assert.True(viewModel.UpdateSceneTransform(100, 100, 91, 50));
+            Assert.True(viewModel.BeginSceneTransform(800, 450, 525, 225));
+            Assert.True(viewModel.UpdateSceneTransform(800, 450, 550, 225));
             Assert.True(await viewModel.CompleteSceneTransformAsync());
 
             var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", CancellationToken.None);

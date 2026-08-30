@@ -12,7 +12,8 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
         int height,
         Matrix4x4 viewProjection,
         string? clearColor = null,
-        IReadOnlyDictionary<string, RekallAgeRgbaImage>? textures = null)
+        IReadOnlyDictionary<string, RekallAgeRgbaImage>? textures = null,
+        RekallAgeRuntimeViewportCameraRect? viewport = null)
     {
         if (width <= 0)
         {
@@ -22,6 +23,15 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
         if (height <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(height), "Render height must be positive.");
+        }
+
+        var renderRect = viewport ?? new RekallAgeRuntimeViewportCameraRect(0, 0, width, height);
+        if (renderRect.Width <= 0 || renderRect.Height <= 0
+            || renderRect.X < 0 || renderRect.Y < 0
+            || renderRect.X + renderRect.Width > width
+            || renderRect.Y + renderRect.Height > height)
+        {
+            throw new ArgumentOutOfRangeException(nameof(viewport), "Render viewport must fit inside the output dimensions.");
         }
 
         var clear = ParseColor(clearColor, new Rgba(14, 20, 30, 255));
@@ -49,9 +59,9 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
                 var clipA = Vector4.Transform(new Vector4(worldA, 1), viewProjection);
                 var clipB = Vector4.Transform(new Vector4(worldB, 1), viewProjection);
                 var clipC = Vector4.Transform(new Vector4(worldC, 1), viewProjection);
-                if (!TryProject(clipA, width, height, out var screenA)
-                    || !TryProject(clipB, width, height, out var screenB)
-                    || !TryProject(clipC, width, height, out var screenC))
+                if (!TryProject(clipA, renderRect, out var screenA)
+                    || !TryProject(clipB, renderRect, out var screenB)
+                    || !TryProject(clipC, renderRect, out var screenC))
                 {
                     continue;
                 }
@@ -69,6 +79,7 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
                     depth,
                     width,
                     height,
+                    renderRect,
                     screenA,
                     screenB,
                     screenC,
@@ -165,7 +176,10 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
             new Vector2(vertex.U, vertex.V));
     }
 
-    private static bool TryProject(Vector4 clip, int width, int height, out ScreenVertex vertex)
+    private static bool TryProject(
+        Vector4 clip,
+        RekallAgeRuntimeViewportCameraRect viewport,
+        out ScreenVertex vertex)
     {
         vertex = default;
         if (MathF.Abs(clip.W) <= 0.0001f)
@@ -181,8 +195,8 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
         }
 
         vertex = new ScreenVertex(
-            Math.Clamp((ndc.X * 0.5f + 0.5f) * (width - 1), -1_000_000, 1_000_000),
-            Math.Clamp((1 - (ndc.Y * 0.5f + 0.5f)) * (height - 1), -1_000_000, 1_000_000),
+            Math.Clamp(viewport.X + (ndc.X * 0.5f + 0.5f) * (viewport.Width - 1), -1_000_000, 1_000_000),
+            Math.Clamp(viewport.Y + (1 - (ndc.Y * 0.5f + 0.5f)) * (viewport.Height - 1), -1_000_000, 1_000_000),
             ndc.Z);
         return true;
     }
@@ -192,6 +206,7 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
         float[] depth,
         int width,
         int height,
+        RekallAgeRuntimeViewportCameraRect viewport,
         ScreenVertex a,
         ScreenVertex b,
         ScreenVertex c,
@@ -207,10 +222,10 @@ public sealed class RekallAgePerspectiveSoftwareSceneRenderer
             return;
         }
 
-        var minX = Math.Max(0, (int)MathF.Floor(MathF.Min(a.X, MathF.Min(b.X, c.X))));
-        var maxX = Math.Min(width - 1, (int)MathF.Ceiling(MathF.Max(a.X, MathF.Max(b.X, c.X))));
-        var minY = Math.Max(0, (int)MathF.Floor(MathF.Min(a.Y, MathF.Min(b.Y, c.Y))));
-        var maxY = Math.Min(height - 1, (int)MathF.Ceiling(MathF.Max(a.Y, MathF.Max(b.Y, c.Y))));
+        var minX = Math.Max(viewport.X, (int)MathF.Floor(MathF.Min(a.X, MathF.Min(b.X, c.X))));
+        var maxX = Math.Min(viewport.X + viewport.Width - 1, (int)MathF.Ceiling(MathF.Max(a.X, MathF.Max(b.X, c.X))));
+        var minY = Math.Max(viewport.Y, (int)MathF.Floor(MathF.Min(a.Y, MathF.Min(b.Y, c.Y))));
+        var maxY = Math.Min(viewport.Y + viewport.Height - 1, (int)MathF.Ceiling(MathF.Max(a.Y, MathF.Max(b.Y, c.Y))));
         for (var y = minY; y <= maxY; y++)
         {
             for (var x = minX; x <= maxX; x++)

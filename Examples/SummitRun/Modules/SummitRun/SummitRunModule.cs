@@ -54,7 +54,9 @@ public sealed class SummitRunSystem : IRekallAgeRuntimeModuleSystem
     private const double CourseStart = 1;
     private const double FinishX = 71;
     private const double StartChassisY = 5.967;
-    private const double StartWheelY = 5.217;
+    private const double StartWheelBackX = 0.66;
+    private const double StartWheelFrontX = 1.34;
+    private const double StartWheelY = 5.667;
     private const double MotorSpeed = 220;
     private const double FuelDrainPerSecond = 0.04;
     private const double CellRefuel = 0.35;
@@ -119,7 +121,9 @@ public sealed class SummitRunSystem : IRekallAgeRuntimeModuleSystem
                     0));
             world = world.UpdateEntitiesWithTag("wheel", e =>
             {
-                var wheelX = e.Name.Equals("WheelBack", StringComparison.Ordinal) ? 0.15 : 1.85;
+                var wheelX = e.Name.Equals("WheelBack", StringComparison.Ordinal)
+                    ? StartWheelBackX
+                    : StartWheelFrontX;
                 return e.WithPhysicsPoseAndVelocity2D(
                     new RekallAgeRuntimeVector2(wheelX, StartWheelY),
                     0,

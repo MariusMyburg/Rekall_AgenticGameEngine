@@ -260,6 +260,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private double _rotationSnap = 15;
     private double _scaleSnap = 0.1;
     private int _viewportRenderableCount;
+    private bool _lastCaptureNonblank;
     private bool _viewportVisuallyInformative;
     private string _selectedQualityPreset = "High";
     private string _comparisonQualityPreset = "Performance";
@@ -1472,6 +1473,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         get => _viewportRenderableCount;
         private set => Set(ref _viewportRenderableCount, value);
+    }
+
+    internal bool LastCaptureNonblank
+    {
+        get => _lastCaptureNonblank;
+        private set => Set(ref _lastCaptureNonblank, value);
     }
 
     public bool ViewportVisuallyInformative
@@ -4307,6 +4314,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private async Task<RekallAgeWorkbenchOperationResult> CaptureOperationAsync(
         CancellationToken cancellationToken)
     {
+        LastCaptureNonblank = false;
         ViewportVisuallyInformative = false;
         var result = await _session.ExecuteAsync(
             "rekall.render.capture_runtime_viewport",
@@ -4327,6 +4335,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (result.Ok && result.Value is CaptureRuntimeViewportResult capture && capture.Captured)
         {
             ViewportRenderableCount = capture.RenderableCount;
+            LastCaptureNonblank = capture.NonBlank;
             ViewportVisuallyInformative = IsStudioVisualProofAcceptable(
                 capture.FrameAnalysis,
                 capture.LayoutDiagnostics.WarningCodes);

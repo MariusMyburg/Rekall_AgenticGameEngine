@@ -187,7 +187,7 @@ public static class RekallAgeStudioAutomation
 
         var packageArchivePath = ResolvePackageArchivePath(projectRoot);
         var nonblankViewport = viewModel.ViewportRenderableCount > 0
-            && (viewModel.ViewportAvailable || viewModel.ViewportVisuallyInformative);
+            && viewModel.LastCaptureNonblank;
         var status = providerFailure ?? viewModel.StatusText;
         var result = new RekallAgeStudioAutomationResult(
             IsSuccessful(

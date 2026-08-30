@@ -261,20 +261,36 @@ public sealed class RekallAgeRuntimeSoftwareRenderer
         RekallAgeRuntimeViewportAssetSet assets,
         byte[] pixels)
     {
-        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(frame, assets);
+        var viewport = RekallAgeRuntimeViewportCameraRect.FromFrame(frame);
+        var projectionFrame = frame with
+        {
+            Width = viewport.Width,
+            Height = viewport.Height,
+            ActiveCamera = frame.ActiveCamera is null
+                ? null
+                : frame.ActiveCamera with
+                {
+                    ViewportX = 0,
+                    ViewportY = 0,
+                    ViewportWidth = 1,
+                    ViewportHeight = 1
+                }
+        };
+        var meshes = new RekallAgeVulkanSceneMeshBuilder().BuildMeshes(projectionFrame, assets);
         if (meshes.Count == 0)
         {
             return [];
         }
 
-        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(frame, meshes);
+        var batch = new RekallAgeVulkanSceneBatchBuilder().Build(projectionFrame, meshes);
         var rendered = new RekallAgePerspectiveSoftwareSceneRenderer().Render(
             batch,
             frame.Width,
             frame.Height,
             batch.Frame.SoftwareViewProjection,
             frame.ActiveCamera?.ClearColor,
-            assets.Images);
+            assets.Images,
+            viewport);
         rendered.CopyTo(pixels, 0);
         return meshes
             .Select(mesh => mesh.EntityId)

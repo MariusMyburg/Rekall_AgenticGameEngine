@@ -249,16 +249,17 @@ public sealed class ModelAssetPublishingTests
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
         await using (var oversized = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
-            oversized.SetLength(RekallAgePersistedJson.MaximumDocumentBytes + 1L);
+            oversized.SetLength(RekallAgePublishedModelOutputStore.MaximumCompiledOutputBytes + 1L);
         }
         var transaction = RekallAgeTransaction.Begin("reject oversized immutable output");
 
-        await Assert.ThrowsAsync<RekallAgeBoundedFileSnapshotException>(() =>
+        var exception = await Assert.ThrowsAsync<RekallAgeBoundedFileSnapshotException>(() =>
             fixture.Service.PublishAsync(
                 fixture.Root,
                 new("hero-model", "Hero Model", new(RekallAgeModelSourceKind.Mesh, "hero-mesh"), RekallAgeDocumentRevision.Missing),
                 transaction,
                 default).AsTask());
+        Assert.Equal("REKALL_FILE_SNAPSHOT_TOO_LARGE", exception.Code);
 
         Assert.False(File.Exists(fixture.ModelStore.GetModelPath(fixture.Root, "hero-model")));
         Assert.False(File.Exists(fixture.CatalogStore.GetCatalogPath(fixture.Root)));

@@ -6,6 +6,11 @@ using Microsoft.Win32;
 
 namespace Rekall.Age.Studio;
 
+internal interface IRekallAgeStudioProviderPageLauncher
+{
+    void Open(Uri uri);
+}
+
 internal enum RekallAgeStudioLanguageModelSetupWindowOutcome
 {
     Completed,
@@ -18,11 +23,16 @@ public partial class LanguageModelSetupWindow : Window
     private bool _allowClose;
     private bool _closing;
     private bool _deferRequested;
+    private readonly IRekallAgeStudioProviderPageLauncher _providerPageLauncher;
 
-    internal LanguageModelSetupWindow(Window owner, RekallAgeStudioLanguageModelSetupViewModel viewModel)
+    internal LanguageModelSetupWindow(
+        Window owner,
+        RekallAgeStudioLanguageModelSetupViewModel viewModel,
+        IRekallAgeStudioProviderPageLauncher? providerPageLauncher = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ViewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+        _providerPageLauncher = providerPageLauncher ?? SystemProviderPageLauncher.Instance;
         Owner = owner;
         DataContext = ViewModel;
         InitializeComponent();
@@ -43,7 +53,17 @@ public partial class LanguageModelSetupWindow : Window
         var key = OpenAiApiKeyInput.Password;
         OpenAiApiKeyInput.Clear();
         if (string.IsNullOrWhiteSpace(key)) return;
-        await ViewModel.ApplyApiKeyAsync("openai", key, RememberOpenAiKey.IsChecked == true);
+        try
+        {
+            await ViewModel.ApplyApiKeyAsync("openai", key, RememberOpenAiKey.IsChecked == true);
+        }
+        catch (OperationCanceledException) when (_closing)
+        {
+        }
+        catch (Exception)
+        {
+            ShowUiError("The API key could not be applied. Check the selected provider and try again.");
+        }
     }
 
     private async void OnApplyKimiKeyClick(object sender, RoutedEventArgs e)
@@ -51,7 +71,17 @@ public partial class LanguageModelSetupWindow : Window
         var key = KimiApiKeyInput.Password;
         KimiApiKeyInput.Clear();
         if (string.IsNullOrWhiteSpace(key)) return;
-        await ViewModel.ApplyApiKeyAsync("kimi", key, RememberKimiKey.IsChecked == true);
+        try
+        {
+            await ViewModel.ApplyApiKeyAsync("kimi", key, RememberKimiKey.IsChecked == true);
+        }
+        catch (OperationCanceledException) when (_closing)
+        {
+        }
+        catch (Exception)
+        {
+            ShowUiError("The API key could not be applied. Check the selected provider and try again.");
+        }
     }
 
     private void OnBrowseGgufClick(object sender, RoutedEventArgs e)
@@ -72,7 +102,14 @@ public partial class LanguageModelSetupWindow : Window
     private void OnOpenProviderPageClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string url }) return;
-        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        try
+        {
+            _providerPageLauncher.Open(new Uri(url, UriKind.Absolute));
+        }
+        catch (Exception)
+        {
+            ShowUiError("The provider page could not be opened. Check your browser and try again.");
+        }
     }
 
     private async void OnFinishClick(object sender, RoutedEventArgs e)
@@ -84,7 +121,17 @@ public partial class LanguageModelSetupWindow : Window
         DialogResult = true;
     }
 
-    private void OnSetUpLaterClick(object sender, RoutedEventArgs e) => _deferRequested = true;
+    private void OnSetUpLaterClick(object sender, RoutedEventArgs e)
+    {
+        _deferRequested = true;
+        if (!_closing) _ = Dispatcher.BeginInvoke(Close);
+    }
+
+    private void ShowUiError(string message)
+    {
+        UiErrorText.Text = message;
+        UiErrorText.Visibility = Visibility.Visible;
+    }
 
     private async void OnClosing(object? sender, CancelEventArgs e)
     {
@@ -106,7 +153,14 @@ public partial class LanguageModelSetupWindow : Window
         finally
         {
             _allowClose = true;
-            Close();
+            _ = Dispatcher.BeginInvoke(Close);
         }
+    }
+
+    private sealed class SystemProviderPageLauncher : IRekallAgeStudioProviderPageLauncher
+    {
+        public static SystemProviderPageLauncher Instance { get; } = new();
+
+        public void Open(Uri uri) => Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
     }
 }

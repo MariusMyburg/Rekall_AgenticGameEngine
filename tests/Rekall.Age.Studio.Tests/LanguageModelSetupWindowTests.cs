@@ -1,5 +1,8 @@
 using System.IO;
+using System.Diagnostics;
+using System.Reflection;
 using System.Windows;
+using System.Windows.Controls;
 using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.Studio;
 
@@ -91,31 +94,132 @@ public sealed class LanguageModelSetupWindowTests(WpfApplicationTestFixture wpf)
     }
 
     [Fact]
-    public void ClosingAnIncompleteWindowReturnsClosedIncompleteOutcome()
+    public async Task ApiKeyFailureClearsThePasswordAndShowsABoundedNonSecretError()
     {
-        var outcome = wpf.Invoke(() =>
+        await wpf.InvokeAsync(async () =>
         {
             var owner = new Window();
             owner.Show();
             var window = new LanguageModelSetupWindow(owner, CreateViewModel());
+            window.Show();
+            const string secret = "not-a-real-secret";
+            var input = Assert.IsType<PasswordBox>(window.FindName("OpenAiApiKeyInput"));
+            input.Password = secret;
 
-            window.Close();
+            Assert.IsType<Button>(window.FindName("ApplyOpenAiKeyButton"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await Task.Yield();
 
-            var result = window.Outcome;
+            Assert.Equal(string.Empty, input.Password);
+            var error = Assert.IsType<TextBlock>(window.FindName("UiErrorText"));
+            Assert.Equal(Visibility.Visible, error.Visibility);
+            Assert.Contains("could not", error.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(secret, error.Text, StringComparison.Ordinal);
+
+            await CloseWindowAsync(window);
             owner.Close();
-            return result;
         });
+    }
 
-        Assert.Equal(RekallAgeStudioLanguageModelSetupWindowOutcome.ClosedIncomplete, outcome);
+    [Fact]
+    public async Task ProviderPageLaunchFailureShowsTheSameBoundedUiError()
+    {
+        await wpf.InvokeAsync(async () =>
+        {
+            var owner = new Window();
+            owner.Show();
+            var window = new LanguageModelSetupWindow(owner, CreateViewModel(), new ThrowingProviderPageLauncher());
+            window.Show();
+
+            Assert.IsType<Button>(window.FindName("OpenOllamaDownloadButton"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+            var error = Assert.IsType<TextBlock>(window.FindName("UiErrorText"));
+            Assert.Equal(Visibility.Visible, error.Visibility);
+            Assert.Contains("could not", error.Text, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("provider-page-launch-failure", error.Text, StringComparison.Ordinal);
+
+            await CloseWindowAsync(window);
+            owner.Close();
+        });
+    }
+
+    [Fact]
+    public async Task ClosingAVisibleWindowDefersIncompleteSetupAndCancelsActiveProbe()
+    {
+        await wpf.InvokeAsync(async () =>
+        {
+            var owner = new Window();
+            owner.Show();
+            var store = new RecordingSetupStore();
+            var probe = new BlockingReadinessProbe();
+            var viewModel = CreateViewModel(store: store, probe: probe);
+            var window = new LanguageModelSetupWindow(owner, viewModel);
+            var probeTask = viewModel.SelectProviderAsync("openai");
+            await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            window.Show();
+
+            await CloseWindowAsync(window);
+            await probe.Canceled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await probeTask;
+
+            Assert.Equal(RekallAgeStudioLanguageModelSetupWindowOutcome.ClosedIncomplete, window.Outcome);
+            Assert.Contains(store.Saved, setup => !setup.IsComplete);
+            Assert.Equal(Visibility.Collapsed, Assert.IsType<TextBlock>(window.FindName("UiErrorText")).Visibility);
+            await Assert.ThrowsAsync<ObjectDisposedException>(async () => await viewModel.SelectProviderAsync("ollama"));
+            owner.Close();
+        });
+    }
+
+    [Fact]
+    public async Task SetUpLaterReturnsDeferredOutcomeDistinctFromWindowClose()
+    {
+        await wpf.InvokeAsync(async () =>
+        {
+            var owner = new Window();
+            owner.Show();
+            var store = new RecordingSetupStore();
+            var window = new LanguageModelSetupWindow(owner, CreateViewModel(store: store));
+            window.Show();
+
+            var setUpLater = Assert.IsType<Button>(window.FindName("SetUpLaterButton"));
+            InvokeButtonClick(setUpLater);
+            await WaitForClosedAsync(window);
+
+            Assert.Equal(RekallAgeStudioLanguageModelSetupWindowOutcome.Deferred, window.Outcome);
+            Assert.Contains(store.Saved, setup => !setup.IsComplete);
+            owner.Close();
+        });
     }
 
     private static FrameworkElement Panel(FrameworkElement root, string name) =>
         Assert.IsAssignableFrom<FrameworkElement>(root.FindName(name));
 
-    private static RekallAgeStudioLanguageModelSetupViewModel CreateViewModel() => new(
-        new TestSetupStore(),
+    private static RekallAgeStudioLanguageModelSetupViewModel CreateViewModel(
+        IRekallAgeStudioLanguageModelSetupStore? store = null,
+        IRekallAgeLanguageModelReadinessProbe? probe = null) => new(
+        store ?? new TestSetupStore(),
         new TestCredentialStore(),
-        new TestReadinessProbe());
+        probe ?? new TestReadinessProbe());
+
+    private static async Task CloseWindowAsync(Window window)
+    {
+        var closed = WaitForClosedAsync(window);
+        window.Close();
+        await closed;
+    }
+
+    private static void InvokeButtonClick(Button button) =>
+        typeof(Button).GetMethod("OnClick", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(button, null);
+
+    private static Task WaitForClosedAsync(Window window)
+    {
+        if (!window.IsVisible) return Task.CompletedTask;
+        var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        window.Closed += (_, _) => closed.TrySetResult();
+        return closed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
 
     private static string SourcePath(params string[] segments)
     {
@@ -137,6 +241,20 @@ public sealed class LanguageModelSetupWindowTests(WpfApplicationTestFixture wpf)
 
         public ValueTask SaveAsync(RekallAgeStudioLanguageModelSetup setup, CancellationToken cancellationToken) =>
             ValueTask.CompletedTask;
+    }
+
+    private sealed class RecordingSetupStore : IRekallAgeStudioLanguageModelSetupStore
+    {
+        public List<RekallAgeStudioLanguageModelSetup> Saved { get; } = [];
+
+        public ValueTask<RekallAgeStudioLanguageModelSetup> LoadAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult(RekallAgeStudioLanguageModelSetup.Incomplete);
+
+        public ValueTask SaveAsync(RekallAgeStudioLanguageModelSetup setup, CancellationToken cancellationToken)
+        {
+            Saved.Add(setup);
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class TestCredentialStore : IRekallAgeStudioCredentialStore
@@ -164,5 +282,33 @@ public sealed class LanguageModelSetupWindowTests(WpfApplicationTestFixture wpf)
                 [],
                 "retry",
                 true));
+    }
+
+    private sealed class BlockingReadinessProbe : IRekallAgeLanguageModelReadinessProbe
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Canceled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async ValueTask<RekallAgeLanguageModelReadinessResult> ProbeAsync(
+            RekallAgeLanguageModelReadinessRequest request,
+            CancellationToken cancellationToken)
+        {
+            Started.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new UnreachableException();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                Canceled.TrySetResult();
+                throw;
+            }
+        }
+    }
+
+    private sealed class ThrowingProviderPageLauncher : IRekallAgeStudioProviderPageLauncher
+    {
+        public void Open(Uri uri) => throw new InvalidOperationException("provider-page-launch-failure");
     }
 }

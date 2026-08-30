@@ -260,6 +260,55 @@ public sealed class LanguageModelSetupViewModelTests
     }
 
     [Fact]
+    public async Task HostedEndpointEditDuringCredentialReadReResolvesRememberedKeyAndRetryStaysCredentialed()
+    {
+        const string rememberedKey = "remembered-race-key";
+        var credentials = new BlockingRememberedCredentialStore("openai", rememberedKey);
+        var probe = new RecordingProbe((request, _) => Task.FromResult(Ready("openai", "gpt-5.6-sol")));
+        await using var viewModel = CreateViewModel(credentials: credentials, probe: probe);
+        await viewModel.InitializeAsync(CancellationToken.None);
+
+        var staleSelection = viewModel.SelectProviderAsync("openai");
+        await credentials.FirstReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        viewModel.OpenAiUrl = "https://fresh-openai.example/v1";
+        Assert.False(viewModel.CanFinish);
+        credentials.ReleaseReads();
+        await Task.WhenAll(staleSelection, viewModel.WaitForActiveOperationAsync());
+
+        var freshRequest = Assert.Single(probe.Requests);
+        Assert.Equal("https://fresh-openai.example/v1", freshRequest.Settings.OpenAiUrl);
+        Assert.Equal(rememberedKey, freshRequest.Settings.OpenAiApiKey);
+        Assert.Equal("Remembered securely on this PC", viewModel.CredentialSourceLabel);
+        Assert.Equal(RekallAgeLanguageModelReadinessState.Ready, viewModel.ReadinessState);
+
+        await ExecuteAsync(viewModel.RetryCommand);
+
+        Assert.Equal(2, probe.Requests.Count);
+        Assert.Equal(rememberedKey, probe.Requests[^1].Settings.OpenAiApiKey);
+        Assert.Equal("https://fresh-openai.example/v1", probe.Requests[^1].Settings.OpenAiUrl);
+        Assert.DoesNotContain(probe.Requests, request =>
+            request.Settings.OpenAiUrl != "https://fresh-openai.example/v1");
+    }
+
+    [Fact]
+    public async Task HostedEndpointEditReReadsAuthoritativeRememberedCredentialUnlessKeyWasAppliedForSession()
+    {
+        var credentials = new RecordingCredentialStore();
+        credentials.Values["openai"] = "remembered-before-endpoint-edit";
+        var probe = new RecordingProbe((request, _) => Task.FromResult(Ready("openai", "gpt-5.6-sol")));
+        await using var viewModel = CreateViewModel(credentials: credentials, probe: probe);
+        await viewModel.InitializeAsync(CancellationToken.None);
+        await viewModel.SelectProviderAsync("openai");
+        credentials.Values["openai"] = "remembered-after-endpoint-edit";
+
+        viewModel.OpenAiUrl = "https://rotated-openai.example/v1";
+        await viewModel.WaitForActiveOperationAsync();
+
+        Assert.Equal("remembered-after-endpoint-edit", probe.Requests[^1].Settings.OpenAiApiKey);
+        Assert.Equal("https://rotated-openai.example/v1", probe.Requests[^1].Settings.OpenAiUrl);
+    }
+
+    [Fact]
     public async Task SlowCredentialApplyAndRemoveWindowsKeepFinishDisabledUntilFreshResultsPublish()
     {
         var credentials = new RecordingCredentialStore();
@@ -280,6 +329,11 @@ public sealed class LanguageModelSetupViewModelTests
         credentials.ReleaseWrites();
         await apply;
         Assert.True(viewModel.CanFinish);
+
+        viewModel.OpenAiUrl = "https://session-key-endpoint.example/v1";
+        await viewModel.WaitForActiveOperationAsync();
+        Assert.Equal("replacement-key", probe.Requests[^1].Settings.OpenAiApiKey);
+        Assert.Equal("https://session-key-endpoint.example/v1", probe.Requests[^1].Settings.OpenAiUrl);
 
         credentials.BlockRemoves();
         var remove = viewModel.RemoveRememberedApiKeyAsync("openai");
@@ -438,7 +492,7 @@ public sealed class LanguageModelSetupViewModelTests
     }
 
     private static RekallAgeStudioLanguageModelSetupViewModel CreateViewModel(
-        RecordingCredentialStore? credentials = null,
+        IRekallAgeStudioCredentialStore? credentials = null,
         RecordingProbe? probe = null,
         RecordingSetupStore? store = null,
         RecordingActions? actions = null,
@@ -567,6 +621,34 @@ public sealed class LanguageModelSetupViewModelTests
         public void ReleaseRemoves() => _removeRelease?.TrySetResult();
     }
 
+    private sealed class BlockingRememberedCredentialStore(string providerId, string credential)
+        : IRekallAgeStudioCredentialStore
+    {
+        private readonly TaskCompletionSource _releaseReads =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _readCount;
+
+        public TaskCompletionSource FirstReadStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async ValueTask<string?> ReadAsync(string requestedProviderId, CancellationToken cancellationToken)
+        {
+            Assert.Equal(providerId, requestedProviderId);
+            if (Interlocked.Increment(ref _readCount) == 1) FirstReadStarted.SetResult();
+            await _releaseReads.Task;
+            cancellationToken.ThrowIfCancellationRequested();
+            return credential;
+        }
+
+        public ValueTask WriteAsync(string requestedProviderId, string value, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public ValueTask RemoveAsync(string requestedProviderId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public void ReleaseReads() => _releaseReads.TrySetResult();
+    }
+
     private sealed class RecordingProbe(
         Func<RekallAgeLanguageModelReadinessRequest, CancellationToken, Task<RekallAgeLanguageModelReadinessResult>> probe)
         : IRekallAgeLanguageModelReadinessProbe
@@ -657,7 +739,12 @@ public sealed class LanguageModelSetupViewModelTests
         {
             while (!task.IsCompleted)
             {
-                await WaitForPostAsync();
+                Task posted;
+                lock (_work)
+                {
+                    posted = _work.Count > 0 ? Task.CompletedTask : _posted.Task;
+                }
+                await Task.WhenAny(task, posted).WaitAsync(TimeSpan.FromSeconds(5));
                 Drain();
                 await Task.Yield();
             }

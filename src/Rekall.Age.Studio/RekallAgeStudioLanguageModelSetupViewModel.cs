@@ -35,6 +35,13 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     INotifyPropertyChanged,
     IAsyncDisposable
 {
+    private enum ActiveCredentialRetention
+    {
+        None,
+        AppliedSession,
+        ExternalSource
+    }
+
     internal const string OpenOllamaDownloadActionId = "open-ollama-download";
     internal const string StartOllamaActionId = "start-ollama";
     internal const string PullRecommendedOllamaModelActionId = "pull-qwen3.8:27b";
@@ -59,6 +66,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     private Task _activeOperation = Task.CompletedTask;
     private long _operationGeneration;
     private RekallAgeLanguageModelProviderSettings _activeProviderSettings = new();
+    private ActiveCredentialRetention _activeCredentialRetention;
     private RekallAgeStudioLanguageModelSetupStep _currentStep;
     private string _selectedProviderId = "ollama";
     private string _selectedModelId = RekallAgeStudioLanguageModelSetup.Incomplete.ModelId;
@@ -299,6 +307,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         _selectedProviderId = providerId;
         _selectedModelId = preferredModel;
         _activeProviderSettings = CreateNonSecretSettings();
+        _activeCredentialRetention = ActiveCredentialRetention.None;
         CredentialSourceLabel = HostedProviderIds.Contains(providerId)
             ? "Checking credential source"
             : "No credential required";
@@ -324,6 +333,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
 
         var settings = SettingsWithCredential(providerId, key);
         _activeProviderSettings = settings;
+        _activeCredentialRetention = ActiveCredentialRetention.AppliedSession;
         CredentialSourceLabel = rememberSecurely
             ? "Verifying protected credential"
             : "Verifying session credential";
@@ -336,7 +346,11 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
                 await _credentialStore.WriteAsync(providerId, key, cancellationToken).ConfigureAwait(false);
             }
             if (!IsCurrentOperation(providerId, generation)) return;
-            if (!TrySetActiveProviderSettings(providerId, generation, settings)) return;
+            if (!TrySetActiveProviderSettings(
+                    providerId,
+                    generation,
+                    settings,
+                    ActiveCredentialRetention.AppliedSession)) return;
             await PublishOnUiAsync(() =>
             {
                 if (!IsCurrentOperation(providerId, generation)) return;
@@ -371,7 +385,10 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
             if (!IsCurrentOperation(providerId, generation)) return;
             var (credential, sourceLabel) = EnvironmentCredential(providerId);
             var settings = SettingsWithCredential(providerId, credential);
-            if (!TrySetActiveProviderSettings(providerId, generation, settings)) return;
+            var retention = string.IsNullOrWhiteSpace(credential)
+                ? ActiveCredentialRetention.None
+                : ActiveCredentialRetention.ExternalSource;
+            if (!TrySetActiveProviderSettings(providerId, generation, settings, retention)) return;
             await PublishOnUiAsync(() =>
             {
                 if (IsCurrentOperation(providerId, generation)) CredentialSourceLabel = sourceLabel;
@@ -404,8 +421,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
             await _actions.ExecuteAsync(actionId, providerId, cancellationToken).ConfigureAwait(false);
             if (!IsCurrentOperation(providerId, generation)) return;
             var settings = RebuildActiveProviderSettings();
-            if (!TrySetActiveProviderSettings(providerId, generation, settings)) return;
-            await ProbeAndPublishAsync(
+            await ResolveCredentialAndProbeAsync(
                     providerId,
                     SelectedModelId,
                     settings,
@@ -441,6 +457,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         finally
         {
             _activeProviderSettings = new RekallAgeLanguageModelProviderSettings();
+            _activeCredentialRetention = ActiveCredentialRetention.None;
             _activeOperationCancellation?.Dispose();
             _lifecycleCancellation.Dispose();
             await PublishOnUiAsync(RaiseCommands).ConfigureAwait(false);
@@ -504,21 +521,27 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     {
         string? credential = null;
         var sourceLabel = "No credential required";
+        var retention = ActiveCredentialRetention.None;
         if (HostedProviderIds.Contains(providerId))
         {
             credential = await _credentialStore.ReadAsync(providerId, cancellationToken).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(credential))
             {
                 sourceLabel = "Remembered securely on this PC";
+                retention = ActiveCredentialRetention.ExternalSource;
             }
             else
             {
                 (credential, sourceLabel) = EnvironmentCredential(providerId);
+                if (!string.IsNullOrWhiteSpace(credential))
+                {
+                    retention = ActiveCredentialRetention.ExternalSource;
+                }
             }
         }
         if (!IsCurrentOperation(providerId, generation)) return;
         var settings = SettingsWithCredential(providerId, credential);
-        if (!TrySetActiveProviderSettings(providerId, generation, settings)) return;
+        if (!TrySetActiveProviderSettings(providerId, generation, settings, retention)) return;
         await PublishOnUiAsync(() =>
         {
             if (IsCurrentOperation(providerId, generation)) CredentialSourceLabel = sourceLabel;
@@ -548,6 +571,35 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         }).ConfigureAwait(false);
     }
 
+    private Task ResolveCredentialAndProbeAsync(
+        string providerId,
+        string preferredModel,
+        RekallAgeLanguageModelProviderSettings settings,
+        long generation,
+        CancellationToken cancellationToken)
+    {
+        if (HostedProviderIds.Contains(providerId) && !HasCredential(providerId, settings))
+        {
+            return LoadCredentialAndProbeAsync(
+                providerId,
+                preferredModel,
+                generation,
+                cancellationToken);
+        }
+
+        var retention = HasCredential(providerId, settings)
+            ? ActiveCredentialRetention.AppliedSession
+            : ActiveCredentialRetention.None;
+        return TrySetActiveProviderSettings(providerId, generation, settings, retention)
+            ? ProbeAndPublishAsync(
+                providerId,
+                preferredModel,
+                settings,
+                generation,
+                cancellationToken)
+            : Task.CompletedTask;
+    }
+
     private Task RetryAsync()
     {
         var providerId = SelectedProviderId;
@@ -555,7 +607,12 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         _activeProviderSettings = settings;
         ClearReadiness();
         return QueueOperationAsync((generation, cancellationToken) =>
-            ProbeAndPublishAsync(providerId, SelectedModelId, settings, generation, cancellationToken));
+            ResolveCredentialAndProbeAsync(
+                providerId,
+                SelectedModelId,
+                settings,
+                generation,
+                cancellationToken));
     }
 
     private Task MoveNextAsync()
@@ -747,15 +804,22 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     {
         OllamaUrl = OllamaUrl,
         OpenAiUrl = OpenAiUrl,
-        OpenAiApiKey = SelectedProviderId == "openai" ? _activeProviderSettings.OpenAiApiKey : null,
+        OpenAiApiKey = SelectedProviderId == "openai"
+            && _activeCredentialRetention == ActiveCredentialRetention.AppliedSession
+                ? _activeProviderSettings.OpenAiApiKey
+                : null,
         KimiUrl = KimiUrl,
-        KimiApiKey = SelectedProviderId == "kimi" ? _activeProviderSettings.KimiApiKey : null
+        KimiApiKey = SelectedProviderId == "kimi"
+            && _activeCredentialRetention == ActiveCredentialRetention.AppliedSession
+                ? _activeProviderSettings.KimiApiKey
+                : null
     };
 
     private bool TrySetActiveProviderSettings(
         string providerId,
         long generation,
-        RekallAgeLanguageModelProviderSettings settings)
+        RekallAgeLanguageModelProviderSettings settings,
+        ActiveCredentialRetention retention)
     {
         lock (_operationSync)
         {
@@ -763,6 +827,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
                 || generation != _operationGeneration
                 || !providerId.Equals(SelectedProviderId, StringComparison.Ordinal)) return false;
             _activeProviderSettings = settings;
+            _activeCredentialRetention = retention;
             return true;
         }
     }
@@ -775,6 +840,13 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         KimiUrl = KimiUrl,
         KimiApiKey = providerId == "kimi" ? credential : null
     };
+
+    private static bool HasCredential(
+        string providerId,
+        RekallAgeLanguageModelProviderSettings settings) =>
+        !string.IsNullOrWhiteSpace(providerId == "openai"
+            ? settings.OpenAiApiKey
+            : settings.KimiApiKey);
 
     private (string? Credential, string SourceLabel) EnvironmentCredential(string providerId)
     {
@@ -801,9 +873,18 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         var providerId = SelectedProviderId;
         var settings = RebuildActiveProviderSettings();
         _activeProviderSettings = settings;
+        if (HostedProviderIds.Contains(providerId) && !HasCredential(providerId, settings))
+        {
+            CredentialSourceLabel = "Checking credential source";
+        }
         ClearReadiness();
         _ = QueueOperationAsync((generation, cancellationToken) =>
-            ProbeAndPublishAsync(providerId, SelectedModelId, settings, generation, cancellationToken));
+            ResolveCredentialAndProbeAsync(
+                providerId,
+                SelectedModelId,
+                settings,
+                generation,
+                cancellationToken));
     }
 
     private bool IsCurrentOperation(string providerId, long generation) =>

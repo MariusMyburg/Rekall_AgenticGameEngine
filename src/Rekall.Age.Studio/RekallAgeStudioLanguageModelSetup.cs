@@ -207,7 +207,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupStore : IRekallAgeStudioL
         }
     }
 
-    private static string ResolveSetupRoot()
+    internal static string ResolveSetupRoot()
     {
         var overrideRoot = Environment.GetEnvironmentVariable(SetupRootEnvironmentVariable);
         if (!string.IsNullOrWhiteSpace(overrideRoot))

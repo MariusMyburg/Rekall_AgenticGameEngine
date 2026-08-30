@@ -31,6 +31,60 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioViewModelTests
 {
     [Fact]
+    public async Task InteractiveStudioDoesNotOptimisticallyReportUncheckedOllamaAsReady()
+    {
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            new EmptyModel());
+
+        Assert.Equal("deterministic test session ready.", viewModel.ProviderStatus);
+
+        await using var ordinary = new RekallAgeStudioViewModel();
+        Assert.Equal("Local Ollama selected; setup not checked.", ordinary.ProviderStatus);
+    }
+
+    [Fact]
+    public async Task RestoreLanguageModelSetupSelectsOnlyADiscoveredSavedModelAndRestoresReasoning()
+    {
+        var handlers = new Queue<ProviderLifecycleHandler>(
+        [
+            new ProviderLifecycleHandler(blockOllamaChat: false),
+            new ProviderLifecycleHandler(blockOllamaChat: false, openAiModels: ["gpt-5.6-sol", "gpt-5.6-sol-preview"]),
+            new ProviderLifecycleHandler(blockOllamaChat: false, openAiModels: ["gpt-5.6-sol", "gpt-5.6-sol-preview"])
+        ]);
+        var catalog = new RekallAgeLanguageModelProviderCatalog(
+            new RekallAgeLanguageModelProviderSettings { OpenAiApiKey = " " },
+            () => new HttpClient(handlers.Dequeue(), disposeHandler: true));
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            catalog,
+            new RecordingPreviewSession());
+        var setup = RekallAgeStudioLanguageModelSetup.Incomplete with
+        {
+            ProviderId = "openai",
+            ModelId = "gpt-5.6-sol-preview",
+            ReasoningEffort = "xhigh"
+        };
+
+        await viewModel.RestoreLanguageModelSetupAsync(
+            setup,
+            "restore-session-openai-key",
+            null,
+            CancellationToken.None);
+
+        Assert.Equal("openai", viewModel.SelectedLanguageModelProvider.Id);
+        Assert.Equal("gpt-5.6-sol-preview", viewModel.SelectedLanguageModel);
+        Assert.Equal("xhigh", viewModel.SelectedReasoningEffort);
+
+        await viewModel.RestoreLanguageModelSetupAsync(
+            setup with { ModelId = "invented-model" },
+            "restore-session-openai-key",
+            null,
+            CancellationToken.None);
+        Assert.NotEqual("invented-model", viewModel.SelectedLanguageModel);
+    }
+
+    [Fact]
     public void CodexApprovalSummaryShowsAllowlistedActionFactsAndOmitsCredentialLikeFields()
     {
         using var document = JsonDocument.Parse(

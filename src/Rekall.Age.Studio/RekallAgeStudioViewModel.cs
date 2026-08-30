@@ -161,6 +161,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private CancellationTokenSource? _codexSignInCancellation;
     private string? _sessionOpenAiApiKey;
     private string? _sessionKimiApiKey;
+    private string? _sessionOllamaUrl;
+    private string? _sessionOpenAiUrl;
+    private string? _sessionKimiUrl;
     private bool _isBusy;
     private bool _isAgentRunning;
     private bool _isLiveViewportEnabled = true;
@@ -413,7 +416,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             _languageModelProviderLease = _languageModelProviderCatalog.Acquire("ollama", _agentRegistry);
             _languageModelRunner = _languageModelProviderLease.Runner;
-            _providerStatus = $"{_selectedLanguageModelProvider.DisplayName} ready. Refresh models.";
+            _providerStatus = "Local Ollama selected; setup not checked.";
             _providerDisplayStatus = _providerStatus;
         }
         else
@@ -1940,6 +1943,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             }
 
             _sessionOpenAiApiKey = null;
+            _sessionKimiApiKey = null;
+            _sessionOllamaUrl = null;
+            _sessionOpenAiUrl = null;
+            _sessionKimiUrl = null;
+            OnPropertyChanged(nameof(HasSessionOpenAiCredential));
+            OnPropertyChanged(nameof(HasSessionKimiCredential));
             try
             {
                 _lifecycleCancellation.Dispose();
@@ -3942,6 +3951,69 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
     }
 
+    internal async Task RestoreLanguageModelSetupAsync(
+        RekallAgeStudioLanguageModelSetup setup,
+        string? openAiSessionKey,
+        string? kimiSessionKey,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(setup);
+        var normalized = RekallAgeStudioLanguageModelSetup.Normalize(setup)
+            ?? throw new ArgumentException("Language-model setup is incompatible.", nameof(setup));
+        cancellationToken.ThrowIfCancellationRequested();
+
+        Task requestedTransition;
+        var provider = LanguageModelProviders.SingleOrDefault(candidate =>
+            candidate.Id.Equals(normalized.ProviderId, StringComparison.Ordinal))
+            ?? throw new ArgumentException("Language-model setup provider is unavailable.", nameof(setup));
+        lock (_languageModelLifecycleSync)
+        {
+            _sessionOpenAiApiKey = string.IsNullOrWhiteSpace(openAiSessionKey) ? null : openAiSessionKey;
+            _sessionKimiApiKey = string.IsNullOrWhiteSpace(kimiSessionKey) ? null : kimiSessionKey;
+            _sessionOllamaUrl = normalized.OllamaUrl;
+            _sessionOpenAiUrl = normalized.OpenAiUrl;
+            _sessionKimiUrl = normalized.KimiUrl;
+            OnPropertyChanged(nameof(HasSessionOpenAiCredential));
+            OnPropertyChanged(nameof(HasSessionKimiCredential));
+            OnPropertyChanged(nameof(LanguageModelProviders));
+            provider = LanguageModelProviders.Single(candidate =>
+                candidate.Id.Equals(normalized.ProviderId, StringComparison.Ordinal));
+
+            if (!SelectedLanguageModelProvider.Id.Equals(provider.Id, StringComparison.Ordinal))
+            {
+                SelectedLanguageModelProvider = provider;
+            }
+            else
+            {
+                _selectedLanguageModelProvider = provider;
+                OnPropertyChanged(nameof(SelectedLanguageModelProvider));
+                Replace(LanguageModels, []);
+                SelectedLanguageModel = string.Empty;
+                ProviderStatus = $"Restoring {provider.DisplayName} setup…";
+                ProviderDisplayStatus = ProviderStatus;
+                QueueLanguageModelProviderTransition(provider);
+            }
+            requestedTransition = _languageModelProviderTransition;
+        }
+
+        await requestedTransition.WaitAsync(cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_languageModelLifecycleSync)
+        {
+            if (!ReferenceEquals(requestedTransition, _languageModelProviderTransition)
+                || !SelectedLanguageModelProvider.Id.Equals(provider.Id, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (LanguageModels.Contains(normalized.ModelId, StringComparer.Ordinal))
+            {
+                SelectedLanguageModel = normalized.ModelId;
+            }
+            SelectedReasoningEffort = normalized.ReasoningEffort;
+        }
+    }
+
     internal Task WaitForLanguageModelProviderTransitionAsync()
     {
         lock (_languageModelLifecycleSync)
@@ -4241,14 +4313,18 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private RekallAgeLanguageModelProviderSettings? SessionLanguageModelProviderSettings()
     {
-        if (_sessionOpenAiApiKey is null && _sessionKimiApiKey is null) return null;
+        if (_sessionOpenAiApiKey is null
+            && _sessionKimiApiKey is null
+            && _sessionOllamaUrl is null
+            && _sessionOpenAiUrl is null
+            && _sessionKimiUrl is null) return null;
         return new RekallAgeLanguageModelProviderSettings
         {
-            OllamaUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL"),
+            OllamaUrl = _sessionOllamaUrl ?? Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL"),
             OpenAiApiKey = _sessionOpenAiApiKey ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY"),
-            OpenAiUrl = Environment.GetEnvironmentVariable("REKALL_AGE_OPENAI_URL"),
+            OpenAiUrl = _sessionOpenAiUrl ?? Environment.GetEnvironmentVariable("REKALL_AGE_OPENAI_URL"),
             KimiApiKey = _sessionKimiApiKey ?? ReadFirstEnvironmentValue("KIMI_API_KEY", "MOONSHOT_API_KEY"),
-            KimiUrl = Environment.GetEnvironmentVariable("REKALL_AGE_KIMI_URL")
+            KimiUrl = _sessionKimiUrl ?? Environment.GetEnvironmentVariable("REKALL_AGE_KIMI_URL")
         };
     }
 

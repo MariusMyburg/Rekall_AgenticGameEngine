@@ -4,6 +4,10 @@ using Rekall.Age.Studio;
 
 namespace Rekall.Age.Studio.Tests;
 
+[CollectionDefinition("Studio onboarding environment", DisableParallelization = true)]
+public sealed class StudioOnboardingEnvironmentCollection;
+
+[Collection("Studio onboarding environment")]
 public sealed class StudioCredentialStoreTests
 {
     [Fact]
@@ -44,6 +48,41 @@ public sealed class StudioCredentialStoreTests
             await store.WriteAsync("openai", " \t ", CancellationToken.None));
 
         Assert.Empty(Directory.EnumerateFiles(directory.Path));
+    }
+
+    [Fact]
+    public async Task CancelledOperationsObserveCancellationBeforeMissingFileFastPathsAndLeaveNoArtifacts()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = new RekallAgeStudioDpapiCredentialStore(directory.Path);
+        using var cancellationSource = new CancellationTokenSource();
+        cancellationSource.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await store.ReadAsync("openai", cancellationSource.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await store.WriteAsync("openai", "cancelled-write-sentinel", cancellationSource.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await store.RemoveAsync("openai", cancellationSource.Token));
+
+        Assert.False(File.Exists(directory.File("openai.dpapi")));
+        Assert.Empty(Directory.GetFiles(directory.Path, "*.tmp"));
+    }
+
+    [Fact]
+    public async Task FailedWriteLeavesNoProviderOrTemporaryArtifact()
+    {
+        using var directory = new TemporaryDirectory();
+        var blockedRoot = directory.File("blocked-root");
+        await File.WriteAllTextAsync(blockedRoot, "not a directory");
+        var store = new RekallAgeStudioDpapiCredentialStore(blockedRoot);
+
+        var exception = await Assert.ThrowsAsync<RekallAgeStudioCredentialStoreException>(async () =>
+            await store.WriteAsync("openai", "failed-write-sentinel", CancellationToken.None));
+
+        Assert.Equal("REKALL_CREDENTIAL_STORE_WRITE_FAILED", exception.Code);
+        Assert.False(File.Exists(System.IO.Path.Combine(blockedRoot, "openai.dpapi")));
+        Assert.Empty(Directory.GetFiles(directory.Path, "*.tmp"));
     }
 
     [Fact]

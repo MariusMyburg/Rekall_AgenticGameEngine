@@ -4,6 +4,7 @@ using Rekall.Age.Studio;
 
 namespace Rekall.Age.Studio.Tests;
 
+[Collection("Studio onboarding environment")]
 public sealed class LanguageModelSetupStoreTests
 {
     [Fact]

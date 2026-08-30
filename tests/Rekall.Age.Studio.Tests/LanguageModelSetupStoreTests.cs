@@ -17,6 +17,18 @@ public sealed class LanguageModelSetupStoreTests
         Assert.Equal(RekallAgeStudioLanguageModelSetup.Incomplete, loaded);
     }
 
+    [Fact]
+    public async Task LoadAsyncObservesCancellationBeforeTheMissingFileFastPath()
+    {
+        await using var directory = new TemporaryDirectory();
+        using var cancellationSource = new CancellationTokenSource();
+        cancellationSource.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await new RekallAgeStudioLanguageModelSetupStore(directory.File("setup.json"))
+                .LoadAsync(cancellationSource.Token));
+    }
+
     [Theory]
     [InlineData("not-json")]
     [InlineData("{\"version\":2,\"isComplete\":true}")]
@@ -89,6 +101,22 @@ public sealed class LanguageModelSetupStoreTests
         Assert.Equal(RekallAgeStudioLanguageModelSetup.Incomplete, loaded);
     }
 
+    [Theory]
+    [InlineData("https://test-secret-8b5d24d9@api.example.test/v1")]
+    [InlineData("https://api.example.test/v1?api_key=test-secret-8b5d24d9")]
+    [InlineData("https://api.example.test/v1#token=test-secret-8b5d24d9")]
+    public async Task SaveAsyncRejectsEndpointValuesThatCouldCarrySecrets(string hostileEndpoint)
+    {
+        await using var directory = new TemporaryDirectory();
+        var path = directory.File("setup.json");
+        var setup = CompletedSetup() with { OpenAiUrl = hostileEndpoint };
+
+        await Assert.ThrowsAsync<ArgumentException>(async () =>
+            await new RekallAgeStudioLanguageModelSetupStore(path).SaveAsync(setup, CancellationToken.None));
+
+        Assert.False(File.Exists(path));
+    }
+
     [Fact]
     public async Task DefaultStoreUsesOnlyAnAbsoluteSetupRootOverride()
     {
@@ -105,6 +133,31 @@ public sealed class LanguageModelSetupStoreTests
 
             Assert.Equal(directory.File("language-model-setup-v1.json"), store.Path);
             Assert.True(File.Exists(directory.File("language-model-setup-v1.json")));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("REKALL_AGE_STUDIO_SETUP_ROOT", previous);
+        }
+    }
+
+    [Fact]
+    public void DefaultStoreIgnoresAMalformedAbsoluteSetupRootOverride()
+    {
+        var previous = Environment.GetEnvironmentVariable("REKALL_AGE_STUDIO_SETUP_ROOT");
+        try
+        {
+            Environment.SetEnvironmentVariable("REKALL_AGE_STUDIO_SETUP_ROOT", "C:\\invalid|path");
+
+            var store = new RekallAgeStudioLanguageModelSetupStore();
+
+            Assert.Equal(
+                System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Rekall",
+                    "AGE",
+                    "Studio",
+                    "language-model-setup-v1.json"),
+                store.Path);
         }
         finally
         {

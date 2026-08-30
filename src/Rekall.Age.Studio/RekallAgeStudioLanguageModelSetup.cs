@@ -85,7 +85,10 @@ internal sealed record RekallAgeStudioLanguageModelSetup(
         }
 
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri)
-            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            || !string.IsNullOrEmpty(uri.UserInfo)
+            || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment))
         {
             endpoint = null;
             return false;
@@ -129,6 +132,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupStore : IRekallAgeStudioL
 
     public async ValueTask<RekallAgeStudioLanguageModelSetup> LoadAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!File.Exists(_path)) return RekallAgeStudioLanguageModelSetup.Incomplete;
 
         try
@@ -165,6 +169,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupStore : IRekallAgeStudioL
             directory,
             $".{System.IO.Path.GetFileName(_path)}.{Guid.NewGuid():N}.tmp");
 
+        Exception? primaryFailure = null;
         try
         {
             await using (var stream = new FileStream(
@@ -183,9 +188,21 @@ internal sealed class RekallAgeStudioLanguageModelSetupStore : IRekallAgeStudioL
 
             File.Move(temporaryPath, _path, overwrite: true);
         }
+        catch (Exception exception)
+        {
+            primaryFailure = exception;
+            throw;
+        }
         finally
         {
-            if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+            try
+            {
+                if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+            }
+            catch when (primaryFailure is not null)
+            {
+                // The primary write or cancellation failure is more actionable than cleanup failure.
+            }
         }
     }
 
@@ -196,7 +213,8 @@ internal sealed class RekallAgeStudioLanguageModelSetupStore : IRekallAgeStudioL
         {
             try
             {
-                if (System.IO.Path.IsPathFullyQualified(overrideRoot))
+                if (System.IO.Path.IsPathFullyQualified(overrideRoot)
+                    && overrideRoot.IndexOfAny(System.IO.Path.GetInvalidPathChars()) < 0)
                 {
                     return System.IO.Path.GetFullPath(overrideRoot);
                 }

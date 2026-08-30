@@ -234,14 +234,26 @@ internal sealed class RekallAgeStudioLanguageModelSetupStore : IRekallAgeStudioL
 
     private static bool IsValidWindowsFullPath(string value)
     {
-        if (!System.IO.Path.IsPathFullyQualified(value)
-            || value.IndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0
-            || value.IndexOfAny(AdditionalWindowsInvalidPathChars) >= 0)
+        if (!System.IO.Path.IsPathFullyQualified(value))
         {
             return false;
         }
 
-        var firstColon = value.IndexOf(':');
-        return firstColon < 0 || firstColon == 1 && value.IndexOf(':', firstColon + 1) < 0;
+        var hasExtendedPrefix = value.StartsWith("\\\\?\\", StringComparison.Ordinal);
+        var pathToValidate = hasExtendedPrefix ? value[4..] : value;
+        if (pathToValidate.IndexOfAny(System.IO.Path.GetInvalidPathChars()) >= 0
+            || pathToValidate.IndexOfAny(AdditionalWindowsInvalidPathChars) >= 0)
+        {
+            return false;
+        }
+
+        var firstColon = pathToValidate.IndexOf(':');
+        if (hasExtendedPrefix
+            && pathToValidate.StartsWith("UNC\\", StringComparison.OrdinalIgnoreCase))
+        {
+            return firstColon < 0;
+        }
+
+        return firstColon < 0 || firstColon == 1 && pathToValidate.IndexOf(':', firstColon + 1) < 0;
     }
 }

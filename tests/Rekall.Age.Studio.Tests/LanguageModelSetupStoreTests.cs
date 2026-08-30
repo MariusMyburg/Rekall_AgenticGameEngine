@@ -140,6 +140,26 @@ public sealed class LanguageModelSetupStoreTests
         }
     }
 
+    [Fact]
+    public async Task DefaultStorePreservesAnExtendedWindowsDriveSetupRootOverride()
+    {
+        await using var directory = new TemporaryDirectory();
+        var previous = Environment.GetEnvironmentVariable("REKALL_AGE_STUDIO_SETUP_ROOT");
+        var extendedRoot = "\\\\?\\" + directory.Path;
+        try
+        {
+            Environment.SetEnvironmentVariable("REKALL_AGE_STUDIO_SETUP_ROOT", extendedRoot);
+
+            var store = new RekallAgeStudioLanguageModelSetupStore();
+
+            Assert.Equal(System.IO.Path.Combine(extendedRoot, "language-model-setup-v1.json"), store.Path);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("REKALL_AGE_STUDIO_SETUP_ROOT", previous);
+        }
+    }
+
     [Theory]
     [InlineData("C:\\invalid|path")]
     [InlineData("C:\\invalid<path")]

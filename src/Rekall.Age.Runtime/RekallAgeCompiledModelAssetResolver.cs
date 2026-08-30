@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Rekall.Age.Assets;
 using Rekall.Age.AssetPipeline;
+using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Contracts;
 
 namespace Rekall.Age.Runtime;
@@ -29,6 +30,8 @@ public sealed class RekallAgeCompiledModelAssetResolver
 {
     private readonly RekallAgeModelAssetStore _assetStore = new();
     private readonly RekallAgePublishedModelOutputStore _outputStore = new();
+    private readonly RekallAgeMeshAssetStore _meshStore = new();
+    private readonly RekallAgeMeshCompiler _meshCompiler = new();
     private readonly ConcurrentDictionary<string, CacheEntry> _cache = new(StringComparer.OrdinalIgnoreCase);
 
     public RekallAgeCompiledModelAssetResolution Resolve(string? projectRoot, string? modelAssetId)
@@ -74,9 +77,30 @@ public sealed class RekallAgeCompiledModelAssetResolver
                     return new(loaded.Revision, null, "REKALL_MODEL_ASSET_NOT_BUILT", $"Model Asset '{normalizedAssetId}' has no successful build to resolve.");
                 }
 
-                var snapshot = _outputStore.LoadAsync(
-                        projectRoot, normalizedAssetId, build.CompiledContentHash, CancellationToken.None)
-                    .AsTask().GetAwaiter().GetResult();
+                RekallAgeCompiledMeshSnapshot snapshot;
+                try
+                {
+                    snapshot = _outputStore.LoadAsync(
+                            projectRoot, normalizedAssetId, build.CompiledContentHash, CancellationToken.None)
+                        .AsTask().GetAwaiter().GetResult();
+                }
+                catch (FileNotFoundException)
+                {
+                    var source = _meshStore.LoadVersionedAsync(
+                            projectRoot, loaded.Value.Source.AssetId, CancellationToken.None)
+                        .AsTask().GetAwaiter().GetResult();
+                    if (!source.Revision.Equals(build.SourceFileRevision, StringComparison.Ordinal)
+                        || source.Value.Revision != build.SourceLogicalRevision)
+                    {
+                        return new(
+                            loaded.Revision,
+                            null,
+                            "REKALL_MODEL_ASSET_REBUILD_REQUIRED",
+                            $"Model Asset '{normalizedAssetId}' has no compiled output and its editable source has changed; rebuild the Model Asset.");
+                    }
+
+                    snapshot = _meshCompiler.Compile(source.Value);
+                }
                 info.Refresh();
                 cached = new CacheEntry(info.Length, info.LastWriteTimeUtc, loaded.Revision, snapshot);
                 _cache[key] = cached;

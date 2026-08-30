@@ -75,9 +75,9 @@ internal static class RekallAgeCli
                     await RunProjectLanguageModelAgentAsync(registry, provider, model, root, scene, task, maxTurns, null, cancellationToken),
                 ["agent", "run-project", var provider, var model, var root, var scene, var task, "--approval-policy", var approvalPolicy] =>
                     await RunProjectLanguageModelAgentAsync(registry, provider, model, root, scene, task, "24", approvalPolicy, cancellationToken),
-                ["distribution", "assemble", var output, var cli, var studio, var headless, var windows, var sdk, var readme, var notice, var thirdParty] =>
+                ["distribution", "assemble", var output, var cli, var studio, var headless, var windows, var sdk, var readme, var eula, var notice, var thirdParty] =>
                     await AssembleDistributionAsync(
-                        registry, context, output, cli, studio, headless, windows, sdk, readme, notice, thirdParty),
+                        registry, context, output, cli, studio, headless, windows, sdk, readme, eula, notice, thirdParty),
                 ["render", "backends"] => await ListRenderBackendsAsync(registry, context),
                 ["render", "device", "inspect-workload", var workloadJson] =>
                     await InspectRenderingDeviceWorkloadAsync(registry, context, workloadJson),
@@ -3495,6 +3495,7 @@ internal static class RekallAgeCli
         string windows,
         string sdk,
         string readme,
+        string eula,
         string notice,
         string thirdParty)
     {
@@ -3508,6 +3509,7 @@ internal static class RekallAgeCli
                 windows,
                 sdk,
                 readme,
+                eula,
                 notice,
                 thirdParty),
             context);

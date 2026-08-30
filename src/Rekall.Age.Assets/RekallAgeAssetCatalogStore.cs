@@ -64,7 +64,7 @@ public sealed class RekallAgeAssetCatalogStore
             cancellationToken).ConfigureAwait(false);
         var catalog = JsonSerializer.Deserialize<RekallAgeAssetCatalogDocument>(snapshot.Bytes, JsonOptions)
             ?? throw new InvalidDataException($"Asset catalog '{path}' could not be deserialized.");
-        return new(catalog, snapshot.Revision);
+        return new(ResolveRuntimePaths(projectRoot, catalog), snapshot.Revision);
     }
 
     public async ValueTask SaveAsync(
@@ -76,7 +76,7 @@ public sealed class RekallAgeAssetCatalogStore
         Directory.CreateDirectory(assetsRoot);
         await RekallAgePersistedJson.WriteAllTextAsync(
             GetCatalogPath(projectRoot),
-            Serialize(catalog),
+            Serialize(projectRoot, catalog),
             cancellationToken);
     }
 
@@ -89,7 +89,7 @@ public sealed class RekallAgeAssetCatalogStore
         ArgumentNullException.ThrowIfNull(catalog);
         return await RekallAgeAtomicFile.WriteAllTextIfRevisionAsync(
             GetCatalogPath(projectRoot),
-            Serialize(catalog),
+            Serialize(projectRoot, catalog),
             RekallAgePersistedJson.MaximumDocumentBytes,
             expectedRevision,
             cancellationToken).ConfigureAwait(false);
@@ -151,9 +151,151 @@ public sealed class RekallAgeAssetCatalogStore
             cancellationToken);
     }
 
-    private static string Serialize(RekallAgeAssetCatalogDocument catalog)
+    private static string Serialize(string projectRoot, RekallAgeAssetCatalogDocument catalog)
     {
         ArgumentNullException.ThrowIfNull(catalog);
-        return JsonSerializer.Serialize(catalog, JsonOptions) + Environment.NewLine;
+        return JsonSerializer.Serialize(ToPortablePaths(projectRoot, catalog), JsonOptions) + Environment.NewLine;
     }
+
+    private static RekallAgeAssetCatalogDocument ResolveRuntimePaths(
+        string projectRoot,
+        RekallAgeAssetCatalogDocument catalog) =>
+        new(catalog.Assets.Select(asset => asset with
+        {
+            SourcePath = IsRemoteUri(asset.SourcePath)
+                ? asset.SourcePath
+                : ResolveLocalPath(projectRoot, asset.SourcePath),
+            ImportedPath = ResolveLocalPath(projectRoot, asset.ImportedPath)
+        }).ToArray());
+
+    private static RekallAgeAssetCatalogDocument ToPortablePaths(
+        string projectRoot,
+        RekallAgeAssetCatalogDocument catalog) =>
+        new(catalog.Assets.Select(asset =>
+        {
+            var importedIsPortable = TryProjectRelativePath(
+                projectRoot,
+                asset.ImportedPath,
+                out var relativeImported);
+            var importedPath = importedIsPortable
+                ? relativeImported
+                : asset.ImportedPath;
+            var sourcePath = IsRemoteUri(asset.SourcePath)
+                ? asset.SourcePath
+                : TryProjectRelativePath(projectRoot, asset.SourcePath, out var relativeSource)
+                    ? relativeSource
+                    : importedIsPortable
+                        ? importedPath
+                        : asset.SourcePath;
+            return asset with { SourcePath = sourcePath, ImportedPath = importedPath };
+        }).ToArray());
+
+    private static string ResolveLocalPath(string projectRoot, string storedPath)
+    {
+        if (string.IsNullOrWhiteSpace(storedPath))
+        {
+            return storedPath;
+        }
+
+        try
+        {
+            if (Path.IsPathFullyQualified(storedPath))
+            {
+                var fullStoredPath = Path.GetFullPath(storedPath);
+                return TryResolveRelocatedPath(projectRoot, fullStoredPath, out var relocatedPath)
+                    ? relocatedPath
+                    : fullStoredPath;
+            }
+
+            var root = NormalizeRoot(projectRoot);
+            var resolved = Path.GetFullPath(Path.Combine(root, storedPath));
+            return IsInside(root, resolved) ? resolved : storedPath;
+        }
+        catch (ArgumentException)
+        {
+            return storedPath;
+        }
+        catch (NotSupportedException)
+        {
+            return storedPath;
+        }
+    }
+
+    private static bool TryResolveRelocatedPath(
+        string projectRoot,
+        string storedPath,
+        out string relocatedPath)
+    {
+        var root = NormalizeRoot(projectRoot);
+        if (IsInside(root, storedPath) && File.Exists(storedPath))
+        {
+            relocatedPath = storedPath;
+            return true;
+        }
+
+        var projectName = Path.GetFileName(root);
+        var segments = storedPath.Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+            StringSplitOptions.RemoveEmptyEntries);
+        for (var index = segments.Length - 2; index >= 0; index--)
+        {
+            if (!segments[index].Equals(projectName, PathComparison))
+            {
+                continue;
+            }
+
+            var candidate = Path.GetFullPath(Path.Combine(root, Path.Combine(segments[(index + 1)..])));
+            if (IsInside(root, candidate) && File.Exists(candidate))
+            {
+                relocatedPath = candidate;
+                return true;
+            }
+        }
+
+        relocatedPath = string.Empty;
+        return false;
+    }
+
+    private static bool TryProjectRelativePath(string projectRoot, string path, out string relative)
+    {
+        relative = string.Empty;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            var root = NormalizeRoot(projectRoot);
+            var fullPath = Path.GetFullPath(Path.IsPathFullyQualified(path) ? path : Path.Combine(root, path));
+            if (!IsInside(root, fullPath))
+            {
+                return false;
+            }
+
+            relative = Path.GetRelativePath(root, fullPath).Replace('\\', '/');
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private static string NormalizeRoot(string projectRoot) =>
+        Path.GetFullPath(projectRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+    private static bool IsInside(string root, string path) =>
+        path.Equals(root, PathComparison)
+        || path.StartsWith(root + Path.DirectorySeparatorChar, PathComparison);
+
+    private static bool IsRemoteUri(string path) =>
+        Uri.TryCreate(path, UriKind.Absolute, out var uri) && !uri.IsFile;
+
+    private static StringComparison PathComparison =>
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 }

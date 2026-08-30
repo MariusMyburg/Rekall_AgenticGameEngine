@@ -789,16 +789,16 @@ public sealed class AetherfallHighFidelityAcceptanceTests
         Assert.Contains(mesh.Attributes, item => item.Name == "curve.source.span");
         Assert.True(new RekallAgeMeshValidator().Validate(mesh).IsValid);
 
-        var model = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(
-            projectRoot, "Assets", "Models", "aetherfall-broken-arch-model.age.model.json")))!.AsObject();
-        var compiledRelativePath = model["lastSuccessfulBuild"]!["compiledMeshPath"]!.GetValue<string>();
-        var compiledMesh = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(projectRoot, compiledRelativePath)))!.AsObject();
-        var surfaces = compiledMesh["surfaces"]!.AsArray();
+        var resolved = new RekallAgeCompiledModelAssetResolver().Resolve(
+            projectRoot,
+            "aetherfall-broken-arch-model");
+        Assert.Null(resolved.IssueCode);
+        var surfaces = Assert.IsType<RekallAgeCompiledMeshSnapshot>(resolved.Snapshot).Surfaces;
 
         Assert.Equal(2, surfaces.Count);
         Assert.Equal(
             ["aetherfall.ruin-mass.material", "aetherfall.ruin-trim.material"],
-            surfaces.Select(surface => surface!["materialAssetId"]!.GetValue<string>()).ToArray());
+            surfaces.Select(surface => surface.MaterialAssetId!).ToArray());
     }
 
     [Fact]

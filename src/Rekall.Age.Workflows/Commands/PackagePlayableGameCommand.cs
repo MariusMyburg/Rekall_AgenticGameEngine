@@ -515,7 +515,10 @@ public sealed class PackagePlayableGameCommand
                 continue;
             }
 
-            var fullImportedPath = Path.GetFullPath(importedPath);
+            var fullImportedPath = Path.GetFullPath(
+                Path.IsPathFullyQualified(importedPath)
+                    ? importedPath
+                    : Path.Combine(sourceRoot, importedPath));
             if (!IsSameOrInside(fullImportedPath, sourceRoot))
             {
                 throw new InvalidDataException(

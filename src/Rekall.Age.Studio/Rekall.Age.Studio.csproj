@@ -33,7 +33,8 @@
   </ItemGroup>
   <ItemGroup>
     <StudioExampleFile Include="$(MSBuildProjectDirectory)\..\..\Examples\**\*"
-                       Exclude="$(MSBuildProjectDirectory)\..\..\Examples\**\.git\**;$(MSBuildProjectDirectory)\..\..\Examples\**\.rekall\**;$(MSBuildProjectDirectory)\..\..\Examples\**\.vs\**;$(MSBuildProjectDirectory)\..\..\Examples\**\bin\**;$(MSBuildProjectDirectory)\..\..\Examples\**\Builds\**;$(MSBuildProjectDirectory)\..\..\Examples\**\Captures\**;$(MSBuildProjectDirectory)\..\..\Examples\**\obj\**;$(MSBuildProjectDirectory)\..\..\Examples\**\TestResults\**" />
+                       Exclude="$(MSBuildProjectDirectory)\..\..\Examples\**\.git\**;$(MSBuildProjectDirectory)\..\..\Examples\**\.rekall\**;$(MSBuildProjectDirectory)\..\..\Examples\**\.vs\**;$(MSBuildProjectDirectory)\..\..\Examples\**\bin\**;$(MSBuildProjectDirectory)\..\..\Examples\**\Builds\**;$(MSBuildProjectDirectory)\..\..\Examples\**\Captures\**;$(MSBuildProjectDirectory)\..\..\Examples\**\obj\**;$(MSBuildProjectDirectory)\..\..\Examples\**\TestResults\**;$(MSBuildProjectDirectory)\..\..\Examples\**\Transactions\**;$(MSBuildProjectDirectory)\..\..\Examples\**\Artifacts\**;$(MSBuildProjectDirectory)\..\..\Examples\**\__pycache__\**;$(MSBuildProjectDirectory)\..\..\Examples\**\*.pyc;$(MSBuildProjectDirectory)\..\..\Examples\**\Assets\Models\Compiled\**;$(MSBuildProjectDirectory)\..\..\Examples\Stride\**;$(MSBuildProjectDirectory)\..\..\Examples\Prowl\**;$(MSBuildProjectDirectory)\..\..\Examples\GlbStationTest\**;$(MSBuildProjectDirectory)\..\..\Examples\**\Assets\audio\**;$(MSBuildProjectDirectory)\..\..\Examples\**\Assets\texture\**;$(MSBuildProjectDirectory)\..\..\Examples\**\asset_menu-theme_e91ed2cf.mp3" />
+    <StudioApprovedImportedAsset Include="$(MSBuildProjectDirectory)\..\..\Examples\RainGlass\Assets\texture\asset_little-redfish-lake-sunrise_58618c91.jpg"><DestinationRelativePath>RainGlass\Assets\texture\asset_little-redfish-lake-sunrise_58618c91.jpg</DestinationRelativePath></StudioApprovedImportedAsset>
   </ItemGroup>
   <ItemGroup>
     <None Update="Documentation\Rekall-AGE-Documentation.html">
@@ -44,6 +45,9 @@
   <Target Name="CopyBundledExamples" AfterTargets="Publish">
     <Copy SourceFiles="@(StudioExampleFile)"
           DestinationFiles="@(StudioExampleFile->'$(PublishDir)Examples\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(StudioApprovedImportedAsset)"
+          DestinationFiles="@(StudioApprovedImportedAsset->'$(PublishDir)Examples\%(DestinationRelativePath)')"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>

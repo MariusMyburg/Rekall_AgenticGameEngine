@@ -59,11 +59,14 @@ try {
     $listener.Start()
     Write-Output "listening:$Port"
     [IO.File]::WriteAllText([IO.Path]::GetFullPath($ReadyPath), 'ready')
-    1..2 | ForEach-Object {
-        Write-Output "waiting:$_"
+    $requestIndex = 0
+    $chatRequestIndex = 0
+    while ($chatRequestIndex -lt 2 -and $requestIndex -lt 8) {
+        $requestIndex++
+        Write-Output "waiting:$requestIndex"
         $client = $listener.AcceptTcpClient()
         try {
-            Write-Output "accepted:$_"
+            Write-Output "accepted:$requestIndex"
             $stream = $client.GetStream()
             $request = [IO.MemoryStream]::new()
             $buffer = [byte[]]::new(8192)
@@ -102,28 +105,47 @@ try {
             }
             $request.Dispose()
 
-            $toolCall = if ($_ -eq 1) {
-                @{ function = @{ name = 'rekall.context.engine_status'; arguments = @{} } }
+            $requestLine = ($headerText -split "`r`n", 2)[0]
+            $requestPath = ($requestLine -split ' ')[1]
+            if ($requestPath -eq '/api/tags') {
+                $responseObject = @{
+                    models = @(
+                        @{ name = 'qwen3.8:27b'; size = 1 }
+                        @{ name = 'rekall-acceptance'; size = 1 }
+                    )
+                }
+            }
+            elseif ($requestPath -eq '/api/show') {
+                $responseObject = @{ capabilities = @('completion', 'tools') }
+            }
+            elseif ($requestPath -eq '/api/chat') {
+                $chatRequestIndex++
+                $toolCall = if ($chatRequestIndex -eq 1) {
+                    @{ function = @{ name = 'rekall.context.engine_status'; arguments = @{} } }
+                }
+                else {
+                    @{ function = @{ name = 'rekall.workflow.agent_authoring_gauntlet'; arguments = @{
+                        projectRoot = [IO.Path]::GetFullPath($ProjectRoot)
+                        projectName = 'Installed Studio Agent Proof'
+                        sceneName = 'Main'
+                    } } }
+                }
+                $responseObject = @{
+                    model = 'rekall-acceptance'
+                    message = @{
+                        role = 'assistant'
+                        content = ''
+                        thinking = 'Execute the deterministic installed proof.'
+                        tool_calls = @($toolCall)
+                    }
+                    done = $true
+                    done_reason = 'stop'
+                    prompt_eval_count = 100
+                    eval_count = 10
+                }
             }
             else {
-                @{ function = @{ name = 'rekall.workflow.agent_authoring_gauntlet'; arguments = @{
-                    projectRoot = [IO.Path]::GetFullPath($ProjectRoot)
-                    projectName = 'Installed Studio Agent Proof'
-                    sceneName = 'Main'
-                } } }
-            }
-            $responseObject = @{
-                model = 'rekall-acceptance'
-                message = @{
-                    role = 'assistant'
-                    content = ''
-                    thinking = 'Execute the deterministic installed proof.'
-                    tool_calls = @($toolCall)
-                }
-                done = $true
-                done_reason = 'stop'
-                prompt_eval_count = 100
-                eval_count = 10
+                throw "Ollama fixture received unexpected request path '$requestPath'."
             }
             $body = $responseObject | ConvertTo-Json -Depth 12 -Compress
             $bodyBytes = [Text.Encoding]::UTF8.GetBytes($body)
@@ -132,7 +154,7 @@ try {
             $stream.Write($headerBytes, 0, $headerBytes.Length)
             $stream.Write($bodyBytes, 0, $bodyBytes.Length)
             $stream.Flush()
-            Write-Output "responded:$_"
+            Write-Output "responded:${requestIndex}:$requestPath"
         }
         finally {
             $client.Dispose()

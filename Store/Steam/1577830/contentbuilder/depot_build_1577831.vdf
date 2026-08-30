@@ -1,0 +1,13 @@
+"DepotBuild"
+{
+  "DepotID" "1577831"
+  "FileMapping"
+  {
+    "LocalPath" "*"
+    "DepotPath" "."
+    "Recursive" "1"
+  }
+  "FileExclusion" "*.pdb"
+  "FileExclusion" "*.log"
+  "FileExclusion" "steam_appid.txt"
+}

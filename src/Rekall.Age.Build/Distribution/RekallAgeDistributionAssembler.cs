@@ -13,6 +13,7 @@ public sealed record AssembleDistributionRequest(
     string WindowsPlayerPublishRoot,
     string SdkSourceRoot,
     string ReadmePath,
+    string EndUserLicensePath,
     string ProprietaryNoticePath,
     string ThirdPartyNoticesPath,
     string RuntimeIdentifier = "win-x64");
@@ -81,6 +82,7 @@ public sealed class RekallAgeDistributionAssembler
                 RekallAgeProductInfo.Current.ModuleSdkCompatibilityVersion.ToString(
                     System.Globalization.CultureInfo.InvariantCulture)));
         CopyFile(request.ReadmePath, Path.Combine(outputRoot, "docs", "README.md"));
+        CopyFile(request.EndUserLicensePath, Path.Combine(outputRoot, "END-USER-LICENSE-AGREEMENT.md"));
         CopyFile(request.ProprietaryNoticePath, Path.Combine(outputRoot, "PROPRIETARY-NOTICE.md"));
         CopyFile(request.ThirdPartyNoticesPath, Path.Combine(outputRoot, "THIRD-PARTY-NOTICES.txt"));
 
@@ -127,6 +129,7 @@ public sealed class RekallAgeDistributionAssembler
             request.WindowsPlayerPublishRoot,
             request.SdkSourceRoot,
             request.ReadmePath,
+            request.EndUserLicensePath,
             request.ProprietaryNoticePath,
             request.ThirdPartyNoticesPath
         ];

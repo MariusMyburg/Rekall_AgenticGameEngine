@@ -129851,32 +129851,6 @@
       "locked": false
     },
     {
-      "id": "ent_94bb82c19d404a8f90a1cdb4eac9f47e",
-      "name": "Menu Music",
-      "tags": [
-        "audio"
-      ],
-      "components": [
-        {
-          "type": "Rekall.AudioEmitter",
-          "properties": {
-            "clip": "asset_menu-theme_e91ed2cf",
-            "playing": true,
-            "loop": true,
-            "gain": 0.0
-          }
-        },
-        {
-          "type": "Rekall.Transform3D",
-          "properties": {}
-        }
-      ],
-      "parentId": null,
-      "prefabSourceId": null,
-      "visible": true,
-      "locked": false
-    },
-    {
       "id": "ent_d2eb3bcb2db149b6ae3772cbad4fe426",
       "name": "Meridian",
       "tags": [
@@ -130005,8 +129979,8 @@
             "fadeOutSeconds": 2.0,
             "targetScene": "",
             "overlayEntityName": "Fade Curtain",
-            "musicEntityName": "Menu Music",
-            "musicGain": 0.85
+            "musicEntityName": "",
+            "musicGain": 0.0
           }
         },
         {

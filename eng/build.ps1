@@ -16,6 +16,12 @@ $outputRoot = Join-Path $artifactRoot "Rekall-AGE-0.1.0-preview.1-$RuntimeIdenti
 $systemTempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/')
 $testTempRoot = [IO.Path]::GetFullPath((Join-Path $systemTempRoot ("rekall-age-build-" + [Guid]::NewGuid().ToString('N'))))
 $priorTestTempRoot = [Environment]::GetEnvironmentVariable('REKALL_AGE_TEST_TEMP_ROOT', 'Process')
+$publishProjects = @(
+    'src\Rekall.Age.Cli\Rekall.Age.Cli.csproj',
+    'src\Rekall.Age.Studio\Rekall.Age.Studio.csproj',
+    'src\Rekall.Age.Player\Rekall.Age.Player.csproj',
+    'src\Rekall.Age.Player.Windows\Rekall.Age.Player.Windows.csproj'
+)
 
 function Invoke-Checked {
     param([string]$FilePath, [string[]]$ArgumentList)
@@ -46,7 +52,10 @@ try {
     }
     New-Item -ItemType Directory -Path $testTempRoot -Force | Out-Null
     [Environment]::SetEnvironmentVariable('REKALL_AGE_TEST_TEMP_ROOT', $testTempRoot, 'Process')
-    Invoke-Checked dotnet @('restore', $solution, '--locked-mode', '-r', $RuntimeIdentifier, '/nr:false')
+    Invoke-Checked dotnet @('restore', $solution, '--locked-mode', '/nr:false')
+    foreach ($project in $publishProjects) {
+        Invoke-Checked dotnet @('restore', $project, '--locked-mode', '-r', $RuntimeIdentifier, '/nr:false')
+    }
     Invoke-Checked dotnet @('build', $solution, '-c', $Configuration, '--no-restore', '/nr:false')
     if (Test-Path -LiteralPath $testResultRoot) {
         Remove-Item -LiteralPath $testResultRoot -Recurse -Force
@@ -92,7 +101,8 @@ try {
         (Join-Path $stagingRoot 'headless'),
         (Join-Path $stagingRoot 'windows'),
         $sdk,
-        (Join-Path $repoRoot 'README.md'),
+        (Join-Path $repoRoot 'docs\DISTRIBUTION-README.md'),
+        (Join-Path $repoRoot 'END-USER-LICENSE-AGREEMENT.md'),
         (Join-Path $repoRoot 'PROPRIETARY-NOTICE.md'),
         (Join-Path $repoRoot 'THIRD-PARTY-NOTICES.txt'))
 

@@ -1,26 +1,68 @@
-Rekall AGE - Third-Party Package Inventory
+Rekall AGE - Third-Party Notices and Runtime Package Inventory
 Copyright © 2026 Rekall. All rights reserved.
 
-This inventory identifies direct external package dependencies. It does not replace
-the license texts or notices supplied by those projects and their transitive dependencies.
+The following exact runtime packages were enumerated from every .deps.json in the
+accepted self-contained Windows payload. Test-only packages are not shipped.
 
-BepuPhysics 2.4.0 - https://www.nuget.org/packages/BepuPhysics/2.4.0
-coverlet.collector 6.0.4 - https://www.nuget.org/packages/coverlet.collector/6.0.4
-Microsoft.NET.Test.Sdk 17.14.1 - https://www.nuget.org/packages/Microsoft.NET.Test.Sdk/17.14.1
-SamuelRe.CSG.Sharp 1.0.0 - https://www.nuget.org/packages/SamuelRe.CSG.Sharp/1.0.0
-Serilog 4.3.1 - https://www.nuget.org/packages/Serilog/4.3.1
-Serilog.Extensions.Logging 10.0.0 - https://www.nuget.org/packages/Serilog.Extensions.Logging/10.0.0
-Serilog.Sinks.File 7.0.0 - https://www.nuget.org/packages/Serilog.Sinks.File/7.0.0
-Silk.NET.OpenXR 2.23.0 - https://www.nuget.org/packages/Silk.NET.OpenXR/2.23.0
-Silk.NET.Shaderc 2.23.0 - https://www.nuget.org/packages/Silk.NET.Shaderc/2.23.0
-Silk.NET.Vulkan 2.23.0 - https://www.nuget.org/packages/Silk.NET.Vulkan/2.23.0
-StbImageSharp 2.30.15 - https://www.nuget.org/packages/StbImageSharp/2.30.15
-System.Drawing.Common 10.0.8 - https://www.nuget.org/packages/System.Drawing.Common/10.0.8
-Veldrid.SPIRV 1.0.15 - https://www.nuget.org/packages/Veldrid.SPIRV/1.0.15
-Veldrid.StartupUtilities 4.9.0 - https://www.nuget.org/packages/Veldrid.StartupUtilities/4.9.0
-xunit 2.9.3 - https://www.nuget.org/packages/xunit/2.9.3
-xunit.runner.visualstudio 3.1.4 - https://www.nuget.org/packages/xunit.runner.visualstudio/3.1.4
-ZstdSharp.Port 0.8.8 - https://www.nuget.org/packages/ZstdSharp.Port/0.8.8
+BepuPhysics 2.4.0 (Apache-2.0) - https://www.nuget.org/packages/BepuPhysics/2.4.0
+BepuUtilities 2.4.0 (Apache-2.0) - https://www.nuget.org/packages/BepuUtilities/2.4.0
+Microsoft.DotNet.PlatformAbstractions 3.1.6 (MIT) - https://www.nuget.org/packages/Microsoft.DotNet.PlatformAbstractions/3.1.6
+Microsoft.Extensions.DependencyInjection.Abstractions 10.0.0 (MIT) - https://www.nuget.org/packages/Microsoft.Extensions.DependencyInjection.Abstractions/10.0.0
+Microsoft.Extensions.DependencyInjection 10.0.0 (MIT) - https://www.nuget.org/packages/Microsoft.Extensions.DependencyInjection/10.0.0
+Microsoft.Extensions.DependencyModel 9.0.9 (MIT) - https://www.nuget.org/packages/Microsoft.Extensions.DependencyModel/9.0.9
+Microsoft.Extensions.Logging.Abstractions 10.0.0 (MIT) - https://www.nuget.org/packages/Microsoft.Extensions.Logging.Abstractions/10.0.0
+Microsoft.Extensions.Logging 10.0.0 (MIT) - https://www.nuget.org/packages/Microsoft.Extensions.Logging/10.0.0
+Microsoft.Extensions.Options 10.0.0 (MIT) - https://www.nuget.org/packages/Microsoft.Extensions.Options/10.0.0
+Microsoft.Extensions.Primitives 10.0.0 (MIT) - https://www.nuget.org/packages/Microsoft.Extensions.Primitives/10.0.0
+Microsoft.Win32.SystemEvents 10.0.8 (MIT) - https://www.nuget.org/packages/Microsoft.Win32.SystemEvents/10.0.8
+NativeLibraryLoader 1.0.13 (MIT) - https://www.nuget.org/packages/NativeLibraryLoader/1.0.13
+NLayer 3.0.0 (MIT) - https://www.nuget.org/packages/NLayer/3.0.0
+SamuelRe.CSG.Sharp 1.0.0 (MIT) - https://www.nuget.org/packages/SamuelRe.CSG.Sharp/1.0.0
+Serilog 4.3.1 (Apache-2.0) - https://www.nuget.org/packages/Serilog/4.3.1
+Serilog.Extensions.Logging 10.0.0 (Apache-2.0) - https://www.nuget.org/packages/Serilog.Extensions.Logging/10.0.0
+Serilog.Sinks.File 7.0.0 (Apache-2.0) - https://www.nuget.org/packages/Serilog.Sinks.File/7.0.0
+SharpGen.Runtime 2.0.0-beta.13 (MIT) - https://www.nuget.org/packages/SharpGen.Runtime/2.0.0-beta.13
+SharpGen.Runtime.COM 2.0.0-beta.13 (MIT) - https://www.nuget.org/packages/SharpGen.Runtime.COM/2.0.0-beta.13
+Silk.NET.Core 2.23.0 (MIT) - https://www.nuget.org/packages/Silk.NET.Core/2.23.0
+Silk.NET.Maths 2.23.0 (MIT) - https://www.nuget.org/packages/Silk.NET.Maths/2.23.0
+Silk.NET.OpenXR 2.23.0 (MIT) - https://www.nuget.org/packages/Silk.NET.OpenXR/2.23.0
+Silk.NET.Shaderc 2.23.0 (MIT) - https://www.nuget.org/packages/Silk.NET.Shaderc/2.23.0
+Silk.NET.Shaderc.Native 2.23.0 (Apache-2.0 and upstream native notices) - https://www.nuget.org/packages/Silk.NET.Shaderc.Native/2.23.0
+Silk.NET.Vulkan 2.23.0 (MIT) - https://www.nuget.org/packages/Silk.NET.Vulkan/2.23.0
+StbImageSharp 2.30.15 (MIT/Public Domain dual permission) - https://www.nuget.org/packages/StbImageSharp/2.30.15
+System.Drawing.Common 10.0.8 (MIT) - https://www.nuget.org/packages/System.Drawing.Common/10.0.8
+Veldrid 4.9.0 (MIT) - https://www.nuget.org/packages/Veldrid/4.9.0
+Veldrid.MetalBindings 4.9.0 (MIT) - https://www.nuget.org/packages/Veldrid.MetalBindings/4.9.0
+Veldrid.OpenGLBindings 4.9.0 (MIT) - https://www.nuget.org/packages/Veldrid.OpenGLBindings/4.9.0
+Veldrid.SDL2 4.9.0 (MIT; bundled SDL2 is zlib licensed) - https://www.nuget.org/packages/Veldrid.SDL2/4.9.0
+Veldrid.SPIRV 1.0.15 (MIT and upstream SPIR-V native notices) - https://www.nuget.org/packages/Veldrid.SPIRV/1.0.15
+Veldrid.StartupUtilities 4.9.0 (MIT) - https://www.nuget.org/packages/Veldrid.StartupUtilities/4.9.0
+Vk 1.0.25 (MIT) - https://www.nuget.org/packages/Vk/1.0.25
+Vortice.D3DCompiler 2.3.0 (MIT) - https://www.nuget.org/packages/Vortice.D3DCompiler/2.3.0
+Vortice.Direct3D11 2.3.0 (MIT) - https://www.nuget.org/packages/Vortice.Direct3D11/2.3.0
+Vortice.DirectX 2.3.0 (MIT) - https://www.nuget.org/packages/Vortice.DirectX/2.3.0
+Vortice.DXGI 2.3.0 (MIT) - https://www.nuget.org/packages/Vortice.DXGI/2.3.0
+Vortice.Mathematics 1.4.25 (MIT) - https://www.nuget.org/packages/Vortice.Mathematics/1.4.25
+Vortice.SPIRV 1.0.5 (MIT and upstream SPIR-V native notices) - https://www.nuget.org/packages/Vortice.SPIRV/1.0.5
+Vortice.SPIRV.Reflect 1.0.6 (MIT and Apache-2.0 upstream notice) - https://www.nuget.org/packages/Vortice.SPIRV.Reflect/1.0.6
+ZstdSharp.Port 0.8.8 (MIT; Zstandard native algorithm is BSD licensed) - https://www.nuget.org/packages/ZstdSharp.Port/0.8.8
+
+The self-contained payload also includes Microsoft .NET and Windows Desktop runtime
+components under the MIT license and their upstream third-party notices:
+https://github.com/dotnet/runtime/blob/main/LICENSE.TXT
+https://github.com/dotnet/runtime/blob/main/THIRD-PARTY-NOTICES.TXT
+
+The complete standard and upstream-native license texts still require final legal
+collection and review before public distribution. This inventory is not a substitute
+for those texts.
+
+Rain Glass example background image
+"Dramatic sunrise over Little Redfish Lake Idaho" by Knowles Gallery / Chuck Knowles
+Source: https://www.flickr.com/photos/knowlesgallery/36934533053/
+License: Creative Commons Attribution 2.0 Generic (CC BY 2.0)
+https://creativecommons.org/licenses/by/2.0/
+The image is redistributed as part of the editable Rain Glass example and may be
+cropped, resized, or color-processed by the engine's rendering pipeline.
 
 SamuelRe.CSG.Sharp / CSG.Sharp
 MIT License

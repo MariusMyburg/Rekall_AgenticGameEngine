@@ -26,6 +26,7 @@ public sealed class DistributionAssemblerTests
         Assert.True(File.Exists(Path.Combine(result.Root, "tools", "cli", "Rekall.Age.Cli.exe")));
         Assert.True(File.Exists(Path.Combine(result.Root, "players", "windows", "Rekall.Age.Player.Windows.exe")));
         Assert.True(File.Exists(Path.Combine(result.Root, "sdk", "1", "Rekall.Age.Modules.dll")));
+        Assert.True(File.Exists(Path.Combine(result.Root, "END-USER-LICENSE-AGREEMENT.md")));
         Assert.True(File.Exists(result.ManifestPath));
         Assert.True(File.Exists(result.ArchivePath));
     }
@@ -70,6 +71,7 @@ public sealed class DistributionAssemblerTests
         }
 
         var readme = WriteFile(inputs, "README.md", "# Rekall AGE");
+        var eula = WriteFile(inputs, "END-USER-LICENSE-AGREEMENT.md", "Licensed use and runtime redistribution.");
         var notice = WriteFile(inputs, "PROPRIETARY-NOTICE.md", "All rights reserved.");
         var thirdParty = WriteFile(inputs, "THIRD-PARTY-NOTICES.txt", "Dependency notices");
         var output = Path.Combine(root, "output", "Rekall-AGE-0.1.0-preview.1-win-x64");
@@ -81,6 +83,7 @@ public sealed class DistributionAssemblerTests
             windows,
             sdk,
             readme,
+            eula,
             notice,
             thirdParty));
     }

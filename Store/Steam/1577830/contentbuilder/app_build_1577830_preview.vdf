@@ -1,0 +1,12 @@
+"AppBuild"
+{
+  "AppID" "1577830"
+  "Desc" "Rekall AGE 0.1.0-preview.1 Early Access Windows preview"
+  "Preview" "1"
+  "ContentRoot" "F:\Dev\Rekall_AGE\Artifacts\Distribution\Rekall-AGE-0.1.0-preview.1-win-x64"
+  "BuildOutput" "C:\steamworks_sdk_164\sdk\tools\ContentBuilder\output"
+  "Depots"
+  {
+    "1577831" "depot_build_1577831.vdf"
+  }
+}

@@ -74,6 +74,7 @@ public sealed class CliSmokeTests
         }
 
         var readme = await WriteDistributionFileAsync(inputs, "README.md", "# Rekall AGE");
+        var eula = await WriteDistributionFileAsync(inputs, "END-USER-LICENSE-AGREEMENT.md", "Licensed use and runtime redistribution.");
         var notice = await WriteDistributionFileAsync(inputs, "PROPRIETARY-NOTICE.md", "All rights reserved.");
         var thirdParty = await WriteDistributionFileAsync(inputs, "THIRD-PARTY-NOTICES.txt", "Notices");
         var output = Path.Combine(root, "output", "Rekall-AGE");
@@ -81,13 +82,14 @@ public sealed class CliSmokeTests
         var result = await RunAsync(
             FindCliAssemblyPath(),
             "distribution", "assemble", output, cliInput, studioInput, headlessInput,
-            windowsInput, sdkInput, readme, notice, thirdParty);
+            windowsInput, sdkInput, readme, eula, notice, thirdParty);
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Version: 0.1.0-preview.1", result.Output);
         Assert.Contains("Manifest:", result.Output);
         Assert.Contains("Archive:", result.Output);
         Assert.True(File.Exists(Path.Combine(output, "rekall.distribution.json")));
+        Assert.True(File.Exists(Path.Combine(output, "END-USER-LICENSE-AGREEMENT.md")));
         Assert.True(File.Exists($"{output}.zip"));
     }
 

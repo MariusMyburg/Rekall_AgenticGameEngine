@@ -1,9 +1,8 @@
 """Main menu scene for Stellar Dominion.
 
-The fleet drifts past the gas giant behind the title while the menu theme plays.
-Both the picture and the music fade in on arrival and back out before the next
-scene loads - the ShellSystem owns that so the outward fade actually finishes
-before Rekall.SceneTransition is written.
+The fleet drifts past the gas giant behind the title. The picture fades in on
+arrival and back out before the next scene loads; the ShellSystem owns that so
+the outward fade actually finishes before Rekall.SceneTransition is written.
 """
 import json
 import os
@@ -13,7 +12,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_scene as base
 
 ROOT = "F:/Dev/Rekall_AGE/Examples/StellarDominion"
-MUSIC = "asset_menu-theme_e91ed2cf"
 
 
 def e(name, tags, components, **kw):
@@ -54,24 +52,12 @@ entities.append(e("Shell", ["flow"], [
         "fadeOutSeconds": 2.0,
         "targetScene": "",
         "overlayEntityName": "Fade Curtain",
-        "musicEntityName": "Menu Music",
-        "musicGain": 0.85,
+        "musicEntityName": "",
+        "musicGain": 0.0,
     }),
     ("Rekall.SceneTransition", {"requestedScene": "", "reason": "main menu"}),
 ]))
 
-# --- Music -----------------------------------------------------------------
-# Gain starts at 0 and is ramped by ShellSystem, so the track fades up rather
-# than starting at full volume the instant the scene loads.
-entities.append(e("Menu Music", ["audio"], [
-    ("Rekall.Transform3D", {}),
-    ("Rekall.AudioEmitter", {
-        "clip": MUSIC,
-        "playing": True,
-        "loop": True,
-        "gain": 0.0,
-    }),
-]))
 entities.append(e("Listener", ["audio"], [
     ("Rekall.Transform3D", {}),
     ("Rekall.AudioListener", {"active": True}),

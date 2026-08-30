@@ -95,6 +95,33 @@ public sealed class ModelAssetRenderingTests
     }
 
     [Fact]
+    public async Task RuntimeFrameRebuildsFromEditableMeshWhenPublishedOutputIsMissing()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await PublishBoxModelAssetAsync(root, "recoverable-model");
+        var model = await new RekallAgeModelAssetStore().LoadVersionedAsync(root, "recoverable-model", default);
+        File.Delete(Path.Combine(root, model.Value.LastSuccessfulBuild!.CompiledMeshPath));
+        var entity = RekallAgeEntityDocument.Create("Recoverable Instance", ["model-asset"])
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.Transform3D"))
+            .AddComponent(RekallAgeComponentDocument.Create(
+                "Rekall.ModelAssetReference",
+                new JsonObject { ["assetId"] = "recoverable-model" }))
+            .AddComponent(RekallAgeComponentDocument.Create("Rekall.MeshRenderer"));
+
+        var frame = new RekallAgeRuntimeRenderFrameBuilder().Build(
+            new RekallAgeRuntimeWorldBuilder().Build(
+                RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"]).AddEntity(entity),
+                root),
+            320,
+            180,
+            false);
+
+        Assert.Empty(frame.Observations);
+        var geometry = Assert.IsType<RekallAgeRuntimeViewportGeometryMesh>(Assert.Single(frame.Renderables).GeometryMesh);
+        Assert.Equal(24, geometry.Vertices.Count);
+    }
+
+    [Fact]
     public async Task RebuiltFramesReuseUnchangedCompiledModelGeometry()
     {
         var root = TestPaths.CreateTempDirectory();

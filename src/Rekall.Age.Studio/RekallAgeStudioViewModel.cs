@@ -5594,7 +5594,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         Log.Error(exception, "Studio operation failed unexpectedly.");
         StatusText = "Studio operation failed. See Validation for details.";
-        Replace(ValidationLines, ["error: REKALL_STUDIO_UNEXPECTED_FAILURE - The operation failed unexpectedly."]);
+        Replace(
+            ValidationLines,
+            [$"error: REKALL_STUDIO_UNEXPECTED_FAILURE - {exception.GetType().Name}. See the protected local Studio log for details."]);
         IsBusy = false;
     }
 }

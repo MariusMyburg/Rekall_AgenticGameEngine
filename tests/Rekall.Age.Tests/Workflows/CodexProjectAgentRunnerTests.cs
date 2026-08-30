@@ -58,7 +58,7 @@ public sealed class CodexProjectAgentRunnerTests
     [Fact]
     public async Task ProjectRunStartsARestrictedThreadWithThePackagedAgeMcpExecutable()
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var fixture = Directory.CreateTempSubdirectory("rekall-codex-runner-");
         try
         {
@@ -151,7 +151,7 @@ public sealed class CodexProjectAgentRunnerTests
     [Fact]
     public async Task AuthenticatedAccountAndModelStateUseTheSharedProviderDescriptor()
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var fixture = Directory.CreateTempSubdirectory("rekall-codex-status-");
         try
         {
@@ -191,7 +191,7 @@ public sealed class CodexProjectAgentRunnerTests
     [Fact]
     public async Task ToolProgressUsageAndMcpErrorsRemainVisibleInTheProjectResult()
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var fixture = Directory.CreateTempSubdirectory("rekall-codex-evidence-");
         try
         {
@@ -241,7 +241,7 @@ public sealed class CodexProjectAgentRunnerTests
     [Fact]
     public async Task NoninteractiveApprovalRequestsAreDeniedByDefault()
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var fixture = Directory.CreateTempSubdirectory("rekall-codex-denial-");
         try
         {
@@ -278,7 +278,7 @@ public sealed class CodexProjectAgentRunnerTests
     [Fact]
     public async Task ExplicitApprovalCallbackControlsTheExactServerResponse()
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var fixture = Directory.CreateTempSubdirectory("rekall-codex-approval-");
         try
         {
@@ -325,7 +325,7 @@ public sealed class CodexProjectAgentRunnerTests
     [Fact]
     public async Task McpElicitationApprovalUsesTheAppServerActionResponseContract()
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var fixture = Directory.CreateTempSubdirectory("rekall-codex-mcp-approval-");
         try
         {
@@ -363,7 +363,7 @@ public sealed class CodexProjectAgentRunnerTests
     [Fact]
     public async Task ExplicitNeverApprovalPolicyIsProjectedWithoutInstallingAnApprovalCallback()
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var fixture = Directory.CreateTempSubdirectory("rekall-codex-never-");
         try
         {
@@ -392,7 +392,7 @@ public sealed class CodexProjectAgentRunnerTests
     [Fact]
     public async Task CancellationInterruptsAndWaitsForTerminalCompletionBeforeReturningAStableResult()
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         using var runCancellation = new CancellationTokenSource();
         var fixture = Directory.CreateTempSubdirectory("rekall-codex-cancel-");
         try

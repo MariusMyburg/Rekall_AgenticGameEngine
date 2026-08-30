@@ -35,6 +35,8 @@ internal interface IRekallAgeStudioPreviewSession : IAsyncDisposable
     ValueTask InvalidateAssetsAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
     ValueTask InvalidateShadersAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+    void SetRenderStyle(RekallAgeStudioViewportRenderStyle style) { }
 }
 
 /// <summary>

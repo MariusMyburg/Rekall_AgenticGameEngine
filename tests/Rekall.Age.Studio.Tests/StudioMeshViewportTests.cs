@@ -1,4 +1,5 @@
 using System.Windows;
+using System.IO;
 using Rekall.Age.Modeling.Contracts;
 
 namespace Rekall.Age.Studio.Tests;
@@ -127,6 +128,29 @@ public sealed class StudioMeshViewportTests
         frame.Image.CopyPixels(new Int32Rect(40, 20, 1, 1), pixel, 4, 0);
 
         Assert.NotEqual(new byte[] { 22, 16, 12, 255 }, pixel);
+    }
+
+    [Fact]
+    public void SharedRenderStylesProduceDistinctMeshViewportImages()
+    {
+        var renderer = new RekallAgeStudioMeshViewportRenderer();
+        var images = Enum.GetValues<RekallAgeStudioViewportRenderStyle>()
+            .Select(style => renderer.Render(Quad(), RekallAgeGeometryDomain.Face, [], 640, 360,
+                preview: false, style: style).Image)
+            .Select(ToBytes)
+            .ToArray();
+
+        Assert.Equal(Enum.GetValues<RekallAgeStudioViewportRenderStyle>().Length,
+            images.Select(Convert.ToBase64String).Distinct(StringComparer.Ordinal).Count());
+
+        static byte[] ToBytes(System.Windows.Media.Imaging.BitmapSource image)
+        {
+            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
+            using var stream = new MemoryStream();
+            encoder.Save(stream);
+            return stream.ToArray();
+        }
     }
 
     private static RekallAgeMeshAsset Quad() => RekallAgeMeshAsset.Create("quad", "Quad",

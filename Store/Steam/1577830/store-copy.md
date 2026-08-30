@@ -128,6 +128,10 @@ We will use Steam Discussions and structured bug reports to collect feedback on 
 5. **Author with a local model** — Studio's Author workspace using local Ollama without an account sign-in.
 6. **Inspect the running world** — A live hardware-Vulkan viewport beside the scene hierarchy and typed component Inspector.
 7. **Own the gameplay code** — Edit and build C# modules, attach typed components, and launch Visual Studio or VS Code debugging.
+8. **Build geometry procedurally** — Inspect a typed, pan-and-zoom node graph and its evaluated 3D output with selectable viewport styles.
+9. **Edit meshes directly** — Orbit, pan, zoom, select stable mesh elements, and apply semantic topology operations in Studio.
+10. **Publish models into a scene** — Turn an editable mesh into a reusable Model Asset and place live-linked instances in the active world.
+11. **Choose how the world is rendered** — Switch the hardware-Vulkan World viewport between textured, shaded, wireframe, and clay views while inspecting typed components.
 
 ### Primary category
 

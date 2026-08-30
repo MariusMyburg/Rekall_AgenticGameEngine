@@ -35,7 +35,7 @@ internal sealed record RekallAgeStudioLayout(
     string ActiveOutputTab,
     IReadOnlyList<RekallAgeStudioDockPanelLayout> Panels)
 {
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     private static readonly string[] PanelIds = ["Hierarchy", "Inspector", "Output"];
     private static readonly HashSet<string> OutputTabs = new(
@@ -93,7 +93,7 @@ internal sealed record RekallAgeStudioLayout(
 
     public static RekallAgeStudioLayout? Normalize(RekallAgeStudioLayout? candidate)
     {
-        if (candidate is null || candidate.Version is not (1 or 2 or CurrentVersion) || candidate.Panels is null)
+        if (candidate is null || candidate.Version is not (1 or 2 or 3 or CurrentVersion) || candidate.Panels is null)
         {
             return null;
         }

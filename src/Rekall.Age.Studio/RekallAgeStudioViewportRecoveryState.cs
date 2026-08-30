@@ -33,13 +33,22 @@ internal sealed class RekallAgeStudioViewportRecoveryState
         bool viewportAvailable,
         DateTimeOffset now)
     {
-        if (!hasProject || viewportAvailable)
+        if (!hasProject)
         {
             _retryPending = false;
             _nextRetryAt = default;
             return new RekallAgeStudioViewportVisualState(
-                PresentationSurfaceVisible: hasProject && viewportAvailable,
-                PlaceholderVisible: !viewportAvailable);
+                PresentationSurfaceVisible: false,
+                PlaceholderVisible: false);
+        }
+
+        if (viewportAvailable)
+        {
+            _retryPending = false;
+            _nextRetryAt = default;
+            return new RekallAgeStudioViewportVisualState(
+                PresentationSurfaceVisible: true,
+                PlaceholderVisible: false);
         }
 
         if (!_retryPending)

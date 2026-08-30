@@ -188,7 +188,7 @@
         </Border>
 
         <Border x:Name="MainToolbar" DockPanel.Dock="Top" Padding="7" Background="{StaticResource ChromeBackground}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
-          <StackPanel Orientation="Horizontal">
+          <WrapPanel Orientation="Horizontal">
             <Button Content="Undo" Command="{Binding UndoCommand}" />
             <Button Content="Redo" Command="{Binding RedoCommand}" />
             <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
@@ -212,7 +212,7 @@
             <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
             <Button Content="Publish Web" Command="{Binding PublishWebCommand}" />
             <Button Content="Audit Web" Command="{Binding AuditWebCommand}" />
-          </StackPanel>
+          </WrapPanel>
         </Border>
 
         <Grid>
@@ -264,10 +264,10 @@
                         <TextBlock Text="Selected entity name" Foreground="{StaticResource MutedText}" />
                         <Grid Margin="0,3,0,5"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBox Text="{Binding EntityNameInput, UpdateSourceTrigger=PropertyChanged}" /><Button Grid.Column="1" Content="Rename" Command="{Binding RenameEntityCommand}" /></Grid>
                         <UniformGrid Columns="4">
-                            <Button Content="Duplicate" Command="{Binding DuplicateEntityCommand}" />
-                            <Button Content="Delete" Command="{Binding DeleteEntityCommand}" />
-                            <Button Content="Show/Hide" Command="{Binding ToggleEntityVisibleCommand}" />
-                            <Button Content="Lock" Command="{Binding ToggleEntityLockedCommand}" />
+                            <Button Content="Duplicate" Padding="5,4" Command="{Binding DuplicateEntityCommand}" />
+                            <Button Content="Delete" Padding="5,4" Command="{Binding DeleteEntityCommand}" />
+                            <Button Content="Show/Hide" Padding="5,4" Command="{Binding ToggleEntityVisibleCommand}" />
+                            <Button Content="Lock" Padding="5,4" Command="{Binding ToggleEntityLockedCommand}" />
                         </UniformGrid>
                         <Button Content="Edit Linked Model" Click="OnEditLinkedModelClick"
                                 IsEnabled="{Binding CanEditSelectedLinkedModel}"
@@ -293,20 +293,41 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Border Grid.Row="0" Background="#D9171C23" Padding="12,8">
-                        <StackPanel Orientation="Horizontal">
+                        <DockPanel LastChildFill="True">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0">
+                                <TextBlock Text="View style" Foreground="#AAB6C5" VerticalAlignment="Center" Margin="0,0,7,0" />
+                                <ComboBox Width="132" ItemsSource="{Binding ViewportRenderStyles}" SelectedItem="{Binding WorldViewportRenderStyle}" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{Binding ViewportTitle}" FontSize="16" FontWeight="SemiBold" />
                             <TextBlock Text=" · " Foreground="#718096" />
-                            <TextBlock Text="{Binding ViewportSummary}" Foreground="#AAB6C5" />
+                            <TextBlock Text="{Binding ViewportSummary}" Foreground="#AAB6C5" MaxWidth="430" TextTrimming="CharacterEllipsis" />
                             <TextBlock Text=" · " Foreground="#718096" />
                             <TextBlock Text="{Binding ViewportBackendLabel}" Foreground="#78C8FF" FontWeight="SemiBold" />
                             <TextBlock Text=" · " Foreground="#718096" />
                             <TextBlock Text="{Binding ModeLabel}" Foreground="{StaticResource Accent}" FontWeight="SemiBold" />
-                        </StackPanel>
+                            </StackPanel>
+                        </DockPanel>
                     </Border>
                     <Grid Grid.Row="1">
                         <local:RekallAgeVulkanViewportHost x:Name="SceneVulkanViewportHost"
                             Cursor="Cross" ToolTip="Select scene entities directly through the Vulkan viewport." />
+                        <StackPanel x:Name="NoProjectViewportPlaceholder"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="REKALL AGE" Foreground="{StaticResource Accent}" FontSize="28"
+                                       FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock Text="Build a game by describing it, or open an existing project."
+                                       Foreground="#AAB6C5" FontSize="15" Margin="0,9,0,16"
+                                       TextAlignment="Center" TextWrapping="Wrap" MaxWidth="520" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Button Content="Create a project..." Click="OnCreateProjectClick" Padding="18,8" />
+                                <Button Content="Open a project..." Click="OnOpenProjectClick" Padding="18,8" Margin="8,0,0,0" />
+                            </StackPanel>
+                            <TextBlock Text="You can also choose a ready-to-run project from the Examples menu."
+                                       Foreground="#718096" Margin="0,14,0,0" HorizontalAlignment="Center" />
+                        </StackPanel>
                         <StackPanel x:Name="VulkanUnavailablePlaceholder"
+                                    Visibility="Collapsed"
                                     HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
                             <TextBlock Text="AGE" Foreground="#33404D" FontSize="34" FontWeight="Light" HorizontalAlignment="Center" />
                             <TextBlock Text="Vulkan is unavailable" Foreground="#E28A8A" FontWeight="SemiBold"

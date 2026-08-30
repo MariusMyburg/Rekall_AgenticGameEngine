@@ -5,6 +5,17 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioProjectDialogTests
 {
     [Fact]
+    public async Task EmptyStudioViewportInvitesProjectSelectionInsteadOfReportingVulkanFailure()
+    {
+        await using var viewModel = new RekallAgeStudioViewModel();
+
+        Assert.False(viewModel.HasProject);
+        Assert.Contains("Open or create", viewModel.ViewportSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("unavailable", viewModel.ViewportBackendLabel, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("unavailable", viewModel.ViewportUnavailableReason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ProjectContextExplainsTheEmptyStateAndShowsTheSelectedFolder()
     {
         await using var viewModel = new RekallAgeStudioViewModel();

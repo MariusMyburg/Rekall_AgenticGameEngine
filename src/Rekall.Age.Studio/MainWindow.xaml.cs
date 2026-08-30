@@ -680,11 +680,28 @@ public partial class MainWindow : Window
         {
             ApplyViewportAvailabilityVisual();
         }
+        if (e.PropertyName == nameof(RekallAgeStudioViewModel.WorldViewportRenderStyle)
+            && _viewModel.HasProject && SceneVulkanViewportHost.Metrics.IsPresentable)
+        {
+            _ = RefreshWorldViewportStyleAsync();
+        }
         if (e.PropertyName == nameof(RekallAgeStudioViewModel.EntityNodes))
         {
             _ = Dispatcher.BeginInvoke(
                 DispatcherPriority.Loaded,
                 new Action(RestoreSceneHierarchySelection));
+        }
+    }
+
+    private async Task RefreshWorldViewportStyleAsync()
+    {
+        try
+        {
+            await _viewModel.PresentViewportAtHostSizeAsync(SceneVulkanViewportHost.Metrics);
+        }
+        catch (Exception exception)
+        {
+            Log.Error(exception, "Studio Vulkan viewport failed to apply render style.");
         }
     }
 
@@ -758,6 +775,9 @@ public partial class MainWindow : Window
         // is hidden while WPF displays the diagnostic placeholder.
         SceneVulkanViewportHost.Visibility = Visibility.Visible;
         SceneVulkanViewportHost.SetPresentationVisible(visual.PresentationSurfaceVisible);
+        NoProjectViewportPlaceholder.Visibility = _viewModel.HasProject
+            ? Visibility.Collapsed
+            : Visibility.Visible;
         VulkanUnavailablePlaceholder.Visibility = visual.PlaceholderVisible
             ? Visibility.Visible
             : Visibility.Collapsed;

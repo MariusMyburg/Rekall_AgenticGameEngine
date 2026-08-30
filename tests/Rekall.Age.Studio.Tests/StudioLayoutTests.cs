@@ -21,6 +21,17 @@ public sealed class StudioLayoutTests
     }
 
     [Fact]
+    public void WorldViewportShowsAProjectWelcomeStateSeparatelyFromVulkanFailures()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+
+        Assert.Contains("x:Name=\"NoProjectViewportPlaceholder\"", window, StringComparison.Ordinal);
+        Assert.Contains("Create a project", window, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Open a project", window, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void WorldViewportKeepsVulkanUnavailablePlaceholderAndExternalTransformControls()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
@@ -55,7 +66,7 @@ public sealed class StudioLayoutTests
         var layout = RekallAgeStudioLayout.Default;
 
         Assert.Equal(RekallAgeStudioLayout.CurrentVersion, layout.Version);
-        Assert.Equal(3, layout.Version);
+        Assert.Equal(4, layout.Version);
         Assert.Equal("Author", layout.ActiveWorkspace);
         Assert.Equal(["Hierarchy", "Inspector", "Output"], layout.Panels.Select(panel => panel.Id).Order().ToArray());
         Assert.All(layout.Panels, panel => Assert.True(panel.Visible));
@@ -80,7 +91,7 @@ public sealed class StudioLayoutTests
     }
 
     [Fact]
-    public void LayoutVersionThreeWidensKnownLegacyAndUndersizedPanelsButPreservesWiderCustomPanels()
+    public void CurrentLayoutWidensKnownLegacyAndUndersizedPanelsButPreservesWiderCustomPanels()
     {
         var legacyDefault = RekallAgeStudioLayout.Default with
         {
@@ -94,7 +105,7 @@ public sealed class StudioLayoutTests
         };
         var migrated = RekallAgeStudioLayout.Normalize(legacyDefault)!;
 
-        Assert.Equal(3, migrated.Version);
+        Assert.Equal(4, migrated.Version);
         Assert.Equal(340, migrated.Panel("Hierarchy").Size);
         Assert.Equal(460, migrated.Panel("Inspector").Size);
 
@@ -125,6 +136,27 @@ public sealed class StudioLayoutTests
 
         Assert.Equal(380, normalizedCustom.Panel("Hierarchy").Size);
         Assert.Equal(520, normalizedCustom.Panel("Inspector").Size);
+    }
+
+    [Fact]
+    public void LayoutVersionFourRepairsUndersizedVersionThreeWorldPanelsThatClipInspectorActions()
+    {
+        var undersizedVersionThree = RekallAgeStudioLayout.Default with
+        {
+            Version = 3,
+            Panels =
+            [
+                new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 180, 0),
+                new("Inspector", RekallAgeStudioDockRegion.Right, true, 180, 0),
+                new("Output", RekallAgeStudioDockRegion.Bottom, true, 260, 0)
+            ]
+        };
+
+        var migrated = RekallAgeStudioLayout.Normalize(undersizedVersionThree)!;
+
+        Assert.Equal(4, migrated.Version);
+        Assert.Equal(340, migrated.Panel("Hierarchy").Size);
+        Assert.Equal(460, migrated.Panel("Inspector").Size);
     }
 
     [Fact]
@@ -212,6 +244,23 @@ public sealed class StudioLayoutTests
         Assert.Contains("PreviewMeshOperationCommand", modeling, StringComparison.Ordinal);
         Assert.Contains("ApplyMeshOperationCommand", modeling, StringComparison.Ordinal);
         Assert.Contains("NODE CONTRACTS", modeling, StringComparison.Ordinal);
+        Assert.Contains("MouseWheel=\"OnModelingGraphCanvasMouseWheel\"", modeling, StringComparison.Ordinal);
+        Assert.Contains("Pan: middle/right drag", modeling, StringComparison.Ordinal);
+        Assert.Contains("Zoom: wheel", modeling, StringComparison.Ordinal);
+        Assert.Contains("OnResetModelingGraphCanvasView", modeling, StringComparison.Ordinal);
+        Assert.Contains("Orbit: middle drag", modeling, StringComparison.Ordinal);
+        Assert.Contains("Pan: Shift+middle drag", modeling, StringComparison.Ordinal);
+        Assert.Contains("Zoom: wheel", modeling, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Line X1=\"0\" Y1=\"0\" X2=\"1\" Y2=\"1\"", modeling, StringComparison.Ordinal);
+        Assert.Contains("MeshViewportRenderStyle", modeling, StringComparison.Ordinal);
+        Assert.Contains("ModelingGraphViewportRenderStyle", modeling, StringComparison.Ordinal);
+        Assert.Contains("ViewportRenderStyles", modeling, StringComparison.Ordinal);
+        Assert.Contains("WorldViewportRenderStyle", window, StringComparison.Ordinal);
+        Assert.Contains("<WrapPanel Orientation=\"Horizontal\">", window, StringComparison.Ordinal);
+        Assert.Contains("<WrapPanel Orientation=\"Horizontal\">", modeling, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"Preview\" Width=\"62\"", modeling, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"Apply\" Width=\"52\"", modeling, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"Cancel\" Width=\"55\"", modeling, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -277,6 +326,7 @@ public sealed class StudioLayoutTests
         Assert.Contains("InspectorVector3EditorTemplate", window, StringComparison.Ordinal);
         Assert.Contains("ResetInspectorPropertyCommand", window, StringComparison.Ordinal);
         Assert.Contains("Content=\"Add / Replace\"", window, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Show/Hide\" Padding=\"5,4\"", window, StringComparison.Ordinal);
         Assert.DoesNotContain("Content=\"Set Value\"", window, StringComparison.Ordinal);
     }
 

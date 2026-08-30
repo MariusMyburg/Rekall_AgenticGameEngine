@@ -39,12 +39,22 @@ public interface IRekallAgeVulkanPresentationSession : IAsyncDisposable
         throw new NotSupportedException("This presentation session does not support resizing.");
 }
 
+public enum RekallAgeVulkanPresentationRenderStyle
+{
+    Textured,
+    SmoothShaded,
+    FlatShaded,
+    Wireframe,
+    Clay
+}
+
 public sealed record RekallAgeVulkanPresentationOptions(
     string ProjectRoot,
     bool SyncToVerticalBlank = true,
     int SceneSupersampleFactor = 2,
     bool DebugHudEnabled = false,
-    Action<string>? Log = null);
+    Action<string>? Log = null,
+    RekallAgeVulkanPresentationRenderStyle RenderStyle = RekallAgeVulkanPresentationRenderStyle.Textured);
 
 public sealed record RekallAgeVulkanSceneSubmission
 {

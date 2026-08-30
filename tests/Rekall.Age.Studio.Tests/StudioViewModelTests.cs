@@ -1817,6 +1817,77 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task PanningAndZoomingMeshViewportEachChangeTheRenderedCameraView()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-pan-zoom-camera-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Pan Zoom Camera Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            viewModel.SelectedMeshPrimitive = "box";
+            viewModel.MeshPrimitiveAssetIdInput = "camera-box";
+            await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
+            var initial = ToBytes(viewModel.MeshViewportImage!);
+
+            viewModel.PanMeshViewport(80, -35);
+            var panned = ToBytes(viewModel.MeshViewportImage!);
+            viewModel.ZoomMeshViewport(1.7);
+            var zoomed = ToBytes(viewModel.MeshViewportImage!);
+
+            Assert.False(initial.SequenceEqual(panned));
+            Assert.False(panned.SequenceEqual(zoomed));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+
+        static byte[] ToBytes(System.Windows.Media.Imaging.BitmapSource image)
+        {
+            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
+            using var stream = new MemoryStream();
+            encoder.Save(stream);
+            return stream.ToArray();
+        }
+    }
+
+    [Fact]
+    public async Task EmptyMeshViewportStillRendersACameraAwareGrid()
+    {
+        await using var viewModel = new RekallAgeStudioViewModel();
+        var initial = ToBytes(Assert.IsAssignableFrom<System.Windows.Media.Imaging.BitmapSource>(viewModel.MeshViewportImage));
+
+        viewModel.OrbitMeshViewport(0.45, 0.2);
+        var orbited = ToBytes(viewModel.MeshViewportImage!);
+        viewModel.PanMeshViewport(70, -25);
+        var panned = ToBytes(viewModel.MeshViewportImage!);
+        viewModel.ZoomMeshViewport(1.5);
+        var zoomed = ToBytes(viewModel.MeshViewportImage!);
+
+        Assert.False(initial.SequenceEqual(orbited));
+        Assert.False(orbited.SequenceEqual(panned));
+        Assert.False(panned.SequenceEqual(zoomed));
+
+        static byte[] ToBytes(System.Windows.Media.Imaging.BitmapSource image)
+        {
+            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
+            using var stream = new MemoryStream();
+            encoder.Save(stream);
+            return stream.ToArray();
+        }
+    }
+
+    [Fact]
     public async Task SimulationIsBlockedWhenPreviewOmittedUnverifiedProjectModules()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-module-block-" + Guid.NewGuid().ToString("N"));
@@ -1949,9 +2020,41 @@ public sealed class StudioViewModelTests
             Assert.False(unavailable.PresentationSurfaceVisible);
             Assert.True(unavailable.PlaceholderVisible);
             Assert.True(viewModel.ViewportAvailable);
+            Assert.DoesNotContain("Vulkan is unavailable", viewModel.StatusText, StringComparison.OrdinalIgnoreCase);
             Assert.True(recovered.PresentationSurfaceVisible);
             Assert.False(recovered.PlaceholderVisible);
             Assert.Equal(1, preview.PresentCurrentCount);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task TransientZeroHostMetricsDoNotReplaceAValidVulkanStatusWithAnUnavailableError()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-vulkan-transient-size-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Transient Size Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+            Assert.True(viewModel.ViewportAvailable);
+
+            preview.Metrics = default;
+            await ExecuteAsync(viewModel.SimulateCommand);
+
+            Assert.DoesNotContain("Vulkan is unavailable", viewModel.StatusText, StringComparison.OrdinalIgnoreCase);
+            Assert.True(viewModel.ViewportAvailable);
         }
         finally
         {
@@ -3418,7 +3521,7 @@ public sealed class StudioViewModelTests
         public int PresentCurrentCount { get; private set; }
         public int ExternalDependencyPollCount { get; private set; }
         public int ExternalDependencyPresentationCount { get; private set; }
-        public RekallAgeStudioViewportMetrics Metrics { get; } = new(800, 450, 800, 450, true);
+        public RekallAgeStudioViewportMetrics Metrics { get; set; } = new(800, 450, 800, 450, true);
         public List<(int Width, int Height)> ResetSizes { get; } = [];
         public List<RekallAgeStudioViewportPickRegion> Regions { get; } = [];
         public bool IsDisposed { get; private set; }

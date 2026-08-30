@@ -143,12 +143,23 @@ public partial class ModelingWorkspace : UserControl
     }
 
     private bool _draggingGraphNode;
+    private bool _panningModelingGraph;
+    private System.Windows.Point _lastModelingGraphPanPoint;
 
     /// <summary>A port hit arms/completes a link; a node-body hit selects and begins a drag; empty space clears both.</summary>
     private async void OnModelingGraphCanvasMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (ViewModel is null || sender is not Image image || image.ActualWidth <= 0 || image.ActualHeight <= 0) return;
         var point = e.GetPosition(image);
+        if (e.ChangedButton is MouseButton.Middle or MouseButton.Right)
+        {
+            _panningModelingGraph = true;
+            _lastModelingGraphPanPoint = point;
+            image.CaptureMouse();
+            e.Handled = true;
+            return;
+        }
+        if (e.ChangedButton != MouseButton.Left) return;
         image.CaptureMouse();
         _draggingGraphNode = true;
         await ViewModel.ClickModelingGraphCanvasAsync(point.X / image.ActualWidth, point.Y / image.ActualHeight);
@@ -157,15 +168,32 @@ public partial class ModelingWorkspace : UserControl
 
     private void OnModelingGraphCanvasMouseMove(object sender, MouseEventArgs e)
     {
-        if (!_draggingGraphNode || ViewModel is null || sender is not Image image) return;
+        if (ViewModel is null || sender is not Image image || image.ActualWidth <= 0 || image.ActualHeight <= 0) return;
         var point = e.GetPosition(image);
+        if (_panningModelingGraph)
+        {
+            var delta = point - _lastModelingGraphPanPoint;
+            _lastModelingGraphPanPoint = point;
+            ViewModel.PanModelingGraphCanvas(delta.X / image.ActualWidth, delta.Y / image.ActualHeight);
+            e.Handled = true;
+            return;
+        }
+        if (!_draggingGraphNode) return;
         ViewModel.UpdateModelingGraphNodeDrag(point.X / image.ActualWidth, point.Y / image.ActualHeight);
         e.Handled = true;
     }
 
     private void OnModelingGraphCanvasMouseUp(object sender, MouseButtonEventArgs e)
     {
-        if (!_draggingGraphNode || sender is not Image image) return;
+        if (sender is not Image image) return;
+        if (_panningModelingGraph && (e.ChangedButton is MouseButton.Middle or MouseButton.Right))
+        {
+            _panningModelingGraph = false;
+            image.ReleaseMouseCapture();
+            e.Handled = true;
+            return;
+        }
+        if (!_draggingGraphNode || e.ChangedButton != MouseButton.Left) return;
         _draggingGraphNode = false;
         image.ReleaseMouseCapture();
         ViewModel?.CompleteModelingGraphNodeDrag();
@@ -174,8 +202,21 @@ public partial class ModelingWorkspace : UserControl
 
     private void OnModelingGraphCanvasLostCapture(object sender, MouseEventArgs e)
     {
+        _panningModelingGraph = false;
         if (!_draggingGraphNode) return;
         _draggingGraphNode = false;
         ViewModel?.CompleteModelingGraphNodeDrag();
     }
+
+    private void OnModelingGraphCanvasMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (ViewModel is null || sender is not Image image || image.ActualWidth <= 0 || image.ActualHeight <= 0) return;
+        var point = e.GetPosition(image);
+        ViewModel.ZoomModelingGraphCanvas(e.Delta > 0 ? 1.15 : 1 / 1.15,
+            point.X / image.ActualWidth, point.Y / image.ActualHeight);
+        e.Handled = true;
+    }
+
+    private void OnResetModelingGraphCanvasView(object sender, System.Windows.RoutedEventArgs e) =>
+        ViewModel?.ResetModelingGraphCanvasView();
 }

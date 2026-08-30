@@ -47,7 +47,8 @@ internal sealed record RekallAgeStudioPresentationContext(
     int RuntimeEntityCount,
     int SceneRevision,
     int AssetRevision,
-    string? DebugBackendText = null);
+    string? DebugBackendText = null,
+    RekallAgeStudioViewportRenderStyle RenderStyle = RekallAgeStudioViewportRenderStyle.Textured);
 
 internal interface IRekallAgeStudioViewportPresenter : IAsyncDisposable
 {
@@ -104,6 +105,7 @@ internal sealed class RekallAgeStudioVulkanViewportPresenter :
     private IRekallAgeVulkanPresentationSession? _session;
     private RekallAgeStudioViewportMetrics _metrics;
     private string? _sessionProjectRoot;
+    private RekallAgeStudioViewportRenderStyle _sessionRenderStyle;
     private bool _assetsInvalidated;
     private bool _shadersInvalidated;
     private bool _sessionCleanupRequired;
@@ -250,7 +252,8 @@ internal sealed class RekallAgeStudioVulkanViewportPresenter :
             try
             {
                 if (_session is null
-                    || !string.Equals(_sessionProjectRoot, context.ProjectRoot, StringComparison.OrdinalIgnoreCase))
+                    || !string.Equals(_sessionProjectRoot, context.ProjectRoot, StringComparison.OrdinalIgnoreCase)
+                    || _sessionRenderStyle != context.RenderStyle)
                 {
                     await DisposeSessionAsync();
                     var descriptor = _surface.Describe(_metrics.PixelWidth, _metrics.PixelHeight);
@@ -260,11 +263,13 @@ internal sealed class RekallAgeStudioVulkanViewportPresenter :
                             context.ProjectRoot,
                             SyncToVerticalBlank: true,
                             SceneSupersampleFactor: RekallAgeInteractiveAntialiasing.DefaultSupersampleFactor,
-                            DebugHudEnabled: false),
+                            DebugHudEnabled: false,
+                            RenderStyle: MapRenderStyle(context.RenderStyle)),
                         frame,
                         assets,
                         context.AssetRevision);
                     _sessionProjectRoot = context.ProjectRoot;
+                    _sessionRenderStyle = context.RenderStyle;
                     _assetsInvalidated = false;
                     _shadersInvalidated = false;
                 }
@@ -321,6 +326,15 @@ internal sealed class RekallAgeStudioVulkanViewportPresenter :
             _gate.Release();
         }
     }
+
+    private static RekallAgeVulkanPresentationRenderStyle MapRenderStyle(RekallAgeStudioViewportRenderStyle style) => style switch
+    {
+        RekallAgeStudioViewportRenderStyle.SmoothShaded => RekallAgeVulkanPresentationRenderStyle.SmoothShaded,
+        RekallAgeStudioViewportRenderStyle.FlatShaded => RekallAgeVulkanPresentationRenderStyle.FlatShaded,
+        RekallAgeStudioViewportRenderStyle.Wireframe => RekallAgeVulkanPresentationRenderStyle.Wireframe,
+        RekallAgeStudioViewportRenderStyle.Clay => RekallAgeVulkanPresentationRenderStyle.Clay,
+        _ => RekallAgeVulkanPresentationRenderStyle.Textured
+    };
 
     public async ValueTask InvalidateAssetsAsync(CancellationToken cancellationToken)
     {

@@ -48,6 +48,7 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
     private int _sceneRevision;
     private int _assetRevision;
     private bool _assetsDirty;
+    private RekallAgeStudioViewportRenderStyle _renderStyle = RekallAgeStudioViewportRenderStyle.Textured;
     private RekallAgeStudioProjectModuleDiagnostic? _projectModuleDiagnostic;
     private IRekallAgeStudioViewportDependencyMonitor? _dependencyMonitor;
     private bool _disposeStarted;
@@ -72,6 +73,8 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
             projectRoot => new RekallAgeStudioViewportDependencyMonitor(projectRoot))
     {
     }
+
+    public void SetRenderStyle(RekallAgeStudioViewportRenderStyle style) => _renderStyle = style;
 
     internal RekallAgeStudioVulkanPreviewSession(
         IRekallAgeStudioViewportPresenter presenter,
@@ -446,15 +449,17 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
         RekallAgeStudioProjectModuleDiagnostic? projectModuleDiagnostic,
         CancellationToken cancellationToken)
     {
+        var styledFrame = RekallAgeStudioViewportStyleAdapter.Apply(viewportFrame, _renderStyle);
         var presentation = await _presenter.PresentAsync(
-            viewportFrame,
+            styledFrame,
             assets,
             new RekallAgeStudioPresentationContext(
                 projectRoot,
                 world.Subsystems.Rendering.GpuWorkloads,
                 world.Entities.Count,
                 sceneRevision,
-                assetRevision),
+                assetRevision,
+                RenderStyle: _renderStyle),
             cancellationToken);
         return new RekallAgeStudioPreviewFrame(
             presentation,

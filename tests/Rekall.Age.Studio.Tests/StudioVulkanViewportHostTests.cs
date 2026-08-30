@@ -9,6 +9,34 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioVulkanViewportHostTests
 {
     [Fact]
+    public void WorldViewportStyleAdapterProducesClayAndFlatInspectionFramesWithoutMutatingAuthoredData()
+    {
+        var renderable = new RekallAgeRuntimeViewportRenderable(
+            "mesh", "Mesh", "model", "hero", 0, 0, 0, 0,
+            MaterialColor: "#224466",
+            TextureAssetId: "base-color",
+            NormalTextureAssetId: "normal-map",
+            MetallicFactor: 0.8,
+            RoughnessFactor: 0.2,
+            EmissiveTextureAssetId: "emissive");
+        var source = ViewportFrame() with { Renderables = [renderable] };
+
+        var clay = Assert.Single(RekallAgeStudioViewportStyleAdapter.Apply(
+            source, RekallAgeStudioViewportRenderStyle.Clay).Renderables);
+        var flat = Assert.Single(RekallAgeStudioViewportStyleAdapter.Apply(
+            source, RekallAgeStudioViewportRenderStyle.FlatShaded).Renderables);
+
+        Assert.Equal("#B6AA97", clay.MaterialColor);
+        Assert.Null(clay.TextureAssetId);
+        Assert.Null(clay.NormalTextureAssetId);
+        Assert.Null(clay.EmissiveTextureAssetId);
+        Assert.Null(flat.NormalTextureAssetId);
+        Assert.Equal("base-color", flat.TextureAssetId);
+        Assert.Equal("base-color", renderable.TextureAssetId);
+        Assert.Equal("normal-map", renderable.NormalTextureAssetId);
+    }
+
+    [Fact]
     public void NativeVulkanChildPaintLeavesThePresentedSurfaceUntouched()
     {
         if (!OperatingSystem.IsWindows()) return;
@@ -55,6 +83,19 @@ public sealed class StudioVulkanViewportHostTests
             if (child != IntPtr.Zero) native.DestroyChild(child);
             NativePaintProbe.Destroy(parent);
         }
+    }
+
+    [Fact]
+    public void MainWindowAvailabilityStateDoesNotReportVulkanFailureBeforeAProjectIsOpen()
+    {
+        var recovery = new RekallAgeStudioViewportRecoveryState(TimeSpan.FromSeconds(1));
+        var now = new DateTimeOffset(2026, 8, 30, 8, 0, 0, TimeSpan.Zero);
+
+        var visual = recovery.Synchronize(hasProject: false, viewportAvailable: false, now);
+
+        Assert.False(visual.PresentationSurfaceVisible);
+        Assert.False(visual.PlaceholderVisible);
+        Assert.False(recovery.TryBeginAutomaticRetry(now));
     }
 
     [Fact]

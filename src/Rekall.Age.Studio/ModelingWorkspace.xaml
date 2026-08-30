@@ -32,50 +32,55 @@
             <TabItem Header="Mesh Editing">
                 <Grid Margin="3">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="48" /><ColumnDefinition Width="*" /><ColumnDefinition Width="5" /><ColumnDefinition Width="340" /></Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions><RowDefinition Height="34" /><RowDefinition Height="*" /><RowDefinition Height="28" /></Grid.RowDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="28" /></Grid.RowDefinitions>
 
                     <Border Grid.Column="0" Grid.ColumnSpan="2" Background="#252A30" BorderBrush="{StaticResource PanelBorder}" BorderThickness="1" Padding="5,3">
-                        <StackPanel Orientation="Horizontal">
+                        <WrapPanel Orientation="Horizontal">
                             <ComboBox Width="115" ItemsSource="{Binding MeshEditDomains}" SelectedItem="{Binding MeshEditDomain}" />
                             <TextBlock Text="Add" VerticalAlignment="Center" Margin="12,0,5,0" Foreground="#D0D5DA" />
                             <ComboBox Width="95" ItemsSource="{Binding MeshPrimitiveTypes}" SelectedItem="{Binding SelectedMeshPrimitive}" />
                             <TextBox Width="110" Margin="4,0" Text="{Binding MeshPrimitiveAssetIdInput, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button Content="+ Add" Width="58" Padding="3,1" Command="{Binding CreateMeshPrimitiveCommand}" Style="{StaticResource AccentButton}" />
+                            <Button Content="+ Add" Width="66" Padding="6,2" Command="{Binding CreateMeshPrimitiveCommand}" Style="{StaticResource AccentButton}" />
                             <Border Width="1" Margin="8,2" Background="{StaticResource PanelBorder}" />
                             <TextBlock Text="Edit" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="#D0D5DA" />
                             <ComboBox Width="155" ItemsSource="{Binding MeshOperationIds}" SelectedItem="{Binding SelectedMeshOperationId}" />
-                            <Button Content="Preview" Width="62" Padding="3,1" Command="{Binding PreviewMeshOperationCommand}" Margin="7,0,0,0" />
-                            <Button Content="Apply" Width="52" Padding="3,1" Command="{Binding ApplyMeshOperationCommand}" Style="{StaticResource AccentButton}" />
-                            <Button Content="Cancel" Width="55" Padding="3,1" Command="{Binding CancelMeshPreviewCommand}" />
+                            <Button Content="Preview" Width="76" Padding="6,2" Command="{Binding PreviewMeshOperationCommand}" Margin="7,0,0,0" />
+                            <Button Content="Apply" Width="64" Padding="6,2" Command="{Binding ApplyMeshOperationCommand}" Style="{StaticResource AccentButton}" />
+                            <Button Content="Cancel" Width="70" Padding="6,2" Command="{Binding CancelMeshPreviewCommand}" />
                             <Border Width="1" Margin="8,2" Background="{StaticResource PanelBorder}" />
                             <TextBlock Text="Global" VerticalAlignment="Center" Foreground="{StaticResource MutedText}" />
                             <TextBlock Text="  •  snapping and stable topology IDs" VerticalAlignment="Center" Foreground="#788695" />
-                        </StackPanel>
+                        </WrapPanel>
                     </Border>
 
                     <Border Grid.Row="1" Grid.Column="0" Background="#20252B" BorderBrush="{StaticResource PanelBorder}" BorderThickness="1,0,1,1">
                         <StackPanel HorizontalAlignment="Center" Margin="0,8">
-                            <Button Content="↖" Width="36" Height="36" Command="{Binding SelectMeshElementCommand}" ToolTip="Select stable element" />
-                            <Button Content="✥" Width="36" Height="36" Command="{Binding ClearMeshSelectionCommand}" ToolTip="Clear selection" />
+                            <Button Content="↖" Width="36" Height="36" Padding="3" Command="{Binding SelectMeshElementCommand}" ToolTip="Select stable element" />
+                            <Button Content="✥" Width="36" Height="36" Padding="3" Command="{Binding ClearMeshSelectionCommand}" ToolTip="Clear selection" />
                             <Separator Width="30" Margin="0,5" />
-                            <Button Content="P" Width="36" Height="36" Command="{Binding PreviewMeshOperationCommand}" ToolTip="Preview semantic operation" />
-                            <Button Content="✓" Width="36" Height="36" Command="{Binding ApplyMeshOperationCommand}" ToolTip="Apply semantic operation" />
+                            <Button Content="P" Width="36" Height="36" Padding="3" Command="{Binding PreviewMeshOperationCommand}" ToolTip="Preview semantic operation" />
+                            <Button Content="✓" Width="36" Height="36" Padding="3" Command="{Binding ApplyMeshOperationCommand}" ToolTip="Apply semantic operation" />
                             <Separator Width="30" Margin="0,5" />
-                            <Button Content="⛶" Width="36" Height="36" Command="{Binding FrameSelectedMeshViewportCommand}" ToolTip="Frame selected (reset pan/zoom)" />
-                            <Button Content="⬚/◆" Width="36" Height="36" FontSize="10" Command="{Binding ToggleMeshViewportProjectionCommand}" ToolTip="Toggle orthographic / perspective" />
+                            <Button Content="⛶" Width="36" Height="36" Padding="3" Command="{Binding FrameSelectedMeshViewportCommand}" ToolTip="Frame selected (reset pan/zoom)" />
+                            <Button Content="⬚/◆" Width="42" Height="36" Padding="3" FontSize="10" Command="{Binding ToggleMeshViewportProjectionCommand}" ToolTip="Toggle orthographic / perspective" />
                         </StackPanel>
                     </Border>
 
                     <Border Grid.Row="1" Grid.Column="1" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,1,1" Background="{StaticResource ModelingGrid}">
                         <Grid>
-                            <Line X1="0" Y1="0" X2="1" Y2="1" Stretch="Fill" Stroke="#7E3036" StrokeThickness="1" Opacity="0.75" />
-                            <Line X1="0" Y1="1" X2="1" Y2="0" Stretch="Fill" Stroke="#3E7541" StrokeThickness="1" Opacity="0.75" />
                             <Image x:Name="MeshViewportImage" Source="{Binding MeshViewportImage}" Stretch="Fill"
                                    MouseLeftButtonDown="OnMeshMouseDown" MouseMove="OnMeshMouseMove"
                                    MouseLeftButtonUp="OnMeshMouseUp" LostMouseCapture="OnMeshLostCapture" Cursor="Cross" />
                             <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10">
                                 <TextBlock Text="User Perspective" Foreground="#D5D8DC" />
                                 <TextBlock Text="{Binding MeshSummary}" Foreground="#AAB2BC" FontSize="11" />
+                                <Border Margin="0,7,0,0" Padding="7,4" CornerRadius="3" Background="#D9181D24" HorizontalAlignment="Left">
+                                    <TextBlock Text="Orbit: middle drag   •   Pan: Shift+middle drag   •   Zoom: wheel" Foreground="#B8C4D0" FontSize="10" />
+                                </Border>
+                                <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
+                                    <TextBlock Text="View style" VerticalAlignment="Center" Foreground="#AAB2BC" Margin="0,0,7,0" />
+                                    <ComboBox Width="132" ItemsSource="{Binding ViewportRenderStyles}" SelectedItem="{Binding MeshViewportRenderStyle}" />
+                                </StackPanel>
                             </StackPanel>
                             <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10" CornerRadius="18" Width="36" Height="36" BorderBrush="#6D7782" BorderThickness="1" Background="#CC282E35">
                                 <Grid><TextBlock Text="Z" Foreground="#5DADE2" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,2,0,0" /><TextBlock Text="X Y" Foreground="#D96B73" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,3" /></Grid>
@@ -155,25 +160,31 @@
                     </Grid>
 
                     <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Background="#20252B" BorderBrush="{StaticResource PanelBorder}" BorderThickness="1,0,1,1" Padding="7,3">
-                        <Grid><TextBlock Text="View   Select   Mesh" Foreground="#B9C1CA" /><TextBlock Text="Point/Edge/Face domains · stable IDs · deterministic operations" HorizontalAlignment="Center" Foreground="#778493" /><TextBlock Text="Ready" HorizontalAlignment="Right" Foreground="{StaticResource Accent}" /></Grid>
+                        <Grid><TextBlock Text="View   Select   Mesh" Foreground="#B9C1CA" /><TextBlock Text="Orbit: middle drag  ·  Pan: Shift+middle drag  ·  Zoom: wheel  ·  Frame: ⛶" HorizontalAlignment="Center" Foreground="#8997A6" /><TextBlock Text="Ready" HorizontalAlignment="Right" Foreground="{StaticResource Accent}" /></Grid>
                     </Border>
                 </Grid>
             </TabItem>
 
             <TabItem Header="Procedural Geometry">
                 <Grid Margin="7">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="5" /><ColumnDefinition Width="380" /><ColumnDefinition Width="5" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="250" /><ColumnDefinition Width="5" /><ColumnDefinition Width="5*" /><ColumnDefinition Width="5" /><ColumnDefinition Width="4*" /></Grid.ColumnDefinitions>
                     <Border Grid.Column="0" Style="{StaticResource EditorPanel}"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><TextBlock Text="PROCEDURAL GRAPH" FontWeight="SemiBold" /></Border><StackPanel Margin="9"><TextBlock Text="Graph asset" Style="{StaticResource SectionLabel}" /><ComboBox ItemsSource="{Binding ModelingGraphAssetIds}" SelectedItem="{Binding SelectedModelingGraphAssetId}" Margin="0,4,0,6" /><UniformGrid Columns="2"><Button Content="Refresh" Command="{Binding RefreshModelingGraphsCommand}" /><Button Content="Open" Command="{Binding OpenModelingGraphCommand}" /></UniformGrid><TextBlock Text="Named output" Style="{StaticResource SectionLabel}" Margin="0,14,0,0" /><ComboBox ItemsSource="{Binding ModelingGraphOutputNames}" SelectedItem="{Binding SelectedModelingGraphOutput}" Margin="0,4,0,6" /><Button Content="Evaluate Output" Command="{Binding EvaluateModelingGraphCommand}" Style="{StaticResource AccentButton}" /><TextBlock Text="{Binding ModelingGraphSummary}" TextWrapping="Wrap" Foreground="{StaticResource MutedText}" Margin="0,14,0,0" /></StackPanel></DockPanel></Border>
                     <GridSplitter Grid.Column="1" Width="5" Background="{StaticResource PanelBorder}" />
-                    <Border Grid.Column="2" Style="{StaticResource EditorPanel}"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><TextBlock Text="NODE CONTRACTS" FontWeight="SemiBold" /></Border><Grid><Grid.RowDefinitions><RowDefinition Height="220" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                    <Border Grid.Column="2" Style="{StaticResource EditorPanel}"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><Grid><TextBlock Text="NODE CONTRACTS" FontWeight="SemiBold" /><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><TextBlock Text="{Binding ModelingGraphCanvasZoomLabel}" VerticalAlignment="Center" Foreground="{StaticResource MutedText}" Margin="0,0,8,0" /><Button Content="Frame All" Padding="7,1" Click="OnResetModelingGraphCanvasView" ToolTip="Reset the graph canvas pan and zoom" /></StackPanel></Grid></Border><Grid><Grid.RowDefinitions><RowDefinition Height="360" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                         <Border Grid.Row="0" Background="{StaticResource ViewportBackground}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
+                            <Grid>
                             <Image x:Name="ModelingGraphCanvasImage" Source="{Binding ModelingGraphCanvasImage}" Stretch="Fill" Cursor="Hand"
                                    MouseDown="OnModelingGraphCanvasMouseDown" MouseMove="OnModelingGraphCanvasMouseMove"
-                                   MouseUp="OnModelingGraphCanvasMouseUp" LostMouseCapture="OnModelingGraphCanvasLostCapture" />
+                                   MouseUp="OnModelingGraphCanvasMouseUp" LostMouseCapture="OnModelingGraphCanvasLostCapture"
+                                   MouseWheel="OnModelingGraphCanvasMouseWheel" />
+                            <Border VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="8" Padding="7,4" CornerRadius="3" Background="#D9181D24" IsHitTestVisible="False">
+                                <TextBlock Text="Pan: middle/right drag   •   Zoom: wheel   •   Move node: left drag   •   Connect: click ports" Foreground="#B8C4D0" FontSize="10" />
+                            </Border>
+                            </Grid>
                         </Border>
                         <ListBox Grid.Row="1" ItemsSource="{Binding ModelingGraphNodes}" SelectedItem="{Binding SelectedModelingGraphNode}" DisplayMemberPath="DisplayName" BorderThickness="0" /><StackPanel Grid.Row="2" Margin="9"><TextBlock Text="TYPED PARAMETERS" Style="{StaticResource SectionLabel}" /><ItemsControl ItemsSource="{Binding ModelingGraphParameterEditors}"><ItemsControl.ItemTemplate><DataTemplate><Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Text="{Binding DisplayName}" /><ComboBox Grid.Column="1" ItemsSource="{Binding EnumChoices}" Text="{Binding ValueText, UpdateSourceTrigger=PropertyChanged}" IsEditable="True" /></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl><Button Content="Apply Parameters + Re-evaluate" Command="{Binding ApplyModelingGraphParametersCommand}" Style="{StaticResource AccentButton}" Margin="0,7,0,0" /></StackPanel></Grid></DockPanel></Border>
                     <GridSplitter Grid.Column="3" Width="5" Background="{StaticResource PanelBorder}" />
-                    <Grid Grid.Column="4"><Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="150" /></Grid.RowDefinitions><Border Style="{StaticResource EditorPanel}" Background="{StaticResource ViewportBackground}" Margin="0,0,0,6"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><TextBlock Text="EVALUATED OUTPUT" FontWeight="SemiBold" /></Border><Image Source="{Binding ModelingGraphViewportImage}" Stretch="Uniform" /></DockPanel></Border><Border Grid.Row="1" Style="{StaticResource EditorPanel}"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><TextBlock Text="DIAGNOSTICS" /></Border><ListBox ItemsSource="{Binding ModelingGraphDiagnosticLines}" BorderThickness="0" /></DockPanel></Border></Grid>
+                    <Grid Grid.Column="4"><Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="150" /></Grid.RowDefinitions><Border Style="{StaticResource EditorPanel}" Background="{StaticResource ViewportBackground}" Margin="0,0,0,6"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><Grid><TextBlock Text="EVALUATED OUTPUT" FontWeight="SemiBold" /><ComboBox Width="132" HorizontalAlignment="Right" ItemsSource="{Binding ViewportRenderStyles}" SelectedItem="{Binding ModelingGraphViewportRenderStyle}" /></Grid></Border><Image Source="{Binding ModelingGraphViewportImage}" Stretch="Uniform" /></DockPanel></Border><Border Grid.Row="1" Style="{StaticResource EditorPanel}"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><TextBlock Text="DIAGNOSTICS" /></Border><ListBox ItemsSource="{Binding ModelingGraphDiagnosticLines}" BorderThickness="0" /></DockPanel></Border></Grid>
                 </Grid>
             </TabItem>
 

@@ -42,6 +42,42 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
     private const double PointHitRadius = 9;
     private const double EdgeHitRadius = 7;
 
+    public BitmapSource RenderEmpty(int width, int height, RekallAgeStudioViewportCamera? camera = null)
+    {
+        if (width < 64 || width > 4096 || height < 64 || height > 4096)
+            throw new ArgumentOutOfRangeException(nameof(width), "Mesh viewport dimensions must be 64-4096 pixels.");
+        var activeCamera = camera ?? RekallAgeStudioViewportCamera.Identity;
+        var center = new Point(width / 2d + activeCamera.PanX, height / 2d + activeCamera.PanY);
+        var scale = 25 * activeCamera.Zoom;
+        Point Screen(RekallAgeGeometryVector3 point)
+        {
+            var projected = Project(point, activeCamera);
+            return new Point(center.X + projected.X * scale, center.Y + projected.Y * scale);
+        }
+
+        var visual = new DrawingVisual();
+        using (var drawing = visual.RenderOpen())
+        {
+            drawing.DrawRectangle(new SolidColorBrush(Color.FromRgb(12, 16, 22)), null, new Rect(0, 0, width, height));
+            for (var index = -12; index <= 12; index++)
+            {
+                var major = index % 5 == 0;
+                var xPen = index == 0
+                    ? new Pen(new SolidColorBrush(Color.FromRgb(92, 57, 61)), 1.4)
+                    : new Pen(new SolidColorBrush(major ? Color.FromRgb(48, 57, 67) : Color.FromRgb(31, 38, 46)), 1);
+                var zPen = index == 0
+                    ? new Pen(new SolidColorBrush(Color.FromRgb(53, 94, 59)), 1.4)
+                    : new Pen(new SolidColorBrush(major ? Color.FromRgb(48, 57, 67) : Color.FromRgb(31, 38, 46)), 1);
+                drawing.DrawLine(xPen, Screen(new(-12, 0, index)), Screen(new(12, 0, index)));
+                drawing.DrawLine(zPen, Screen(new(index, 0, -12)), Screen(new(index, 0, 12)));
+            }
+        }
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        bitmap.Freeze();
+        return bitmap;
+    }
+
     public RekallAgeStudioMeshViewportFrame Render(
         RekallAgeMeshAsset mesh,
         RekallAgeGeometryDomain activeDomain,
@@ -49,7 +85,8 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
         int width,
         int height,
         bool preview,
-        RekallAgeStudioViewportCamera? camera = null)
+        RekallAgeStudioViewportCamera? camera = null,
+        RekallAgeStudioViewportRenderStyle style = RekallAgeStudioViewportRenderStyle.SmoothShaded)
     {
         ArgumentNullException.ThrowIfNull(mesh); ArgumentNullException.ThrowIfNull(selectedIds);
         if (width < 64 || width > 4096 || height < 64 || height > 4096) throw new ArgumentOutOfRangeException(nameof(width), "Mesh viewport dimensions must be 64-4096 pixels.");
@@ -116,11 +153,37 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
                 new Point(0, height / 2d + 0.5), new Point(width, height / 2d + 0.5));
             drawing.DrawLine(new Pen(new SolidColorBrush(Color.FromRgb(52, 91, 57)), 1),
                 new Point(width / 2d + 0.5, 0), new Point(width / 2d + 0.5, height));
-            var faceBrush = new SolidColorBrush(preview ? Color.FromArgb(165, 57, 102, 112) : Color.FromArgb(165, 38, 67, 91));
+            var faceBrush = new SolidColorBrush(style switch
+            {
+                RekallAgeStudioViewportRenderStyle.Textured => Color.FromArgb(225, 47, 78, 103),
+                RekallAgeStudioViewportRenderStyle.FlatShaded => Color.FromArgb(255, 72, 91, 108),
+                RekallAgeStudioViewportRenderStyle.Wireframe => Colors.Transparent,
+                RekallAgeStudioViewportRenderStyle.Clay => Color.FromRgb(171, 157, 139),
+                _ => preview ? Color.FromArgb(190, 57, 102, 112) : Color.FromArgb(205, 38, 67, 91)
+            });
             var selectedFaceBrush = new SolidColorBrush(Color.FromArgb(205, 38, 157, 181));
-            var outline = new Pen(new SolidColorBrush(Color.FromRgb(86, 108, 132)), 1);
+            var outline = new Pen(new SolidColorBrush(style switch
+            {
+                RekallAgeStudioViewportRenderStyle.Wireframe => Color.FromRgb(221, 232, 244),
+                RekallAgeStudioViewportRenderStyle.Clay => Color.FromRgb(111, 101, 91),
+                RekallAgeStudioViewportRenderStyle.FlatShaded => Color.FromRgb(54, 66, 77),
+                RekallAgeStudioViewportRenderStyle.Textured => Color.FromRgb(79, 132, 171),
+                _ => Color.FromRgb(86, 108, 132)
+            }), style == RekallAgeStudioViewportRenderStyle.Wireframe ? 2 : 1);
             foreach (var face in faces)
-                drawing.DrawGeometry(activeDomain == RekallAgeGeometryDomain.Face && selected.Contains(face.Id) ? selectedFaceBrush : faceBrush, outline, Polygon(face.Polygon));
+            {
+                var brush = activeDomain == RekallAgeGeometryDomain.Face && selected.Contains(face.Id)
+                    ? selectedFaceBrush
+                    : style == RekallAgeStudioViewportRenderStyle.FlatShaded
+                        ? new SolidColorBrush(FlatShade(face.Id))
+                        : faceBrush;
+                drawing.DrawGeometry(brush, outline, Polygon(face.Polygon));
+                if (style == RekallAgeStudioViewportRenderStyle.Textured)
+                {
+                    var center = Center(face.Polygon);
+                    drawing.DrawEllipse(new SolidColorBrush(Color.FromArgb(85, 89, 175, 196)), null, center, 7, 7);
+                }
+            }
             foreach (var edge in edges)
             {
                 var highlighted = activeDomain == RekallAgeGeometryDomain.Edge && selected.Contains(edge.Id);
@@ -152,6 +215,12 @@ internal sealed class RekallAgeStudioMeshViewportRenderer
         }
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); bitmap.Render(visual); bitmap.Freeze();
         return new(bitmap, centers, preview, faces, edges, points, corners, scale, gizmo, activeCamera);
+    }
+
+    private static Color FlatShade(ulong faceId)
+    {
+        var step = (byte)(faceId % 4 * 13);
+        return Color.FromRgb((byte)(77 + step), (byte)(91 + step), (byte)(104 + step));
     }
 
     public RekallAgeStudioMeshTransformGesture? BeginTransform(RekallAgeStudioMeshViewportFrame frame, double x, double y)

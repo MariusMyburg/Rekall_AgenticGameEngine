@@ -113,6 +113,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly Dictionary<RekallAgeStudioInspectorPropertyEditorModel, InspectorPropertyEditorKey> _inspectorPropertyEditorKeys = [];
     private readonly List<RekallAgeStudioInspectorComponentEditorModel> _allInspectorComponentEditors = [];
     private RekallAgeStudioModelingGraphCanvasFrame? _modelingGraphCanvasFrame;
+    private RekallAgeStudioModelingGraphCanvasView _modelingGraphCanvasView = RekallAgeStudioModelingGraphCanvasView.Identity;
+    private bool _modelingGraphCanvasNeedsFrame;
     private string? _modelingGraphDragNodeId;
     private System.Windows.Point _modelingGraphDragOrigin;
     private System.Windows.Point _modelingGraphDragStart;
@@ -229,10 +231,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private bool _extendMeshSelection;
     private bool _toggleMeshSelection;
     private BitmapSource? _meshViewportImage;
+    private string _meshViewportRenderStyle = "Smooth shaded";
     private string? _selectedModelingGraphAssetId;
     private string? _selectedModelingGraphOutput;
     private string _modelingGraphSummary = "Open a procedural graph to inspect its nodes and evaluation evidence.";
     private BitmapSource? _modelingGraphViewportImage;
+    private string _modelingGraphViewportRenderStyle = "Smooth shaded";
     private RekallAgeStudioModelingGraphNodeView? _selectedModelingGraphNode;
     private string? _selectedMaterialGraphAssetId;
     private string _materialGraphSummary = "Open a material graph to inspect its node contracts.";
@@ -246,10 +250,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string? _lastWebPublishPath;
     private string _statusText = "Create or open a Rekall AGE project to begin.";
     private string _viewportTitle = "Viewport";
-    private string _viewportSummary = "No rendered frame yet.";
-    private string _viewportBackendLabel = "Vulkan · unavailable";
+    private string _viewportSummary = "Open or create a project to begin.";
+    private string _viewportBackendLabel = "Vulkan · idle";
     private bool _viewportAvailable;
-    private string _viewportUnavailableReason = "Vulkan is unavailable until the World viewport surface is ready.";
+    private string _viewportUnavailableReason = string.Empty;
+    private string _worldViewportRenderStyle = "Textured";
     private RekallAgeStudioViewportInteractionSnapshot? _viewportInteraction;
     private RekallAgeStudioSceneGizmo? _sceneGizmo;
     private RekallAgeStudioTransformGesture? _sceneTransformGesture;
@@ -509,6 +514,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _addAnimationMixerLayerCommand = CreateAsyncCommand(
             () => { AnimationMixerLayers.Add(new RekallAgeStudioAnimationMixerLayerModel("new-layer", string.Empty, "1", "loop", "1")); RefreshCommands(); return Task.CompletedTask; },
             () => AnimationMixerIsOpen);
+        RefreshMeshEditingState();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -1207,6 +1213,28 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         private set => Set(ref _meshViewportImage, value);
     }
 
+    public IReadOnlyList<string> ViewportRenderStyles => RekallAgeStudioViewportRenderStyles.Labels;
+
+    public string WorldViewportRenderStyle
+    {
+        get => _worldViewportRenderStyle;
+        set
+        {
+            if (!Set(ref _worldViewportRenderStyle, value)) return;
+            _previewSession.SetRenderStyle(RekallAgeStudioViewportRenderStyles.Parse(value));
+        }
+    }
+
+    public string MeshViewportRenderStyle
+    {
+        get => _meshViewportRenderStyle;
+        set
+        {
+            if (!Set(ref _meshViewportRenderStyle, value)) return;
+            RefreshMeshEditingState();
+        }
+    }
+
     public string? SelectedModelingGraphAssetId
     {
         get => _selectedModelingGraphAssetId;
@@ -1229,6 +1257,16 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         get => _modelingGraphViewportImage;
         private set => Set(ref _modelingGraphViewportImage, value);
+    }
+
+    public string ModelingGraphViewportRenderStyle
+    {
+        get => _modelingGraphViewportRenderStyle;
+        set
+        {
+            if (!Set(ref _modelingGraphViewportRenderStyle, value)) return;
+            RefreshModelingGraphOutputViewport();
+        }
     }
 
     public RekallAgeStudioModelingGraphNodeView? SelectedModelingGraphNode
@@ -2406,6 +2444,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         ModelingGraphSummary = _modelingGraph.EvaluationSummary;
         SelectedModelingGraphNode = ModelingGraphNodes.FirstOrDefault();
         _modelingGraphNodePositions.Clear();
+        _modelingGraphCanvasNeedsFrame = true;
         _modelingGraphPendingLinkPort = null;
         RefreshModelingGraphCanvas();
     });
@@ -2417,15 +2456,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         Replace(ModelingGraphDiagnosticLines, report.Diagnostics.Select(item =>
             $"{item.Severity}: {item.Code}{(item.NodeId is null ? string.Empty : $" [{item.NodeId}]")} - {item.Message}"));
         ModelingGraphSummary = _modelingGraph.EvaluationSummary;
-        ModelingGraphViewportImage = _modelingGraph.OutputMesh is null
-            ? null
-            : _meshViewportRenderer.Render(
-                _modelingGraph.OutputMesh,
-                RekallAgeGeometryDomain.Face,
-                [],
-                640,
-                360,
-                preview: false).Image;
+        RefreshModelingGraphOutputViewport();
         RefreshModelingGraphCanvas();
     });
 
@@ -2451,18 +2482,24 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             foreach (var diagnostic in evaluation.Diagnostics)
                 ModelingGraphDiagnosticLines.Add($"{diagnostic.Severity}: {diagnostic.Code}{(diagnostic.NodeId is null ? string.Empty : $" [{diagnostic.NodeId}]")} - {diagnostic.Message}");
             ModelingGraphSummary = _modelingGraph.EvaluationSummary;
-            ModelingGraphViewportImage = _modelingGraph.OutputMesh is null
-                ? null
-                : _meshViewportRenderer.Render(
-                    _modelingGraph.OutputMesh,
-                    RekallAgeGeometryDomain.Face,
-                    [],
-                    640,
-                    360,
-                    preview: false).Image;
+            RefreshModelingGraphOutputViewport();
         }
         RefreshModelingGraphCanvas();
     });
+
+    private void RefreshModelingGraphOutputViewport()
+    {
+        ModelingGraphViewportImage = _modelingGraph.OutputMesh is null
+            ? null
+            : _meshViewportRenderer.Render(
+                _modelingGraph.OutputMesh,
+                RekallAgeGeometryDomain.Face,
+                [],
+                640,
+                360,
+                preview: false,
+                style: RekallAgeStudioViewportRenderStyles.Parse(ModelingGraphViewportRenderStyle)).Image;
+    }
 
     /// <summary>Re-renders the node-graph canvas from the current graph, auto-laying-out any node without a remembered position.</summary>
     private void RefreshModelingGraphCanvas()
@@ -2479,13 +2516,55 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             _modelingGraphNodePositions.Remove(staleId);
         foreach (var (nodeId, position) in RekallAgeStudioModelingGraphLayout.ComputeDefaultPositions(graph.Nodes, graph.Links))
             _modelingGraphNodePositions.TryAdd(nodeId, position);
+        if (_modelingGraphCanvasNeedsFrame)
+        {
+            FrameModelingGraphCanvasView();
+            _modelingGraphCanvasNeedsFrame = false;
+        }
         _modelingGraphCanvasFrame = _modelingGraphCanvasRenderer.Render(
             graph.Nodes, graph.Links, _modelingGraphNodePositions, _modelingGraphCatalog,
-            SelectedModelingGraphNode?.NodeId, 640, 360);
+            SelectedModelingGraphNode?.NodeId, 640, 360, _modelingGraphCanvasView);
         OnPropertyChanged(nameof(ModelingGraphCanvasImage));
+        OnPropertyChanged(nameof(ModelingGraphCanvasZoomLabel));
     }
 
     public BitmapSource? ModelingGraphCanvasImage => _modelingGraphCanvasFrame?.Image;
+    public string ModelingGraphCanvasZoomLabel => $"{_modelingGraphCanvasView.Zoom * 100:0}%";
+
+    public void PanModelingGraphCanvas(double normalizedDeltaX, double normalizedDeltaY)
+    {
+        _modelingGraphCanvasView = _modelingGraphCanvasView.PanBy(
+            new System.Windows.Vector(normalizedDeltaX * 640, normalizedDeltaY * 360));
+        RefreshModelingGraphCanvas();
+    }
+
+    public void ZoomModelingGraphCanvas(double factor, double normalizedAnchorX, double normalizedAnchorY)
+    {
+        _modelingGraphCanvasView = _modelingGraphCanvasView.ZoomAt(
+            new System.Windows.Point(normalizedAnchorX * 640, normalizedAnchorY * 360), factor);
+        RefreshModelingGraphCanvas();
+    }
+
+    public void ResetModelingGraphCanvasView()
+    {
+        FrameModelingGraphCanvasView();
+        RefreshModelingGraphCanvas();
+    }
+
+    private void FrameModelingGraphCanvasView()
+    {
+        if (_modelingGraphNodePositions.Count == 0)
+        {
+            _modelingGraphCanvasView = RekallAgeStudioModelingGraphCanvasView.Identity;
+            return;
+        }
+        var minX = _modelingGraphNodePositions.Values.Min(point => point.X);
+        var minY = _modelingGraphNodePositions.Values.Min(point => point.Y);
+        var maxX = _modelingGraphNodePositions.Values.Max(point => point.X) + 220;
+        var maxY = _modelingGraphNodePositions.Values.Max(point => point.Y) + 150;
+        _modelingGraphCanvasView = RekallAgeStudioModelingGraphCanvasView.FitBounds(
+            new System.Windows.Rect(minX, minY, maxX - minX, maxY - minY), 640, 360, 18);
+    }
 
     /// <summary>
     /// Handles a mouse-down on the node-graph canvas: a port hit arms or completes a link
@@ -2532,7 +2611,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         if (_modelingGraphDragNodeId is not { } nodeId) return;
         var (x, y) = DenormalizeGraphCanvasPoint(normalizedX, normalizedY);
-        var delta = new System.Windows.Point(x, y) - _modelingGraphDragStart;
+        var delta = (new System.Windows.Point(x, y) - _modelingGraphDragStart) / _modelingGraphCanvasView.Zoom;
         _modelingGraphNodePositions[nodeId] = _modelingGraphDragOrigin + delta;
         RefreshModelingGraphCanvas();
     }
@@ -2711,7 +2790,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             Replace(MeshElementIds, []); Replace(MeshOperationIds, []); Replace(MeshSelectionLines, []);
             Replace(MeshAttributeSummaries, []); Replace(MeshMaterialSlotSummaries, []);
-            _meshViewportFrame = null; MeshViewportImage = null; RefreshCommands(); return;
+            _meshViewportFrame = null;
+            MeshViewportImage = _meshViewportRenderer.RenderEmpty(640, 360, _meshViewportCamera);
+            RefreshCommands();
+            return;
         }
         var mesh = _modeling.Preview?.Mesh ?? _modeling.Mesh;
         Replace(MeshAttributeSummaries, mesh.Attributes.Select(attribute =>
@@ -2735,7 +2817,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (SelectedMeshElementId is null || !MeshElementIds.Contains(SelectedMeshElementId.Value)) SelectedMeshElementId = MeshElementIds.Count == 0 ? null : MeshElementIds[0];
         Replace(MeshSelectionLines, _modeling.SelectedElementIds.Select((id, index) => $"{index + 1}. {MeshEditDomain} {id}{(id == _modeling.ActiveElementId ? " (active)" : string.Empty)}"));
         MeshSummary = $"{mesh.Name} r{mesh.Revision} · {mesh.Topology.PointIds.Count} points · {mesh.Topology.EdgeIds.Count} edges · {mesh.Topology.FaceIds.Count} faces · {_modeling.SelectedElementIds.Count} selected{(_modeling.Preview is null ? string.Empty : " · PREVIEW")}";
-        _meshViewportFrame = _meshViewportRenderer.Render(mesh, MeshEditDomain, _modeling.SelectedElementIds, 640, 360, _modeling.Preview is not null, _meshViewportCamera);
+        _meshViewportFrame = _meshViewportRenderer.Render(
+            mesh,
+            MeshEditDomain,
+            _modeling.SelectedElementIds,
+            640,
+            360,
+            _modeling.Preview is not null,
+            _meshViewportCamera,
+            RekallAgeStudioViewportRenderStyles.Parse(MeshViewportRenderStyle));
         MeshViewportImage = _meshViewportFrame.Image;
         OnPropertyChanged(nameof(MeshEditDomain)); RefreshCommands();
     }
@@ -4709,6 +4799,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (validVulkanFrame)
         {
             ViewportUnavailableReason = string.Empty;
+            if (StatusText.Contains("Vulkan is unavailable", StringComparison.OrdinalIgnoreCase))
+            {
+                StatusText = "Vulkan viewport ready.";
+            }
         }
         else
         {
@@ -4786,6 +4880,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         metrics = _previewSession.Metrics;
         if (metrics.IsPresentable) return true;
+        if (ViewportAvailable)
+        {
+            // A WPF workspace transition can briefly report a zero-sized host after the
+            // most recent Vulkan frame was already presented successfully. Keep that
+            // valid state visible; the host will supply fresh metrics on its resize tick.
+            return false;
+        }
         ViewportAvailable = false;
         ViewportBackendLabel = "Vulkan · unavailable";
         ViewportUnavailableReason = "Vulkan is unavailable until the World viewport surface has a positive physical size.";

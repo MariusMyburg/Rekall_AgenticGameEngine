@@ -266,10 +266,13 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
             _sceneSupersampleFactor,
             _presentTextureLayout);
         var sceneShaderSet = new ShaderSetDescription([sceneVertexLayout], sceneShaders);
+        var sceneRasterizer = options.RenderStyle == RekallAgeVulkanPresentationRenderStyle.Wireframe
+            ? new RasterizerStateDescription(FaceCullMode.None, PolygonFillMode.Wireframe, FrontFace.Clockwise, true, false)
+            : RasterizerStateDescription.CullNone;
         _scenePipeline = _factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             RekallAgeVeldridBlendStates.SceneCoverage,
             DepthStencilStateDescription.DepthOnlyLessEqual,
-            RasterizerStateDescription.CullNone,
+            sceneRasterizer,
             PrimitiveTopology.TriangleList,
             sceneShaderSet,
             [_frameLayout, _drawLayout, _materialLayout],
@@ -277,7 +280,7 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
         _sceneTransparentPipeline = _factory.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             RekallAgeVeldridBlendStates.SceneCoverage,
             new DepthStencilStateDescription(true, false, ComparisonKind.LessEqual),
-            RasterizerStateDescription.CullNone,
+            sceneRasterizer,
             PrimitiveTopology.TriangleList,
             sceneShaderSet,
             [_frameLayout, _drawLayout, _materialLayout],

@@ -40,6 +40,6 @@ No software can guarantee absolute security. Keep provider credentials private, 
 
 ## Contact
 
-Privacy and support requests can be filed through the public Rekall AGE issue tracker:
+Privacy and support requests can be submitted through the Rekall Software Solutions website:
 
-https://github.com/MariusMyburg/Rekall_AgenticGameEngine/issues
+https://rekall-ai.com

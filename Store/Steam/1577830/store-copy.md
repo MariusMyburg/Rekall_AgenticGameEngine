@@ -12,11 +12,11 @@ Publisher: Rekall
 
 Current product version: `0.1.0-preview.1`
 
-Website: https://github.com/MariusMyburg/Rekall_AgenticGameEngine
+Website: https://rekall-ai.com
 
-Support: https://github.com/MariusMyburg/Rekall_AgenticGameEngine/issues
+Support: https://rekall-ai.com
 
-Privacy policy: https://github.com/MariusMyburg/Rekall_AgenticGameEngine/blob/master/Store/Steam/1577830/privacy-policy.md
+Privacy policy: Not yet published on the public website. Do not use a private repository URL in Steam.
 
 ## Product name
 

@@ -2,7 +2,7 @@
 
 Rekall AGE is an Early Access developer preview. Support and reproducible bug reports are handled through:
 
-- GitHub issues: https://github.com/MariusMyburg/Rekall_AgenticGameEngine/issues
+- Support website: https://rekall-ai.com
 - Steam Discussions for app 1577830 after the community hub is enabled
 
 ## Before filing a report

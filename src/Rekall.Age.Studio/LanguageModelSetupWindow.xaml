@@ -1,0 +1,192 @@
+<Window x:Class="Rekall.Age.Studio.LanguageModelSetupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:studio="clr-namespace:Rekall.Age.Studio"
+        Title="Set up AI authoring" Width="760" MinWidth="640"
+        SizeToContent="Height" MaxHeight="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{StaticResource WorkbenchBackground}" Foreground="{StaticResource WorkbenchText}"
+        Closing="OnClosing">
+    <Window.Resources>
+        <Style x:Key="WizardStepPanel" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed" />
+        </Style>
+        <Style x:Key="ProviderCard" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="MinWidth" Value="190" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+        </Style>
+        <Style x:Key="WizardAction" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="MinWidth" Value="108" />
+            <Setter Property="Padding" Value="14,7" />
+        </Style>
+        <Style x:Key="BackWizardAction" TargetType="Button" BasedOn="{StaticResource WizardAction}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CurrentStep}" Value="{x:Static studio:RekallAgeStudioLanguageModelSetupStep.Welcome}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="NextWizardAction" TargetType="Button" BasedOn="{StaticResource WizardAction}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CurrentStep}" Value="{x:Static studio:RekallAgeStudioLanguageModelSetupStep.Summary}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="FinishWizardAction" TargetType="Button" BasedOn="{StaticResource AccentButton}">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Setter Property="MinWidth" Value="108" />
+            <Setter Property="Padding" Value="14,7" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CurrentStep}" Value="{x:Static studio:RekallAgeStudioLanguageModelSetupStep.Summary}">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Margin="0,0,0,16">
+            <TextBlock Text="REKALL AGE AI AUTHORING" Style="{StaticResource SectionLabel}" Foreground="{StaticResource Accent}" />
+            <TextBlock Text="Choose how Studio should reach your language model"
+                       FontSize="24" FontWeight="SemiBold" Margin="0,5,0,4" TextWrapping="Wrap" />
+            <TextBlock Text="You can safely defer this and configure it later from Settings."
+                       Foreground="{StaticResource MutedText}" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      CanContentScroll="True" Focusable="False">
+            <Grid Margin="0,0,8,0">
+                <StackPanel x:Name="WelcomeStepPanel">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel" BasedOn="{StaticResource WizardStepPanel}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentStep}" Value="{x:Static studio:RekallAgeStudioLanguageModelSetupStep.Welcome}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <Border Style="{StaticResource EditorPanel}" CornerRadius="5" Padding="18">
+                        <StackPanel>
+                            <TextBlock Text="Welcome" FontSize="18" FontWeight="SemiBold" />
+                            <TextBlock Margin="0,7,0,0" TextWrapping="Wrap" Foreground="{StaticResource MutedText}"
+                                       Text="Set up a local model, an API provider, or your Codex account. Studio checks readiness before it saves a finished setup." />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel x:Name="ProviderStepPanel">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel" BasedOn="{StaticResource WizardStepPanel}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentStep}" Value="{x:Static studio:RekallAgeStudioLanguageModelSetupStep.Provider}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <StackPanel>
+                        <TextBlock Text="Choose a provider" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10" />
+                        <TextBlock Text="LOCAL" Style="{StaticResource SectionLabel}" Margin="0,0,0,6" />
+                        <WrapPanel>
+                            <Button Style="{StaticResource ProviderCard}" Tag="ollama" Click="OnProviderCardClick"
+                                    ToolTip="Use an Ollama model installed on this PC" AutomationProperties.Name="Choose local Ollama">
+                                <StackPanel><TextBlock Text="Ollama" FontWeight="SemiBold" /><TextBlock Text="Installed models" Foreground="{StaticResource MutedText}" /></StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource ProviderCard}" Tag="gguf" Click="OnProviderCardClick"
+                                    ToolTip="Import a local GGUF model through Ollama" AutomationProperties.Name="Choose local GGUF">
+                                <StackPanel><TextBlock Text="GGUF through Ollama" FontWeight="SemiBold" /><TextBlock Text="A local model file" Foreground="{StaticResource MutedText}" /></StackPanel>
+                            </Button>
+                        </WrapPanel>
+                        <TextBlock Text="API" Style="{StaticResource SectionLabel}" Margin="0,10,0,6" />
+                        <WrapPanel>
+                            <Button Style="{StaticResource ProviderCard}" Tag="openai" Click="OnProviderCardClick"
+                                    ToolTip="Connect with an OpenAI API key" AutomationProperties.Name="Choose OpenAI API">
+                                <StackPanel><TextBlock Text="OpenAI" FontWeight="SemiBold" /><TextBlock Text="API key connection" Foreground="{StaticResource MutedText}" /></StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource ProviderCard}" Tag="kimi" Click="OnProviderCardClick"
+                                    ToolTip="Connect with a Kimi API key" AutomationProperties.Name="Choose Kimi API">
+                                <StackPanel><TextBlock Text="Kimi" FontWeight="SemiBold" /><TextBlock Text="Moonshot API key" Foreground="{StaticResource MutedText}" /></StackPanel>
+                            </Button>
+                        </WrapPanel>
+                        <TextBlock Text="ACCOUNT" Style="{StaticResource SectionLabel}" Margin="0,10,0,6" />
+                        <WrapPanel>
+                            <Button Style="{StaticResource ProviderCard}" Tag="codex" Click="OnProviderCardClick"
+                                    ToolTip="Use your Codex account" AutomationProperties.Name="Choose Codex account">
+                                <StackPanel><TextBlock Text="Codex" FontWeight="SemiBold" /><TextBlock Text="ChatGPT account" Foreground="{StaticResource MutedText}" /></StackPanel>
+                            </Button>
+                        </WrapPanel>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel x:Name="ConfigurationStepPanel">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel" BasedOn="{StaticResource WizardStepPanel}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentStep}" Value="{x:Static studio:RekallAgeStudioLanguageModelSetupStep.Configuration}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <StackPanel>
+                        <TextBlock Text="Configure the selected provider" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10" />
+                        <Border x:Name="OllamaConfigurationPanel" Padding="14" CornerRadius="5">
+                            <Border.Style>
+                                <Style TargetType="Border" BasedOn="{StaticResource EditorPanel}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding CurrentStep}" Value="{x:Static studio:RekallAgeStudioLanguageModelSetupStep.Configuration}" /><Condition Binding="{Binding IsOllamaSelected}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style>
+                            </Border.Style>
+                            <StackPanel><TextBlock Text="Local Ollama" FontWeight="SemiBold" /><TextBlock Text="Ollama URL" Style="{StaticResource SectionLabel}" Margin="0,10,0,5" /><TextBox Text="{Binding OllamaUrl, UpdateSourceTrigger=PropertyChanged}" ToolTip="The local Ollama server address" AutomationProperties.Name="Ollama server URL" /><Button Content="Open Ollama download" Tag="https://ollama.com/download" Click="OnOpenProviderPageClick" HorizontalAlignment="Left" ToolTip="Open the official Ollama download page" AutomationProperties.Name="Open Ollama download page" /></StackPanel>
+                        </Border>
+                        <Border x:Name="GgufConfigurationPanel" Padding="14" CornerRadius="5">
+                            <Border.Style><Style TargetType="Border" BasedOn="{StaticResource EditorPanel}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding CurrentStep}" Value="{x:Static studio:RekallAgeStudioLanguageModelSetupStep.Configuration}" /><Condition Binding="{Binding IsGgufSelected}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></Border.Style>
+                            <StackPanel><TextBlock Text="Local GGUF via Ollama" FontWeight="SemiBold" /><TextBlock Text="Choose a GGUF file to import through your local Ollama installation." Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,5,0,8" /><Button Content="Browse for GGUF…" Click="OnBrowseGgufClick" HorizontalAlignment="Left" ToolTip="Choose a GGUF model file" AutomationProperties.Name="Browse for a GGUF model" /><TextBlock x:Name="GgufSelectionStatus" Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,0" /></StackPanel>
+                        </Border>
+                        <Border x:Name="OpenAiConfigurationPanel" Padding="14" CornerRadius="5">
+                            <Border.Style><Style TargetType="Border" BasedOn="{StaticResource EditorPanel}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding CurrentStep}" Value="{x:Static studio:RekallAgeStudioLanguageModelSetupStep.Configuration}" /><Condition Binding="{Binding IsOpenAiSelected}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></Border.Style>
+                            <StackPanel><TextBlock Text="OpenAI API" FontWeight="SemiBold" /><TextBlock Text="API endpoint" Style="{StaticResource SectionLabel}" Margin="0,10,0,5" /><TextBox Text="{Binding OpenAiUrl, UpdateSourceTrigger=PropertyChanged}" ToolTip="The OpenAI-compatible API endpoint" AutomationProperties.Name="OpenAI API endpoint" /><TextBlock Text="API key" Style="{StaticResource SectionLabel}" Margin="0,10,0,5" /><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><PasswordBox x:Name="OpenAiApiKeyInput" PasswordChar="●" Padding="7,5" ToolTip="Enter an OpenAI API key" AutomationProperties.Name="OpenAI API key" /><Button Grid.Column="1" Content="Apply key" Click="OnApplyOpenAiKeyClick" MinWidth="108" Padding="14,7" ToolTip="Apply the key to this Studio session" AutomationProperties.Name="Apply OpenAI API key" /></Grid><CheckBox x:Name="RememberOpenAiKey" Content="Remember securely on this PC" IsChecked="False" Margin="0,8,0,0" ToolTip="Store this key using Windows protection" AutomationProperties.Name="Remember OpenAI key securely" /><Button Content="Open OpenAI API keys" Tag="https://platform.openai.com/api-keys" Click="OnOpenProviderPageClick" HorizontalAlignment="Left" ToolTip="Open the official OpenAI API keys page" AutomationProperties.Name="Open OpenAI API keys page" /></StackPanel>
+                        </Border>
+                        <Border x:Name="KimiConfigurationPanel" Padding="14" CornerRadius="5">
+                            <Border.Style><Style TargetType="Border" BasedOn="{StaticResource EditorPanel}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding CurrentStep}" Value="{x:Static studio:RekallAgeStudioLanguageModelSetupStep.Configuration}" /><Condition Binding="{Binding IsKimiSelected}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></Border.Style>
+                            <StackPanel><TextBlock Text="Kimi API" FontWeight="SemiBold" /><TextBlock Text="API endpoint" Style="{StaticResource SectionLabel}" Margin="0,10,0,5" /><TextBox Text="{Binding KimiUrl, UpdateSourceTrigger=PropertyChanged}" ToolTip="The Kimi API endpoint" AutomationProperties.Name="Kimi API endpoint" /><TextBlock Text="API key" Style="{StaticResource SectionLabel}" Margin="0,10,0,5" /><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><PasswordBox x:Name="KimiApiKeyInput" PasswordChar="●" Padding="7,5" ToolTip="Enter a Kimi API key" AutomationProperties.Name="Kimi API key" /><Button Grid.Column="1" Content="Apply key" Click="OnApplyKimiKeyClick" MinWidth="108" Padding="14,7" ToolTip="Apply the key to this Studio session" AutomationProperties.Name="Apply Kimi API key" /></Grid><CheckBox x:Name="RememberKimiKey" Content="Remember securely on this PC" IsChecked="False" Margin="0,8,0,0" ToolTip="Store this key using Windows protection" AutomationProperties.Name="Remember Kimi key securely" /><Button Content="Open Kimi console" Tag="https://platform.moonshot.ai/console/api-keys" Click="OnOpenProviderPageClick" HorizontalAlignment="Left" ToolTip="Open the official Kimi provider page" AutomationProperties.Name="Open Kimi console" /></StackPanel>
+                        </Border>
+                        <Border x:Name="CodexConfigurationPanel" Padding="14" CornerRadius="5">
+                            <Border.Style><Style TargetType="Border" BasedOn="{StaticResource EditorPanel}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding CurrentStep}" Value="{x:Static studio:RekallAgeStudioLanguageModelSetupStep.Configuration}" /><Condition Binding="{Binding IsCodexSelected}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></Border.Style>
+                            <StackPanel><TextBlock Text="Codex account" FontWeight="SemiBold" /><TextBlock Text="Sign in through your Codex account, then retry the readiness check." Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,5,0,8" /><Button Content="Open Codex" Tag="https://chatgpt.com/codex" Click="OnOpenProviderPageClick" HorizontalAlignment="Left" ToolTip="Open the Codex account page" AutomationProperties.Name="Open Codex account page" /></StackPanel>
+                        </Border>
+                        <Button Content="Retry readiness check" Command="{Binding RetryCommand}" HorizontalAlignment="Left" MinWidth="170" Padding="14,7" ToolTip="Check the selected provider again" AutomationProperties.Name="Retry provider readiness" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel x:Name="ModelStepPanel">
+                    <StackPanel.Style><Style TargetType="StackPanel" BasedOn="{StaticResource WizardStepPanel}"><Style.Triggers><DataTrigger Binding="{Binding CurrentStep}" Value="{x:Static studio:RekallAgeStudioLanguageModelSetupStep.Model}"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+                    <StackPanel><TextBlock Text="Choose a model" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10" /><Border Style="{StaticResource EditorPanel}" Padding="14" CornerRadius="5"><StackPanel><TextBlock Text="MODEL" Style="{StaticResource SectionLabel}" /><ComboBox ItemsSource="{Binding CompatibleModels}" SelectedItem="{Binding SelectedModelId, Mode=TwoWay}" Margin="0,6,0,12" ToolTip="Choose a model compatible with the selected provider" AutomationProperties.Name="Language model" /><TextBlock Text="REASONING EFFORT" Style="{StaticResource SectionLabel}" /><ComboBox ItemsSource="{Binding ReasoningEfforts}" SelectedItem="{Binding ReasoningEffort, Mode=TwoWay}" Margin="0,6,0,0" ToolTip="Choose the model reasoning effort" AutomationProperties.Name="Reasoning effort" /></StackPanel></Border></StackPanel>
+                </StackPanel>
+
+                <StackPanel x:Name="SummaryStepPanel">
+                    <StackPanel.Style><Style TargetType="StackPanel" BasedOn="{StaticResource WizardStepPanel}"><Style.Triggers><DataTrigger Binding="{Binding CurrentStep}" Value="{x:Static studio:RekallAgeStudioLanguageModelSetupStep.Summary}"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+                    <StackPanel><TextBlock Text="Review readiness" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10" /><Border Style="{StaticResource EditorPanel}" Padding="14" CornerRadius="5"><StackPanel><TextBlock Text="{Binding ReadinessSummary}" TextWrapping="Wrap" Margin="0,0,0,10" /><ItemsControl ItemsSource="{Binding ReadinessRows}"><ItemsControl.ItemTemplate><DataTemplate><Grid Margin="0,3"><Grid.ColumnDefinitions><ColumnDefinition Width="26" /><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Grid.Column="0" Text="{Binding StatusGlyph}" FontWeight="Bold" AutomationProperties.Name="Readiness status glyph" /><TextBlock Grid.Column="1" Text="{Binding Label}" FontWeight="SemiBold" /><TextBlock Grid.Column="2" Text="{Binding Detail}" Foreground="{StaticResource MutedText}" TextWrapping="Wrap" /></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel></Border></StackPanel>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+        <Grid Grid.Row="2" Margin="0,16,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+            <Button Grid.Column="0" Content="Set up later" IsCancel="True" Click="OnSetUpLaterClick" Style="{StaticResource WizardAction}"
+                    HorizontalAlignment="Left" ToolTip="Save this setup as incomplete and return to Studio" AutomationProperties.Name="Set up language model later" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="Back" Command="{Binding BackCommand}" Style="{StaticResource BackWizardAction}" ToolTip="Return to the previous setup step" AutomationProperties.Name="Previous setup step" />
+                <Button Content="Next" Command="{Binding NextCommand}" IsDefault="True" Style="{StaticResource NextWizardAction}" ToolTip="Continue to the next setup step" AutomationProperties.Name="Next setup step" />
+                <Button Content="Finish" Click="OnFinishClick" IsDefault="True" Style="{StaticResource FinishWizardAction}" ToolTip="Save a ready language-model setup" AutomationProperties.Name="Finish language model setup" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

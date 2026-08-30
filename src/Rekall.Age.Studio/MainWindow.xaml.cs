@@ -12,6 +12,11 @@ namespace Rekall.Age.Studio;
 
 public partial class MainWindow : Window
 {
+    public static RoutedUICommand OpenDocumentationCommand { get; } = new(
+        "Open Documentation",
+        nameof(OpenDocumentationCommand),
+        typeof(MainWindow));
+
     private readonly RekallAgeStudioViewModel _viewModel;
     private readonly IRekallAgeStudioLayoutStore _layoutStore = new RekallAgeStudioLayoutStore();
     private readonly RekallAgeStudioExampleCatalog _exampleCatalog = RekallAgeStudioExampleCatalog.CreateDefault();
@@ -365,6 +370,30 @@ public partial class MainWindow : Window
     }
 
     private void OnExitClick(object sender, RoutedEventArgs e) => Close();
+
+    private void OnOpenDocumentationExecuted(object sender, ExecutedRoutedEventArgs e)
+    {
+        try
+        {
+            RekallAgeStudioDocumentation.Open(AppContext.BaseDirectory);
+        }
+        catch (Exception exception) when (exception is IOException or InvalidOperationException or Win32Exception)
+        {
+            Log.Error(exception, "Could not open the bundled Studio documentation");
+            var message = exception is FileNotFoundException
+                ? exception.Message
+                : $"Windows could not open the documentation in your default browser. " +
+                  $"You can open the file directly at:{Environment.NewLine}{Environment.NewLine}" +
+                  $"{RekallAgeStudioDocumentation.ResolvePath(AppContext.BaseDirectory)}" +
+                  $"{Environment.NewLine}{Environment.NewLine}{exception.Message}";
+            MessageBox.Show(
+                this,
+                message,
+                "Documentation unavailable",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
 
     private void PopulateExamplesMenu()
     {

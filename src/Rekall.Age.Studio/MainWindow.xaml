@@ -5,6 +5,13 @@
         Title="Rekall AGE Studio" Width="1500" Height="940" MinWidth="1120" MinHeight="700"
         Background="{StaticResource WorkbenchBackground}" Foreground="{StaticResource WorkbenchText}"
         FontFamily="Segoe UI" UseLayoutRounding="True">
+    <Window.CommandBindings>
+        <CommandBinding Command="{x:Static local:MainWindow.OpenDocumentationCommand}"
+                        Executed="OnOpenDocumentationExecuted" />
+    </Window.CommandBindings>
+    <Window.InputBindings>
+        <KeyBinding Key="F1" Command="{x:Static local:MainWindow.OpenDocumentationCommand}" />
+    </Window.InputBindings>
     <Window.Resources>
         <local:RekallAgeStudioColorBrushConverter x:Key="InspectorColorBrushConverter" />
 
@@ -140,6 +147,10 @@
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>
             <MenuItem x:Name="ExamplesMenu" Header="_Examples" />
+            <MenuItem Header="_Help">
+                <MenuItem Header="_Documentation" InputGestureText="F1"
+                          Command="{x:Static local:MainWindow.OpenDocumentationCommand}" />
+            </MenuItem>
         </Menu>
         <Border x:Name="ProjectBar" DockPanel.Dock="Top" Background="{StaticResource ChromeBackground}" Padding="12,9" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">
             <Grid>

@@ -35,6 +35,12 @@
     <StudioExampleFile Include="$(MSBuildProjectDirectory)\..\..\Examples\**\*"
                        Exclude="$(MSBuildProjectDirectory)\..\..\Examples\**\.git\**;$(MSBuildProjectDirectory)\..\..\Examples\**\.rekall\**;$(MSBuildProjectDirectory)\..\..\Examples\**\.vs\**;$(MSBuildProjectDirectory)\..\..\Examples\**\bin\**;$(MSBuildProjectDirectory)\..\..\Examples\**\Builds\**;$(MSBuildProjectDirectory)\..\..\Examples\**\Captures\**;$(MSBuildProjectDirectory)\..\..\Examples\**\obj\**;$(MSBuildProjectDirectory)\..\..\Examples\**\TestResults\**" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Documentation\Rekall-AGE-Documentation.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
   <Target Name="CopyBundledExamples" AfterTargets="Publish">
     <Copy SourceFiles="@(StudioExampleFile)"
           DestinationFiles="@(StudioExampleFile->'$(PublishDir)Examples\%(RecursiveDir)%(Filename)%(Extension)')"

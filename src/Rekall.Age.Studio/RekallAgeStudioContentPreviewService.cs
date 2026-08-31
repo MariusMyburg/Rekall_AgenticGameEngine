@@ -1,12 +1,83 @@
 using System.IO;
-using System.Numerics;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Rekall.Age.Editor.Contracts;
 using Rekall.Age.Rendering;
+using Rekall.Age.Modeling.Contracts;
 
 namespace Rekall.Age.Studio;
+
+public sealed class RekallAgeStudioContentCardModel : INotifyPropertyChanged
+{
+    private RekallAgeContentBrowserItem _item;
+    private ImageSource? _thumbnail;
+    private string _previewHealth;
+    private string? _previewSummary;
+    private long _generation;
+
+    internal RekallAgeStudioContentCardModel(RekallAgeContentBrowserItem item)
+    {
+        _item = item;
+        _previewHealth = item.Health;
+    }
+
+    internal RekallAgeContentBrowserItem Item => _item;
+    public string Id => _item.Id;
+    public string DisplayName => _item.DisplayName;
+    public string Family => _item.Family;
+    public string Kind => _item.Kind;
+    public string Origin => _item.Origin;
+    public string? Path => _item.Path;
+    public string Health => _item.Health;
+    public string? Diagnostic => _item.Diagnostic;
+    public ImageSource? Thumbnail { get => _thumbnail; private set => Set(ref _thumbnail, value); }
+    public string PreviewHealth { get => _previewHealth; private set => Set(ref _previewHealth, value); }
+    public string? PreviewSummary { get => _previewSummary; private set => Set(ref _previewSummary, value); }
+
+    internal void Update(RekallAgeContentBrowserItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        if (!item.Id.Equals(_item.Id, StringComparison.Ordinal))
+            throw new ArgumentException("A content card identity cannot change.", nameof(item));
+        var revisionChanged = !string.Equals(item.Revision, _item.Revision, StringComparison.Ordinal);
+        _item = item;
+        Interlocked.Increment(ref _generation);
+        if (revisionChanged)
+        {
+            Thumbnail = null;
+            PreviewHealth = item.Health;
+            PreviewSummary = null;
+        }
+        OnPropertyChanged(string.Empty);
+    }
+
+    internal async Task LoadPreviewAsync(
+        IRekallAgeStudioContentPreviewService service, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        var item = _item;
+        var generation = Volatile.Read(ref _generation);
+        var preview = await service.GetAsync(item, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (generation != Volatile.Read(ref _generation)
+            || !string.Equals(item.Revision, _item.Revision, StringComparison.Ordinal)) return;
+        Thumbnail = preview.Thumbnail;
+        PreviewHealth = preview.Health;
+        PreviewSummary = preview.Summary;
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+        field = value; OnPropertyChanged(name); return true;
+    }
+    private void OnPropertyChanged([CallerMemberName] string? name = null) =>
+        PropertyChanged?.Invoke(this, new(name));
+}
 
 public sealed record RekallAgeStudioContentPreview(
     string ContentId,
@@ -163,50 +234,21 @@ internal sealed class RekallAgeStudioImportedModelPreviewAdapter : IRekallAgeStu
         var path = item.Path ?? throw new InvalidDataException("Model path is unavailable.");
         var meshes = await new RekallAgeGlbMeshLoader().LoadAsync(item.Id, path, cancellationToken).ConfigureAwait(false);
         if (meshes.Count == 0) throw new InvalidDataException("Model has no renderable geometry.");
-        return await Task.Run<ImageSource>(() => Render(meshes, maximumDimension, cancellationToken), cancellationToken)
+        return await Task.Run<ImageSource>(() => Render(item, meshes, maximumDimension, cancellationToken), cancellationToken)
             .ConfigureAwait(false);
     }
 
     private static BitmapSource Render(
-        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes, int size, CancellationToken cancellationToken)
+        RekallAgeContentBrowserItem item,
+        IReadOnlyList<RekallAgeVulkanSceneMesh> meshes,
+        int size,
+        CancellationToken cancellationToken)
     {
-        var points = meshes.SelectMany(mesh => mesh.Vertices)
-            .Select(vertex => new Vector3(vertex.X, vertex.Y, vertex.Z)).ToArray();
-        if (points.Length == 0) throw new InvalidDataException("Model has no vertices.");
-        var minX = points.Min(point => point.X - point.Z * .35f);
-        var maxX = points.Max(point => point.X - point.Z * .35f);
-        var minY = points.Min(point => -point.Y + point.Z * .2f);
-        var maxY = points.Max(point => -point.Y + point.Z * .2f);
-        var span = Math.Max(Math.Max(maxX - minX, maxY - minY), .001f);
-        Point Project(Vector3 point) => new(
-            12 + ((point.X - point.Z * .35f - minX) / span) * (size - 24),
-            12 + ((-point.Y + point.Z * .2f - minY) / span) * (size - 24));
-        var visual = new DrawingVisual();
-        using (var context = visual.RenderOpen())
-        {
-            context.DrawRectangle(new SolidColorBrush(Color.FromRgb(17, 22, 29)), null, new Rect(0, 0, size, size));
-            var fill = new SolidColorBrush(Color.FromRgb(72, 171, 206));
-            var edge = new Pen(new SolidColorBrush(Color.FromRgb(151, 220, 239)), .7);
-            foreach (var mesh in meshes)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                for (var i = 0; i + 2 < mesh.Indices.Count; i += 3)
-                {
-                    var geometry = new StreamGeometry();
-                    using (var stream = geometry.Open())
-                    {
-                        var a = Project(new(mesh.Vertices[(int)mesh.Indices[i]].X, mesh.Vertices[(int)mesh.Indices[i]].Y, mesh.Vertices[(int)mesh.Indices[i]].Z));
-                        var b = Project(new(mesh.Vertices[(int)mesh.Indices[i + 1]].X, mesh.Vertices[(int)mesh.Indices[i + 1]].Y, mesh.Vertices[(int)mesh.Indices[i + 1]].Z));
-                        var c = Project(new(mesh.Vertices[(int)mesh.Indices[i + 2]].X, mesh.Vertices[(int)mesh.Indices[i + 2]].Y, mesh.Vertices[(int)mesh.Indices[i + 2]].Z));
-                        stream.BeginFigure(a, true, true); stream.LineTo(b, true, false); stream.LineTo(c, true, false);
-                    }
-                    geometry.Freeze();
-                    context.DrawGeometry(fill, edge, geometry);
-                }
-            }
-        }
-        var bitmap = new RenderTargetBitmap(size, size, 96, 96, PixelFormats.Pbgra32);
-        bitmap.Render(visual); bitmap.Freeze();
-        return bitmap;
+        cancellationToken.ThrowIfCancellationRequested();
+        var topology = RekallAgeStudioImportedModelPublisher.ToTopology(meshes);
+        var asset = RekallAgeMeshAsset.Create(item.Id, item.DisplayName, topology);
+        return new RekallAgeStudioMeshViewportRenderer().Render(
+            asset, RekallAgeGeometryDomain.Face, [], size, size, preview: false,
+            style: RekallAgeStudioViewportRenderStyle.SmoothShaded).Image;
     }
 }

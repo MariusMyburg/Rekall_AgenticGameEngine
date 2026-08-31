@@ -255,7 +255,7 @@ internal static class RekallAgeStudioImportedModelPublisher
         throw new InvalidDataException("REKALL_CONTENT_MODEL_ID_COLLISION: Could not allocate an imported Model Asset identity.");
     }
 
-    private static RekallAgeMeshTopology ToTopology(IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
+    internal static RekallAgeMeshTopology ToTopology(IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
     {
         var positions = new List<RekallAgeGeometryVector3>();
         var faces = new List<int[]>();

@@ -76,7 +76,7 @@ public sealed class StudioContentOpenRouterTests : IDisposable
     }
 
     [Fact]
-    public async Task ImportedModelProjectionUsesStablePathAndExternalCapabilityInsteadOfDisplayNameMeshId()
+    public async Task ImportedModelProjectionUsesStablePathAndRoutesToEditableMeshPublishing()
     {
         var importedPath = ExistingFile("imported-model.glb");
         var sourcePath = ExistingFile("source-model.glb");
@@ -89,9 +89,9 @@ public sealed class StudioContentOpenRouterTests : IDisposable
 
         Assert.Equal("stable-model-id", item.Id);
         Assert.Equal(importedPath, item.Path);
-        Assert.Equal("external", item.EditorRouteId);
-        Assert.Contains(RekallAgeContentCapability.OpenExternal, item.Capabilities);
-        Assert.DoesNotContain(RekallAgeContentCapability.Open, item.Capabilities);
+        Assert.Equal("mesh-edit", item.EditorRouteId);
+        Assert.Contains(RekallAgeContentCapability.Open, item.Capabilities);
+        Assert.DoesNotContain(RekallAgeContentCapability.OpenExternal, item.Capabilities);
     }
 
     [Theory]

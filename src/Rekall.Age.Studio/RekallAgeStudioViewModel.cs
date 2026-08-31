@@ -599,6 +599,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<string> AssetLines { get; } = [];
     public ObservableCollection<RekallAgeContentBrowserItem> ContentItems { get; } = [];
     public ObservableCollection<RekallAgeContentBrowserItem> FilteredContentItems { get; } = [];
+    public ObservableCollection<RekallAgeStudioContentCardModel> ContentCards { get; } = [];
+    public ObservableCollection<RekallAgeStudioContentCardModel> FilteredContentCards { get; } = [];
     public ObservableCollection<RekallAgeContentBrowserWarning> ContentWarnings { get; } = [];
     public ObservableCollection<RekallAgeStudioContentImportJob> ImportJobs => _contentImportSession.Jobs;
     public ObservableCollection<string> ContentCategories { get; } = ["All"];
@@ -644,8 +646,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             {
                 RefreshCommands();
                 BeginSelectedContentPreview(value);
+                OnPropertyChanged(nameof(SelectedContentCard));
             }
         }
+    }
+
+    public RekallAgeStudioContentCardModel? SelectedContentCard
+    {
+        get => SelectedContentItem is null ? null : ContentCards.FirstOrDefault(card => card.Id == SelectedContentItem.Id);
+        set => SelectedContentItem = value?.Item;
     }
 
     public RekallAgeStudioContentPreview? SelectedContentPreview
@@ -5704,7 +5713,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         if (_session.ProjectRoot is null) throw new InvalidOperationException("Open a project first.");
         var assetId = item.DisplayName;
-        if (item.Kind.Equals("model-asset", StringComparison.OrdinalIgnoreCase))
+        if (item.Origin.Equals("Imported", StringComparison.OrdinalIgnoreCase)
+            && item.Family.Equals("model", StringComparison.OrdinalIgnoreCase))
+        {
+            var publishedId = await RekallAgeStudioImportedModelPublisher.EnsurePublishedAsync(_session, item, cancellationToken);
+            var model = await _modelAssetStore.LoadAsync(_session.ProjectRoot, publishedId, cancellationToken);
+            assetId = model.Source.AssetId;
+        }
+        else if (item.Kind.Equals("model-asset", StringComparison.OrdinalIgnoreCase))
         {
             var model = await _modelAssetStore.LoadAsync(_session.ProjectRoot, assetId, cancellationToken);
             if (model.Source.Kind != RekallAgeModelSourceKind.Mesh)
@@ -5783,6 +5799,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         _contentModel = content;
         Replace(ContentItems, content.Items);
+        var existingCards = ContentCards.ToDictionary(card => card.Id, StringComparer.Ordinal);
+        var cards = content.Items.Select(item =>
+        {
+            if (existingCards.TryGetValue(item.Id, out var card)) { card.Update(item); return card; }
+            return new RekallAgeStudioContentCardModel(item);
+        }).ToArray();
+        Replace(ContentCards, cards);
         Replace(ContentWarnings, content.Warnings);
         Replace(ContentCategories, RekallAgeStudioContentProjection.Categories(content.Items));
         if (!ContentCategories.Contains(SelectedContentCategory, StringComparer.OrdinalIgnoreCase))
@@ -5833,10 +5856,17 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         var selectedId = SelectedContentItem?.Id;
         Replace(FilteredContentItems, RekallAgeStudioContentProjection.Filter(
             _contentModel.Items, SelectedContentCategory, ContentSearchText));
+        var visibleIds = FilteredContentItems.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
+        Replace(FilteredContentCards, ContentCards.Where(card => visibleIds.Contains(card.Id)));
         SelectedContentItem = selectedId is null
             ? null
             : FilteredContentItems.FirstOrDefault(item => item.Id.Equals(selectedId, StringComparison.Ordinal));
+        OnPropertyChanged(nameof(SelectedContentCard));
     }
+
+    internal Task LoadContentCardPreviewAsync(
+        RekallAgeStudioContentCardModel card, CancellationToken cancellationToken) =>
+        card.LoadPreviewAsync(_contentPreviewService, cancellationToken);
 
     private void ApplyRendering(
         RekallAgeWorkbenchRenderQualityModel rendering,

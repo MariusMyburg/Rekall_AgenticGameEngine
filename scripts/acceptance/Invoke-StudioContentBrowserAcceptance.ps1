@@ -8,6 +8,8 @@ $acceptanceRoot = Join-Path ([IO.Path]::GetTempPath()) "rekall-content-browser-$
 $projectRoot = Join-Path $acceptanceRoot 'project'
 $fixtureRoot = Join-Path $acceptanceRoot 'fixtures'
 $evidencePath = Join-Path ([IO.Path]::GetTempPath()) "rekall-content-browser-evidence-$runId.json"
+$manifestPath = Join-Path $acceptanceRoot 'phase-manifest.json'
+$phaseNonce = [Guid]::NewGuid().ToString('N')
 
 function Write-MinimalGlb([string]$Path) {
     $jsonObject = '{"asset":{"version":"2.0"},"buffers":[{"byteLength":44}],"bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36},{"buffer":0,"byteOffset":36,"byteLength":6}],"accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","min":[0,0,0],"max":[1,1,0]},{"bufferView":1,"componentType":5123,"count":3,"type":"SCALAR"}],"meshes":[{"primitives":[{"attributes":{"POSITION":0},"indices":1}]}],"nodes":[{"mesh":0}],"scenes":[{"nodes":[0]}],"scene":0}'
@@ -58,10 +60,14 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Studio build failed.' }
     $studio = Join-Path $repoRoot 'src\Rekall.Age.Studio\bin\Debug\net10.0-windows\Rekall.Age.Studio.exe'
     $fixtures = @($glb, $png, $wav, $mp3, $unsupported) -join '|'
-    $process = Start-Process -FilePath $studio -ArgumentList @(
-        '--studio-content-browser-acceptance', '--project', $projectRoot,
-        '--fixtures', $fixtures, '--evidence', $evidencePath) -Wait -PassThru -WindowStyle Hidden
-    if ($process.ExitCode -ne 0) { throw "Studio acceptance exited with code $($process.ExitCode)." }
+    $common = @('--studio-content-browser-acceptance', '--project', $projectRoot,
+        '--evidence', $evidencePath, '--phase-manifest', $manifestPath, '--phase-nonce', $phaseNonce)
+    $phaseOne = Start-Process -FilePath $studio -ArgumentList @($common + @('--phase', '1', '--fixtures', $fixtures)) -PassThru -WindowStyle Hidden
+    $phaseOne.WaitForExit()
+    if ($phaseOne.ExitCode -ne 0) { throw "Studio acceptance phase 1 exited with code $($phaseOne.ExitCode)." }
+    $phaseTwo = Start-Process -FilePath $studio -ArgumentList @($common + @('--phase', '2')) -PassThru -WindowStyle Hidden
+    $phaseTwo.WaitForExit()
+    if ($phaseTwo.ExitCode -ne 0) { throw "Studio acceptance phase 2 exited with code $($phaseTwo.ExitCode)." }
 
     $evidence = Get-Content -Raw -LiteralPath $evidencePath | ConvertFrom-Json
     foreach ($requiredKind in @('model', 'texture', 'audio')) {
@@ -71,6 +77,12 @@ try {
     if ([string]::IsNullOrWhiteSpace($evidence.PersistedModelAssetId)) { throw 'Model placement did not persist.' }
     if ([string]::IsNullOrWhiteSpace($evidence.PersistedTextureAssetId)) { throw 'Texture assignment did not persist.' }
     if (-not $evidence.RestartedIndexContainedImports) { throw 'Imported content did not survive the restart boundary.' }
+    if ($evidence.PhaseOneProcessId -eq $evidence.PhaseTwoProcessId) { throw 'Acceptance did not use two distinct Studio processes.' }
+    if ($evidence.PhaseOneStartUtcTicks -eq $evidence.PhaseTwoStartUtcTicks) { throw 'Acceptance process start times were not distinct.' }
+    if ($evidence.Nonce -ne $phaseNonce) { throw 'Acceptance phase nonce was not preserved through disk.' }
+    if (@($evidence.OpenCodes | Where-Object { $_ -ne 'REKALL_CONTENT_OPENED' }).Count -ne 0) { throw 'A production content route did not open.' }
+    if ($evidence.PlacementCode -ne 'REKALL_CONTENT_DROP_APPLIED' -or [string]::IsNullOrWhiteSpace($evidence.PlacementTransactionId)) { throw 'Production placement did not return transaction evidence.' }
+    if ($evidence.AssignmentCode -ne 'REKALL_CONTENT_DROP_APPLIED' -or [string]::IsNullOrWhiteSpace($evidence.AssignmentTransactionId)) { throw 'Production assignment did not return transaction evidence.' }
     $evidence | ConvertTo-Json -Depth 8
 } finally {
     if (Test-Path -LiteralPath $acceptanceRoot) {
@@ -82,4 +94,5 @@ try {
         }
         Remove-Item -LiteralPath $resolved -Recurse -Force
     }
+    if (Test-Path -LiteralPath ($evidencePath + '.phase1')) { Remove-Item -LiteralPath ($evidencePath + '.phase1') -Force }
 }

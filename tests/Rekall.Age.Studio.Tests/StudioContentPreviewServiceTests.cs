@@ -10,6 +10,15 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioContentPreviewServiceTests
 {
     [Fact]
+    public void ProductionModelPreviewReusesTheModelingViewportRenderer()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var source = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "RekallAgeStudioContentPreviewService.cs"));
+        Assert.Contains("RekallAgeStudioMeshViewportRenderer", source, StringComparison.Ordinal);
+        Assert.Contains("RekallAgeStudioImportedModelPublisher.ToTopology", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("DrawingVisual", source, StringComparison.Ordinal);
+    }
+    [Fact]
     public async Task ImagesDecodeToFrozenThumbnailsAndCacheByIdentityRevision()
     {
         var decoder = new RecordingDecoder();
@@ -40,6 +49,19 @@ public sealed class StudioContentPreviewServiceTests
         Assert.Null(audio.Thumbnail);
         Assert.Equal("IconContentAudio", audio.IconKey);
         Assert.Equal("Healthy", audio.Health);
+    }
+
+    [Fact]
+    public async Task ModelAdapterCancellationPropagatesWithoutProducingFallback()
+    {
+        var models = new RecordingModelPreview(cancel: true);
+        var service = new RekallAgeStudioContentPreviewService(new RecordingDecoder(), models, 4);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            service.GetAsync(Item("model", "r1", "ship.glb"), cancellation.Token).AsTask());
+        Assert.Equal(0, models.CallCount);
     }
 
     [Fact]
@@ -91,6 +113,31 @@ public sealed class StudioContentPreviewServiceTests
         Assert.True(service.CachedCount <= 2);
     }
 
+    [Fact]
+    public async Task CardsLoadImageAndModelPreviewsWithoutSelectionAndIgnoreStaleRevisionCompletion()
+    {
+        var previews = new DeferredPreviewService();
+        var image = new RekallAgeStudioContentCardModel(Item("texture", "r1", "image.png", "image"));
+        var model = new RekallAgeStudioContentCardModel(Item("model", "r1", "ship.glb", "model"));
+
+        var staleLoad = image.LoadPreviewAsync(previews, CancellationToken.None);
+        image.Update(Item("texture", "r2", "image.png", "image"));
+        previews.Complete("image", "r1");
+        await staleLoad;
+        Assert.Null(image.Thumbnail);
+
+        var imageLoad = image.LoadPreviewAsync(previews, CancellationToken.None);
+        var modelLoad = model.LoadPreviewAsync(previews, CancellationToken.None);
+        previews.Complete("image", "r2");
+        previews.Complete("model", "r1");
+        await Task.WhenAll(imageLoad, modelLoad);
+
+        Assert.NotNull(image.Thumbnail);
+        Assert.NotNull(model.Thumbnail);
+        Assert.Equal("Healthy", image.PreviewHealth);
+        Assert.Equal("Healthy", model.PreviewHealth);
+    }
+
     private static RekallAgeContentBrowserItem Item(string family, string revision, string path, string id = "asset") =>
         new(id, id, family, family, "Imported", path, path, revision, "external", [], "Healthy", null, new());
 
@@ -108,15 +155,33 @@ public sealed class StudioContentPreviewServiceTests
         }
     }
 
-    private sealed class RecordingModelPreview : IRekallAgeStudioContentModelPreviewAdapter
+    private sealed class RecordingModelPreview(bool cancel = false) : IRekallAgeStudioContentModelPreviewAdapter
     {
         public int CallCount { get; private set; }
         public ValueTask<ImageSource> RenderAsync(RekallAgeContentBrowserItem item, int maximumDimension, CancellationToken cancellationToken)
         {
             CallCount++;
+            if (cancel) return ValueTask.FromCanceled<ImageSource>(cancellationToken);
             var image = new WriteableBitmap(2, 2, 96, 96, PixelFormats.Bgra32, null);
             image.Freeze();
             return ValueTask.FromResult<ImageSource>(image);
+        }
+    }
+
+    private sealed class DeferredPreviewService : IRekallAgeStudioContentPreviewService
+    {
+        private readonly Dictionary<(string, string), TaskCompletionSource<RekallAgeStudioContentPreview>> _pending = [];
+        public ValueTask<RekallAgeStudioContentPreview> GetAsync(RekallAgeContentBrowserItem item, CancellationToken cancellationToken)
+        {
+            var completion = new TaskCompletionSource<RekallAgeStudioContentPreview>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _pending[(item.Id, item.Revision!)] = completion;
+            return new(completion.Task.WaitAsync(cancellationToken));
+        }
+
+        public void Complete(string id, string revision)
+        {
+            var image = new WriteableBitmap(2, 2, 96, 96, PixelFormats.Bgra32, null); image.Freeze();
+            _pending[(id, revision)].SetResult(new(id, revision, image, "IconContentFile", "Healthy", null));
         }
     }
 }

@@ -17,6 +17,7 @@
             <Grid MinWidth="180" Margin="2">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                 <Border Width="28" Height="28" CornerRadius="4" Background="{StaticResource PanelRaised}" VerticalAlignment="Top">
+                    <Grid>
                     <Path Margin="6">
                         <Path.Style>
                             <Style TargetType="Path" BasedOn="{StaticResource StudioIconPath}">
@@ -31,11 +32,13 @@
                             </Style>
                         </Path.Style>
                     </Path>
+                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" Loaded="OnContentThumbnailLoaded" />
+                    </Grid>
                 </Border>
                 <StackPanel Grid.Column="1" Margin="7,0,0,0">
                     <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayName}" />
                     <TextBlock Text="{Binding Family}" Foreground="{StaticResource MutedText}" FontSize="11" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding Health}" Foreground="{StaticResource Accent}" FontSize="10" />
+                    <TextBlock Text="{Binding PreviewHealth}" Foreground="{StaticResource Accent}" FontSize="10" ToolTip="{Binding PreviewSummary}" />
                 </StackPanel>
             </Grid>
         </DataTemplate>
@@ -87,8 +90,8 @@
             <GridSplitter x:Name="CategorySplitter" Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="Transparent" />
             <Border Grid.Column="2" Style="{StaticResource EditorPanel}">
                 <Grid>
-                    <ListView x:Name="ContentItemList" ItemsSource="{Binding FilteredContentItems}"
-                              SelectedItem="{Binding SelectedContentItem, Mode=TwoWay}"
+                    <ListView x:Name="ContentItemList" ItemsSource="{Binding FilteredContentCards}"
+                              SelectedItem="{Binding SelectedContentCard, Mode=TwoWay}"
                               ItemTemplate="{StaticResource ContentCardTemplate}"
                               PreviewMouseLeftButtonDown="OnContentItemMouseDown"
                               PreviewMouseMove="OnContentItemMouseMove"

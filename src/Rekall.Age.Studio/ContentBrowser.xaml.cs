@@ -138,7 +138,7 @@ public partial class ContentBrowser : UserControl
     private void OnContentItemMouseMove(object sender, MouseEventArgs e)
     {
         if (e.LeftButton != MouseButtonState.Pressed || _contentDragOrigin is not { } origin
-            || ContentItemList.SelectedItem is not RekallAgeContentBrowserItem item)
+            || ContentItemList.SelectedItem is not RekallAgeStudioContentCardModel card)
         {
             return;
         }
@@ -151,11 +151,18 @@ public partial class ContentBrowser : UserControl
         }
 
         _contentDragOrigin = null;
-        var payload = RekallAgeStudioContentDragPayload.FromItem(item);
+        var payload = RekallAgeStudioContentDragPayload.FromItem(card.Item);
         if (payload.Operations.Count == 0) return;
         var data = new DataObject();
         data.SetData(RekallAgeStudioContentDragService.DataFormat, payload.ToJson());
         DragDrop.DoDragDrop(ContentItemList, data, DragDropEffects.Copy);
+    }
+
+    private async void OnContentThumbnailLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Image { DataContext: RekallAgeStudioContentCardModel card }
+            || DataContext is not RekallAgeStudioViewModel viewModel) return;
+        await ExecuteUiAsync(token => viewModel.LoadContentCardPreviewAsync(card, token));
     }
 
     private void OnCardViewClick(object sender, RoutedEventArgs e)

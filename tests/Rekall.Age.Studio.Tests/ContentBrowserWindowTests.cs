@@ -34,8 +34,8 @@ public sealed class ContentBrowserWindowTests(WpfApplicationTestFixture wpf)
     {
         var source = Source("ContentBrowser.xaml");
 
-        Assert.Contains("ItemsSource=\"{Binding FilteredContentItems}\"", source, StringComparison.Ordinal);
-        Assert.Contains("SelectedItem=\"{Binding SelectedContentItem", source, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding FilteredContentCards}\"", source, StringComparison.Ordinal);
+        Assert.Contains("SelectedItem=\"{Binding SelectedContentCard", source, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding OpenSelectedContentCommand}\"", source, StringComparison.Ordinal);
         Assert.Contains("Key=\"Enter\" Command=\"{Binding OpenSelectedContentCommand}\"", source, StringComparison.Ordinal);
         Assert.Contains("MouseDoubleClick=\"OnContentItemDoubleClick\"", source, StringComparison.Ordinal);
@@ -54,6 +54,8 @@ public sealed class ContentBrowserWindowTests(WpfApplicationTestFixture wpf)
         Assert.Contains("DataTrigger Binding=\"{Binding Family}\"", source, StringComparison.Ordinal);
         Assert.Contains("IconContentAudio", source, StringComparison.Ordinal);
         Assert.Contains("IconContentModel", source, StringComparison.Ordinal);
+        Assert.Contains("Source=\"{Binding Thumbnail}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Loaded=\"OnContentThumbnailLoaded\"", source, StringComparison.Ordinal);
     }
 
     [Fact]

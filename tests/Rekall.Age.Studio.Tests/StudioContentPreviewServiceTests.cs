@@ -153,6 +153,72 @@ public sealed class StudioContentPreviewServiceTests
         Assert.Null(card.Thumbnail);
     }
 
+    [Fact]
+    public async Task ConcurrentRequestsCoalesceByCompositeIdentityAndRespectGlobalBound()
+    {
+        var decoder = new BlockingDecoder();
+        var service = new RekallAgeStudioContentPreviewService(decoder, new RecordingModelPreview(), 32, 2);
+        var same = Item("texture", "r1", "same.png", "same");
+        var coalesced = Enumerable.Range(0, 6).Select(_ => service.GetAsync(same, CancellationToken.None).AsTask()).ToArray();
+        await decoder.WaitForCallsAsync(1);
+        Assert.Equal(1, decoder.CallCount);
+
+        var burst = Enumerable.Range(0, 8)
+            .Select(index => service.GetAsync(Item("texture", "r1", $"{index}.png", $"asset-{index}"), CancellationToken.None).AsTask())
+            .ToArray();
+        await decoder.WaitForCallsAsync(2);
+        Assert.True(decoder.MaximumConcurrency <= 2);
+        decoder.Release();
+        await Task.WhenAll(coalesced.Concat(burst));
+        Assert.True(decoder.MaximumConcurrency <= 2);
+    }
+
+    [Fact]
+    public async Task CancellingOneCoalescedCallerDoesNotCancelSharedPreview()
+    {
+        var decoder = new BlockingDecoder();
+        var service = new RekallAgeStudioContentPreviewService(decoder, new RecordingModelPreview(), 4, 2);
+        var item = Item("texture", "r1", "same.png", "same");
+        using var cancellation = new CancellationTokenSource();
+        var cancelled = service.GetAsync(item, cancellation.Token).AsTask();
+        var survivor = service.GetAsync(item, CancellationToken.None).AsTask();
+        await decoder.WaitForCallsAsync(1);
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelled);
+        decoder.Release();
+        Assert.NotNull((await survivor).Thumbnail);
+        Assert.Equal(1, decoder.CallCount);
+    }
+
+    [Fact]
+    public async Task CompositeKindIdentityPreventsMeshAndModelAssetCollision()
+    {
+        var decoder = new RecordingDecoder();
+        var models = new RecordingModelPreview();
+        var service = new RekallAgeStudioContentPreviewService(decoder, models, 8);
+        var mesh = Item("model", "r1", "same.glb", "shared") with { Kind = "mesh", Origin = "Authored" };
+        var modelAsset = mesh with { Kind = "model-asset", Path = "same.model.json" };
+        var cards = new[] { new RekallAgeStudioContentCardModel(mesh), new RekallAgeStudioContentCardModel(modelAsset) };
+
+        Assert.Equal(2, cards.ToDictionary(card => card.Key).Count);
+        await service.GetAsync(mesh, CancellationToken.None);
+        await service.GetAsync(modelAsset, CancellationToken.None);
+        Assert.Equal(2, models.CallCount);
+    }
+
+    [Fact]
+    public async Task ImageDecoderRejectsOversizedEncodedFileBeforeDecode()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "rekall-large-preview-" + Guid.NewGuid().ToString("N") + ".png");
+        try
+        {
+            await using (var stream = File.Create(path)) stream.SetLength(RekallAgeStudioContentImageDecoder.MaximumEncodedBytes + 1);
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                new RekallAgeStudioContentImageDecoder().DecodeAsync(path, 192, CancellationToken.None).AsTask());
+        }
+        finally { File.Delete(path); }
+    }
+
     private static RekallAgeContentBrowserItem Item(string family, string revision, string path, string id = "asset") =>
         new(id, id, family, family, "Imported", path, path, revision, "external", [], "Healthy", null, new());
 
@@ -198,5 +264,33 @@ public sealed class StudioContentPreviewServiceTests
             var image = new WriteableBitmap(2, 2, 96, 96, PixelFormats.Bgra32, null); image.Freeze();
             _pending[(id, revision)].SetResult(new(id, revision, image, "IconContentFile", "Healthy", null));
         }
+    }
+
+    private sealed class BlockingDecoder : IRekallAgeStudioContentImageDecoder
+    {
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _calls;
+        private int _active;
+        public int CallCount => Volatile.Read(ref _calls);
+        public int MaximumConcurrency { get; private set; }
+        public async ValueTask<ImageSource> DecodeAsync(string path, int maximumDimension, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _calls);
+            var active = Interlocked.Increment(ref _active);
+            MaximumConcurrency = Math.Max(MaximumConcurrency, active);
+            try
+            {
+                await _release.Task.WaitAsync(cancellationToken);
+                var image = new WriteableBitmap(2, 2, 96, 96, PixelFormats.Bgra32, null); image.Freeze();
+                return image;
+            }
+            finally { Interlocked.Decrement(ref _active); }
+        }
+        public async Task WaitForCallsAsync(int count)
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            while (CallCount < count) await Task.Delay(10, timeout.Token);
+        }
+        public void Release() => _release.TrySetResult();
     }
 }

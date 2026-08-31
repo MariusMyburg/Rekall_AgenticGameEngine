@@ -9,7 +9,6 @@ namespace Rekall.Age.Studio;
 
 public partial class ContentBrowser : UserControl
 {
-    private readonly RekallAgeStudioContentImportPolicy _importPolicy = new();
     private CancellationTokenSource _lifetime = new();
     private readonly Dictionary<Image, CancellationTokenSource> _thumbnailRealizations = [];
     private Point? _contentDragOrigin;
@@ -44,7 +43,7 @@ public partial class ContentBrowser : UserControl
             Filter = "Supported content|*.glb;*.gltf;*.png;*.jpg;*.jpeg;*.dds;*.ktx2;*.wav;*.mp3;*.glsl;*.vert;*.frag;*.comp;*.hlsl|All files|*.*"
         };
         if (picker.ShowDialog(Window.GetWindow(this)) == true)
-            await viewModel.ImportContentAsync(SafeCandidates(picker.FileNames), token);
+            await viewModel.ImportContentAsync(picker.FileNames, token);
     });
 
     private void OnFilesDragEnter(object sender, DragEventArgs e) => ApplyDropEffect(e);
@@ -62,22 +61,23 @@ public partial class ContentBrowser : UserControl
 
     private void ApplyDropEffect(DragEventArgs e)
     {
-        e.Effects = DroppedCandidates(e.Data).Length > 0
+        e.Effects = CanAdvertiseCopy(DroppedCandidates(e.Data))
             ? DragDropEffects.Copy
             : DragDropEffects.None;
         e.Handled = true;
     }
 
-    private string[] DroppedCandidates(IDataObject data) => data.GetDataPresent(DataFormats.FileDrop)
-        ? SafeCandidates(data.GetData(DataFormats.FileDrop) as string[] ?? [])
+    internal static string[] DroppedCandidates(IDataObject data) => data.GetDataPresent(DataFormats.FileDrop)
+        ? (data.GetData(DataFormats.FileDrop) as string[] ?? []).ToArray()
         : [];
 
-    private string[] SafeCandidates(IEnumerable<string> paths) => paths
-        .Where(path => !string.IsNullOrWhiteSpace(path)
+    internal static bool CanAdvertiseCopy(IEnumerable<string> paths)
+    {
+        var policy = new RekallAgeStudioContentImportPolicy();
+        return paths.Any(path => !string.IsNullOrWhiteSpace(path)
             && Path.IsPathFullyQualified(path)
-            && _importPolicy.Classify(path).Accepted)
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToArray();
+            && policy.Classify(path).Accepted);
+    }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {

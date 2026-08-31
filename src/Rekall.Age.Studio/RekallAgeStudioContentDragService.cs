@@ -19,6 +19,7 @@ namespace Rekall.Age.Studio;
 internal sealed record RekallAgeStudioContentDragPayload(
     string ContentId,
     string ContentKind,
+    string ContentOrigin,
     IReadOnlyList<string> Operations)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -26,7 +27,7 @@ internal sealed record RekallAgeStudioContentDragPayload(
     public static RekallAgeStudioContentDragPayload FromItem(RekallAgeContentBrowserItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
-        return new(item.Id, item.Kind, item.Capabilities
+        return new(item.Id, item.Kind, item.Origin, item.Capabilities
             .Where(operation => operation is RekallAgeContentCapability.Assign or RekallAgeContentCapability.Place)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray());
@@ -39,7 +40,8 @@ internal sealed record RekallAgeStudioContentDragPayload(
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
         var payload = JsonSerializer.Deserialize<RekallAgeStudioContentDragPayload>(json, JsonOptions)
             ?? throw new JsonException("The Studio content drag payload is empty.");
-        if (string.IsNullOrWhiteSpace(payload.ContentId) || string.IsNullOrWhiteSpace(payload.ContentKind))
+        if (string.IsNullOrWhiteSpace(payload.ContentId) || string.IsNullOrWhiteSpace(payload.ContentKind)
+            || string.IsNullOrWhiteSpace(payload.ContentOrigin))
         {
             throw new JsonException("The Studio content drag payload has no stable content identity.");
         }
@@ -147,13 +149,14 @@ internal interface IRekallAgeStudioContentPlacementCommand
 
 internal interface IRekallAgeStudioContentDragResolver
 {
-    RekallAgeStudioContentDragPayload? Resolve(string contentId);
+    RekallAgeStudioContentDragPayload? Resolve(string contentId, string contentKind, string contentOrigin);
 }
 
 internal sealed class RekallAgeStudioContentDragResolver(
-    Func<string, RekallAgeStudioContentDragPayload?> resolve) : IRekallAgeStudioContentDragResolver
+    Func<string, string, string, RekallAgeStudioContentDragPayload?> resolve) : IRekallAgeStudioContentDragResolver
 {
-    public RekallAgeStudioContentDragPayload? Resolve(string contentId) => resolve(contentId);
+    public RekallAgeStudioContentDragPayload? Resolve(string contentId, string contentKind, string contentOrigin) =>
+        resolve(contentId, contentKind, contentOrigin);
 }
 
 internal sealed class RekallAgeStudioContentPropertyMutationCommand(
@@ -399,13 +402,14 @@ internal sealed class RekallAgeStudioContentDragService(
         out RekallAgeStudioContentDragPayload current,
         out RekallAgeStudioContentDropResult rejection)
     {
-        current = resolver.Resolve(claimed.ContentId)!;
+        current = resolver.Resolve(claimed.ContentId, claimed.ContentKind, claimed.ContentOrigin)!;
         if (current is null)
         {
             rejection = Rejected("REKALL_CONTENT_DROP_STALE", "The dragged content is no longer present in the current project index.");
             return false;
         }
         if (!claimed.ContentKind.Equals(current.ContentKind, StringComparison.OrdinalIgnoreCase)
+            || !claimed.ContentOrigin.Equals(current.ContentOrigin, StringComparison.OrdinalIgnoreCase)
             || !claimed.Operations.ToHashSet(StringComparer.OrdinalIgnoreCase)
                 .SetEquals(current.Operations))
         {

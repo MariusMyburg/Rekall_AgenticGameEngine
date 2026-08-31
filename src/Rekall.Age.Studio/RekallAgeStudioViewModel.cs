@@ -482,10 +482,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _contentDragService = new RekallAgeStudioContentDragService(
             new RekallAgeStudioContentPropertyMutationCommand(ExecuteContentPropertyMutationAsync),
             new RekallAgeStudioContentPlacementCommand(ExecuteContentPlacementAsync),
-            new RekallAgeStudioContentDragResolver(contentId =>
+            new RekallAgeStudioContentDragResolver((contentId, contentKind, contentOrigin) =>
             {
                 var item = _contentModel.Items.FirstOrDefault(candidate =>
-                    candidate.Id.Equals(contentId, StringComparison.Ordinal));
+                    candidate.Id.Equals(contentId, StringComparison.Ordinal)
+                    && candidate.Kind.Equals(contentKind, StringComparison.OrdinalIgnoreCase)
+                    && candidate.Origin.Equals(contentOrigin, StringComparison.OrdinalIgnoreCase));
                 return item is null ? null : RekallAgeStudioContentDragPayload.FromItem(item);
             }));
         _contentPreviewService = RekallAgeStudioContentPreviewService.CreateDefault();
@@ -669,7 +671,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public RekallAgeStudioContentCardModel? SelectedContentCard
     {
-        get => SelectedContentItem is null ? null : ContentCards.FirstOrDefault(card => card.Id == SelectedContentItem.Id);
+        get => SelectedContentItem is null ? null : ContentCards.FirstOrDefault(card =>
+            card.Key == RekallAgeStudioContentKey.From(SelectedContentItem));
         set => SelectedContentItem = value?.Item;
     }
 
@@ -5808,10 +5811,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         _contentModel = content;
         Replace(ContentItems, content.Items);
-        var existingCards = ContentCards.ToDictionary(card => card.Id, StringComparer.Ordinal);
+        var existingCards = ContentCards.ToDictionary(card => card.Key);
         var cards = content.Items.Select(item =>
         {
-            if (existingCards.TryGetValue(item.Id, out var card)) { card.Update(item); return card; }
+            if (existingCards.TryGetValue(RekallAgeStudioContentKey.From(item), out var card)) { card.Update(item); return card; }
             return new RekallAgeStudioContentCardModel(item);
         }).ToArray();
         Replace(ContentCards, cards);
@@ -5843,7 +5846,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             var preview = await _contentPreviewService.GetAsync(item, cancellation.Token);
             if (!cancellation.IsCancellationRequested
                 && ReferenceEquals(_contentPreviewCancellation, cancellation)
-                && SelectedContentItem?.Id == item.Id
+                && SelectedContentItem is { } selected
+                && RekallAgeStudioContentKey.From(selected) == RekallAgeStudioContentKey.From(item)
                 && SelectedContentItem?.Revision == item.Revision)
             {
                 SelectedContentPreview = preview;
@@ -5862,14 +5866,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private void RefreshContentProjection()
     {
-        var selectedId = SelectedContentItem?.Id;
+        var selectedKey = SelectedContentItem is null ? (RekallAgeStudioContentKey?)null : RekallAgeStudioContentKey.From(SelectedContentItem);
         Replace(FilteredContentItems, RekallAgeStudioContentProjection.Filter(
             _contentModel.Items, SelectedContentCategory, ContentSearchText));
-        var visibleIds = FilteredContentItems.Select(item => item.Id).ToHashSet(StringComparer.Ordinal);
-        Replace(FilteredContentCards, ContentCards.Where(card => visibleIds.Contains(card.Id)));
-        SelectedContentItem = selectedId is null
+        var visibleKeys = FilteredContentItems.Select(RekallAgeStudioContentKey.From).ToHashSet();
+        Replace(FilteredContentCards, ContentCards.Where(card => visibleKeys.Contains(card.Key)));
+        SelectedContentItem = selectedKey is null
             ? null
-            : FilteredContentItems.FirstOrDefault(item => item.Id.Equals(selectedId, StringComparison.Ordinal));
+            : FilteredContentItems.FirstOrDefault(item => RekallAgeStudioContentKey.From(item) == selectedKey.Value);
         OnPropertyChanged(nameof(SelectedContentCard));
     }
 

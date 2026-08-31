@@ -18,6 +18,19 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioContentDragServiceTests
 {
     [Fact]
+    public void CompositeResolverDistinguishesSameIdMeshAndModelAsset()
+    {
+        var mesh = Payload("shared", "mesh", RekallAgeContentCapability.Place);
+        var model = Payload("shared", "model-asset", RekallAgeContentCapability.Place);
+        var resolver = new RekallAgeStudioContentDragResolver((id, kind, origin) =>
+            new[] { mesh, model }.SingleOrDefault(item => item.ContentId == id
+                && item.ContentKind.Equals(kind, StringComparison.OrdinalIgnoreCase)
+                && item.ContentOrigin.Equals(origin, StringComparison.OrdinalIgnoreCase)));
+
+        Assert.Same(mesh, resolver.Resolve("shared", "mesh", "Imported"));
+        Assert.Same(model, resolver.Resolve("shared", "model-asset", "Imported"));
+    }
+    [Fact]
     public void LongCommonPrefixContentIdsKeepBoundedDistinctCryptographicSuffixes()
     {
         var prefix = new string('a', 180);
@@ -170,7 +183,7 @@ public sealed class StudioContentDragServiceTests
         Assert.Equal(item.Kind, roundTrip.ContentKind);
         Assert.Equal([RekallAgeContentCapability.Assign], roundTrip.Operations);
         Assert.DoesNotContain("sentinel", json, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(["contentId", "contentKind", "operations"],
+        Assert.Equal(["contentId", "contentKind", "contentOrigin", "operations"],
             JsonDocument.Parse(json).RootElement.EnumerateObject().Select(property => property.Name).Order().ToArray());
     }
 
@@ -351,7 +364,7 @@ public sealed class StudioContentDragServiceTests
             resolver ?? new HeuristicResolver());
 
     private static RekallAgeStudioContentDragPayload Payload(string id, string kind, params string[] operations) =>
-        new(id, kind, operations);
+        new(id, kind, "Imported", operations);
 
     private static RekallAgeContentBrowserItem Item(string id, string kind, IReadOnlyList<string> capabilities, string path) =>
         new(id, id, kind, kind, "Imported", path, path, "1", "external", capabilities, "ready", null, new());
@@ -424,13 +437,13 @@ public sealed class StudioContentDragServiceTests
 
     private sealed class FixedResolver(RekallAgeStudioContentDragPayload? current) : IRekallAgeStudioContentDragResolver
     {
-        public RekallAgeStudioContentDragPayload? Resolve(string contentId) =>
+        public RekallAgeStudioContentDragPayload? Resolve(string contentId, string contentKind, string contentOrigin) =>
             current?.ContentId == contentId ? current : null;
     }
 
     private sealed class HeuristicResolver : IRekallAgeStudioContentDragResolver
     {
-        public RekallAgeStudioContentDragPayload? Resolve(string contentId) => contentId switch
+        public RekallAgeStudioContentDragPayload? Resolve(string contentId, string contentKind, string contentOrigin) => contentId switch
         {
             "rover" => Payload(contentId, "model", RekallAgeContentCapability.Place),
             "asset_audio" => Payload(contentId, "audio", RekallAgeContentCapability.Assign),

@@ -25,6 +25,7 @@ public sealed class RekallAgeStudioContentCardModel : INotifyPropertyChanged
     }
 
     internal RekallAgeContentBrowserItem Item => _item;
+    internal RekallAgeStudioContentKey Key => RekallAgeStudioContentKey.From(_item);
     public string Id => _item.Id;
     public string DisplayName => _item.DisplayName;
     public string Family => _item.Family;
@@ -40,7 +41,7 @@ public sealed class RekallAgeStudioContentCardModel : INotifyPropertyChanged
     internal void Update(RekallAgeContentBrowserItem item)
     {
         ArgumentNullException.ThrowIfNull(item);
-        if (!item.Id.Equals(_item.Id, StringComparison.Ordinal))
+        if (RekallAgeStudioContentKey.From(item) != Key)
             throw new ArgumentException("A content card identity cannot change.", nameof(item));
         var revisionChanged = !string.Equals(item.Revision, _item.Revision, StringComparison.Ordinal);
         _item = item;
@@ -79,6 +80,12 @@ public sealed class RekallAgeStudioContentCardModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new(name));
 }
 
+internal readonly record struct RekallAgeStudioContentKey(string Id, string Kind, string Origin)
+{
+    internal static RekallAgeStudioContentKey From(RekallAgeContentBrowserItem item) =>
+        new(item.Id, item.Kind.ToLowerInvariant(), item.Origin.ToLowerInvariant());
+}
+
 public sealed record RekallAgeStudioContentPreview(
     string ContentId,
     string Revision,
@@ -111,17 +118,21 @@ internal sealed class RekallAgeStudioContentPreviewService : IRekallAgeStudioCon
     private readonly IRekallAgeStudioContentModelPreviewAdapter _models;
     private readonly int _capacity;
     private readonly object _sync = new();
-    private readonly Dictionary<(string Id, string Revision), CacheEntry> _cache = [];
-    private readonly LinkedList<(string Id, string Revision)> _usage = [];
+    private readonly Dictionary<PreviewKey, CacheEntry> _cache = [];
+    private readonly LinkedList<PreviewKey> _usage = [];
+    private readonly Dictionary<PreviewKey, Task<RekallAgeStudioContentPreview>> _inflight = [];
+    private readonly SemaphoreSlim _workGate;
 
     public RekallAgeStudioContentPreviewService(
         IRekallAgeStudioContentImageDecoder decoder,
         IRekallAgeStudioContentModelPreviewAdapter models,
-        int capacity = 96)
+        int capacity = 96,
+        int maximumConcurrency = 3)
     {
         _decoder = decoder ?? throw new ArgumentNullException(nameof(decoder));
         _models = models ?? throw new ArgumentNullException(nameof(models));
         _capacity = capacity > 0 ? capacity : throw new ArgumentOutOfRangeException(nameof(capacity));
+        _workGate = new(maximumConcurrency > 0 ? maximumConcurrency : throw new ArgumentOutOfRangeException(nameof(maximumConcurrency)));
     }
 
     public static RekallAgeStudioContentPreviewService CreateDefault() =>
@@ -135,7 +146,9 @@ internal sealed class RekallAgeStudioContentPreviewService : IRekallAgeStudioCon
         ArgumentNullException.ThrowIfNull(item);
         cancellationToken.ThrowIfCancellationRequested();
         var revision = item.Revision ?? string.Empty;
-        var key = (item.Id, revision);
+        var identity = RekallAgeStudioContentKey.From(item);
+        var key = new PreviewKey(identity.Id, identity.Kind, identity.Origin, revision);
+        Task<RekallAgeStudioContentPreview> work;
         lock (_sync)
         {
             if (_cache.TryGetValue(key, out var cached))
@@ -144,47 +157,64 @@ internal sealed class RekallAgeStudioContentPreviewService : IRekallAgeStudioCon
                 _usage.AddFirst(cached.Node);
                 return cached.Preview;
             }
-        }
-
-        RekallAgeStudioContentPreview preview;
-        try
-        {
-            ImageSource? image = item.Family.ToLowerInvariant() switch
+            if (!_inflight.TryGetValue(key, out work!))
             {
-                "texture" or "image" when !string.IsNullOrWhiteSpace(item.Path) =>
-                    await _decoder.DecodeAsync(item.Path, ThumbnailDimension, cancellationToken),
-                "model" or "mesh" when !string.IsNullOrWhiteSpace(item.Path) =>
-                    await _models.RenderAsync(item, ThumbnailDimension, cancellationToken),
-                _ => null
-            };
-            cancellationToken.ThrowIfCancellationRequested();
-            if (image is { CanFreeze: true, IsFrozen: false }) image.Freeze();
-            preview = new(item.Id, revision, image, IconFor(item.Family), item.Health, null);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
-            or InvalidDataException or NotSupportedException or ArgumentException)
-        {
-            preview = new(item.Id, revision, null, IconFor(item.Family), "Warning",
-                "REKALL_CONTENT_PREVIEW_FAILED · Preview unavailable.");
-        }
-
-        lock (_sync)
-        {
-            if (_cache.TryGetValue(key, out var existing)) return existing.Preview;
-            var node = _usage.AddFirst(key);
-            _cache[key] = new(preview, node);
-            while (_cache.Count > _capacity)
-            {
-                var last = _usage.Last!;
-                _usage.RemoveLast();
-                _cache.Remove(last.Value);
+                work = GenerateAsync(item, key);
+                _inflight[key] = work;
             }
         }
-        return preview;
+
+        return await work.WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<RekallAgeStudioContentPreview> GenerateAsync(
+        RekallAgeContentBrowserItem item, PreviewKey key)
+    {
+        // Ensure the task is registered in _inflight before even a synchronous adapter can complete.
+        await Task.Yield();
+        await _workGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            RekallAgeStudioContentPreview preview;
+            try
+            {
+                ImageSource? image = item.Family.ToLowerInvariant() switch
+                {
+                    "texture" or "image" when !string.IsNullOrWhiteSpace(item.Path) =>
+                        await _decoder.DecodeAsync(item.Path, ThumbnailDimension, CancellationToken.None),
+                    "model" or "mesh" when !string.IsNullOrWhiteSpace(item.Path) =>
+                        await _models.RenderAsync(item, ThumbnailDimension, CancellationToken.None),
+                    _ => null
+                };
+                if (image is { CanFreeze: true, IsFrozen: false }) image.Freeze();
+                preview = new(item.Id, key.Revision, image, IconFor(item.Family), item.Health, null);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                or InvalidDataException or NotSupportedException or ArgumentException)
+            {
+                preview = new(item.Id, key.Revision, null, IconFor(item.Family), "Warning",
+                    "REKALL_CONTENT_PREVIEW_FAILED · Preview unavailable.");
+            }
+
+            lock (_sync)
+            {
+                if (_cache.TryGetValue(key, out var existing)) return existing.Preview;
+                var node = _usage.AddFirst(key);
+                _cache[key] = new(preview, node);
+                while (_cache.Count > _capacity)
+                {
+                    var last = _usage.Last!;
+                    _usage.RemoveLast();
+                    _cache.Remove(last.Value);
+                }
+            }
+            return preview;
+        }
+        finally
+        {
+            lock (_sync) _inflight.Remove(key);
+            _workGate.Release();
+        }
     }
 
     private static string IconFor(string family) => family.ToLowerInvariant() switch
@@ -199,26 +229,34 @@ internal sealed class RekallAgeStudioContentPreviewService : IRekallAgeStudioCon
 
     private sealed record CacheEntry(
         RekallAgeStudioContentPreview Preview,
-        LinkedListNode<(string Id, string Revision)> Node);
+        LinkedListNode<PreviewKey> Node);
+
+    private readonly record struct PreviewKey(string Id, string Kind, string Origin, string Revision);
 }
 
 internal sealed class RekallAgeStudioContentImageDecoder : IRekallAgeStudioContentImageDecoder
 {
+    internal const long MaximumEncodedBytes = 32 * 1024 * 1024;
     public async ValueTask<ImageSource> DecodeAsync(
         string path, int maximumDimension, CancellationToken cancellationToken)
     {
-        var bytes = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+            64 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        if (stream.Length > MaximumEncodedBytes)
+            throw new InvalidDataException("Encoded image exceeds the preview size limit.");
         return await Task.Run<ImageSource>(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            using var stream = new MemoryStream(bytes, writable: false);
-            var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
-            var source = decoder.Frames[0];
-            var largest = Math.Max(source.PixelWidth, source.PixelHeight);
-            BitmapSource result = largest > maximumDimension
-                ? new TransformedBitmap(source, new ScaleTransform(
-                    maximumDimension / (double)largest, maximumDimension / (double)largest))
-                : source;
+            var metadata = BitmapDecoder.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames[0];
+            stream.Position = 0;
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.StreamSource = stream;
+            if (metadata.PixelWidth >= metadata.PixelHeight) image.DecodePixelWidth = maximumDimension;
+            else image.DecodePixelHeight = maximumDimension;
+            image.EndInit();
+            BitmapSource result = image;
             result.Freeze();
             return result;
         }, cancellationToken).ConfigureAwait(false);

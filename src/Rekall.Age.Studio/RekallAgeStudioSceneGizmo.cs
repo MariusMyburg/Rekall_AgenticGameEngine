@@ -1,6 +1,7 @@
 namespace Rekall.Age.Studio;
 
 using Rekall.Age.Rendering.Abstractions;
+using Rekall.Age.Rendering;
 
 public enum RekallAgeStudioTransformTool
 {
@@ -304,9 +305,34 @@ internal static class RekallAgeStudioSceneGizmoRenderables
             new(0, 0, 0, end.X, end.Y, end.Z)
         };
         var size = scaleHandle ? 0.13 : 0.18;
-        segments.Add(new(end.X - size, end.Y, end.Z, end.X, end.Y, end.Z));
-        segments.Add(new(end.X, end.Y - size, end.Z, end.X, end.Y, end.Z));
-        segments.Add(new(end.X, end.Y, end.Z - size, end.X, end.Y, end.Z));
+        if (scaleHandle)
+        {
+            segments.Add(new(end.X - size, end.Y - size, end.Z - size, end.X + size, end.Y + size, end.Z + size));
+            segments.Add(new(end.X - size, end.Y + size, end.Z - size, end.X + size, end.Y - size, end.Z + size));
+            segments.Add(new(end.X - size, end.Y - size, end.Z + size, end.X + size, end.Y + size, end.Z - size));
+        }
+        else
+        {
+            var back = AxisLength - size;
+            if (axis is RekallAgeStudioTransformAxis.X)
+            {
+                segments.Add(new(back, -size, 0, end.X, end.Y, end.Z));
+                segments.Add(new(back, size, 0, end.X, end.Y, end.Z));
+                segments.Add(new(back, 0, -size, end.X, end.Y, end.Z));
+            }
+            else if (axis is RekallAgeStudioTransformAxis.Y)
+            {
+                segments.Add(new(-size, back, 0, end.X, end.Y, end.Z));
+                segments.Add(new(size, back, 0, end.X, end.Y, end.Z));
+                segments.Add(new(0, back, -size, end.X, end.Y, end.Z));
+            }
+            else
+            {
+                segments.Add(new(-size, 0, back, end.X, end.Y, end.Z));
+                segments.Add(new(size, 0, back, end.X, end.Y, end.Z));
+                segments.Add(new(0, -size, back, end.X, end.Y, end.Z));
+            }
+        }
         return segments;
     }
 
@@ -331,4 +357,117 @@ internal static class RekallAgeStudioSceneGizmoRenderables
         RekallAgeStudioTransformAxis.Y => (Math.Cos(angle) * AxisLength, 0, Math.Sin(angle) * AxisLength),
         _ => (Math.Cos(angle) * AxisLength, Math.Sin(angle) * AxisLength, 0)
     };
+}
+
+internal static class RekallAgeStudioViewportOverlayRenderables
+{
+    public static IReadOnlyList<RekallAgeRuntimeViewportRenderable> CreateGrid(int halfExtent = 20, double spacing = 1)
+    {
+        if (halfExtent < 1) throw new ArgumentOutOfRangeException(nameof(halfExtent));
+        if (!double.IsFinite(spacing) || spacing <= 0) throw new ArgumentOutOfRangeException(nameof(spacing));
+
+        var extent = halfExtent * spacing;
+        var minor = new List<RekallAgeRuntimeViewportLineSegment>(halfExtent * 4);
+        for (var index = -halfExtent; index <= halfExtent; index++)
+        {
+            if (index == 0) continue;
+            var offset = index * spacing;
+            minor.Add(new(-extent, 0, offset, extent, 0, offset));
+            minor.Add(new(offset, 0, -extent, offset, 0, extent));
+        }
+
+        return
+        [
+            Lines("__studio_grid", "Studio Grid", "#38414c", minor, 0.012, 0),
+            Lines("__studio_grid_x", "Studio X Axis", "#d34b4b", [new(-extent, 0, 0, extent, 0, 0)], 0.025, 1),
+            Lines("__studio_grid_z", "Studio Z Axis", "#4c79d8", [new(0, 0, -extent, 0, 0, extent)], 0.025, 2)
+        ];
+    }
+
+    public static RekallAgeRuntimeViewportRenderable? CreateSelectionOutline(
+        RekallAgeRuntimeViewportRenderable selected)
+    {
+        ArgumentNullException.ThrowIfNull(selected);
+        var vertices = selected.GeometryMesh?.Vertices;
+        double minX;
+        double maxX;
+        double minY;
+        double maxY;
+        double minZ;
+        double maxZ;
+        if (vertices is { Count: > 0 })
+        {
+            if (vertices.Any(vertex =>
+                !double.IsFinite(vertex.X) || !double.IsFinite(vertex.Y) || !double.IsFinite(vertex.Z))) return null;
+            minX = vertices.Min(vertex => vertex.X);
+            maxX = vertices.Max(vertex => vertex.X);
+            minY = vertices.Min(vertex => vertex.Y);
+            maxY = vertices.Max(vertex => vertex.Y);
+            minZ = vertices.Min(vertex => vertex.Z);
+            maxZ = vertices.Max(vertex => vertex.Z);
+        }
+        else if (RekallAgeVulkanSceneMeshBuilder.TryGetSupportedPrimitive(selected) is not null)
+        {
+            minX = minY = minZ = -0.5;
+            maxX = maxY = maxZ = 0.5;
+        }
+        else
+        {
+            return null;
+        }
+        var segments = Box(minX, maxX, minY, maxY, minZ, maxZ);
+        return Lines(
+            $"__studio_selection_{selected.EntityId}",
+            $"Selected {selected.EntityName}",
+            "#ff9f32",
+            segments,
+            0.035,
+            int.MaxValue - 10,
+            selected.X,
+            selected.Y,
+            selected.Z,
+            selected.RotationX,
+            selected.RotationY,
+            selected.RotationZ,
+            selected.ScaleX,
+            selected.ScaleY,
+            selected.ScaleZ);
+    }
+
+    private static IReadOnlyList<RekallAgeRuntimeViewportLineSegment> Box(
+        double minX, double maxX, double minY, double maxY, double minZ, double maxZ) =>
+    [
+        new(minX, minY, minZ, maxX, minY, minZ), new(maxX, minY, minZ, maxX, maxY, minZ),
+        new(maxX, maxY, minZ, minX, maxY, minZ), new(minX, maxY, minZ, minX, minY, minZ),
+        new(minX, minY, maxZ, maxX, minY, maxZ), new(maxX, minY, maxZ, maxX, maxY, maxZ),
+        new(maxX, maxY, maxZ, minX, maxY, maxZ), new(minX, maxY, maxZ, minX, minY, maxZ),
+        new(minX, minY, minZ, minX, minY, maxZ), new(maxX, minY, minZ, maxX, minY, maxZ),
+        new(maxX, maxY, minZ, maxX, maxY, maxZ), new(minX, maxY, minZ, minX, maxY, maxZ)
+    ];
+
+    private static RekallAgeRuntimeViewportRenderable Lines(
+        string id,
+        string name,
+        string color,
+        IReadOnlyList<RekallAgeRuntimeViewportLineSegment> segments,
+        double thickness,
+        int sortKey,
+        double x = 0,
+        double y = 0,
+        double z = 0,
+        double rotationX = 0,
+        double rotationY = 0,
+        double rotationZ = 0,
+        double scaleX = 1,
+        double scaleY = 1,
+        double scaleZ = 1) =>
+        new(id, name, "mesh", null, x, y, z, sortKey,
+            RotationX: rotationX, RotationY: rotationY, RotationZ: rotationZ,
+            ScaleX: scaleX, ScaleY: scaleY, ScaleZ: scaleZ,
+            MaterialColor: color, EmissiveColor: color, EmissiveStrength: 2,
+            LineSegments: new(segments, thickness), Layer: "studio-editor")
+        {
+            CastShadows = false,
+            ReceiveShadows = false
+        };
 }

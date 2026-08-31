@@ -1466,6 +1466,19 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             if (!Set(ref _worldViewportRenderStyle, value)) return;
             _previewSession.SetRenderStyle(RekallAgeStudioViewportRenderStyles.Parse(value));
+            RefreshWorldViewportStyle();
+        }
+    }
+
+    private async void RefreshWorldViewportStyle()
+    {
+        try
+        {
+            await PresentViewportAtHostSizeAsync(_previewSession.Metrics);
+        }
+        catch (Exception exception)
+        {
+            Log.Warning(exception, "Could not refresh the Studio viewport after changing render style.");
         }
     }
 
@@ -6063,6 +6076,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private void RefreshSceneGizmo()
     {
         var selected = SelectedEntityId is null ? null : FindEntityNode(EntityNodes, SelectedEntityId);
+        _previewSession.SetSelectedEntity(selected?.EntityId);
         var hasTransform3D = _currentModel?.Inspector.Components.Any(
             component => component.Type.Equals("Rekall.Transform3D", StringComparison.Ordinal)) == true;
         _sceneGizmo = _viewportInteraction is null || selected is null || !hasTransform3D

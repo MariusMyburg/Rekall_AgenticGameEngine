@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "Rekall.Age.Core/0.1.0-preview.1": {
+        "runtime": {
+          "Rekall.Age.Core.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Rekall.Age.Core/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

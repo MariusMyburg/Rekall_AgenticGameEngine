@@ -32,6 +32,36 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioViewModelTests
 {
     [Fact]
+    public async Task ChangingWorldViewportStyleImmediatelyPresentsTheCurrentVulkanFrame()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-style-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var preview = new RecordingPreviewSession();
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                preview)
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "Style Test",
+                SceneNameInput = "Main"
+            };
+            await ExecuteAsync(viewModel.CreateCommand);
+
+            viewModel.WorldViewportRenderStyle = "Wireframe";
+            await WaitForAsync(() => preview.PresentCurrentCount == 1);
+
+            Assert.Equal(RekallAgeStudioViewportRenderStyle.Wireframe, preview.RenderStyle);
+            Assert.Equal(1, preview.PresentCurrentCount);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task AgentMessageFeedbackKeepsTheCompleteMessageInItsDedicatedStream()
     {
         await using var viewModel = new RekallAgeStudioViewModel(
@@ -3631,6 +3661,12 @@ public sealed class StudioViewModelTests
         public void ReleaseChat() => _releaseChat.TrySetResult();
     }
 
+    private static async Task WaitForAsync(Func<bool> condition)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        while (!condition()) await Task.Delay(10, timeout.Token);
+    }
+
     private sealed class RecordingPreviewSession : IRekallAgeStudioPreviewSession
     {
         private int _frame;
@@ -3652,8 +3688,11 @@ public sealed class StudioViewModelTests
         public bool IsDisposalComplete { get; private set; }
         public bool ReturnUnavailable { get; set; }
         public bool ReturnResizeMismatchOnce { get; set; }
+        public RekallAgeStudioViewportRenderStyle RenderStyle { get; private set; } = RekallAgeStudioViewportRenderStyle.Textured;
         public RekallAgeStudioProjectModuleDiagnostic? ProjectModuleDiagnostic { get; set; }
         private bool _externalDependencyChangePending;
+
+        public void SetRenderStyle(RekallAgeStudioViewportRenderStyle style) => RenderStyle = style;
 
         public ValueTask<RekallAgeStudioPreviewFrame> ResetAsync(
             string projectRoot,

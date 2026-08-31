@@ -1,5 +1,6 @@
 using System.Windows.Controls;
 using System.Windows.Input;
+using Rekall.Age.Modeling.Contracts;
 
 namespace Rekall.Age.Studio;
 
@@ -25,6 +26,14 @@ public partial class ModelingWorkspace : UserControl
     }
 
     private RekallAgeStudioViewModel? ViewModel => DataContext as RekallAgeStudioViewModel;
+
+    private void OnLoopCutToolClicked(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (ViewModel is null) return;
+        ViewModel.MeshEditDomain = RekallAgeGeometryDomain.Edge;
+        if (ViewModel.MeshOperationIds.Contains("loop_cut_edges", StringComparer.Ordinal))
+            ViewModel.SelectedMeshOperationId = "loop_cut_edges";
+    }
 
     private void OnMeshMouseDown(object sender, MouseButtonEventArgs e)
     {

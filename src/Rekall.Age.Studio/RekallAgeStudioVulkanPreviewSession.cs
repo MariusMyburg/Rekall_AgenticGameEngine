@@ -13,11 +13,12 @@ internal sealed record RekallAgeStudioPreviewFrame(
     RekallAgeVulkanPresentationFrame Presentation,
     RekallAgeStudioViewportInteractionSnapshot Interaction,
     RekallAgeStudioProjectModuleDiagnostic? ProjectModuleDiagnostic = null,
-    RekallAgeStudioViewportPlacementContext? PlacementContext = null)
+    RekallAgeStudioViewportPlacementContext? PlacementContext = null,
+    int? SceneRenderableCount = null)
 {
     public int FrameIndex => Presentation.FrameIndex;
 
-    public int RenderableCount => Presentation.RenderableCount;
+    public int RenderableCount => SceneRenderableCount ?? Presentation.RenderableCount;
 
     public int ObservationCount => Presentation.ObservationCount;
 
@@ -51,12 +52,15 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
     private bool _assetsDirty;
     private RekallAgeStudioViewportRenderStyle _renderStyle = RekallAgeStudioViewportRenderStyle.Textured;
     private RekallAgeRuntimeViewportRenderable[] _editorRenderables = [];
+    private string? _selectedEntityId;
     private RekallAgeStudioProjectModuleDiagnostic? _projectModuleDiagnostic;
     private IRekallAgeStudioViewportDependencyMonitor? _dependencyMonitor;
     private bool _disposeStarted;
 
     public void SetEditorRenderables(IReadOnlyList<RekallAgeRuntimeViewportRenderable> renderables) =>
         _editorRenderables = renderables.Count == 0 ? [] : renderables.ToArray();
+
+    public void SetSelectedEntity(string? entityId) => _selectedEntityId = entityId;
     private bool _disposalComplete;
 
     internal RekallAgeStudioVulkanPreviewSession(IRekallAgeStudioViewportPresenter presenter)
@@ -455,14 +459,22 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
         CancellationToken cancellationToken)
     {
         var styledFrame = RekallAgeStudioViewportStyleAdapter.Apply(viewportFrame, _renderStyle);
-        var editorRenderables = _editorRenderables;
-        if (editorRenderables.Length > 0)
+        var overlays = new List<RekallAgeRuntimeViewportRenderable>(
+            RekallAgeStudioViewportOverlayRenderables.CreateGrid());
+        if (_selectedEntityId is { } selectedEntityId)
         {
-            styledFrame = styledFrame with
-            {
-                Renderables = styledFrame.Renderables.Concat(editorRenderables).ToArray()
-            };
+            var selected = styledFrame.Renderables.FirstOrDefault(renderable =>
+                string.Equals(renderable.EntityId, selectedEntityId, StringComparison.Ordinal));
+            var outline = selected is null
+                ? null
+                : RekallAgeStudioViewportOverlayRenderables.CreateSelectionOutline(selected);
+            if (outline is not null) overlays.Add(outline);
         }
+        overlays.AddRange(_editorRenderables);
+        styledFrame = styledFrame with
+        {
+            Renderables = styledFrame.Renderables.Concat(overlays).ToArray()
+        };
         var presentation = await _presenter.PresentAsync(
             styledFrame,
             assets,
@@ -478,7 +490,8 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
             presentation,
             RekallAgeStudioViewportInteractionBuilder.Build(viewportFrame, world.Entities),
             projectModuleDiagnostic,
-            RekallAgeStudioViewportPlacementContext.From(viewportFrame.ActiveCamera));
+            RekallAgeStudioViewportPlacementContext.From(viewportFrame.ActiveCamera),
+            viewportFrame.Renderables.Count);
     }
 
     private async ValueTask<RekallAgeStudioViewportDependencyChange> ApplyExternalDependencyChangesAsync(

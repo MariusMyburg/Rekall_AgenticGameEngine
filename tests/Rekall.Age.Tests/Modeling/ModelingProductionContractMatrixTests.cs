@@ -195,12 +195,12 @@ public sealed class ModelingProductionContractMatrixTests
     public void ProductionMatricesExactlyCoverThePublishedOperationAndModifierCatalogs()
     {
         var operationIds = new RekallAgeMeshOperationExecutor().Descriptors.Select(item => item.OperationId).ToArray();
-        Assert.Equal(31, operationIds.Length);
+        Assert.Equal(32, operationIds.Length);
         Assert.All(new[]
         {
             "transform", "reverse_faces", "triangulate_faces", "extrude_faces", "delete",
             "generate_normals", "shade_faces", "mark_sharp", "auto_smooth", "project_uv", "mark_uv_seams", "unwrap_pack_uv", "subdivide_faces", "subdivide_smooth", "set_edge_crease", "merge_by_distance",
-            "bevel_edges", "select_edges_by_angle", "assign_linear_skin_weights", "assign_envelope_skin_weights", "taper_points", "bend_points", "crater_stamp", "inset_faces", "solidify", "weighted_normals",
+            "bevel_edges", "loop_cut_edges", "select_edges_by_angle", "assign_linear_skin_weights", "assign_envelope_skin_weights", "taper_points", "bend_points", "crater_stamp", "inset_faces", "solidify", "weighted_normals",
             "fill_holes", "bridge_edge_loops", "poke_faces", "dissolve_edges", "bisect_plane"
         }, expected => Assert.Contains(expected, operationIds));
 
@@ -248,15 +248,18 @@ public sealed class ModelingProductionContractMatrixTests
         RekallAgeGeometryDomain domain,
         RekallAgeMeshAsset source)
     {
-        IReadOnlyList<ulong> elementIds = operationId is "extrude_faces" or "delete"
-            ? [source.Topology.FaceIds[0]]
-            : domain switch
+        IReadOnlyList<ulong> elementIds = operationId switch
+        {
+            "extrude_faces" or "delete" => [source.Topology.FaceIds[0]],
+            "loop_cut_edges" => [source.Topology.EdgeIds[0]],
+            _ => domain switch
             {
                 RekallAgeGeometryDomain.Point => source.Topology.PointIds,
                 RekallAgeGeometryDomain.Edge => source.Topology.EdgeIds,
                 RekallAgeGeometryDomain.Corner => source.Topology.CornerIds,
                 _ => source.Topology.FaceIds
-            };
+            }
+        };
         var parameters = operationId switch
         {
             "transform" => new JsonObject { ["x"] = 0.25, ["y"] = -0.5, ["z"] = 0.75 },

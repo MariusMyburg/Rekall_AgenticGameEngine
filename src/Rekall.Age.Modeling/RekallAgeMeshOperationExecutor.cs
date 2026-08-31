@@ -167,6 +167,12 @@ public sealed partial class RekallAgeMeshOperationExecutor
                 new("materialIndex", RekallAgeGeometryValueType.Int32, false, JsonSerializer.SerializeToElement(-1), "Material slot for generated bevel faces, or -1 to inherit adjacent source faces.")
             ]),
         new(
+            "loop_cut_edges",
+            "Splits the deterministic quad edge ring containing one selected seed edge at an authored factor.",
+            RekallAgeGeometryDomain.Edge,
+            RekallAgeMeshChangeKind.Topology | RekallAgeMeshChangeKind.Positions | RekallAgeMeshChangeKind.Attributes | RekallAgeMeshChangeKind.Selection,
+            [new("factor", RekallAgeGeometryValueType.Float, false, JsonSerializer.SerializeToElement(0.5), "Cut position strictly between zero and one along each ring edge.")]),
+        new(
             "select_edges_by_angle",
             "Creates or replaces a named edge selection from adjacent-face angle without changing geometry.",
             RekallAgeGeometryDomain.Edge,
@@ -315,6 +321,7 @@ public sealed partial class RekallAgeMeshOperationExecutor
             "set_edge_crease" => SetEdgeCrease(source, request),
             "merge_by_distance" => MergeByDistance(source, request),
             "bevel_edges" => BevelEdges(source, request),
+            "loop_cut_edges" => LoopCutEdges(source, request),
             "select_edges_by_angle" => SelectEdgesByAngle(source, request),
             "assign_linear_skin_weights" => AssignLinearSkinWeights(source, request),
             "assign_envelope_skin_weights" => AssignEnvelopeSkinWeights(source, request),

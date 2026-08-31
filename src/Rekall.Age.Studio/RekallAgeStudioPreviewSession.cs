@@ -39,6 +39,8 @@ internal interface IRekallAgeStudioPreviewSession : IAsyncDisposable
     void SetRenderStyle(RekallAgeStudioViewportRenderStyle style) { }
 
     void SetEditorRenderables(IReadOnlyList<Rekall.Age.Rendering.Abstractions.RekallAgeRuntimeViewportRenderable> renderables) { }
+
+    void SetSelectedEntity(string? entityId) { }
 }
 
 /// <summary>

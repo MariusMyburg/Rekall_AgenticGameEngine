@@ -200,6 +200,20 @@ public sealed class StudioLayoutTests
     }
 
     [Fact]
+    public void WorldViewportUsesACompactPersistentToolShelfAndSelectionOnlyTransformPanel()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+
+        Assert.Contains("x:Name=\"ViewportToolShelf\"", window, StringComparison.Ordinal);
+        Assert.Contains("Width=\"68\"", window, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding TransformTools}\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ViewportTransformPanel\" Grid.Column=\"2\"", window, StringComparison.Ordinal);
+        Assert.Contains("DataTrigger Binding=\"{Binding HasInspectorSelection}\" Value=\"True\"", window, StringComparison.Ordinal);
+        Assert.Contains("ToolTip=\"Select, move, rotate, or scale the current viewport selection\"", window, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StudioCarriesTheSharedVulkanRuntimePackagesIntoItsExecutableOutput()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));

@@ -1,0 +1,282 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "Rekall.Age.Runtime/0.1.0-preview.1": {
+        "dependencies": {
+          "BepuPhysics": "2.4.0",
+          "NLayer": "3.0.0",
+          "Rekall.Age.AssetPipeline": "0.1.0-preview.1",
+          "Rekall.Age.Assets": "0.1.0-preview.1",
+          "Rekall.Age.Core": "0.1.0-preview.1",
+          "Rekall.Age.Modeling": "0.1.0-preview.1",
+          "Rekall.Age.Modeling.Contracts": "0.1.0-preview.1",
+          "Rekall.Age.Modules": "0.1.0-preview.1",
+          "Rekall.Age.Rendering.Abstractions": "0.1.0-preview.1",
+          "Rekall.Age.Runtime.Abstractions": "0.1.0-preview.1",
+          "Rekall.Age.Validation": "0.1.0-preview.1",
+          "Rekall.Age.World": "0.1.0-preview.1"
+        },
+        "runtime": {
+          "Rekall.Age.Runtime.dll": {}
+        }
+      },
+      "BepuPhysics/2.4.0": {
+        "dependencies": {
+          "BepuUtilities": "2.4.0"
+        },
+        "runtime": {
+          "lib/net6.0/BepuPhysics.dll": {
+            "assemblyVersion": "2.4.0.0",
+            "fileVersion": "2.4.0.0"
+          }
+        }
+      },
+      "BepuUtilities/2.4.0": {
+        "runtime": {
+          "lib/net6.0/BepuUtilities.dll": {
+            "assemblyVersion": "2.4.0.0",
+            "fileVersion": "2.4.0.0"
+          }
+        }
+      },
+      "NLayer/3.0.0": {
+        "runtime": {
+          "lib/net8.0/NLayer.dll": {
+            "assemblyVersion": "3.0.0.0",
+            "fileVersion": "3.0.0.0"
+          }
+        }
+      },
+      "SamuelRe.CSG.Sharp/1.0.0": {
+        "runtime": {
+          "lib/net8.0/CSG.Sharp.Lib.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "Rekall.Age.AssetPipeline/0.1.0-preview.1": {
+        "dependencies": {
+          "Rekall.Age.Assets": "0.1.0-preview.1",
+          "Rekall.Age.Core": "0.1.0-preview.1",
+          "Rekall.Age.Modeling": "0.1.0-preview.1",
+          "Rekall.Age.Modeling.Contracts": "0.1.0-preview.1"
+        },
+        "runtime": {
+          "Rekall.Age.AssetPipeline.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Rekall.Age.Assets/0.1.0-preview.1": {
+        "dependencies": {
+          "Rekall.Age.Core": "0.1.0-preview.1"
+        },
+        "runtime": {
+          "Rekall.Age.Assets.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Rekall.Age.Core/0.1.0-preview.1": {
+        "runtime": {
+          "Rekall.Age.Core.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Rekall.Age.Modeling/0.1.0-preview.1": {
+        "dependencies": {
+          "Rekall.Age.Core": "0.1.0-preview.1",
+          "Rekall.Age.Modeling.Contracts": "0.1.0-preview.1",
+          "Rekall.Age.Modules": "0.1.0-preview.1",
+          "SamuelRe.CSG.Sharp": "1.0.0"
+        },
+        "runtime": {
+          "Rekall.Age.Modeling.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Rekall.Age.Modeling.Contracts/0.1.0-preview.1": {
+        "runtime": {
+          "Rekall.Age.Modeling.Contracts.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Rekall.Age.Modules/0.1.0-preview.1": {
+        "dependencies": {
+          "Rekall.Age.Core": "0.1.0-preview.1",
+          "Rekall.Age.Modeling.Contracts": "0.1.0-preview.1",
+          "Rekall.Age.Runtime.Abstractions": "0.1.0-preview.1"
+        },
+        "runtime": {
+          "Rekall.Age.Modules.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Rekall.Age.Project/0.1.0-preview.1": {
+        "dependencies": {
+          "Rekall.Age.Core": "0.1.0-preview.1"
+        },
+        "runtime": {
+          "Rekall.Age.Project.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Rekall.Age.Rendering.Abstractions/0.1.0-preview.1": {
+        "dependencies": {
+          "Rekall.Age.World": "0.1.0-preview.1"
+        },
+        "runtime": {
+          "Rekall.Age.Rendering.Abstractions.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Rekall.Age.Runtime.Abstractions/0.1.0-preview.1": {
+        "dependencies": {
+          "Rekall.Age.Rendering.Abstractions": "0.1.0-preview.1",
+          "Rekall.Age.World": "0.1.0-preview.1"
+        },
+        "runtime": {
+          "Rekall.Age.Runtime.Abstractions.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Rekall.Age.Validation/0.1.0-preview.1": {
+        "dependencies": {
+          "Rekall.Age.Core": "0.1.0-preview.1",
+          "Rekall.Age.Modules": "0.1.0-preview.1",
+          "Rekall.Age.Project": "0.1.0-preview.1",
+          "Rekall.Age.World": "0.1.0-preview.1"
+        },
+        "runtime": {
+          "Rekall.Age.Validation.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Rekall.Age.World/0.1.0-preview.1": {
+        "dependencies": {
+          "Rekall.Age.Core": "0.1.0-preview.1"
+        },
+        "runtime": {
+          "Rekall.Age.World.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Rekall.Age.Runtime/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "BepuPhysics/2.4.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Ck/BJgSQrBqYrj0T9jGljDdHNILBP5kTPTylc7N/hCzR1XJJc7p6ORzwtjTfjgoYkkdajvLHxEQv6BRC8kaysQ==",
+      "path": "bepuphysics/2.4.0",
+      "hashPath": "bepuphysics.2.4.0.nupkg.sha512"
+    },
+    "BepuUtilities/2.4.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-KNMxkzKLHAvV7jRtErxs3rPv71fHToqo/WN96HlT6iomWuwL97tohEbt0B1WA8A6sO5t6PP+qF08d4T9A8k2uA==",
+      "path": "bepuutilities/2.4.0",
+      "hashPath": "bepuutilities.2.4.0.nupkg.sha512"
+    },
+    "NLayer/3.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-aQrCT93NjIrJNXA7wiTSHMp9OUhGNb8YTJAwnsx2FtaNdAe74vwfguFExf6QFNU72XhNPb/bLAcdMbxvaNZgWg==",
+      "path": "nlayer/3.0.0",
+      "hashPath": "nlayer.3.0.0.nupkg.sha512"
+    },
+    "SamuelRe.CSG.Sharp/1.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-O08bJk78p96Nomx3BOctu6Du65lNbYfsow/rWAmD0fa1UqcECK4IV7JPcUPL3CdRodECOuoyq5V0PKkRi+/94w==",
+      "path": "samuelre.csg.sharp/1.0.0",
+      "hashPath": "samuelre.csg.sharp.1.0.0.nupkg.sha512"
+    },
+    "Rekall.Age.AssetPipeline/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.Assets/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.Core/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.Modeling/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.Modeling.Contracts/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.Modules/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.Project/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.Rendering.Abstractions/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.Runtime.Abstractions/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.Validation/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.World/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

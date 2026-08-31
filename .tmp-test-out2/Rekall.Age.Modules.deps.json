@@ -1,0 +1,103 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "Rekall.Age.Modules/0.1.0-preview.1": {
+        "dependencies": {
+          "Rekall.Age.Core": "0.1.0-preview.1",
+          "Rekall.Age.Modeling.Contracts": "0.1.0-preview.1",
+          "Rekall.Age.Runtime.Abstractions": "0.1.0-preview.1"
+        },
+        "runtime": {
+          "Rekall.Age.Modules.dll": {}
+        }
+      },
+      "Rekall.Age.Core/0.1.0-preview.1": {
+        "runtime": {
+          "Rekall.Age.Core.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Rekall.Age.Modeling.Contracts/0.1.0-preview.1": {
+        "runtime": {
+          "Rekall.Age.Modeling.Contracts.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Rekall.Age.Rendering.Abstractions/0.1.0-preview.1": {
+        "dependencies": {
+          "Rekall.Age.World": "0.1.0-preview.1"
+        },
+        "runtime": {
+          "Rekall.Age.Rendering.Abstractions.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Rekall.Age.Runtime.Abstractions/0.1.0-preview.1": {
+        "dependencies": {
+          "Rekall.Age.Rendering.Abstractions": "0.1.0-preview.1",
+          "Rekall.Age.World": "0.1.0-preview.1"
+        },
+        "runtime": {
+          "Rekall.Age.Runtime.Abstractions.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "Rekall.Age.World/0.1.0-preview.1": {
+        "dependencies": {
+          "Rekall.Age.Core": "0.1.0-preview.1"
+        },
+        "runtime": {
+          "Rekall.Age.World.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Rekall.Age.Modules/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.Core/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.Modeling.Contracts/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.Rendering.Abstractions/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.Runtime.Abstractions/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Rekall.Age.World/0.1.0-preview.1": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

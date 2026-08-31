@@ -51,6 +51,19 @@ public sealed class StudioLayoutTests
     }
 
     [Fact]
+    public void WorldTransformSnapEditorsRemainReadableAtScaledDpi()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+
+        Assert.Contains("x:Name=\"MoveSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"RotationSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ScaleSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("<TextBox Width=\"40\" Text=\"{Binding RotationSnap", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("<TextBox Width=\"45\" Text=\"{Binding MoveSnap", window, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StudioCarriesTheSharedVulkanRuntimePackagesIntoItsExecutableOutput()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));

@@ -526,6 +526,10 @@ internal interface IRekallAgeVulkanViewportNativeWindow
     {
     }
 
+    void RefreshParentSurface(IntPtr hwnd)
+    {
+    }
+
     (int Width, int Height) GetClientSize(IntPtr hwnd);
 
     (int X, int Y) ScreenToClient(IntPtr hwnd, int x, int y);
@@ -649,6 +653,8 @@ internal sealed class RekallAgeVulkanViewportHostCore
                 cancellationToken);
         }
 
+        _native.RefreshParentSurface(_child);
+
         MetricsChanged?.Invoke(this, coherent);
     }
 
@@ -657,6 +663,7 @@ internal sealed class RekallAgeVulkanViewportHostCore
         _presentationVisible = visible;
         if (_child == IntPtr.Zero || _destroyed) return;
         _native.SetVisible(_child, visible && Metrics.IsPresentable);
+        _native.RefreshParentSurface(_child);
     }
 
     internal bool ProcessWindowMessage(int message, IntPtr wParam, IntPtr lParam)
@@ -922,6 +929,9 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
     private const uint SwpNoSize = 0x0001;
     private const uint SwpShowWindow = 0x0040;
     private const uint SwpHideWindow = 0x0080;
+    private const uint RedrawInvalidate = 0x0001;
+    private const uint RedrawErase = 0x0004;
+    private const uint RedrawUpdateNow = 0x0100;
     private static readonly IntPtr ModuleHandle = GetModuleHandleW(null);
     private static readonly WindowProcedure VulkanChildWindowProcedure = ProcessVulkanChildWindowMessage;
     private static readonly Lazy<ushort> VulkanChildWindowClass = new(RegisterVulkanChildWindowClass);
@@ -1018,6 +1028,20 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
         var flags = SwpNoActivate | SwpNoZOrder | SwpNoMove | SwpNoSize
             | (visible ? SwpShowWindow : SwpHideWindow);
         if (!SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, flags))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+    }
+
+    public void RefreshParentSurface(IntPtr hwnd)
+    {
+        var parent = GetParent(hwnd);
+        if (parent == IntPtr.Zero) return;
+        if (!RedrawWindow(
+                parent,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                RedrawInvalidate | RedrawErase | RedrawUpdateNow))
         {
             throw new Win32Exception(Marshal.GetLastWin32Error());
         }
@@ -1169,6 +1193,17 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
         int y,
         int width,
         int height,
+        uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetParent(IntPtr hwnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool RedrawWindow(
+        IntPtr hwnd,
+        IntPtr updateRectangle,
+        IntPtr updateRegion,
         uint flags);
 
     [DllImport("user32.dll", SetLastError = true)]

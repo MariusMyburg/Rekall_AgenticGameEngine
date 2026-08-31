@@ -167,6 +167,7 @@ public sealed class StudioVulkanViewportHostTests
         Assert.Equal(451, surface.Metrics.PixelHeight);
         Assert.Equal(401, surface.Metrics.DipWidth);
         Assert.Equal(226, surface.Metrics.DipHeight);
+        Assert.Equal(1, native.ParentSurfaceRefreshCount);
     }
 
     [Fact]
@@ -182,6 +183,23 @@ public sealed class StudioVulkanViewportHostTests
 
         Assert.Equal([false], native.VisibilityChanges);
         Assert.False(surface.Metrics.IsPresentable);
+        Assert.Equal(1, native.ParentSurfaceRefreshCount);
+    }
+
+    [Fact]
+    public async Task PresentationVisibilityChangeRefreshesTheWpfParentToClearExposedNativePixels()
+    {
+        var native = new RecordingNativeWindow();
+        var surface = new RecordingSurfaceController(native.Order);
+        var core = new RekallAgeVulkanViewportHostCore(native, surface);
+        core.BuildWindow(new IntPtr(17));
+        core.QueueResize(400, 225, 1, 1, isVisible: true);
+        await core.ApplyPendingResizeAsync(CancellationToken.None);
+
+        core.SetPresentationVisible(false);
+
+        Assert.Equal([true, false], native.VisibilityChanges);
+        Assert.Equal(2, native.ParentSurfaceRefreshCount);
     }
 
     [Fact]
@@ -839,6 +857,8 @@ public sealed class StudioVulkanViewportHostTests
 
         public int AttachMessageHandlerCount { get; private set; }
 
+        public int ParentSurfaceRefreshCount { get; private set; }
+
         private Func<int, IntPtr, IntPtr, bool>? MessageHandler { get; set; }
 
         public int VerifiedClientWidth { get; init; }
@@ -900,6 +920,12 @@ public sealed class StudioVulkanViewportHostTests
         {
             Assert.Equal(_child, hwnd);
             VisibilityChanges.Add(visible);
+        }
+
+        public void RefreshParentSurface(IntPtr hwnd)
+        {
+            Assert.Equal(_child, hwnd);
+            ParentSurfaceRefreshCount++;
         }
 
         public (int Width, int Height) GetClientSize(IntPtr hwnd)

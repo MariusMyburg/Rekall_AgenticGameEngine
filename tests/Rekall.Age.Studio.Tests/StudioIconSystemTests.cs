@@ -44,6 +44,7 @@ public sealed class StudioIconSystemTests(WpfApplicationTestFixture wpf)
     [InlineData("IconLocalModel", 5)]
     [InlineData("IconFileModel", 4)]
     [InlineData("IconAgent", 5)]
+    [InlineData("IconDownload", 2)]
     public void CompoundOutlineIconsRetainIndependentDetailFigures(string resourceKey, int minimumFigures)
     {
         wpf.Invoke(() =>
@@ -67,6 +68,7 @@ public sealed class StudioIconSystemTests(WpfApplicationTestFixture wpf)
         Assert.Contains("{StaticResource IconCheck}", wizard, StringComparison.Ordinal);
         Assert.Contains("Data=\"{StaticResource IconLocalModel}\" Style=\"{StaticResource StudioIconPath}\"", wizard, StringComparison.Ordinal);
         Assert.Contains("Data=\"{StaticResource IconCloud}\" Style=\"{StaticResource StudioFilledIconPath}\"", wizard, StringComparison.Ordinal);
+        Assert.Contains("Data=\"{StaticResource IconDownload}\" Style=\"{StaticResource StudioIconPath}\"", wizard, StringComparison.Ordinal);
         Assert.Contains("Text=\"Back\"", wizard, StringComparison.Ordinal);
         Assert.Contains("Text=\"Next\"", wizard, StringComparison.Ordinal);
         Assert.Contains("Text=\"Finish\"", wizard, StringComparison.Ordinal);

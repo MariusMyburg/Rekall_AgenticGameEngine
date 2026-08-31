@@ -187,7 +187,7 @@ internal sealed class RekallAgeLanguageModelReadinessProbe : IRekallAgeLanguageM
         CancellationToken cancellationToken)
     {
         var isDefaultEndpoint = IsDefaultOllamaEndpoint(settings.OllamaUrl);
-        if (isDefaultEndpoint)
+        if (isDefaultEndpoint || providerId == "gguf")
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrWhiteSpace(_executableLocator.FindOllamaExecutable()))

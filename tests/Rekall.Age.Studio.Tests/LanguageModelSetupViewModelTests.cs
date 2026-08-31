@@ -150,6 +150,29 @@ public sealed class LanguageModelSetupViewModelTests
     }
 
     [Fact]
+    public async Task GgufNoModelsAllowsImportPickerAfterRuntimeAndEndpointPrerequisitesPass()
+    {
+        var probe = new RecordingProbe((request, _) => Task.FromResult(new RekallAgeLanguageModelReadinessResult(
+            request.ProviderId,
+            RekallAgeLanguageModelReadinessState.Blocked,
+            "REKALL_ONBOARDING_NO_MODELS",
+            "No models are installed yet.",
+            [
+                new("ollama-runtime", RekallAgeLanguageModelReadinessState.Ready, "Ollama is installed."),
+                new("ollama-endpoint", RekallAgeLanguageModelReadinessState.Ready, "Ollama is identified.")
+            ],
+            [],
+            "download-default-model",
+            true)));
+        await using var viewModel = CreateViewModel(probe: probe);
+
+        await viewModel.SelectProviderAsync("gguf");
+
+        Assert.True(viewModel.CanBrowseGguf);
+        Assert.False(viewModel.CanFinish);
+    }
+
+    [Fact]
     public async Task InitialStateStartsAtWelcomeAndNavigatesTheFiveProviderNeutralSteps()
     {
         await using var viewModel = CreateViewModel();

@@ -43,11 +43,29 @@ internal interface IRekallAgeStudioProcessLauncher
 
 internal static class RekallAgeStudioLocalModelReadiness
 {
-    public static bool CanBrowseGguf(string providerId, RekallAgeLanguageModelReadinessState state) =>
-        providerId == "gguf" && state == RekallAgeLanguageModelReadinessState.Ready;
+    public static bool CanBrowseGguf(
+        string providerId,
+        IEnumerable<RekallAgeLanguageModelReadinessCheck> checks) =>
+        providerId == "gguf"
+        && HasReady(checks.Select(check => (check.Id, check.State)));
+
+    public static bool CanBrowseGguf(
+        string providerId,
+        IEnumerable<RekallAgeStudioLanguageModelReadinessRow> rows) =>
+        providerId == "gguf"
+        && HasReady(rows.Select(row => (row.Id, row.State)));
 
     public static bool CanBrowseGguf(string providerId, bool runtimeReady) =>
         providerId == "gguf" && runtimeReady;
+
+    private static bool HasReady(IEnumerable<(string Id, RekallAgeLanguageModelReadinessState State)> checks)
+    {
+        var states = checks.ToDictionary(check => check.Id, check => check.State, StringComparer.Ordinal);
+        return states.TryGetValue("ollama-runtime", out var runtime)
+            && runtime == RekallAgeLanguageModelReadinessState.Ready
+            && states.TryGetValue("ollama-endpoint", out var endpoint)
+            && endpoint == RekallAgeLanguageModelReadinessState.Ready;
+    }
 }
 
 internal sealed class RekallAgeStudioLanguageModelSetupActions(
@@ -247,7 +265,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     public bool IsOpenAiSelected => SelectedProviderId == "openai";
     public bool IsCodexSelected => SelectedProviderId == "codex";
 
-    public bool CanBrowseGguf => RekallAgeStudioLocalModelReadiness.CanBrowseGguf(SelectedProviderId, ReadinessState);
+    public bool CanBrowseGguf => RekallAgeStudioLocalModelReadiness.CanBrowseGguf(SelectedProviderId, ReadinessRows);
 
     public ObservableCollection<string> CompatibleModels { get; } = [];
     public ObservableCollection<RekallAgeStudioLanguageModelReadinessRow> ReadinessRows { get; } = [];

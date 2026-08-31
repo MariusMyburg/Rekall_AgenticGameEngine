@@ -7,7 +7,6 @@ namespace Rekall.Age.Studio;
 public partial class AuthorWorkspace : UserControl
 {
     private readonly IRekallAgeStudioGgufFilePicker _ggufFilePicker;
-    private readonly Func<RekallAgeStudioViewModel, bool> _canBrowseGguf;
     internal Func<CancellationToken, Task>? FixSetupRequested { get; set; }
 
     public AuthorWorkspace() : this(null)
@@ -15,11 +14,9 @@ public partial class AuthorWorkspace : UserControl
     }
 
     internal AuthorWorkspace(
-        IRekallAgeStudioGgufFilePicker? ggufFilePicker,
-        Func<RekallAgeStudioViewModel, bool>? canBrowseGguf = null)
+        IRekallAgeStudioGgufFilePicker? ggufFilePicker)
     {
         _ggufFilePicker = ggufFilePicker ?? SystemAuthorGgufFilePicker.Instance;
-        _canBrowseGguf = canBrowseGguf ?? (viewModel => viewModel.CanBrowseGguf);
         InitializeComponent();
     }
 
@@ -47,7 +44,7 @@ public partial class AuthorWorkspace : UserControl
     private async void OnImportGgufClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not RekallAgeStudioViewModel viewModel) return;
-        if (!_canBrowseGguf(viewModel)) return;
+        if (!viewModel.CanBrowseGguf) return;
         var path = _ggufFilePicker.Pick(Window.GetWindow(this), "Import a local GGUF model");
         if (path is not null) await viewModel.ImportGgufModelAsync(path);
     }

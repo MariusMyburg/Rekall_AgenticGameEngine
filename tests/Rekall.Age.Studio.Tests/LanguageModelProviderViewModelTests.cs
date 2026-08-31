@@ -76,6 +76,7 @@ public sealed class LanguageModelProviderViewModelTests
             importer);
         viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "gguf");
         await viewModel.WaitForLanguageModelProviderTransitionAsync();
+        AllowGgufImport(viewModel);
 
         await viewModel.ImportGgufModelAsync("C:\\private\\model.gguf");
 
@@ -110,6 +111,7 @@ public sealed class LanguageModelProviderViewModelTests
             importer);
         viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "gguf");
         await viewModel.WaitForLanguageModelProviderTransitionAsync();
+        AllowGgufImport(viewModel);
 
         await viewModel.ImportGgufModelAsync("C:\\private\\no-tools.gguf");
 
@@ -132,6 +134,7 @@ public sealed class LanguageModelProviderViewModelTests
             importer);
         viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "gguf");
         await viewModel.WaitForLanguageModelProviderTransitionAsync();
+        AllowGgufImport(viewModel);
 
         await viewModel.ImportGgufModelAsync("C:\\private\\model.gguf");
 
@@ -152,6 +155,20 @@ public sealed class LanguageModelProviderViewModelTests
             return ValueTask.FromResult(import(ggufPath));
         }
     }
+
+    private static void AllowGgufImport(RekallAgeStudioViewModel viewModel) =>
+        viewModel.SetLocalModelPrerequisiteReadiness(new RekallAgeLanguageModelReadinessResult(
+            "gguf",
+            RekallAgeLanguageModelReadinessState.Blocked,
+            "REKALL_ONBOARDING_NO_MODELS",
+            "No models installed.",
+            [
+                new("ollama-runtime", RekallAgeLanguageModelReadinessState.Ready, "installed"),
+                new("ollama-endpoint", RekallAgeLanguageModelReadinessState.Ready, "identified")
+            ],
+            [],
+            "download-default-model",
+            true));
 
     private sealed class EmptyLanguageModel : IRekallAgeLanguageModelClient
     {

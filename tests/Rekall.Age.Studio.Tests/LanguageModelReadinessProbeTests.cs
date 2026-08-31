@@ -59,6 +59,21 @@ public sealed class LanguageModelReadinessProbeTests
     }
 
     [Fact]
+    public async Task GgufImportRequiresLocalExecutableEvenWithACustomOllamaEndpoint()
+    {
+        var fixture = new ProbeFixture { ExecutablePath = null };
+
+        var result = await fixture.ProbeAsync(
+            "gguf",
+            settings: new RekallAgeLanguageModelProviderSettings { OllamaUrl = "https://models.example.test" });
+
+        AssertResult(result, "gguf", RekallAgeLanguageModelReadinessState.Blocked,
+            "REKALL_ONBOARDING_OLLAMA_RUNTIME_MISSING", "open-ollama-download", canRetry: true);
+        Assert.Equal(0, fixture.IdentityCalls);
+        Assert.Equal(0, fixture.LeaseCalls);
+    }
+
+    [Fact]
     public async Task NonOllamaEndpointIsReportedAsInvalidWithoutResponseDetail()
     {
         var fixture = new ProbeFixture

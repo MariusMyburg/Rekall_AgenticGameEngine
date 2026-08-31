@@ -155,7 +155,7 @@ public sealed class LanguageModelSetupWindowTests(WpfApplicationTestFixture wpf)
             var owner = new Window();
             owner.Show();
             var picker = new RecordingGgufPicker();
-            var blocked = CreateViewModel(probe: new FixedReadinessProbe(RekallAgeLanguageModelReadinessState.Blocked));
+            var blocked = CreateViewModel(probe: new FixedReadinessProbe("REKALL_ONBOARDING_OLLAMA_SERVICE_STOPPED"));
             await blocked.SelectProviderAsync("gguf");
             var blockedWindow = new LanguageModelSetupWindow(owner, blocked, ggufFilePicker: picker);
             blockedWindow.Show();
@@ -164,7 +164,7 @@ public sealed class LanguageModelSetupWindowTests(WpfApplicationTestFixture wpf)
             Assert.Equal(0, picker.ShowCount);
             await CloseWindowAsync(blockedWindow);
 
-            var ready = CreateViewModel(probe: new FixedReadinessProbe(RekallAgeLanguageModelReadinessState.Ready));
+            var ready = CreateViewModel(probe: new FixedReadinessProbe("REKALL_ONBOARDING_NO_MODELS"));
             await ready.SelectProviderAsync("gguf");
             var readyWindow = new LanguageModelSetupWindow(owner, ready, ggufFilePicker: picker);
             readyWindow.Show();
@@ -186,12 +186,15 @@ public sealed class LanguageModelSetupWindowTests(WpfApplicationTestFixture wpf)
             var studio = new RekallAgeStudioViewModel(
                 new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
                 client);
-            var blocked = new AuthorWorkspace(picker, _ => false) { DataContext = studio };
+            studio.SelectedLanguageModelProvider = studio.LanguageModelProviders.Single(provider => provider.Id == "gguf");
+            studio.SetLocalModelPrerequisiteReadiness(LocalReadiness("REKALL_ONBOARDING_OLLAMA_SERVICE_STOPPED"));
+            var blocked = new AuthorWorkspace(picker) { DataContext = studio };
             Assert.IsType<Button>(blocked.FindName("ImportGgufButton"))
                 .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.Equal(0, picker.ShowCount);
 
-            var ready = new AuthorWorkspace(picker, _ => true) { DataContext = studio };
+            studio.SetLocalModelPrerequisiteReadiness(LocalReadiness("REKALL_ONBOARDING_NO_MODELS"));
+            var ready = new AuthorWorkspace(picker) { DataContext = studio };
             Assert.IsType<Button>(ready.FindName("ImportGgufButton"))
                 .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.Equal(1, picker.ShowCount);
@@ -338,16 +341,29 @@ public sealed class LanguageModelSetupWindowTests(WpfApplicationTestFixture wpf)
                 true));
     }
 
-    private sealed class FixedReadinessProbe(RekallAgeLanguageModelReadinessState state)
+    private sealed class FixedReadinessProbe(string code)
         : IRekallAgeLanguageModelReadinessProbe
     {
         public ValueTask<RekallAgeLanguageModelReadinessResult> ProbeAsync(
             RekallAgeLanguageModelReadinessRequest request,
-            CancellationToken cancellationToken) => ValueTask.FromResult(new RekallAgeLanguageModelReadinessResult(
-                request.ProviderId, state, "fixed", "fixed", [],
-                state == RekallAgeLanguageModelReadinessState.Ready ? ["qwen3.8:27b"] : [],
-                state == RekallAgeLanguageModelReadinessState.Ready ? null : "start-ollama",
-                state != RekallAgeLanguageModelReadinessState.Ready));
+            CancellationToken cancellationToken)
+        {
+            var prerequisitesReady = code == "REKALL_ONBOARDING_NO_MODELS";
+            return ValueTask.FromResult(new RekallAgeLanguageModelReadinessResult(
+                request.ProviderId,
+                RekallAgeLanguageModelReadinessState.Blocked,
+                code,
+                "fixed",
+                prerequisitesReady
+                    ? [
+                        new("ollama-runtime", RekallAgeLanguageModelReadinessState.Ready, "installed"),
+                        new("ollama-endpoint", RekallAgeLanguageModelReadinessState.Ready, "identified")
+                    ]
+                    : [new("ollama-runtime", RekallAgeLanguageModelReadinessState.Ready, "installed")],
+                [],
+                prerequisitesReady ? "download-default-model" : "start-ollama",
+                true));
+        }
     }
 
     private sealed class RecordingGgufPicker : IRekallAgeStudioGgufFilePicker
@@ -358,6 +374,25 @@ public sealed class LanguageModelSetupWindowTests(WpfApplicationTestFixture wpf)
             ShowCount++;
             return "C:\\models\\ready.gguf";
         }
+    }
+
+    private static RekallAgeLanguageModelReadinessResult LocalReadiness(string code)
+    {
+        var prerequisitesReady = code == "REKALL_ONBOARDING_NO_MODELS";
+        return new RekallAgeLanguageModelReadinessResult(
+            "gguf",
+            RekallAgeLanguageModelReadinessState.Blocked,
+            code,
+            "fixed",
+            prerequisitesReady
+                ? [
+                    new("ollama-runtime", RekallAgeLanguageModelReadinessState.Ready, "installed"),
+                    new("ollama-endpoint", RekallAgeLanguageModelReadinessState.Ready, "identified")
+                ]
+                : [new("ollama-runtime", RekallAgeLanguageModelReadinessState.Ready, "installed")],
+            [],
+            prerequisitesReady ? "download-default-model" : "start-ollama",
+            true);
     }
 
     private sealed class EmptyLanguageModelClient : IRekallAgeLanguageModelClient, IDisposable

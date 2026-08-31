@@ -1028,6 +1028,20 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         RefreshCommands();
     }
 
+    internal void SetLocalModelPrerequisiteAvailability(bool available)
+    {
+        if (_localModelRuntimeReady == available) return;
+        _localModelRuntimeReady = available;
+        OnPropertyChanged(nameof(CanBrowseGguf));
+    }
+
+    internal void SetLocalModelPrerequisiteReadiness(RekallAgeLanguageModelReadinessResult readiness)
+    {
+        ArgumentNullException.ThrowIfNull(readiness);
+        SetLocalModelPrerequisiteAvailability(
+            RekallAgeStudioLocalModelReadiness.CanBrowseGguf(readiness.ProviderId, readiness.Checks));
+    }
+
     public RekallAgeCodexApprovalCallback? CodexApprovalHandler { get; set; }
 
     public RekallAgeCodexAuthenticationLauncher? CodexAuthenticationLauncher { get; set; }
@@ -4224,8 +4238,6 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         var previousSelection = SelectedLanguageModel;
         var isOllamaBacked = provider.Id is "ollama" or "gguf";
-        _localModelRuntimeReady = isOllamaBacked;
-        OnPropertyChanged(nameof(CanBrowseGguf));
         var authoringModels = isOllamaBacked
             ? models.Where(model => model.SupportsTools is not false).ToArray()
             : models.ToArray();

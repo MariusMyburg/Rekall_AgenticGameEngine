@@ -118,6 +118,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupCoordinator
         if (_isAutomation())
         {
             studio.SetLanguageModelSetupAvailability(true);
+            studio.SetLocalModelPrerequisiteAvailability(true);
             IsSetupIncomplete = false;
             ShouldRefreshLanguageModels = false;
             SetupStatusText = "AI setup skipped for automation.";
@@ -167,6 +168,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupCoordinator
         ShouldRefreshLanguageModels = setup.IsComplete && ready;
         IsSetupIncomplete = !setup.IsComplete || !ready;
         studio.SetLanguageModelSetupAvailability(!IsSetupIncomplete);
+        studio.SetLocalModelPrerequisiteReadiness(readiness);
         SetupStatusText = IsSetupIncomplete ? "AI setup incomplete." : "AI setup ready.";
         if (IsSetupIncomplete)
         {
@@ -249,6 +251,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupCoordinator
                 ShouldRefreshLanguageModels = true;
                 SetupStatusText = "AI setup ready.";
                 studio.SetLanguageModelSetupAvailability(true);
+                studio.SetLocalModelPrerequisiteAvailability(viewModel.CanBrowseGguf);
                 return;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -266,6 +269,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupCoordinator
         ShouldRefreshLanguageModels = false;
         SetupStatusText = "AI setup incomplete.";
         studio.SetLanguageModelSetupAvailability(false);
+        studio.SetLocalModelPrerequisiteAvailability(viewModel.CanBrowseGguf);
     }
 
     private async Task<ResolvedCredentials> ResolveCredentialsAsync(

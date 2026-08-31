@@ -110,6 +110,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeStudioContentImportSession _contentImportSession;
     private readonly RekallAgeStudioContentDragService _contentDragService;
     private readonly IRekallAgeStudioContentPreviewService _contentPreviewService;
+    private readonly IRekallAgeStudioExternalContentLauncher _externalContentLauncher;
     private readonly Action<string> _openPackageFolder;
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
@@ -354,6 +355,19 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     internal RekallAgeStudioViewModel(
         RekallAgeWorkbenchSession session,
+        IRekallAgeStudioExternalContentLauncher externalContentLauncher)
+        : this(
+            session,
+            new RekallAgeLanguageModelProviderCatalog(),
+            null,
+            new RekallAgeStudioPreviewSession(),
+            null,
+            externalContentLauncher: externalContentLauncher)
+    {
+    }
+
+    internal RekallAgeStudioViewModel(
+        RekallAgeWorkbenchSession session,
         IRekallAgeStudioPreviewSession previewSession,
         RekallAgeStudioContentImportSession contentImportSession)
         : this(
@@ -443,7 +457,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         Action<string>? openPackageFolder,
         IRekallAgeStudioMonotonicClock? monotonicClock = null,
         IRekallAgeGgufImporter? ggufImporter = null,
-        RekallAgeStudioContentImportSession? contentImportSession = null)
+        RekallAgeStudioContentImportSession? contentImportSession = null,
+        IRekallAgeStudioExternalContentLauncher? externalContentLauncher = null)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _languageModelProviderCatalog = languageModelProviderCatalog
@@ -453,6 +468,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             monotonicClock ?? new RekallAgeStudioStopwatchClock());
         _ggufImporter = ggufImporter ?? new RekallAgeOllamaGgufImporter();
         _openPackageFolder = openPackageFolder ?? OpenDirectoryInExplorer;
+        _externalContentLauncher = externalContentLauncher ?? new RekallAgeStudioShellExternalContentLauncher();
         _contentOpenRouter = new RekallAgeStudioContentOpenRouter(this);
         _contentImportSession = contentImportSession ?? new RekallAgeStudioContentImportSession(
             new RekallAgeStudioAssetImportCommand(),
@@ -5785,15 +5801,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     ValueTask IRekallAgeStudioContentOpenTarget.OpenAssociatedAsync(
         RekallAgeContentBrowserItem item, CancellationToken cancellationToken) =>
-        OpenAssociatedContentAsync(item, cancellationToken);
+        _externalContentLauncher.OpenAsync(item.Path!, cancellationToken);
 
-    private static ValueTask OpenAssociatedContentAsync(
-        RekallAgeContentBrowserItem item, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        Process.Start(new ProcessStartInfo(item.Path!) { UseShellExecute = true });
-        return ValueTask.CompletedTask;
-    }
 
     private void ApplyContentModel(RekallAgeContentBrowserModel content)
     {

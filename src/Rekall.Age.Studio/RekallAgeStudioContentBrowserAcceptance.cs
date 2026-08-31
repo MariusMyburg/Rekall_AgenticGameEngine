@@ -80,7 +80,9 @@ internal static class RekallAgeStudioContentBrowserAcceptance
             throw new InvalidDataException("Acceptance phases did not cross a distinct Studio process boundary.");
 
         var session = new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create());
-        await using var viewModel = new RekallAgeStudioViewModel(session);
+        var validatedExternalPaths = new List<string>();
+        await using var viewModel = new RekallAgeStudioViewModel(session,
+            new RekallAgeStudioValidatingExternalContentLauncher(validatedExternalPaths.Add));
         await viewModel.InitializeAsync(root, "Main");
         var imported = viewModel.ContentItems.Where(item => manifest.AssetIds.Contains(item.Id, StringComparer.Ordinal)).ToArray();
         var router = new RekallAgeStudioContentOpenRouter((IRekallAgeStudioContentOpenTarget)viewModel);
@@ -128,14 +130,14 @@ internal static class RekallAgeStudioContentBrowserAcceptance
             openResults.Select(result => result.Result.Code).ToArray(),
             openResults.Where(result => result.Result.WorkspaceId != "external")
                 .Select(result => $"{result.Result.WorkspaceId}/{result.Result.SurfaceId}").ToArray(),
-            openResults.Where(result => result.Result.WorkspaceId == "external")
-                .Select(result => $"{result.Kind}:{result.Result.SurfaceId}").ToArray(),
+            validatedExternalPaths.Select(path => $"validated:{Path.GetExtension(path).ToLowerInvariant()}").ToArray(),
             placement.Code, assignment.Code, placement.TransactionId, assignment.TransactionId,
             persistedModel, persistedTexture, imported.Length == manifest.AssetIds.Count);
         await WriteJsonAsync(evidencePath, evidence, cancellationToken);
         return evidence.PhaseOneProcessId != evidence.PhaseTwoProcessId
             && evidence.PhaseOneStartUtcTicks != evidence.PhaseTwoStartUtcTicks
             && evidence.OpenCodes.All(code => code == "REKALL_CONTENT_OPENED")
+            && evidence.ExternalRouteOutcomes.Count == openResults.Count(result => result.Result.WorkspaceId == "external")
             && evidence.PlacementCode == "REKALL_CONTENT_DROP_APPLIED"
             && evidence.AssignmentCode == "REKALL_CONTENT_DROP_APPLIED"
             && !string.IsNullOrWhiteSpace(evidence.PlacementTransactionId)

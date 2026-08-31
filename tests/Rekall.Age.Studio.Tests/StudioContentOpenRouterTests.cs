@@ -320,4 +320,26 @@ public sealed class StudioContentOpenRouterTests : IDisposable
             return ValueTask.FromResult(result);
         }
     }
+    [Fact]
+    public async Task AcceptanceExternalLauncherValidatesAndRecordsWithoutStartingAnAssociatedApplication()
+    {
+        var path = ExistingFile("acceptance.wav");
+        var recorded = new List<string>();
+        IRekallAgeStudioExternalContentLauncher launcher =
+            new RekallAgeStudioValidatingExternalContentLauncher(recorded.Add);
+
+        await launcher.OpenAsync(path, CancellationToken.None);
+
+        Assert.Equal([Path.GetFullPath(path)], recorded);
+        var acceptance = Source("RekallAgeStudioContentBrowserAcceptance.cs");
+        Assert.Contains("RekallAgeStudioValidatingExternalContentLauncher", acceptance, StringComparison.Ordinal);
+        Assert.DoesNotContain("RekallAgeStudioShellExternalContentLauncher", acceptance, StringComparison.Ordinal);
+        Assert.DoesNotContain("Process.Start", acceptance, StringComparison.Ordinal);
+    }
+
+    private static string Source(string fileName)
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        return File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", fileName));
+    }
 }

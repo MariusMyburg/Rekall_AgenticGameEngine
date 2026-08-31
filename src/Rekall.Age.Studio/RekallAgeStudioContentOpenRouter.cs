@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using System.ComponentModel;
 using System.Text.Json;
 using Rekall.Age.Editor.Contracts;
@@ -26,6 +27,35 @@ internal interface IRekallAgeStudioContentOpenTarget
     ValueTask SelectMaterialAsync(RekallAgeContentBrowserItem item, CancellationToken cancellationToken);
     ValueTask SelectModuleSourceAsync(RekallAgeContentBrowserItem item, CancellationToken cancellationToken);
     ValueTask OpenAssociatedAsync(RekallAgeContentBrowserItem item, CancellationToken cancellationToken);
+}
+
+internal interface IRekallAgeStudioExternalContentLauncher
+{
+    ValueTask OpenAsync(string path, CancellationToken cancellationToken);
+}
+
+internal sealed class RekallAgeStudioShellExternalContentLauncher : IRekallAgeStudioExternalContentLauncher
+{
+    public ValueTask OpenAsync(string path, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        return ValueTask.CompletedTask;
+    }
+}
+
+internal sealed class RekallAgeStudioValidatingExternalContentLauncher(Action<string> record)
+    : IRekallAgeStudioExternalContentLauncher
+{
+    public ValueTask OpenAsync(string path, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var fullPath = Path.GetFullPath(path);
+        if (!Path.IsPathFullyQualified(fullPath) || !File.Exists(fullPath))
+            throw new FileNotFoundException("External content path is unavailable.");
+        record(fullPath);
+        return ValueTask.CompletedTask;
+    }
 }
 
 internal sealed class RekallAgeStudioContentOpenRouter(IRekallAgeStudioContentOpenTarget target)

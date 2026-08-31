@@ -43,7 +43,7 @@ public sealed class StudioContentDragServiceTests
         var source = Path.Combine(root, "triangle.glb");
         var secondSource = Path.Combine(root, "triangle-two.glb");
         await File.WriteAllBytesAsync(source, TriangleGlb());
-        await File.WriteAllBytesAsync(secondSource, TriangleGlb());
+        await File.WriteAllBytesAsync(secondSource, TriangleGlb(2));
         var session = new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create());
         Assert.True((await session.CreateProjectAsync(root, "Collision", "Main", ["world"], ["world", "rendering3d"], "test", default)).Ok);
         var item = Item(new string('x', 180) + "-one", "model", [RekallAgeContentCapability.Place], source)
@@ -70,8 +70,12 @@ public sealed class StudioContentDragServiceTests
         Assert.NotEqual(modelAssetId, secondModelAssetId);
         var published = await new RekallAgeModelAssetStore().LoadAsync(root, modelAssetId, default);
         var secondPublished = await new RekallAgeModelAssetStore().LoadAsync(root, secondModelAssetId, default);
+        var firstMesh = await new Rekall.Age.Modeling.RekallAgeMeshAssetStore().LoadAsync(root, published.Source.AssetId, default);
+        var secondMesh = await new Rekall.Age.Modeling.RekallAgeMeshAssetStore().LoadAsync(root, secondPublished.Source.AssetId, default);
         Assert.NotEqual(conflict.MeshAssetId, published.Source.AssetId);
         Assert.NotEqual(published.Source.AssetId, secondPublished.Source.AssetId);
+        Assert.Equal(1, firstMesh.Topology.Positions.Max(position => position.X));
+        Assert.Equal(2, secondMesh.Topology.Positions.Max(position => position.X));
         Assert.Equal("rekall-content:" + RekallAgeStudioImportedModelPublisher.GeneratedIds(item, 1).SourceIdentity,
             published.Source.OutputName);
         var placed = await session.ExecuteAsync("rekall.scene.instantiate_asset", JsonSerializer.Serialize(new
@@ -355,7 +359,7 @@ public sealed class StudioContentDragServiceTests
     private static string Source(string fileName) => File.ReadAllText(Path.Combine(
         AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "Rekall.Age.Studio", fileName));
 
-    private static byte[] TriangleGlb()
+    private static byte[] TriangleGlb(float extent = 1)
     {
         const string json = """
         {"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"mesh":0}],
@@ -374,7 +378,7 @@ public sealed class StudioContentDragServiceTests
         jsonBytes.CopyTo(bytes, 20); Array.Fill<byte>(bytes, 0x20, 20 + jsonBytes.Length, jsonLength - jsonBytes.Length);
         var binHeader = 20 + jsonLength; U32(bytes, binHeader, (uint)binLength); U32(bytes, binHeader + 4, 0x004E4942);
         var bin = binHeader + 8;
-        var positions = new float[] { 0, 0, 0, 1, 0, 0, 0, 1, 0 };
+        var positions = new float[] { 0, 0, 0, extent, 0, 0, 0, extent, 0 };
         for (var index = 0; index < positions.Length; index++) BitConverter.GetBytes(positions[index]).CopyTo(bytes, bin + index * 4);
         new ushort[] { 0, 1, 2 }.SelectMany(BitConverter.GetBytes).ToArray().CopyTo(bytes, bin + 36);
         return bytes;

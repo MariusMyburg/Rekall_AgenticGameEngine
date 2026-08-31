@@ -8,6 +8,19 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioLayoutTests
 {
     [Fact]
+    public void WorldWorkspaceActivationQueuesPresentationAfterLayout()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var source = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml.cs"));
+
+        Assert.Contains("if (world)", source, StringComparison.Ordinal);
+        Assert.Contains("QueueWorldViewportPresentation();", source, StringComparison.Ordinal);
+        Assert.Contains("DispatcherPriority.Loaded", source, StringComparison.Ordinal);
+        Assert.Contains("WorldWorkspace.UpdateLayout();", source, StringComparison.Ordinal);
+        Assert.Contains("PresentViewportAtHostSizeAsync(metrics)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WorldHostsAResizableContentBrowserWithoutReplacingTheViewportTransformContract()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
@@ -441,7 +454,10 @@ public sealed class StudioLayoutTests
         Assert.Contains("IsCodexSelected", author, StringComparison.Ordinal);
         Assert.Contains("IsEditable=\"False\"", author, StringComparison.Ordinal);
         Assert.Contains("Text=\"Run Agent\"", author, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Cancel\"", author, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ProviderConfigurationScroller\"", author, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"AgentPromptPanel\" Grid.Row=\"1\"", author, StringComparison.Ordinal);
+        Assert.Contains("Height=\"190\" Margin=\"0,7,0,10\"", author, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Abort\"", author, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding AgentLines}\"", author, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"CreateProjectButton\"", window, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"OpenProjectButton\"", window, StringComparison.Ordinal);

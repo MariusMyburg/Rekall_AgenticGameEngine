@@ -10,6 +10,16 @@ namespace Rekall.Age.Tests.Modeling;
 public sealed class ProceduralTreeGeneratorTests
 {
     [Fact]
+    public void TemperateOakDefaultHasHeroTreeFoliageDensity()
+    {
+        var settings = RekallAgeProceduralTreeSettings.TemperateOak(17);
+
+        Assert.True(settings.NearLeafBudget >= 900);
+        Assert.True(settings.MidLeafBudget >= 300);
+        Assert.True(settings.FarLeafBudget >= 80);
+    }
+
+    [Fact]
     public void MaterialSchemaAuthorsAlphaMaskForFoliageCards()
     {
         var property = typeof(RekallAgeMaterialComponent).GetProperty(nameof(RekallAgeMaterialComponent.AlphaMode))!;

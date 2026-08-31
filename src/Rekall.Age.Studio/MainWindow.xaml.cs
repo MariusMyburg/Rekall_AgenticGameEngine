@@ -302,7 +302,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ModelingWorkspaceHost.Visibility = modeling ? Visibility.Visible : Visibility.Collapsed;
         ProjectBar.Visibility = modeling ? Visibility.Collapsed : Visibility.Visible;
         MainToolbar.Visibility = world ? Visibility.Visible : Visibility.Collapsed;
-        if (world) ApplyViewportAvailabilityVisual();
+        if (world)
+        {
+            ApplyViewportAvailabilityVisual();
+            QueueWorldViewportPresentation();
+        }
         if (modeling && refreshModeling)
         {
             if (_viewModel.RefreshMeshAssetsCommand.CanExecute(null)) _viewModel.RefreshMeshAssetsCommand.Execute(null);
@@ -344,6 +348,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         return choice == RekallAgeCodexApprovalChoice.Deny
             ? RekallAgeCodexApprovalDecision.Decline
             : RekallAgeCodexApprovalDecision.Accept;
+    }
+
+    private void QueueWorldViewportPresentation()
+    {
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(async () =>
+        {
+            try
+            {
+                // A newly selected tab has not necessarily completed layout when SelectionChanged
+                // fires. Present after Loaded priority so Vulkan receives the real physical extent.
+                WorldWorkspace.UpdateLayout();
+                var metrics = SceneVulkanViewportHost.Metrics;
+                if (_viewModel.HasProject && metrics.IsPresentable)
+                    await _viewModel.PresentViewportAtHostSizeAsync(metrics);
+                ApplyViewportAvailabilityVisual();
+            }
+            catch (Exception exception)
+            {
+                Log.Error(exception, "Studio Vulkan viewport failed to present after workspace activation.");
+            }
+        }));
     }
 
     private async void OnCreateProjectClick(object sender, RoutedEventArgs e)

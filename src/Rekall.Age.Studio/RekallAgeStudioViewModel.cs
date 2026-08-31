@@ -2307,6 +2307,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private bool CanOpenOrCreate() => !IsBusy && Mode == RekallAgeStudioMode.Edit && !string.IsNullOrWhiteSpace(ProjectPathInput);
     private bool HasOpenProject() => !IsBusy && _session.Model is not null;
+    private bool HasAgentProjectContext() => !IsBusy
+        && Mode == RekallAgeStudioMode.Edit
+        && (HasOpenProject() || File.Exists(Path.Combine(ProjectPathInput, "rekall.project.json")));
     private bool HasSelectedEntity() => HasEditableProject() && _session.SelectedEntityId is not null;
     private bool CanRenameEntity() => HasSelectedEntity() && !string.IsNullOrWhiteSpace(EntityNameInput);
     private bool CanReparentEntity() => HasSelectedEntity()
@@ -2345,7 +2348,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         && !string.IsNullOrWhiteSpace(CodeModuleNameInput)
         && !string.IsNullOrWhiteSpace(CodeComponentNameInput)
         && !string.IsNullOrWhiteSpace(CodeSystemNameInput);
-    private bool CanRunAgent() => HasEditableProject()
+    private bool CanRunAgent() => HasAgentProjectContext()
         && !IsAgentRunning
         && _languageModelSetupAllowsAuthoring
         && _languageModelRunner is not null
@@ -4175,7 +4178,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         string providerId,
         string model)
     {
-        if (_session.ProjectRoot is null || _session.SceneName is null) return;
+        var projectRoot = _session.ProjectRoot ?? Path.GetFullPath(ProjectPathInput);
+        var sceneName = _session.SceneName ?? SceneNameInput.Trim();
+        if (!File.Exists(Path.Combine(projectRoot, "rekall.project.json")) || string.IsNullOrWhiteSpace(sceneName)) return;
         _agentCancellation?.Dispose();
         _agentCancellation = new CancellationTokenSource();
         var cancellationToken = _agentCancellation.Token;
@@ -4192,8 +4197,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             "Studio authoring started. Provider={ProviderId} Model={Model} ProjectRoot={ProjectRoot} Scene={SceneName} MaxTurns={MaxTurns}",
             providerId,
             model,
-            _session.ProjectRoot,
-            _session.SceneName,
+            projectRoot,
+            sceneName,
             AgentMaxTurns);
         var agentStopwatch = Stopwatch.StartNew();
         try
@@ -4203,8 +4208,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 : new Progress<RekallAgeLanguageModelAgentProgress>(ReportAgentProgress);
             var result = await runner.RunAsync(
                 new RekallAgeProjectAgentSessionRequest(
-                    _session.ProjectRoot,
-                    _session.SceneName,
+                    projectRoot,
+                    sceneName,
                     model,
                     AgentTaskInput)
                 {
@@ -4243,11 +4248,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 AppendAgentLine($"final: {Bound(result.AgentResult.FinalContent, 2_000)}");
             }
 
-            var reload = await _session.ReloadAsync(cancellationToken);
+            var reload = _session.Model is null
+                ? await _session.OpenAsync(projectRoot, sceneName, cancellationToken)
+                : await _session.ReloadAsync(cancellationToken);
             if (reload.Ok && _session.Model is not null) ApplyModel(_session.Model);
             var validation = await _session.ExecuteAsync(
                 "rekall.validation.scene",
-                JsonSerializer.Serialize(new { projectRoot = _session.ProjectRoot, sceneName = _session.SceneName }),
+                JsonSerializer.Serialize(new { projectRoot, sceneName }),
                 "Validate AI authoring",
                 "studio-agent",
                 cancellationToken);

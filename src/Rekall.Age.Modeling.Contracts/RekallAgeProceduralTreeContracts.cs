@@ -19,7 +19,7 @@ public sealed record RekallAgeProceduralTreeSettings(
         seed, Height: 11.5, TrunkRadius: 0.48, CrownStart: 0.28,
         CrownRadius: 5.0, PrimaryBranchCount: 15, ApicalDominance: 0.42,
         Tropism: 0.22, Droop: 0.16, Irregularity: 0.24,
-        NearLeafBudget: 420, MidLeafBudget: 160, FarLeafBudget: 56);
+        NearLeafBudget: 900, MidLeafBudget: 340, FarLeafBudget: 96);
 }
 
 public sealed record RekallAgeGeneratedTreeLod(

@@ -746,7 +746,10 @@ public sealed class RekallAgeCodexProjectAgentRunner :
                     Bound(preview, 4_000));
                 _toolExecutions.Add(execution);
             }
-            Report(succeeded ? "tool.completed" : "tool.failed", $"{toolName}: {preview}", execution);
+            Report(
+                succeeded ? "tool.completed" : "tool.failed",
+                succeeded ? $"{toolName} completed." : $"{toolName}: {preview}",
+                execution);
         }
 
         public void FailPendingTools(string turnStatus)

@@ -21,6 +21,8 @@ public sealed class LanguageModelAgentTests
         Assert.Contains("rekall.asset.import_remote", prompt, StringComparison.Ordinal);
         Assert.Contains("distinct-time frames", prompt, StringComparison.Ordinal);
         Assert.Contains("Do not add unrelated gameplay requirements", prompt, StringComparison.Ordinal);
+        Assert.Contains("Pure scene, environment, modeling, lighting, material, and other visual-authoring requests", prompt, StringComparison.Ordinal);
+        Assert.Contains("do not require a gameplay module, playable adapter, package, or authoring gauntlet", prompt, StringComparison.Ordinal);
         Assert.Contains("unrotated camera faces +Z", prompt, StringComparison.Ordinal);
     }
 

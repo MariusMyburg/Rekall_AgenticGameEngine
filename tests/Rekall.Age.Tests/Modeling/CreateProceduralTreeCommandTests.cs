@@ -1,0 +1,47 @@
+using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Transactions;
+using Rekall.Age.Modeling;
+using Rekall.Age.Modeling.Commands;
+using Rekall.Age.World;
+
+namespace Rekall.Age.Tests.Modeling;
+
+public sealed class CreateProceduralTreeCommandTests
+{
+    [Fact]
+    public async Task CreatesPersistentBarkAndFoliageLodsAndSceneEntities()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-tree-command-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await new RekallAgeSceneStore().SaveAsync(
+                root,
+                RekallAgeSceneDocument.Create("Main", ["world", "rendering3d"]),
+                default);
+            var context = new RekallAgeCommandContext(
+                "test",
+                RekallAgeTransaction.Begin("create-tree"),
+                CancellationToken.None);
+
+            var result = await new CreateProceduralTreeCommand().ExecuteAsync(
+                new CreateProceduralTreeRequest(root, "Main", "Ancient Hero Oak", 72841),
+                context);
+
+            Assert.True(result.Ok, result.Summary);
+            Assert.Equal(6, result.Value.AssetIds.Count);
+            Assert.Equal(3, result.Value.LodCount);
+            var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", default);
+            var bark = Assert.Single(scene.Entities, entity => entity.Id == result.Value.BarkEntityId);
+            var foliage = Assert.Single(scene.Entities, entity => entity.Id == result.Value.FoliageEntityId);
+            Assert.Equal(bark.Id, foliage.ParentId);
+            Assert.Contains(bark.Components, component => component.Type == "Rekall.LodGroup");
+            Assert.Contains(foliage.Components, component => component.Type == "Rekall.LodGroup");
+            Assert.All(result.Value.AssetIds, assetId =>
+                Assert.True(File.Exists(new RekallAgeMeshAssetStore().GetMeshPath(root, assetId)), assetId));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+}

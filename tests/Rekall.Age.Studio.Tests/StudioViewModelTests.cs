@@ -2663,6 +2663,37 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
+    public async Task AgentCanAuthorTheFirstSceneInAValidEmptyProject()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-first-scene-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await new RekallAgeProjectStore().SaveAsync(
+                root,
+                RekallAgeProjectManifest.Create("First Scene", ["world", "rendering3d", "modules"]),
+                CancellationToken.None);
+            await using var viewModel = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                new EmptyModel(),
+                new RecordingPreviewSession())
+            {
+                ProjectPathInput = root,
+                ProjectNameInput = "First Scene",
+                SceneNameInput = "Main",
+                AgentTaskInput = "Author the first scene."
+            };
+
+            await ExecuteAsync(viewModel.OpenCommand);
+
+            Assert.True(viewModel.RunAgentCommand.CanExecute(null));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task EmptyProjectInspectorWaitsForAnEntitySelectionInsteadOfInventingComponentState()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-empty-inspector-" + Guid.NewGuid().ToString("N"));

@@ -145,6 +145,7 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new CreateGeometryPrimitiveCommand());
         registry.Register(new CreateGeometryMeshCommand());
         registry.Register(new CreateGeometryRecipeCommand());
+        registry.Register(new CreateProceduralTreeCommand());
         registry.Register(new CreateGeometryExtrusionCommand());
         registry.Register(new CreateMeshAssetCommand());
         registry.Register(new InspectMeshAssetCommand());

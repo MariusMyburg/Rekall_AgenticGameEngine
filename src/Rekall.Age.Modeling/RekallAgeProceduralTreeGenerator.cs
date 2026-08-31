@@ -13,9 +13,9 @@ public static class RekallAgeProceduralTreeGenerator
 {
     private static readonly LodRecipe[] Recipes =
     [
-        new(0, 32, 4, 6, 8, 1.00),
-        new(1, 72, 3, 4, 6, 0.63),
-        new(2, 150, 2, 3, 5, 0.36)
+        new(0, 60, 4, 6, 8, 1.00),
+        new(1, 120, 3, 4, 6, 0.63),
+        new(2, 240, 2, 3, 5, 0.36)
     ];
 
     public static RekallAgeGeneratedTree Generate(
@@ -204,7 +204,7 @@ public static class RekallAgeProceduralTreeGenerator
             var t = rng.Range(0.42, 1.03);
             var center = SamplePolyline(branch.Points, Math.Min(1, t));
             center += new Vector3((float)rng.Signed(0.32), (float)rng.Signed(0.22), (float)rng.Signed(0.32));
-            var size = (float)(settings.Height * rng.Range(0.018, 0.030) * recipe.LeafScale);
+            var size = (float)(settings.Height * rng.Range(0.022, 0.037) * recipe.LeafScale);
             var azimuth = (float)rng.Range(0, Math.PI * 2);
             var right = Vector3.Normalize(new Vector3(MathF.Cos(azimuth), 0, MathF.Sin(azimuth)));
             var up = Vector3.Normalize(Vector3.UnitY * (float)rng.Range(0.65, 0.95) + new Vector3(right.Z, 0, -right.X) * (float)rng.Signed(0.32));

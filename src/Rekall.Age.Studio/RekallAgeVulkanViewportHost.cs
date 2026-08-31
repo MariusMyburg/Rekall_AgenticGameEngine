@@ -581,7 +581,7 @@ internal sealed class RekallAgeVulkanViewportHostCore
     private RekallAgeStudioViewportMetrics? _pendingMetrics;
     private bool _messageHandlerAttached;
     private bool _presentationVisible = true;
-    private bool _nativeChildVisible = true;
+    private bool _nativeChildVisible;
     private bool _destroyed;
 
     internal RekallAgeVulkanViewportHostCore(
@@ -613,6 +613,7 @@ internal sealed class RekallAgeVulkanViewportHostCore
             throw new InvalidOperationException("The Studio Vulkan child HWND could not be created.");
         }
 
+        _native.SetVisible(_child, false);
         if (attachMessageHandler) AttachWindowMessageHandler();
         _surface.AttachSurface(_child);
         return _child;
@@ -956,7 +957,6 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
     private const int WmEraseBackground = 0x0014;
     private const int GwlpWndProc = -4;
     private const int WsChild = 0x40000000;
-    private const int WsVisible = 0x10000000;
     private const int WsClipChildren = 0x02000000;
     private const int WsClipSiblings = 0x04000000;
     private const uint SwpNoActivate = 0x0010;
@@ -980,7 +980,7 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
             0,
             VulkanChildWindowClassName,
             string.Empty,
-            WsChild | WsVisible | WsClipChildren | WsClipSiblings,
+            WsChild | WsClipChildren | WsClipSiblings,
             0,
             0,
             1,

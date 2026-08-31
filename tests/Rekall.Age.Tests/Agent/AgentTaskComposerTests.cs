@@ -18,6 +18,8 @@ public sealed class AgentTaskComposerTests
         Assert.Contains("rights/provenance", composed, StringComparison.Ordinal);
         Assert.Contains("runtime testing", composed, StringComparison.Ordinal);
         Assert.Contains("without expecting the user to name engine tools", composed, StringComparison.Ordinal);
+        Assert.Contains("final and approved for immediate execution", composed, StringComparison.Ordinal);
+        Assert.Contains("Do not run a brainstorming or approval-gathering step", composed, StringComparison.Ordinal);
         Assert.Contains(Path.GetFullPath(root), composed, StringComparison.Ordinal);
         Assert.Contains("Active scene: Main", composed, StringComparison.Ordinal);
     }

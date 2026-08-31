@@ -172,6 +172,18 @@ public sealed class StudioVulkanViewportHostTests
     }
 
     [Fact]
+    public void NativeChildStartsHiddenUntilTheFirstPresentableViewportFrame()
+    {
+        var native = new RecordingNativeWindow();
+        var surface = new RecordingSurfaceController(native.Order);
+        var core = new RekallAgeVulkanViewportHostCore(native, surface);
+
+        core.BuildWindow(new IntPtr(17));
+
+        Assert.Equal([false], native.VisibilityChanges);
+    }
+
+    [Fact]
     public async Task HiddenViewportHidesTheNativeChildAndSuspendsPresentation()
     {
         var native = new RecordingNativeWindow();
@@ -199,12 +211,12 @@ public sealed class StudioVulkanViewportHostTests
 
         core.SetPresentationVisible(false);
 
-        Assert.Equal([false], native.VisibilityChanges);
+        Assert.Equal([false, true, false], native.VisibilityChanges);
         Assert.Equal(2, native.InvalidatedRegions.Count);
 
         core.SetPresentationVisible(false);
 
-        Assert.Equal([false], native.VisibilityChanges);
+        Assert.Equal([false, true, false], native.VisibilityChanges);
         Assert.Equal(2, native.InvalidatedRegions.Count);
     }
 
@@ -220,7 +232,7 @@ public sealed class StudioVulkanViewportHostTests
 
         core.SetPresentationVisible(false);
 
-        Assert.Equal([false], native.VisibilityChanges);
+        Assert.Equal([false, true, false], native.VisibilityChanges);
         Assert.True(surface.Metrics.IsPresentable);
         Assert.Equal(0, surface.SuspendCount);
     }

@@ -370,8 +370,9 @@ public sealed class StudioLayoutTests
         Assert.DoesNotContain("Text=\"{Binding ProjectNameInput}\"", author, StringComparison.Ordinal);
         Assert.Contains("HasInspectorSelection", window, StringComparison.Ordinal);
         Assert.Contains("InspectorComponentBrowserEmptyText", window, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{TemplateBinding Text}\"", app, StringComparison.Ordinal);
-        Assert.DoesNotContain("Content=\"{TemplateBinding SelectionBoxItem}\"", app, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{TemplateBinding SelectionBoxItem}\"", app, StringComparison.Ordinal);
+        Assert.Contains("ContentTemplate=\"{TemplateBinding SelectionBoxItemTemplate}\"", app, StringComparison.Ordinal);
+        Assert.DoesNotContain("HorizontalAlignment=\"Right\" Background=\"Transparent\" BorderThickness=\"0\" Focusable=\"False\" Cursor=\"Hand\" IsChecked=\"{Binding IsDropDownOpen", app, StringComparison.Ordinal);
     }
 
     [Fact]

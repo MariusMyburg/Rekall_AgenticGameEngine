@@ -425,6 +425,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         ThrowIfDisposed();
         providerId = NormalizeProviderId(providerId);
         var preferredModel = DefaultModel(providerId);
+        ClearReadiness();
         _selectedProviderId = providerId;
         _selectedModelId = preferredModel;
         _activeProviderSettings = CreateNonSecretSettings();
@@ -432,7 +433,6 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         CredentialSourceLabel = HostedProviderIds.Contains(providerId)
             ? "Checking credential source"
             : "No credential required";
-        ClearReadiness();
         OnProviderSelectionChanged();
         return QueueOperationAsync((generation, cancellationToken) =>
             LoadCredentialAndProbeAsync(providerId, preferredModel, generation, cancellationToken));
@@ -824,7 +824,6 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     private Task MoveNextAsync()
     {
         if (CurrentStep == RekallAgeStudioLanguageModelSetupStep.Configuration
-            && SelectedProviderId == "gguf"
             && ReadinessState != RekallAgeLanguageModelReadinessState.Ready) return Task.CompletedTask;
         if (CurrentStep < RekallAgeStudioLanguageModelSetupStep.Summary) CurrentStep++;
         return Task.CompletedTask;
@@ -833,7 +832,6 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     private bool CanMoveNext() => !_disposed
         && CurrentStep < RekallAgeStudioLanguageModelSetupStep.Summary
         && (CurrentStep != RekallAgeStudioLanguageModelSetupStep.Configuration
-            || SelectedProviderId != "gguf"
             || ReadinessState == RekallAgeLanguageModelReadinessState.Ready);
 
     private void PublishRemediationProgress(string value)
@@ -945,6 +943,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         RecommendedActionId = remediationActionId is null
             ? null
             : Redact(remediationActionId, sensitiveValues);
+        var preferredModelId = SelectedModelId;
         Replace(
             CompatibleModels,
             result.CompatibleModels
@@ -962,9 +961,16 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
                     Redact(check.Summary, sensitiveValues),
                     check.State);
             }));
-        if (!CompatibleModels.Contains(SelectedModelId, StringComparer.Ordinal))
+        if (!CompatibleModels.Contains(preferredModelId, StringComparer.Ordinal))
         {
             SelectedModelId = string.Empty;
+        }
+        else
+        {
+            // WPF clears a two-way SelectedItem binding while the catalog is reset.
+            // Restore the preferred value after replacement so the model stays visible.
+            _selectedModelId = preferredModelId;
+            OnPropertyChanged(nameof(SelectedModelId));
         }
         OnPropertyChanged(nameof(CanFinish));
         OnPropertyChanged(nameof(CanBrowseGguf));

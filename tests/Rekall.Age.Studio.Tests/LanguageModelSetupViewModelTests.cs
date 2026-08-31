@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.IO;
 using System.Diagnostics;
+using System.Collections.Specialized;
 using Rekall.Age.Agent.LanguageModels;
 
 namespace Rekall.Age.Studio.Tests;
@@ -150,6 +151,47 @@ public sealed class LanguageModelSetupViewModelTests
     }
 
     [Fact]
+    public async Task CodexCannotAdvancePastConfigurationUntilAModelIsReady()
+    {
+        var probe = new RecordingProbe((request, _) => Task.FromResult(
+            Blocked(request.ProviderId, "REKALL_CODEX_AUTHENTICATION_REQUIRED", "sign-in-codex")));
+        await using var viewModel = CreateViewModel(probe: probe);
+        await ExecuteAsync(viewModel.NextCommand);
+        await viewModel.SelectProviderAsync("codex");
+        await ExecuteAsync(viewModel.NextCommand);
+
+        Assert.Equal(RekallAgeStudioLanguageModelSetupStep.Configuration, viewModel.CurrentStep);
+        Assert.False(viewModel.NextCommand.CanExecute(null));
+        Assert.Empty(viewModel.CompatibleModels);
+    }
+
+    [Fact]
+    public async Task ReadyModelSelectionIsReannouncedAfterTheCompatibleCatalogArrives()
+    {
+        var events = new List<string>();
+        var probe = new RecordingProbe((request, _) => Task.FromResult(
+            Ready(request.ProviderId, "gpt-5.6-sol")));
+        await using var viewModel = CreateViewModel(probe: probe);
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(viewModel.SelectedModelId)) events.Add("selection");
+        };
+        viewModel.CompatibleModels.CollectionChanged += (_, args) =>
+        {
+            if (args.Action == NotifyCollectionChangedAction.Reset)
+            {
+                viewModel.SelectedModelId = string.Empty;
+            }
+            if (args.Action == NotifyCollectionChangedAction.Add) events.Add("catalog");
+        };
+
+        await viewModel.SelectProviderAsync("codex");
+
+        Assert.Equal(["catalog", "selection"], events.TakeLast(2));
+        Assert.Equal("gpt-5.6-sol", viewModel.SelectedModelId);
+    }
+
+    [Fact]
     public async Task GgufNoModelsAllowsImportPickerAfterRuntimeAndEndpointPrerequisitesPass()
     {
         var probe = new RecordingProbe((request, _) => Task.FromResult(new RekallAgeLanguageModelReadinessResult(
@@ -175,13 +217,16 @@ public sealed class LanguageModelSetupViewModelTests
     [Fact]
     public async Task InitialStateStartsAtWelcomeAndNavigatesTheFiveProviderNeutralSteps()
     {
-        await using var viewModel = CreateViewModel();
+        var probe = new RecordingProbe((request, _) => Task.FromResult(
+            Ready(request.ProviderId, "qwen3.8:27b")));
+        await using var viewModel = CreateViewModel(probe: probe);
 
         Assert.Equal(RekallAgeStudioLanguageModelSetupStep.Welcome, viewModel.CurrentStep);
         Assert.False(viewModel.BackCommand.CanExecute(null));
 
         await ExecuteAsync(viewModel.NextCommand);
         Assert.Equal(RekallAgeStudioLanguageModelSetupStep.Provider, viewModel.CurrentStep);
+        await viewModel.SelectProviderAsync("ollama");
         await ExecuteAsync(viewModel.NextCommand);
         Assert.Equal(RekallAgeStudioLanguageModelSetupStep.Configuration, viewModel.CurrentStep);
         await ExecuteAsync(viewModel.NextCommand);

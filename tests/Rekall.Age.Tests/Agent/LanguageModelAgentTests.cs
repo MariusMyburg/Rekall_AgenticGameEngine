@@ -13,6 +13,9 @@ public sealed class LanguageModelAgentTests
         var prompt = RekallAgeEmbeddedAgentContract.SystemPrompt;
 
         Assert.Contains("ordinary authoritative product intent", prompt, StringComparison.Ordinal);
+        Assert.Contains("Do not ask for confirmation", prompt, StringComparison.Ordinal);
+        Assert.Contains("Do not invoke brainstorming, planning, or approval-gathering workflows", prompt, StringComparison.Ordinal);
+        Assert.Contains("execute it immediately", prompt, StringComparison.Ordinal);
         Assert.Contains("do not require the user to supply engine tool names", prompt, StringComparison.Ordinal);
         Assert.Contains("rekall.asset.search_remote_images", prompt, StringComparison.Ordinal);
         Assert.Contains("rekall.asset.import_remote", prompt, StringComparison.Ordinal);

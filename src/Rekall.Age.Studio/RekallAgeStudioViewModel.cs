@@ -103,6 +103,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeStudioModelingGraphSession _modelingGraph = new();
     private readonly RekallAgeStudioMeshViewportRenderer _meshViewportRenderer = new();
     private readonly RekallAgeModelAssetStore _modelAssetStore = new();
+    private readonly IRekallAgeStudioContentIndex _contentIndex = RekallAgeStudioContentIndex.CreateDefault();
     private readonly Action<string> _openPackageFolder;
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
@@ -291,6 +292,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _renderWorkloadText = "0 draws · 0 dispatches";
     private RekallAgeWorkbenchRenderDebugViewModel? _selectedRenderDebugView;
     private RekallAgeWorkbenchModel? _currentModel;
+    private RekallAgeContentBrowserModel _contentModel = RekallAgeContentBrowserModel.Empty;
+    private string _selectedContentCategory = "All";
+    private string _contentSearchText = string.Empty;
+    private RekallAgeContentBrowserItem? _selectedContentItem;
     private readonly List<RekallAgeLanguageModelToolExecution> _lastAgentToolExecutions = [];
     internal bool TreatGauntletAsTerminalSuccess { get; set; }
 
@@ -532,6 +537,35 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<RekallAgeStudioInspectorComponentEditorModel> InspectorComponentEditors { get; } = [];
     public ObservableCollection<RekallAgeStudioInspectorPropertyEditorModel> InspectorPropertyEditors { get; } = [];
     public ObservableCollection<string> AssetLines { get; } = [];
+    public ObservableCollection<RekallAgeContentBrowserItem> ContentItems { get; } = [];
+    public ObservableCollection<RekallAgeContentBrowserItem> FilteredContentItems { get; } = [];
+    public ObservableCollection<RekallAgeContentBrowserWarning> ContentWarnings { get; } = [];
+    public ObservableCollection<string> ContentCategories { get; } = ["All"];
+
+    public string SelectedContentCategory
+    {
+        get => _selectedContentCategory;
+        set
+        {
+            if (Set(ref _selectedContentCategory, string.IsNullOrWhiteSpace(value) ? "All" : value))
+                RefreshContentProjection();
+        }
+    }
+
+    public string ContentSearchText
+    {
+        get => _contentSearchText;
+        set
+        {
+            if (Set(ref _contentSearchText, value ?? string.Empty)) RefreshContentProjection();
+        }
+    }
+
+    public RekallAgeContentBrowserItem? SelectedContentItem
+    {
+        get => _selectedContentItem;
+        set => Set(ref _selectedContentItem, value);
+    }
     public ObservableCollection<string> ValidationLines { get; } = [];
     public ObservableCollection<string> TransactionLines { get; } = [];
     public ObservableCollection<string> ImportLines { get; } = [];
@@ -5173,6 +5207,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                     _session.Model,
                     preserveInspectorDrafts: !result.Ok || rejectedInspectorRow is not null,
                     discardInspectorDraft: result.Ok ? rejectedInspectorRow : null);
+                await RefreshContentAsync();
             }
             if (result.Ok)
             {
@@ -5331,7 +5366,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (selectedNode is not null) RefreshPropertySchemas();
         RefreshInspectorComponents();
         RebuildInspectorPropertyEditors(model, preserveInspectorDrafts, discardInspectorDraft);
-        Replace(AssetLines, model.Assets.Assets.Select(asset => $"{asset.Kind}: {asset.DisplayName} ({asset.AssetId})"));
+        ApplyContentModel(model.Content);
         if (_session.ProjectRoot is not null)
         {
             Replace(MeshAssetIds, _modeling.ListAssets(_session.ProjectRoot));
@@ -5362,6 +5397,35 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         .Properties.FirstOrDefault(property => property.IsDefined
             && property.Name.Equals("assetId", StringComparison.OrdinalIgnoreCase))?
         .Value;
+
+    private async Task RefreshContentAsync()
+    {
+        if (_session.ProjectRoot is null) return;
+        var content = await _contentIndex.RefreshAsync(_session.ProjectRoot, _lifecycleCancellation.Token);
+        ApplyContentModel(content);
+    }
+
+    private void ApplyContentModel(RekallAgeContentBrowserModel content)
+    {
+        _contentModel = content;
+        Replace(ContentItems, content.Items);
+        Replace(ContentWarnings, content.Warnings);
+        Replace(ContentCategories, RekallAgeStudioContentProjection.Categories(content.Items));
+        if (!ContentCategories.Contains(SelectedContentCategory, StringComparer.OrdinalIgnoreCase))
+            SelectedContentCategory = "All";
+        RefreshContentProjection();
+        Replace(AssetLines, content.Items.Select(item => $"{item.Kind}: {item.DisplayName} ({item.Id})"));
+    }
+
+    private void RefreshContentProjection()
+    {
+        var selectedId = SelectedContentItem?.Id;
+        Replace(FilteredContentItems, RekallAgeStudioContentProjection.Filter(
+            _contentModel.Items, SelectedContentCategory, ContentSearchText));
+        SelectedContentItem = selectedId is null
+            ? null
+            : FilteredContentItems.FirstOrDefault(item => item.Id.Equals(selectedId, StringComparison.Ordinal));
+    }
 
     private void ApplyRendering(
         RekallAgeWorkbenchRenderQualityModel rendering,

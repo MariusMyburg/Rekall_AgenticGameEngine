@@ -91,23 +91,43 @@ public sealed class StudioVulkanViewportHostTests
         var recovery = new RekallAgeStudioViewportRecoveryState(TimeSpan.FromSeconds(1));
         var now = new DateTimeOffset(2026, 8, 30, 8, 0, 0, TimeSpan.Zero);
 
-        var visual = recovery.Synchronize(hasProject: false, viewportAvailable: false, now);
+        var visual = recovery.Synchronize(
+            hasProject: false,
+            viewportAvailable: false,
+            hasPresentableMetrics: false,
+            now);
 
         Assert.False(visual.PresentationSurfaceVisible);
         Assert.False(visual.PlaceholderVisible);
+        Assert.False(visual.NativeAirspaceVisible);
         Assert.False(recovery.TryBeginAutomaticRetry(now));
     }
 
     [Fact]
-    public void MainWindowAvailabilityStateShowsPlaceholderOnTheFirstUnavailableFrame()
+    public void MainWindowAvailabilityStateLetsTheNativeHostAcquireMetricsBeforeShowingUnavailablePlaceholder()
     {
         var recovery = new RekallAgeStudioViewportRecoveryState(TimeSpan.FromSeconds(1));
         var now = new DateTimeOffset(2026, 8, 29, 10, 0, 0, TimeSpan.Zero);
 
-        var visual = recovery.Synchronize(hasProject: true, viewportAvailable: false, now);
+        var bootstrap = recovery.Synchronize(
+            hasProject: true,
+            viewportAvailable: false,
+            hasPresentableMetrics: false,
+            now);
+
+        Assert.False(bootstrap.PresentationSurfaceVisible);
+        Assert.False(bootstrap.PlaceholderVisible);
+        Assert.True(bootstrap.NativeAirspaceVisible);
+
+        var visual = recovery.Synchronize(
+            hasProject: true,
+            viewportAvailable: false,
+            hasPresentableMetrics: true,
+            now);
 
         Assert.False(visual.PresentationSurfaceVisible);
         Assert.True(visual.PlaceholderVisible);
+        Assert.False(visual.NativeAirspaceVisible);
         Assert.True(recovery.TryBeginAutomaticRetry(now));
     }
 
@@ -116,13 +136,23 @@ public sealed class StudioVulkanViewportHostTests
     {
         var recovery = new RekallAgeStudioViewportRecoveryState(TimeSpan.FromSeconds(1));
         var now = new DateTimeOffset(2026, 8, 29, 10, 0, 0, TimeSpan.Zero);
-        Assert.True(recovery.Synchronize(hasProject: true, viewportAvailable: true, now)
-            .PresentationSurfaceVisible);
+        var available = recovery.Synchronize(
+            hasProject: true,
+            viewportAvailable: true,
+            hasPresentableMetrics: true,
+            now);
+        Assert.True(available.PresentationSurfaceVisible);
+        Assert.True(available.NativeAirspaceVisible);
 
-        var unavailable = recovery.Synchronize(hasProject: true, viewportAvailable: false, now);
+        var unavailable = recovery.Synchronize(
+            hasProject: true,
+            viewportAvailable: false,
+            hasPresentableMetrics: true,
+            now);
 
         Assert.False(unavailable.PresentationSurfaceVisible);
         Assert.True(unavailable.PlaceholderVisible);
+        Assert.False(unavailable.NativeAirspaceVisible);
         Assert.True(recovery.TryBeginAutomaticRetry(now));
         Assert.False(recovery.TryBeginAutomaticRetry(now + TimeSpan.FromMilliseconds(500)));
         Assert.True(recovery.TryBeginAutomaticRetry(now + TimeSpan.FromSeconds(1)));
@@ -130,9 +160,11 @@ public sealed class StudioVulkanViewportHostTests
         var recovered = recovery.Synchronize(
             hasProject: true,
             viewportAvailable: true,
+            hasPresentableMetrics: true,
             now + TimeSpan.FromSeconds(1));
         Assert.True(recovered.PresentationSurfaceVisible);
         Assert.False(recovered.PlaceholderVisible);
+        Assert.True(recovered.NativeAirspaceVisible);
         Assert.False(recovery.TryBeginAutomaticRetry(now + TimeSpan.FromSeconds(2)));
     }
 

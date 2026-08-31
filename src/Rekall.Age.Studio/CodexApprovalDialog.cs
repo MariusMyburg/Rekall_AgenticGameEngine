@@ -18,6 +18,7 @@ internal sealed class CodexApprovalDialog : Window
 
     public CodexApprovalDialog(string summary)
     {
+        RekallAgeStudioWindowTheme.Apply(this);
         Title = "Codex approval";
         Width = 650;
         SizeToContent = SizeToContent.Height;

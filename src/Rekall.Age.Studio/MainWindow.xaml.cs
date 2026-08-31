@@ -961,11 +961,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var visual = _viewportRecovery.Synchronize(
             _viewModel.HasProject,
             _viewModel.ViewportAvailable,
+            SceneVulkanViewportHost.Metrics.IsPresentable,
             DateTimeOffset.UtcNow);
-        // Keep the HwndHost participating in layout so its last positive physical metrics
-        // remain available for automatic Vulkan session recreation. Only the native child
-        // is hidden while WPF displays the diagnostic placeholder.
-        SceneVulkanViewportHost.Visibility = Visibility.Visible;
+        // Hidden preserves layout metrics for automatic Vulkan recovery while removing the
+        // native HWND's airspace and hit-test surface whenever WPF owns this viewport area.
+        SceneVulkanViewportHost.Visibility = visual.NativeAirspaceVisible
+            ? Visibility.Visible
+            : Visibility.Hidden;
         SceneVulkanViewportHost.SetPresentationVisible(visual.PresentationSurfaceVisible);
         NoProjectViewportPlaceholder.Visibility = _viewModel.HasProject
             ? Visibility.Collapsed

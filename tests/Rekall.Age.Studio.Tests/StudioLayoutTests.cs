@@ -101,6 +101,34 @@ public sealed class StudioLayoutTests
     }
 
     [Fact]
+    public void WorldPlaceholderRemovesNativeAirspaceInsteadOfOnlyHidingItsChildWindow()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var codeBehind = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml.cs"));
+
+        Assert.Contains(
+            "SceneVulkanViewportHost.Visibility = visual.NativeAirspaceVisible",
+            codeBehind,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "SceneVulkanViewportHost.Visibility = Visibility.Visible;",
+            codeBehind,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CodexApprovalDialogExplicitlyUsesTheStudioThemeAndDarkWindowChrome()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var dialog = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "CodexApprovalDialog.cs"));
+        var theme = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "RekallAgeStudioWindowTheme.cs"));
+
+        Assert.Contains("RekallAgeStudioWindowTheme.Apply(this);", dialog, StringComparison.Ordinal);
+        Assert.Contains("Application.Current.FindResource(typeof(Window))", theme, StringComparison.Ordinal);
+        Assert.Contains("DwmSetWindowAttribute", theme, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WorldViewportKeepsVulkanUnavailablePlaceholderAndExternalTransformControls()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));

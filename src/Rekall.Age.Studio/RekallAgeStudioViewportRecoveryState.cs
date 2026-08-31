@@ -2,7 +2,8 @@ namespace Rekall.Age.Studio;
 
 internal readonly record struct RekallAgeStudioViewportVisualState(
     bool PresentationSurfaceVisible,
-    bool PlaceholderVisible);
+    bool PlaceholderVisible,
+    bool NativeAirspaceVisible);
 
 internal enum RekallAgeStudioViewportTickAction
 {
@@ -31,6 +32,13 @@ internal sealed class RekallAgeStudioViewportRecoveryState
     internal RekallAgeStudioViewportVisualState Synchronize(
         bool hasProject,
         bool viewportAvailable,
+        DateTimeOffset now) =>
+        Synchronize(hasProject, viewportAvailable, hasPresentableMetrics: true, now);
+
+    internal RekallAgeStudioViewportVisualState Synchronize(
+        bool hasProject,
+        bool viewportAvailable,
+        bool hasPresentableMetrics,
         DateTimeOffset now)
     {
         if (!hasProject)
@@ -39,7 +47,8 @@ internal sealed class RekallAgeStudioViewportRecoveryState
             _nextRetryAt = default;
             return new RekallAgeStudioViewportVisualState(
                 PresentationSurfaceVisible: false,
-                PlaceholderVisible: false);
+                PlaceholderVisible: false,
+                NativeAirspaceVisible: false);
         }
 
         if (viewportAvailable)
@@ -48,7 +57,20 @@ internal sealed class RekallAgeStudioViewportRecoveryState
             _nextRetryAt = default;
             return new RekallAgeStudioViewportVisualState(
                 PresentationSurfaceVisible: true,
-                PlaceholderVisible: false);
+                PlaceholderVisible: false,
+                NativeAirspaceVisible: true);
+        }
+
+        // A newly opened project cannot obtain Vulkan surface metrics while the HwndHost
+        // itself is hidden. Give the host one layout pass, but keep its child presentation
+        // hidden. Once metrics exist, either Vulkan succeeds or the ordinary unavailable
+        // placeholder can safely replace the native airspace.
+        if (!hasPresentableMetrics)
+        {
+            return new RekallAgeStudioViewportVisualState(
+                PresentationSurfaceVisible: false,
+                PlaceholderVisible: false,
+                NativeAirspaceVisible: true);
         }
 
         if (!_retryPending)
@@ -59,7 +81,8 @@ internal sealed class RekallAgeStudioViewportRecoveryState
 
         return new RekallAgeStudioViewportVisualState(
             PresentationSurfaceVisible: false,
-            PlaceholderVisible: true);
+            PlaceholderVisible: true,
+            NativeAirspaceVisible: false);
     }
 
     internal bool TryBeginAutomaticRetry(DateTimeOffset now)

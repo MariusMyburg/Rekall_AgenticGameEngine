@@ -22,15 +22,15 @@ public sealed class StudioWorkbenchSourceTests
     }
 
     [Fact]
-    public async Task WorldTransformControlsOverlayTheViewportOnlyForASelectionAndViewportClicksSelect()
+    public async Task WorldTransformControlsSitBesideTheViewportOnlyForASelectionAndViewportClicksSelect()
     {
         var root = FindRepositoryRoot();
         var studioDirectory = Path.Combine(root, "src", "Rekall.Age.Studio");
         var xaml = await File.ReadAllTextAsync(Path.Combine(studioDirectory, "MainWindow.xaml"));
         var code = await File.ReadAllTextAsync(Path.Combine(studioDirectory, "MainWindow.xaml.cs"));
 
-        Assert.Contains("x:Name=\"ViewportTransformOverlay\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("HorizontalAlignment=\"Left\" VerticalAlignment=\"Top\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ViewportTransformPanel\" Grid.Column=\"0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"SceneVulkanViewportHost\" Grid.Column=\"1\"", xaml, StringComparison.Ordinal);
         Assert.Contains("DataTrigger Binding=\"{Binding HasInspectorSelection}\" Value=\"True\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("<Border Grid.Row=\"2\" Background=\"#E3151920\"", xaml, StringComparison.Ordinal);
         Assert.Contains("await _viewModel.SelectViewportEntityAsync(", code, StringComparison.Ordinal);

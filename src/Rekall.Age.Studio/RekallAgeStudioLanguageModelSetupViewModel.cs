@@ -317,6 +317,28 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
             LoadCredentialAndProbeAsync(providerId, preferredModel, generation, cancellationToken));
     }
 
+    internal Task RefreshCurrentProviderAsync(CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        cancellationToken.ThrowIfCancellationRequested();
+        var providerId = SelectedProviderId;
+        var preferredModel = SelectedModelId;
+        _activeProviderSettings = CreateNonSecretSettings();
+        _activeCredentialRetention = ActiveCredentialRetention.None;
+        CredentialSourceLabel = HostedProviderIds.Contains(providerId)
+            ? "Checking credential source"
+            : "No credential required";
+        ClearReadiness();
+        return QueueOperationAsync(
+            (generation, operationCancellation) => LoadCredentialAndProbeAsync(
+                providerId,
+                preferredModel,
+                generation,
+                operationCancellation),
+            cancellationToken,
+            propagateCallerCancellation: true);
+    }
+
     internal Task ApplyApiKeyAsync(string providerId, string key, bool rememberSecurely)
     {
         ThrowIfDisposed();
@@ -482,7 +504,10 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         }
     }
 
-    private Task QueueOperationAsync(Func<long, CancellationToken, Task> operation)
+    private Task QueueOperationAsync(
+        Func<long, CancellationToken, Task> operation,
+        CancellationToken callerCancellation = default,
+        bool propagateCallerCancellation = false)
     {
         lock (_operationSync)
         {
@@ -490,14 +515,18 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
             var previousCancellation = _activeOperationCancellation;
             previousCancellation?.Cancel();
             var generation = checked(++_operationGeneration);
-            var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifecycleCancellation.Token);
+            var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                _lifecycleCancellation.Token,
+                callerCancellation);
             _activeOperationCancellation = cancellation;
             _activeOperation = RunOperationAfterAsync(
                 previous,
                 previousCancellation,
                 operation,
                 generation,
-                cancellation);
+                cancellation,
+                callerCancellation,
+                propagateCallerCancellation);
             return _activeOperation;
         }
     }
@@ -507,7 +536,9 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         CancellationTokenSource? previousCancellation,
         Func<long, CancellationToken, Task> operation,
         long generation,
-        CancellationTokenSource cancellation)
+        CancellationTokenSource cancellation,
+        CancellationToken callerCancellation,
+        bool propagateCallerCancellation)
     {
         try
         {
@@ -517,6 +548,11 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
             finally { previousCancellation?.Dispose(); }
             cancellation.Token.ThrowIfCancellationRequested();
             await operation(generation, cancellation.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (
+            propagateCallerCancellation && callerCancellation.IsCancellationRequested)
+        {
+            throw;
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {

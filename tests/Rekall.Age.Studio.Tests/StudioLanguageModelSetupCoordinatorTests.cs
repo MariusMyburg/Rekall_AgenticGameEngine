@@ -273,6 +273,165 @@ public sealed class StudioLanguageModelSetupCoordinatorTests(WpfApplicationTestF
         owner.Close();
     });
 
+    [Fact]
+    public Task ConcurrentShowSetupCallsCreateOneWindowAndPublishBusyImmediately() => wpf.InvokeAsync(async () =>
+    {
+        var windows = new BlockingWindowFactory();
+        var coordinator = CreateCoordinator(windows: windows);
+        await using var studio = new RekallAgeStudioViewModel();
+        var owner = new Window();
+
+        var first = coordinator.ShowSetupAsync(owner, studio, CancellationToken.None);
+        await windows.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(coordinator.IsSetupBusy);
+        Assert.True(studio.LanguageModelSetupBusy);
+
+        var second = coordinator.ShowSetupAsync(owner, studio, CancellationToken.None);
+        await second;
+
+        Assert.Equal(1, windows.ShowCount);
+        windows.Release.TrySetResult();
+        await first;
+        Assert.False(coordinator.IsSetupBusy);
+        Assert.False(studio.LanguageModelSetupBusy);
+        owner.Close();
+    });
+
+    [Fact]
+    public Task CancellationDuringPreModalProbeEscapesAndClearsBusy() => wpf.InvokeAsync(async () =>
+    {
+        var probe = new DelayedReadinessProbe(TimeSpan.FromMilliseconds(300));
+        var windows = new RecordingWindowFactory();
+        var coordinator = CreateCoordinator(probe: probe, windows: windows);
+        await using var studio = new RekallAgeStudioViewModel();
+        var owner = new Window();
+        using var cancellation = new CancellationTokenSource();
+
+        var show = coordinator.ShowSetupAsync(owner, studio, cancellation.Token);
+        await probe.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => show.WaitAsync(TimeSpan.FromSeconds(2)));
+        Assert.Equal(0, windows.ShowCount);
+        Assert.False(coordinator.IsSetupBusy);
+        Assert.False(studio.LanguageModelSetupBusy);
+        owner.Close();
+    });
+
+    [Fact]
+    public Task CancellationDuringShownModalClosesItAndClearsBusy() => wpf.InvokeAsync(async () =>
+    {
+        var windows = new CancellationAwareBlockingWindowFactory();
+        var coordinator = CreateCoordinator(windows: windows);
+        await using var studio = new RekallAgeStudioViewModel();
+        var owner = new Window();
+        using var cancellation = new CancellationTokenSource();
+
+        var show = coordinator.ShowSetupAsync(owner, studio, cancellation.Token);
+        await windows.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => show.WaitAsync(TimeSpan.FromSeconds(2)));
+        Assert.True(windows.ClosedByCancellation);
+        Assert.False(coordinator.IsSetupBusy);
+        Assert.False(studio.LanguageModelSetupBusy);
+        owner.Close();
+    });
+
+    [Fact]
+    public Task ProductionWindowFactoryClosesTheOwnedModalOnCallerCancellation() => wpf.InvokeAsync(async () =>
+    {
+        var owner = new Window();
+        owner.Show();
+        await using var viewModel = new RekallAgeStudioLanguageModelSetupViewModel(
+            new FixedSetupStore(RekallAgeStudioLanguageModelSetup.Incomplete),
+            new EmptyCredentialStore(),
+            new FixedReadinessProbe(Ready()));
+        await viewModel.InitializeAsync(CancellationToken.None);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await RekallAgeStudioLanguageModelSetupWindowFactory.Instance.ShowAsync(
+                owner,
+                viewModel,
+                cancellation.Token));
+
+        Assert.DoesNotContain(
+            Application.Current.Windows.OfType<LanguageModelSetupWindow>(),
+            window => window.IsVisible);
+        owner.Close();
+    });
+
+    [Fact]
+    public Task RecoveryWindowReceivesLoadedProviderModelAndBlockedReadiness() => wpf.InvokeAsync(async () =>
+    {
+        var setup = CompletedSetup() with
+        {
+            ProviderId = "openai",
+            ModelId = "gpt-5.6-sol-preview"
+        };
+        var blocked = Blocked("openai") with { CompatibleModels = ["gpt-5.6-sol-preview"] };
+        var windows = new RecordingWindowFactory();
+        var coordinator = CreateCoordinator(setup, blocked, windows: windows);
+        await using var studio = new RekallAgeStudioViewModel();
+        var owner = new Window();
+
+        await coordinator.InitializeAsync(owner, studio, CancellationToken.None);
+
+        var shown = Assert.Single(windows.ShownStates);
+        Assert.Equal("openai", shown.ProviderId);
+        Assert.Equal("gpt-5.6-sol-preview", shown.ModelId);
+        Assert.Equal(RekallAgeLanguageModelReadinessState.Blocked, shown.Readiness);
+        owner.Close();
+    });
+
+    [Fact]
+    public Task ReopeningSettingsPreservesACompatibleNonDefaultSavedModel() => wpf.InvokeAsync(async () =>
+    {
+        var setup = CompletedSetup() with
+        {
+            ProviderId = "openai",
+            ModelId = "gpt-5.6-sol-preview"
+        };
+        var ready = Ready("openai") with
+        {
+            CompatibleModels = ["gpt-5.6-sol", "gpt-5.6-sol-preview"]
+        };
+        var store = new RecordingSetupStore(setup);
+        var windows = new CompletingRecordingWindowFactory();
+        var restorer = new RecordingStudioRestorer();
+        var coordinator = new RekallAgeStudioLanguageModelSetupCoordinator(
+            store,
+            new EmptyCredentialStore(),
+            new FixedReadinessProbe(ready),
+            windows,
+            new EmptyEnvironment(),
+            restorer);
+        await using var studio = new RekallAgeStudioViewModel();
+        var owner = new Window();
+
+        await coordinator.ShowSetupAsync(owner, studio, CancellationToken.None);
+
+        var shown = Assert.Single(windows.ShownStates);
+        Assert.Equal("gpt-5.6-sol-preview", shown.ModelId);
+        Assert.NotEmpty(store.SavedValues);
+        Assert.Equal("gpt-5.6-sol-preview", store.SavedValues[^1].ModelId);
+        Assert.Equal("gpt-5.6-sol-preview", Assert.Single(restorer.Restores).Setup.ModelId);
+        owner.Close();
+    });
+
+    private static RekallAgeStudioLanguageModelSetupCoordinator CreateCoordinator(
+        RekallAgeStudioLanguageModelSetup? setup = null,
+        RekallAgeLanguageModelReadinessResult? readiness = null,
+        IRekallAgeLanguageModelReadinessProbe? probe = null,
+        IRekallAgeStudioLanguageModelSetupWindowFactory? windows = null) => new(
+        new FixedSetupStore(setup ?? RekallAgeStudioLanguageModelSetup.Incomplete),
+        new EmptyCredentialStore(),
+        probe ?? new FixedReadinessProbe(readiness ?? Ready()),
+        windows ?? new RecordingWindowFactory(),
+        new EmptyEnvironment(),
+        new RecordingStudioRestorer());
+
     private Task VerifyWizardDecisionAsync(
         RekallAgeStudioLanguageModelSetup setup,
         RekallAgeLanguageModelReadinessResult readiness,
@@ -413,6 +572,7 @@ public sealed class StudioLanguageModelSetupCoordinatorTests(WpfApplicationTestF
     private sealed class RecordingWindowFactory : IRekallAgeStudioLanguageModelSetupWindowFactory
     {
         public int ShowCount { get; private set; }
+        public List<ShownSetupState> ShownStates { get; } = [];
 
         public ValueTask<RekallAgeStudioLanguageModelSetupWindowOutcome> ShowAsync(
             Window owner,
@@ -420,7 +580,92 @@ public sealed class StudioLanguageModelSetupCoordinatorTests(WpfApplicationTestF
             CancellationToken cancellationToken)
         {
             ShowCount++;
+            ShownStates.Add(new ShownSetupState(
+                viewModel.SelectedProviderId,
+                viewModel.SelectedModelId,
+                viewModel.ReadinessState));
             return ValueTask.FromResult(RekallAgeStudioLanguageModelSetupWindowOutcome.Deferred);
+        }
+    }
+
+    private sealed record ShownSetupState(
+        string ProviderId,
+        string ModelId,
+        RekallAgeLanguageModelReadinessState Readiness);
+
+    private sealed class CompletingRecordingWindowFactory
+        : IRekallAgeStudioLanguageModelSetupWindowFactory
+    {
+        public List<ShownSetupState> ShownStates { get; } = [];
+
+        public async ValueTask<RekallAgeStudioLanguageModelSetupWindowOutcome> ShowAsync(
+            Window owner,
+            RekallAgeStudioLanguageModelSetupViewModel viewModel,
+            CancellationToken cancellationToken)
+        {
+            ShownStates.Add(new ShownSetupState(
+                viewModel.SelectedProviderId,
+                viewModel.SelectedModelId,
+                viewModel.ReadinessState));
+            await ((RekallAgeAsyncCommand)viewModel.FinishCommand).ExecuteAsync(null);
+            return RekallAgeStudioLanguageModelSetupWindowOutcome.Completed;
+        }
+    }
+
+    private sealed class BlockingWindowFactory : IRekallAgeStudioLanguageModelSetupWindowFactory
+    {
+        public int ShowCount { get; private set; }
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async ValueTask<RekallAgeStudioLanguageModelSetupWindowOutcome> ShowAsync(
+            Window owner,
+            RekallAgeStudioLanguageModelSetupViewModel viewModel,
+            CancellationToken cancellationToken)
+        {
+            ShowCount++;
+            Started.TrySetResult();
+            await Release.Task;
+            return RekallAgeStudioLanguageModelSetupWindowOutcome.Deferred;
+        }
+    }
+
+    private sealed class CancellationAwareBlockingWindowFactory
+        : IRekallAgeStudioLanguageModelSetupWindowFactory
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool ClosedByCancellation { get; private set; }
+
+        public async ValueTask<RekallAgeStudioLanguageModelSetupWindowOutcome> ShowAsync(
+            Window owner,
+            RekallAgeStudioLanguageModelSetupViewModel viewModel,
+            CancellationToken cancellationToken)
+        {
+            Started.TrySetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                throw new InvalidOperationException("Unreachable modal completion.");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                ClosedByCancellation = true;
+                throw;
+            }
+        }
+    }
+
+    private sealed class DelayedReadinessProbe(TimeSpan delay) : IRekallAgeLanguageModelReadinessProbe
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async ValueTask<RekallAgeLanguageModelReadinessResult> ProbeAsync(
+            RekallAgeLanguageModelReadinessRequest request,
+            CancellationToken cancellationToken)
+        {
+            Started.TrySetResult();
+            await Task.Delay(delay, cancellationToken);
+            return Ready(request.ProviderId);
         }
     }
 
@@ -489,6 +734,7 @@ public sealed class StudioLanguageModelSetupCoordinatorTests(WpfApplicationTestF
         : IRekallAgeStudioLanguageModelSetupStore
     {
         public int LoadCount { get; private set; }
+        public List<RekallAgeStudioLanguageModelSetup> SavedValues { get; } = [];
 
         public ValueTask<RekallAgeStudioLanguageModelSetup> LoadAsync(CancellationToken cancellationToken)
         {
@@ -498,6 +744,10 @@ public sealed class StudioLanguageModelSetupCoordinatorTests(WpfApplicationTestF
 
         public ValueTask SaveAsync(
             RekallAgeStudioLanguageModelSetup value,
-            CancellationToken cancellationToken) => ValueTask.CompletedTask;
+            CancellationToken cancellationToken)
+        {
+            SavedValues.Add(value);
+            return ValueTask.CompletedTask;
+        }
     }
 }

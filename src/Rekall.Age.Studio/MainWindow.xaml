@@ -148,7 +148,8 @@
             </MenuItem>
             <MenuItem x:Name="ExamplesMenu" Header="_Examples" />
             <MenuItem Header="_Settings">
-                <MenuItem Header="Language Model Setup…" Click="OnLanguageModelSetupClick" />
+                <MenuItem Header="Language Model Setup…" Click="OnLanguageModelSetupClick"
+                          IsEnabled="{Binding CanOpenLanguageModelSetup, ElementName=StudioWindow}" />
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_Documentation" InputGestureText="F1"
@@ -258,7 +259,8 @@
                         <TextBlock Text="AI setup incomplete" TextWrapping="Wrap" VerticalAlignment="Center"
                                    Foreground="{StaticResource WorkbenchText}" />
                         <TextBlock Text=" · " Foreground="{StaticResource MutedText}" VerticalAlignment="Center" />
-                        <Button Content="Configure" Click="OnLanguageModelSetupClick" MinWidth="76" Padding="9,3" />
+                        <Button Content="Configure" Click="OnLanguageModelSetupClick" MinWidth="76" Padding="9,3"
+                                IsEnabled="{Binding CanOpenLanguageModelSetup, ElementName=StudioWindow}" />
                     </WrapPanel>
                 </Border>
                 <local:AuthorWorkspace x:Name="AuthorWorkspaceHost" Grid.Row="1" />
@@ -959,7 +961,8 @@
                         <TextBlock Text="AI setup incomplete" TextWrapping="Wrap" VerticalAlignment="Center"
                                    Foreground="{StaticResource WorkbenchText}" />
                         <TextBlock Text=" · " Foreground="{StaticResource MutedText}" VerticalAlignment="Center" />
-                        <Button Content="Configure" Click="OnLanguageModelSetupClick" MinWidth="76" Padding="9,3" />
+                        <Button Content="Configure" Click="OnLanguageModelSetupClick" MinWidth="76" Padding="9,3"
+                                IsEnabled="{Binding CanOpenLanguageModelSetup, ElementName=StudioWindow}" />
                     </WrapPanel>
                 </Border>
             <Border x:Name="WorldAuthoringStrip"

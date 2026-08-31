@@ -165,6 +165,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string? _sessionOpenAiUrl;
     private string? _sessionKimiUrl;
     private bool _languageModelSetupAllowsAuthoring = true;
+    private bool _languageModelSetupBusy;
     private bool _isBusy;
     private bool _isAgentRunning;
     private bool _isLiveViewportEnabled = true;
@@ -995,6 +996,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public bool HasSessionKimiCredential => _sessionKimiApiKey is not null;
 
     internal bool LanguageModelSetupAllowsAuthoring => _languageModelSetupAllowsAuthoring;
+
+    internal bool LanguageModelSetupBusy => _languageModelSetupBusy;
+
+    internal void SetLanguageModelSetupBusy(bool busy)
+    {
+        if (_languageModelSetupBusy == busy) return;
+        _languageModelSetupBusy = busy;
+        RefreshCommands();
+    }
 
     internal void SetLanguageModelSetupAvailability(bool allowsAuthoring)
     {

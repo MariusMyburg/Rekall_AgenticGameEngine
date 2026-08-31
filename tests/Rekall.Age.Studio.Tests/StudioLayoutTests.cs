@@ -317,6 +317,9 @@ public sealed class StudioLayoutTests
         Assert.Equal(2, Count(window, "Content=\"Configure\""));
         Assert.Contains("IsLanguageModelSetupIncomplete", window, StringComparison.Ordinal);
         Assert.Contains("OnLanguageModelSetupClick", window, StringComparison.Ordinal);
+        Assert.Equal(
+            3,
+            Count(window, "IsEnabled=\"{Binding CanOpenLanguageModelSetup, ElementName=StudioWindow}\""));
         Assert.Contains("MinWidth=\"", window, StringComparison.Ordinal);
         Assert.Contains("TextWrapping=\"Wrap\"", window, StringComparison.Ordinal);
     }

@@ -42,6 +42,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     public bool IsLanguageModelSetupIncomplete => _languageModelSetupCoordinator.IsSetupIncomplete;
 
+    public bool IsLanguageModelSetupBusy => _languageModelSetupCoordinator.IsSetupBusy;
+
+    public bool CanOpenLanguageModelSetup => !IsLanguageModelSetupBusy;
+
     public string LanguageModelSetupStatusText => _languageModelSetupCoordinator.SetupStatusText;
 
     public MainWindow()
@@ -59,6 +63,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return ValueTask.CompletedTask;
         };
         DataContext = _viewModel;
+        _languageModelSetupCoordinator.StateChanged += OnLanguageModelSetupStateChanged;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         SceneVulkanViewportHost.PointerFact += OnSceneViewportPointerFact;
         SceneVulkanViewportHost.MetricsChanged += OnSceneViewportMetricsChanged;
@@ -399,8 +404,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void NotifyLanguageModelSetupChanged()
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsLanguageModelSetupIncomplete)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsLanguageModelSetupBusy)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CanOpenLanguageModelSetup)));
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LanguageModelSetupStatusText)));
     }
+
+    private void OnLanguageModelSetupStateChanged(object? sender, EventArgs e) =>
+        NotifyLanguageModelSetupChanged();
 
     private void QueueLanguageModelRefreshIfReady()
     {

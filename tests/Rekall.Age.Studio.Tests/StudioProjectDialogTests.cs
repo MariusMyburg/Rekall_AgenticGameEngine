@@ -39,6 +39,28 @@ public sealed class StudioProjectDialogTests
     }
 
     [Fact]
+    public void CommandLineCreateOpenAndExampleProjectPathsSelectWorldAfterOpeningAProject()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var source = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml.cs"));
+
+        Assert.Contains("Array.IndexOf(args, \"--project\")", source, StringComparison.Ordinal);
+        Assert.Contains("() => SelectWorkspace(\"World\")", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "if (_viewModel.HasProject) SelectWorkspace(\"World\");",
+            Slice(source, "private async void OnCreateProjectClick", "private async void OnOpenProjectClick"),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "if (_viewModel.HasProject) SelectWorkspace(\"World\");",
+            Slice(source, "private async void OnOpenProjectClick", "private void OnExitClick"),
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "if (_viewModel.HasProject) SelectWorkspace(\"World\");",
+            Slice(source, "private async void OnOpenExampleClick", "private void SetProjectTransitionVisual"),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task EmptyStudioViewportInvitesProjectSelectionInsteadOfReportingVulkanFailure()
     {
         await using var viewModel = new RekallAgeStudioViewModel();
@@ -88,5 +110,14 @@ public sealed class StudioProjectDialogTests
         Assert.False(RekallAgeCreateProjectRequest.TryCreate(parent, ".", "Main", out _, out _));
         Assert.False(RekallAgeCreateProjectRequest.TryCreate(parent, "..", "Main", out _, out _));
         Assert.False(RekallAgeCreateProjectRequest.TryCreate(parent, "Game", "Act/One", out _, out _));
+    }
+
+    private static string Slice(string source, string startMarker, string endMarker)
+    {
+        var start = source.IndexOf(startMarker, StringComparison.Ordinal);
+        var end = source.IndexOf(endMarker, start + startMarker.Length, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Missing source marker: {startMarker}");
+        Assert.True(end > start, $"Missing source marker: {endMarker}");
+        return source[start..end];
     }
 }

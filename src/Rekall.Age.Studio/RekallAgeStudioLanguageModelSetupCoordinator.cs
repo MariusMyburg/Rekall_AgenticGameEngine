@@ -60,13 +60,14 @@ internal sealed class RekallAgeStudioLanguageModelSetupCoordinator
     private readonly IRekallAgeStudioLanguageModelSetupRestorer _studioRestorer;
     private readonly Func<bool> _isAutomation;
     private readonly TimeSpan _probeTimeout;
+    private int _showSetupGate;
 
     public RekallAgeStudioLanguageModelSetupCoordinator()
         : this(
             new RekallAgeStudioLanguageModelSetupStore(),
             new RekallAgeStudioDpapiCredentialStore(),
             new RekallAgeLanguageModelReadinessProbe(new RekallAgeLanguageModelProviderCatalog()),
-            SystemWindowFactory.Instance,
+            RekallAgeStudioLanguageModelSetupWindowFactory.Instance,
             SystemEnvironment.Instance,
             StudioRestorer.Instance,
             IsAutomationProcess,
@@ -98,6 +99,10 @@ internal sealed class RekallAgeStudioLanguageModelSetupCoordinator
     public bool IsSetupIncomplete { get; private set; }
 
     public string SetupStatusText { get; private set; } = "AI setup not checked.";
+
+    public bool IsSetupBusy { get; private set; }
+
+    public event EventHandler? StateChanged;
 
     internal bool ShouldRefreshLanguageModels { get; private set; }
 
@@ -169,14 +174,55 @@ internal sealed class RekallAgeStudioLanguageModelSetupCoordinator
         }
     }
 
-    public async Task ShowSetupAsync(
+    public Task ShowSetupAsync(
         Window owner,
         RekallAgeStudioViewModel studio,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(owner);
-        ArgumentNullException.ThrowIfNull(studio);
-        cancellationToken.ThrowIfCancellationRequested();
+        if (Interlocked.CompareExchange(ref _showSetupGate, 1, 0) != 0) return Task.CompletedTask;
+        try
+        {
+            ArgumentNullException.ThrowIfNull(owner);
+            ArgumentNullException.ThrowIfNull(studio);
+            cancellationToken.ThrowIfCancellationRequested();
+            IsSetupBusy = true;
+            studio.SetLanguageModelSetupBusy(true);
+            StateChanged?.Invoke(this, EventArgs.Empty);
+            return ShowSetupCoreAsync(owner, studio, cancellationToken);
+        }
+        catch
+        {
+            IsSetupBusy = false;
+            studio?.SetLanguageModelSetupBusy(false);
+            Interlocked.Exchange(ref _showSetupGate, 0);
+            StateChanged?.Invoke(this, EventArgs.Empty);
+            throw;
+        }
+    }
+
+    private async Task ShowSetupCoreAsync(
+        Window owner,
+        RekallAgeStudioViewModel studio,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await ShowSetupCoreWithoutGateAsync(owner, studio, cancellationToken);
+        }
+        finally
+        {
+            IsSetupBusy = false;
+            studio.SetLanguageModelSetupBusy(false);
+            Interlocked.Exchange(ref _showSetupGate, 0);
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private async Task ShowSetupCoreWithoutGateAsync(
+        Window owner,
+        RekallAgeStudioViewModel studio,
+        CancellationToken cancellationToken)
+    {
 
         await using var viewModel = new RekallAgeStudioLanguageModelSetupViewModel(
             _setupStore,
@@ -184,7 +230,8 @@ internal sealed class RekallAgeStudioLanguageModelSetupCoordinator
             _readinessProbe,
             environment: _environment);
         await viewModel.InitializeAsync(cancellationToken);
-        await viewModel.SelectProviderAsync(viewModel.SelectedProviderId);
+        await viewModel.RefreshCurrentProviderAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         var outcome = await _windowFactory.ShowAsync(owner, viewModel, cancellationToken);
         if (outcome == RekallAgeStudioLanguageModelSetupWindowOutcome.Completed
             && viewModel.CompletedSetup is { IsComplete: true } completed)
@@ -313,25 +360,38 @@ internal sealed class RekallAgeStudioLanguageModelSetupCoordinator
                 cancellationToken);
     }
 
-    private sealed class SystemWindowFactory : IRekallAgeStudioLanguageModelSetupWindowFactory
-    {
-        public static SystemWindowFactory Instance { get; } = new();
-
-        public ValueTask<RekallAgeStudioLanguageModelSetupWindowOutcome> ShowAsync(
-            Window owner,
-            RekallAgeStudioLanguageModelSetupViewModel viewModel,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var window = new LanguageModelSetupWindow(owner, viewModel);
-            _ = window.ShowDialog();
-            return ValueTask.FromResult(window.Outcome);
-        }
-    }
-
     private sealed class SystemEnvironment : IRekallAgeEnvironmentValueSource
     {
         public static SystemEnvironment Instance { get; } = new();
         public string? GetValue(string name) => Environment.GetEnvironmentVariable(name);
+    }
+}
+
+internal sealed class RekallAgeStudioLanguageModelSetupWindowFactory
+    : IRekallAgeStudioLanguageModelSetupWindowFactory
+{
+    public static RekallAgeStudioLanguageModelSetupWindowFactory Instance { get; } = new();
+
+    private RekallAgeStudioLanguageModelSetupWindowFactory()
+    {
+    }
+
+    public ValueTask<RekallAgeStudioLanguageModelSetupWindowOutcome> ShowAsync(
+        Window owner,
+        RekallAgeStudioLanguageModelSetupViewModel viewModel,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var window = new LanguageModelSetupWindow(owner, viewModel);
+        using var cancellationRegistration = cancellationToken.Register(() =>
+        {
+            _ = window.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (window.IsVisible) window.Close();
+            }));
+        });
+        _ = window.ShowDialog();
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult(window.Outcome);
     }
 }

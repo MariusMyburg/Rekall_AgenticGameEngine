@@ -55,6 +55,7 @@ Examples/**/Transactions/Snapshots/
 Examples/**/Transactions/transactions.age.json
 *.tmp
 *.temp
+.tmp-test-out*/
 *.bak
 *.orig
 *.swp

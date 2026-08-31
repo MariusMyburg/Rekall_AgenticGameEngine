@@ -46,6 +46,14 @@ public partial class ContentBrowser : UserControl
             await viewModel.ImportContentAsync(picker.FileNames, token);
     });
 
+    private async void OnGenerateTextureClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not RekallAgeStudioViewModel viewModel) return;
+        var dialog = new GenerateTextureDialog { Owner = Window.GetWindow(this) };
+        if (dialog.ShowDialog() != true || dialog.Options is null) return;
+        await ExecuteUiAsync(token => viewModel.GenerateTextureAsync(dialog.Options, token));
+    }
+
     private void OnFilesDragEnter(object sender, DragEventArgs e) => ApplyDropEffect(e);
     private void OnFilesDragOver(object sender, DragEventArgs e) => ApplyDropEffect(e);
     private void OnFilesDragLeave(object sender, DragEventArgs e) { }

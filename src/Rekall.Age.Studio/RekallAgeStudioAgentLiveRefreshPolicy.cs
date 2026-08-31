@@ -12,7 +12,8 @@ internal static class RekallAgeStudioAgentLiveRefreshPolicy
         "rekall.mesh.",
         "rekall.modeling.",
         "rekall.material.",
-        "rekall.module."
+        "rekall.module.",
+        "rekall.asset."
     ];
 
     internal static bool ShouldRefresh(string toolName, bool succeeded) =>

@@ -10,6 +10,7 @@ public sealed class StudioAgentLiveRefreshPolicyTests
     [InlineData("rekall.scene.apply_blueprint")]
     [InlineData("rekall.geometry.create_recipe")]
     [InlineData("rekall.level.camera.aim_at")]
+    [InlineData("rekall.asset.generate_texture")]
     public void SuccessfulAuthoringMutationsRefreshTheLiveScene(string toolName) =>
         Assert.True(RekallAgeStudioAgentLiveRefreshPolicy.ShouldRefresh(toolName, succeeded: true));
 

@@ -129,6 +129,7 @@ public static class RekallAgeDefaultCommandRegistry
         registry.Register(new SearchRemoteImagesCommand());
         registry.Register(new ImportAssetWithReportCommand());
         registry.Register(new GenerateTripoModelCommand());
+        registry.Register(new GenerateTextureCommand());
         registry.Register(new ListAssetsCommand());
         registry.Register(new PublishModelAssetCommand(modelPublishingService));
         registry.Register(new RebuildModelAssetCommand(modelPublishingService));

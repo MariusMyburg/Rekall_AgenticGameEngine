@@ -76,6 +76,10 @@
                         ToolTip="Import model, texture, audio, or shader files" AutomationProperties.Name="Import content files">
                     <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconImport}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Import…" /></StackPanel>
                 </Button>
+                <Button x:Name="GenerateTextureButton" Margin="4,2,0,2" Click="OnGenerateTextureClick"
+                        ToolTip="Generate and import a texture" AutomationProperties.Name="Generate texture">
+                    <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconContentFile}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Generate Texture…" /></StackPanel>
+                </Button>
                 <ToggleButton x:Name="CardContentViewButton" Margin="12,2,0,2" IsChecked="True" Click="OnCardViewClick"
                               ToolTip="Show content as cards" AutomationProperties.Name="Card content view">
                     <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconGrid}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Cards" /></StackPanel>

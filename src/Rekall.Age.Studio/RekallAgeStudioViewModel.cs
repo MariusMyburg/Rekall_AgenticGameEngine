@@ -5695,6 +5695,40 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         StatusText = ContentStatusText;
     }
 
+    internal async Task GenerateTextureAsync(
+        RekallAgeStudioTextureGenerationOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (_session.ProjectRoot is null)
+        {
+            ReportContentBrowserFailure("REKALL_TEXTURE_GENERATION_PROJECT_REQUIRED", "Open a project before generating a texture.");
+            return;
+        }
+
+        ContentStatusText = "Generating texture with the configured image provider…";
+        StatusText = ContentStatusText;
+        var command = new RekallAgeStudioTextureGenerationCommand(_agentRegistry);
+        var result = await command.GenerateAsync(_session.ProjectRoot, options, cancellationToken);
+        if (!result.Ok || result.Value.Asset is null)
+        {
+            var error = result.Errors.FirstOrDefault();
+            ReportContentBrowserFailure(
+                error?.Code ?? "REKALL_TEXTURE_GENERATION_FAILED",
+                error?.Message ?? "Texture generation failed. Check provider configuration and Studio logs.");
+            return;
+        }
+
+        ContentStatusText = $"Generated texture · {result.Value.Asset.DisplayName}. Refreshing project content…";
+        StatusText = ContentStatusText;
+        var content = await _contentIndex.RefreshAsync(_session.ProjectRoot, cancellationToken);
+        ApplyContentModel(content);
+        await _previewSession.InvalidateAssetsAsync(cancellationToken);
+        if (IsLiveViewportEnabled && Mode == RekallAgeStudioMode.Edit)
+            await RefreshEditPreviewAsync(result.Summary);
+        ContentStatusText = result.Summary;
+        StatusText = ContentStatusText;
+    }
+
     internal void ReportContentBrowserFailure(string code, string summary)
     {
         ContentStatusText = $"{code} · {summary}";

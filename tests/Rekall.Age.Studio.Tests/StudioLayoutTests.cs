@@ -129,6 +129,18 @@ public sealed class StudioLayoutTests
     }
 
     [Fact]
+    public void InspectorHasDedicatedWrappedScrollableAgentMessageFeedback()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+
+        Assert.Contains("x:Name=\"InspectorAgentMessages\"", window, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding AgentMessageLines}\"", window, StringComparison.Ordinal);
+        Assert.Contains("TextWrapping=\"Wrap\"", window, StringComparison.Ordinal);
+        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", window, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WorldViewportKeepsVulkanUnavailablePlaceholderAndExternalTransformControls()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));

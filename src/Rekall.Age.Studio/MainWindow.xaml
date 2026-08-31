@@ -405,6 +405,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" MinHeight="120" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <Border Style="{StaticResource EditorHeader}" Padding="12,10">
@@ -594,6 +595,36 @@
                                 </StackPanel>
                             </Expander>
                         </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="4" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,1,0,0"
+                            Background="#111820" MinHeight="120" MaxHeight="240" Padding="11,9">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="AGENT FEEDBACK" Style="{StaticResource SectionLabel}" Margin="0,0,0,6" />
+                            <ListBox x:Name="InspectorAgentMessages" Grid.Row="1"
+                                     ItemsSource="{Binding AgentMessageLines}"
+                                     BorderThickness="0" Padding="2"
+                                     Background="Transparent"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Padding" Value="0" />
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" TextWrapping="Wrap"
+                                                   Foreground="#C5D2E0" Margin="2,2,5,7" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
                     </Border>
                 </Grid>
             </Border>

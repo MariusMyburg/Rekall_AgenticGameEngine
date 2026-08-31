@@ -32,6 +32,23 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioViewModelTests
 {
     [Fact]
+    public async Task AgentMessageFeedbackKeepsTheCompleteMessageInItsDedicatedStream()
+    {
+        await using var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            new EmptyModel());
+        var message = new string('m', 3_000);
+        var report = typeof(RekallAgeStudioViewModel).GetMethod(
+            "ReportAgentProgress",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        report.Invoke(viewModel, [new RekallAgeLanguageModelAgentProgress(2, "agent.message", message)]);
+        report.Invoke(viewModel, [new RekallAgeLanguageModelAgentProgress(2, "tool.start", "not feedback")]);
+
+        Assert.Equal([message], viewModel.AgentMessageLines);
+    }
+
+    [Fact]
     public async Task InteractiveStudioDoesNotOptimisticallyReportUncheckedOllamaAsReady()
     {
         await using var viewModel = new RekallAgeStudioViewModel(

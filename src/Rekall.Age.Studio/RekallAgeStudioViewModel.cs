@@ -712,6 +712,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public IReadOnlyList<string> ReasoningEfforts { get; } =
         ["none", "low", "medium", "high", "xhigh", "max"];
     public ObservableCollection<string> AgentLines { get; } = [];
+
+    public ObservableCollection<string> AgentMessageLines { get; } = [];
     public IReadOnlyList<string> PackageTargets { get; } =
         [RekallAgePlayablePackageTargets.Windows, RekallAgePlayablePackageTargets.Headless];
     public ObservableCollection<string> MeshAssetIds { get; } = [];
@@ -4012,6 +4014,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         IsBusy = true;
         AgentActivityText = $"Starting {providerId} · {model}…";
         AgentLines.Clear();
+        AgentMessageLines.Clear();
         _lastAgentToolExecutions.Clear();
         AppendAgentLine($"provider: {providerId}");
         AppendAgentLine($"model: {model}");
@@ -4678,6 +4681,11 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 progress.Message);
         }
         AppendAgentLine($"turn {progress.Turn}: {progress.Phase}{suffix} — {progress.Message}");
+        if (progress.Phase.Equals("agent.message", StringComparison.OrdinalIgnoreCase))
+        {
+            AgentMessageLines.Add(progress.Message);
+            while (AgentMessageLines.Count > 50) AgentMessageLines.RemoveAt(0);
+        }
         if (progress.ToolExecution is { Succeeded: false } failed)
         {
             AppendAgentLine($"tool failure: {AgentToolFailureSummary(failed.ResultPreview)}");

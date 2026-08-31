@@ -5,7 +5,9 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor.Contracts;
 using Rekall.Age.Modeling;
+using Rekall.Age.Modeling.Commands;
 using Rekall.Age.Modules.Commands;
+using Rekall.Age.Rendering.Commands;
 
 namespace Rekall.Age.Studio;
 
@@ -30,9 +32,14 @@ internal sealed class RekallAgeStudioContentIndex(
 
     public static RekallAgeStudioContentIndex CreateDefault() => new([
         new ImportedContentSource(),
+        new PublishedModelContentSource(),
         new MeshContentSource(),
         new ModelingGraphContentSource(),
         new MaterialGraphContentSource(),
+        new MaterialInstanceContentSource(),
+        new ShaderSourceContentSource(),
+        new CurveContentSource(),
+        new RigContentSource(),
         new ModuleSourceContentSource()
     ]);
 
@@ -40,7 +47,7 @@ internal sealed class RekallAgeStudioContentIndex(
         string projectRoot, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(projectRoot);
-        var items = new Dictionary<string, RekallAgeContentBrowserItem>(StringComparer.Ordinal);
+        var items = new Dictionary<(string Kind, string Id), RekallAgeContentBrowserItem>();
         var warnings = new List<RekallAgeContentBrowserWarning>();
         foreach (var source in _sources)
         {
@@ -49,7 +56,7 @@ internal sealed class RekallAgeStudioContentIndex(
             {
                 foreach (var item in await source.LoadAsync(projectRoot, cancellationToken).ConfigureAwait(false))
                 {
-                    items.TryAdd(item.Id, item);
+                    items.TryAdd((item.Kind, item.Id), item);
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -158,6 +165,13 @@ internal sealed class MeshContentSource() : StoredIdContentSource("model", "mesh
     protected override string PathFor(string projectRoot, string id) => _store.GetMeshPath(projectRoot, id);
 }
 
+internal sealed class PublishedModelContentSource() : StoredIdContentSource("model", "model-asset", "mesh-edit")
+{
+    private readonly RekallAgeModelAssetStore _store = new();
+    protected override IReadOnlyList<string> List(string projectRoot) => _store.ListAssetIds(projectRoot);
+    protected override string PathFor(string projectRoot, string id) => _store.GetModelPath(projectRoot, id);
+}
+
 internal sealed class ModelingGraphContentSource() : StoredIdContentSource("modeling-graph", "modeling-graph", "modeling-graph")
 {
     private readonly RekallAgeModelingGraphAssetStore _store = new();
@@ -170,6 +184,65 @@ internal sealed class MaterialGraphContentSource() : StoredIdContentSource("mate
     private readonly RekallAgeMaterialGraphAssetStore _store = new();
     protected override IReadOnlyList<string> List(string projectRoot) => _store.ListAssetIds(projectRoot);
     protected override string PathFor(string projectRoot, string id) => _store.GetGraphPath(projectRoot, id);
+}
+
+internal sealed class MaterialInstanceContentSource() : StoredIdContentSource("material", "material-instance", "material-instance")
+{
+    private readonly RekallAgeMaterialInstanceAssetStore _store = new();
+    protected override IReadOnlyList<string> List(string projectRoot) => _store.ListAssetIds(projectRoot);
+    protected override string PathFor(string projectRoot, string id) => _store.GetInstancePath(projectRoot, id);
+}
+
+internal sealed class ShaderSourceContentSource : IRekallAgeStudioContentSource
+{
+    public string Family => "shader";
+    public async ValueTask<IReadOnlyList<RekallAgeContentBrowserItem>> LoadAsync(string projectRoot, CancellationToken cancellationToken)
+    {
+        var result = await new ListShaderSourcesCommand().ExecuteAsync(new(projectRoot, IncludeEngineShaders: false), Context(cancellationToken));
+        if (!result.Ok) throw new InvalidDataException("Shader source listing failed.");
+        return result.Value.Shaders.Select(shader =>
+        {
+            var include = shader.Stage.Equals("include", StringComparison.Ordinal);
+            return new RekallAgeContentBrowserItem($"shader:{shader.Scope}:{shader.Stage}:{shader.Name}", shader.Name,
+                "shader", include ? "shader-include" : "shader", "Authored", shader.Path, null,
+                shader.ByteLength.ToString(), "shader-edit",
+                [RekallAgeContentCapability.Open, RekallAgeContentCapability.OpenExternal, RekallAgeContentCapability.Reveal],
+                "Healthy", null, new());
+        }).ToArray();
+    }
+
+    private static RekallAgeCommandContext Context(CancellationToken cancellationToken) =>
+        new("studio-content", RekallAgeTransaction.Begin("Index shader sources"), cancellationToken);
+}
+
+internal sealed class CurveContentSource : IRekallAgeStudioContentSource
+{
+    private readonly RekallAgeCurveAssetStore _store = new();
+    public string Family => "curve";
+    public async ValueTask<IReadOnlyList<RekallAgeContentBrowserItem>> LoadAsync(string projectRoot, CancellationToken cancellationToken)
+    {
+        var result = await new ListCurveAssetsCommand().ExecuteAsync(new(projectRoot), Context(cancellationToken));
+        if (!result.Ok) throw new InvalidDataException("Curve listing failed.");
+        return result.Value.AssetIds.Select(id => Item(id, _store.GetCurvePath(projectRoot, id))).ToArray();
+    }
+    private static RekallAgeContentBrowserItem Item(string id, string path) => new($"curve:{id}", id, "curve", "curve", "Authored", path, null,
+        File.GetLastWriteTimeUtc(path).Ticks.ToString(), "curve-edit", [RekallAgeContentCapability.Open, RekallAgeContentCapability.Reveal], "Healthy", null, new());
+    private static RekallAgeCommandContext Context(CancellationToken token) => new("studio-content", RekallAgeTransaction.Begin("Index curves"), token);
+}
+
+internal sealed class RigContentSource : IRekallAgeStudioContentSource
+{
+    private readonly RekallAgeRigAssetStore _store = new();
+    public string Family => "rig";
+    public async ValueTask<IReadOnlyList<RekallAgeContentBrowserItem>> LoadAsync(string projectRoot, CancellationToken cancellationToken)
+    {
+        var result = await new ListRigAssetsCommand().ExecuteAsync(new(projectRoot), Context(cancellationToken));
+        if (!result.Ok) throw new InvalidDataException("Rig listing failed.");
+        return result.Value.AssetIds.Select(id => Item(id, _store.GetRigPath(projectRoot, id))).ToArray();
+    }
+    private static RekallAgeContentBrowserItem Item(string id, string path) => new($"rig:{id}", id, "rig", "rig", "Authored", path, null,
+        File.GetLastWriteTimeUtc(path).Ticks.ToString(), "rig-edit", [RekallAgeContentCapability.Open, RekallAgeContentCapability.Reveal], "Healthy", null, new());
+    private static RekallAgeCommandContext Context(CancellationToken token) => new("studio-content", RekallAgeTransaction.Begin("Index rigs"), token);
 }
 
 internal sealed class ModuleSourceContentSource : IRekallAgeStudioContentSource

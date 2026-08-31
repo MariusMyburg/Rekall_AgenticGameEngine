@@ -1,24 +1,65 @@
 using Rekall.Age.Editor.Contracts;
 using Rekall.Age.Studio;
 using System.IO;
+using Rekall.Age.Assets;
+using Rekall.Age.Modeling;
 
 namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioContentIndexTests
 {
     [Fact]
-    public async Task RefreshMergesDeduplicatesAndSortsDeterministically()
+    public async Task RefreshDeduplicatesExactKindAndIdWhileKeepingDifferentKindsWithSameId()
     {
         var duplicate = Item("shared", "Zulu", "texture");
         var index = new RekallAgeStudioContentIndex([
             new StubSource("imported", [duplicate, Item("b", "Beta", "model")]),
-            new StubSource("authored", [duplicate with { DisplayName = "Ignored" }, Item("a", "Alpha", "model")])
+            new StubSource("authored", [duplicate with { DisplayName = "Ignored" }, Item("shared", "Shared Model", "model"), Item("a", "Alpha", "model")])
         ]);
 
         var result = await index.RefreshAsync("C:\\project", CancellationToken.None);
 
-        Assert.Equal(["a", "b", "shared"], result.Items.Select(item => item.Id));
-        Assert.Equal("Zulu", Assert.Single(result.Items, item => item.Id == "shared").DisplayName);
+        Assert.Equal(4, result.Items.Count);
+        Assert.Equal("Zulu", Assert.Single(result.Items, item => item.Id == "shared" && item.Kind == "texture").DisplayName);
+        Assert.Contains(result.Items, item => item.Id == "shared" && item.Kind == "model");
+    }
+
+    [Fact]
+    public async Task CreateDefaultIndexesEveryCanonicalAuthoredContentFamily()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-content-index-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            Touch(new RekallAgeModelAssetStore().GetModelPath(root, "published-model"));
+            Touch(new RekallAgeMeshAssetStore().GetMeshPath(root, "mesh"));
+            Touch(new RekallAgeModelingGraphAssetStore().GetGraphPath(root, "modeling-graph"));
+            Touch(new RekallAgeMaterialGraphAssetStore().GetGraphPath(root, "material-graph"));
+            Touch(new RekallAgeMaterialInstanceAssetStore().GetInstancePath(root, "material-instance"));
+            Touch(new RekallAgeCurveAssetStore().GetCurvePath(root, "curve"));
+            Touch(new RekallAgeRigAssetStore().GetRigPath(root, "rig"));
+            Touch(Path.Combine(root, "Shaders", "surface.vert"));
+            Touch(Path.Combine(root, "Shaders", "lighting.glslinc"));
+            Touch(Path.Combine(root, "Modules", "Gameplay", "Game.cs"));
+
+            var result = await RekallAgeStudioContentIndex.CreateDefault().RefreshAsync(root, CancellationToken.None);
+
+            Assert.Empty(result.Warnings);
+            Assert.Contains(result.Items, item => item.Kind == "model-asset");
+            Assert.Contains(result.Items, item => item.Kind == "mesh");
+            Assert.Contains(result.Items, item => item.Kind == "modeling-graph");
+            Assert.Contains(result.Items, item => item.Kind == "material-graph");
+            Assert.Contains(result.Items, item => item.Kind == "material-instance");
+            Assert.Contains(result.Items, item => item.Kind == "curve");
+            Assert.Contains(result.Items, item => item.Kind == "rig");
+            Assert.Contains(result.Items, item => item.Kind == "shader");
+            Assert.Contains(result.Items, item => item.Kind == "shader-include");
+            Assert.Contains(result.Items, item => item.Kind == "module-source");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]
@@ -70,6 +111,12 @@ public sealed class StudioContentIndexTests
 
     private static RekallAgeContentBrowserItem Item(string id, string name, string family) => new(
         id, name, family, family, "Authored", null, null, "1", "external", ["open"], "Healthy", null, new());
+
+    private static void Touch(string path)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "fixture");
+    }
 
     private sealed class StubSource(string family, IReadOnlyList<RekallAgeContentBrowserItem> items) : IRekallAgeStudioContentSource
     {

@@ -46,6 +46,7 @@ public sealed record RekallAgeAssetPipelineDocument(
             ".png" => "image/png",
             ".jpg" or ".jpeg" => "image/jpeg",
             ".wav" => "audio/wav",
+            ".mp3" => "audio/mpeg",
             _ => "application/octet-stream"
         };
     }

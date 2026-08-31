@@ -52,6 +52,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _openCommand;
     private readonly RekallAgeAsyncCommand _createCommand;
     private readonly RekallAgeAsyncCommand _openSelectedContentCommand;
+    private readonly RekallAgeAsyncCommand _importContentCommand;
     private readonly RekallAgeAsyncCommand _addEntityCommand;
     private readonly RekallAgeAsyncCommand _renameEntityCommand;
     private readonly RekallAgeAsyncCommand _duplicateEntityCommand;
@@ -106,6 +107,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeModelAssetStore _modelAssetStore = new();
     private readonly IRekallAgeStudioContentIndex _contentIndex = RekallAgeStudioContentIndex.CreateDefault();
     private readonly IRekallAgeStudioContentOpenRouter _contentOpenRouter;
+    private readonly RekallAgeStudioContentImportSession _contentImportSession;
     private readonly Action<string> _openPackageFolder;
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
@@ -172,6 +174,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private bool _languageModelSetupBusy;
     private bool _isBusy;
     private bool _isAgentRunning;
+    private bool _hasActiveContentImports;
     private bool _isLiveViewportEnabled = true;
     private bool _isSimulationPaused;
     private Task? _disposeTask;
@@ -429,6 +432,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _ggufImporter = ggufImporter ?? new RekallAgeOllamaGgufImporter();
         _openPackageFolder = openPackageFolder ?? OpenDirectoryInExplorer;
         _contentOpenRouter = new RekallAgeStudioContentOpenRouter(this);
+        _contentImportSession = new RekallAgeStudioContentImportSession(
+            new RekallAgeStudioAssetImportCommand(),
+            async cancellationToken =>
+            {
+                if (_session.ProjectRoot is null) return;
+                var content = await _contentIndex.RefreshAsync(_session.ProjectRoot, cancellationToken);
+                ApplyContentModel(content);
+            },
+            cancellationToken => _previewSession.InvalidateAssetsAsync(cancellationToken));
         _agentRegistry = RekallAgeDefaultCommandRegistry.Create();
         _selectedLanguageModelProvider = _languageModelProviderCatalog.Providers.Single(provider => provider.Id == "ollama");
         _selectedLanguageModel = _selectedLanguageModelProvider.DefaultModel;
@@ -450,6 +462,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _openCommand = CreateAsyncCommand(OpenFromInputsAsync, CanOpenOrCreate);
         _createCommand = CreateAsyncCommand(CreateFromInputsAsync, CanOpenOrCreate);
         _openSelectedContentCommand = CreateAsyncCommand(OpenSelectedContentAsync, CanOpenSelectedContent);
+        _importContentCommand = CreateAsyncCommand(
+            ImportContentAsync,
+            parameter => HasOpenProject() && !HasActiveContentImports && parameter is IEnumerable<string>);
         _addEntityCommand = CreateAsyncCommand(AddEntityAsync, HasEditableProject);
         _renameEntityCommand = CreateAsyncCommand(RenameEntityAsync, CanRenameEntity);
         _duplicateEntityCommand = CreateAsyncCommand(DuplicateEntityAsync, HasSelectedEntity);
@@ -553,6 +568,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<RekallAgeContentBrowserItem> ContentItems { get; } = [];
     public ObservableCollection<RekallAgeContentBrowserItem> FilteredContentItems { get; } = [];
     public ObservableCollection<RekallAgeContentBrowserWarning> ContentWarnings { get; } = [];
+    public ObservableCollection<RekallAgeStudioContentImportJob> ImportJobs => _contentImportSession.Jobs;
     public ObservableCollection<string> ContentCategories { get; } = ["All"];
 
     public string SelectedContentCategory
@@ -573,6 +589,19 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             if (Set(ref _contentSearchText, value ?? string.Empty)) RefreshContentProjection();
         }
     }
+
+    public bool HasActiveContentImports
+    {
+        get => _hasActiveContentImports;
+        private set
+        {
+            if (Set(ref _hasActiveContentImports, value)) RefreshCommands();
+        }
+    }
+
+    public string ContentImportSummary => ImportJobs.Count == 0
+        ? "No content imports."
+        : $"{ImportJobs.Count(job => job.Status == "Succeeded")} imported, {ImportJobs.Count(job => job.Status is "Failed" or "Rejected")} not imported.";
 
     public RekallAgeContentBrowserItem? SelectedContentItem
     {
@@ -652,6 +681,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand OpenCommand => _openCommand;
     public ICommand CreateCommand => _createCommand;
     public ICommand OpenSelectedContentCommand => _openSelectedContentCommand;
+    public ICommand ImportContentCommand => _importContentCommand;
     public ICommand AddEntityCommand => _addEntityCommand;
     public ICommand RenameEntityCommand => _renameEntityCommand;
     public ICommand DuplicateEntityCommand => _duplicateEntityCommand;
@@ -5438,6 +5468,34 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         ApplyContentModel(content);
     }
 
+    internal async Task<IReadOnlyList<RekallAgeStudioContentImportJob>> ImportContentAsync(
+        IEnumerable<string> sourcePaths,
+        CancellationToken cancellationToken)
+    {
+        if (_session.ProjectRoot is null) return [];
+        HasActiveContentImports = true;
+        try
+        {
+            var jobs = await _contentImportSession.ImportAsync(_session.ProjectRoot, sourcePaths, cancellationToken);
+            OnPropertyChanged(nameof(ContentImportSummary));
+            var succeeded = jobs.Count(job => job.Status == "Succeeded");
+            ContentStatusText = succeeded > 0
+                ? $"Imported {succeeded} content file(s)."
+                : "No content files were imported.";
+            StatusText = ContentStatusText;
+            return jobs;
+        }
+        finally
+        {
+            OnPropertyChanged(nameof(ContentImportSummary));
+            HasActiveContentImports = false;
+        }
+    }
+
+    private Task ImportContentAsync(object? parameter) => parameter is IEnumerable<string> paths
+        ? ImportContentAsync(paths, _lifecycleCancellation.Token)
+        : Task.CompletedTask;
+
     private bool CanOpenSelectedContent() => HasOpenProject()
         && SelectedContentItem is { } item
         && _contentOpenRouter.CanOpen(item);
@@ -5958,6 +6016,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _openCommand.RaiseCanExecuteChanged();
         _createCommand.RaiseCanExecuteChanged();
         _openSelectedContentCommand.RaiseCanExecuteChanged();
+        _importContentCommand.RaiseCanExecuteChanged();
         _addEntityCommand.RaiseCanExecuteChanged();
         _renameEntityCommand.RaiseCanExecuteChanged();
         _duplicateEntityCommand.RaiseCanExecuteChanged();

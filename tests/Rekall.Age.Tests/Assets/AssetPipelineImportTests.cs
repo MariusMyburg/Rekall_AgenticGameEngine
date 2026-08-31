@@ -98,6 +98,25 @@ public sealed class AssetPipelineImportTests
         Assert.NotNull(result.Value.Pipeline.Imported.Single().TextureMetadata);
     }
 
+    [Fact]
+    public async Task ImportWithReportMapsMp3ToMpegAudio()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        var source = Path.Combine(root, "theme.mp3");
+        await File.WriteAllBytesAsync(source, [0x49, 0x44, 0x33, 4, 0, 0], CancellationToken.None);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new ImportAssetWithReportCommand());
+        var context = new RekallAgeCommandContext("test", RekallAgeTransaction.Begin("import mp3"), CancellationToken.None);
+
+        var result = await registry.ExecuteAsync<ImportAssetWithReportRequest, ImportAssetWithReportResult>(
+            "rekall.asset.import_report",
+            new ImportAssetWithReportRequest(root, source, "audio", "Theme"),
+            context);
+
+        Assert.True(result.Ok, result.Summary);
+        Assert.Equal("audio/mpeg", result.Value.Pipeline.Imported.Single().MimeType);
+    }
+
     private static byte[] CreateMinimalGlb()
     {
         const string json = """

@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Rekall.Age.Core\Rekall.Age.Core.csproj" />
     <ProjectReference Include="..\Rekall.Age.Agent\Rekall.Age.Agent.csproj" />
+    <ProjectReference Include="..\Rekall.Age.AssetPipeline\Rekall.Age.AssetPipeline.csproj" />
     <ProjectReference Include="..\Rekall.Age.Editor\Rekall.Age.Editor.csproj" />
     <ProjectReference Include="..\Rekall.Age.Editor.Contracts\Rekall.Age.Editor.Contracts.csproj" />
     <ProjectReference Include="..\Rekall.Age.Modeling\Rekall.Age.Modeling.csproj" />

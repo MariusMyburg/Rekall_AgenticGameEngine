@@ -1,4 +1,6 @@
 using System.Numerics;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.IO;
 using Rekall.Age.Editor.Contracts;
@@ -7,6 +9,7 @@ using Rekall.Age.Rendering;
 using Rekall.Age.Editor;
 using Rekall.Age.Modeling.Commands;
 using Rekall.Age.Modeling.Contracts;
+using Rekall.Age.Modeling;
 using Rekall.Age.AssetPipeline.Commands;
 using Rekall.Age.Assets;
 using Rekall.Age.Core.Persistence;
@@ -173,6 +176,22 @@ internal sealed class RekallAgeStudioContentPlacementCommand(
 
 internal static class RekallAgeStudioImportedModelPublisher
 {
+    private const string ProvenanceAttributeName = "rekall.content.source.identity";
+    private const int MaximumCollisionAttempts = 16;
+
+    internal static RekallAgeStudioGeneratedModelIds GeneratedIds(RekallAgeContentBrowserItem item, int attempt)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentOutOfRangeException.ThrowIfNegative(attempt);
+        var identityInput = string.Join("\n", item.Id, item.Kind, item.Revision);
+        var sourceIdentity = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identityInput))).ToLowerInvariant();
+        var readable = SanitizeIdPrefix(item.DisplayName);
+        return new(
+            BoundedHashedId(readable, "mesh", sourceIdentity, attempt),
+            BoundedHashedId(readable, "model", sourceIdentity, attempt),
+            sourceIdentity);
+    }
+
     public static async ValueTask<string> EnsurePublishedAsync(
         RekallAgeWorkbenchSession session,
         RekallAgeContentBrowserItem item,
@@ -181,32 +200,59 @@ internal static class RekallAgeStudioImportedModelPublisher
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(item);
         if (session.ProjectRoot is null) throw new InvalidOperationException("Open a project before placing content.");
-        var modelAssetId = BoundedId(item.Id + "-model");
         var modelStore = new RekallAgeModelAssetStore();
-        if (File.Exists(modelStore.GetModelPath(session.ProjectRoot, modelAssetId))) return modelAssetId;
-
         var sourcePath = item.SourcePath ?? item.Path
             ?? throw new InvalidOperationException("The imported model source is unavailable.");
         var meshes = await new RekallAgeGlbMeshLoader().LoadAsync(item.Id, sourcePath, cancellationToken);
         if (meshes.Count == 0) throw new InvalidDataException("The imported model contains no triangle geometry.");
-        var meshAssetId = BoundedId(item.Id + "-mesh");
         var topology = ToTopology(meshes);
-        var created = await session.ExecuteAsync(
-            "rekall.mesh.create_asset",
-            JsonSerializer.Serialize(new CreateMeshAssetRequest(
-                session.ProjectRoot, meshAssetId, item.DisplayName, topology)),
-            $"Create editable mesh for {item.DisplayName}", "studio", cancellationToken);
-        if (!created.Ok && created.Errors.All(error => error.Code != "REKALL_MESH_ASSET_EXISTS"))
-            throw new InvalidOperationException(created.Summary);
+        var meshStore = new RekallAgeMeshAssetStore();
+        for (var attempt = 0; attempt < MaximumCollisionAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var ids = GeneratedIds(item, attempt);
+            var marker = "rekall-content:" + ids.SourceIdentity;
+            var modelPath = modelStore.GetModelPath(session.ProjectRoot, ids.ModelAssetId);
+            var meshPath = meshStore.GetMeshPath(session.ProjectRoot, ids.MeshAssetId);
+            if (File.Exists(modelPath))
+            {
+                var model = await modelStore.LoadAsync(session.ProjectRoot, ids.ModelAssetId, cancellationToken);
+                if (model.Source.AssetId == ids.MeshAssetId && model.Source.OutputName == marker
+                    && File.Exists(meshPath)
+                    && MeshBelongsTo(await meshStore.LoadAsync(session.ProjectRoot, ids.MeshAssetId, cancellationToken), ids.SourceIdentity))
+                    return ids.ModelAssetId;
+                continue;
+            }
 
-        var published = await session.ExecuteAsync(
-            "rekall.asset.model.publish",
-            JsonSerializer.Serialize(new PublishModelAssetRequest(
-                session.ProjectRoot, modelAssetId, item.DisplayName,
-                new(RekallAgeModelSourceKind.Mesh, meshAssetId), RekallAgeDocumentRevision.Missing)),
-            $"Publish Model Asset for {item.DisplayName}", "studio", cancellationToken);
-        if (!published.Ok) throw new InvalidOperationException(published.Summary);
-        return modelAssetId;
+            if (File.Exists(meshPath)
+                && !MeshBelongsTo(await meshStore.LoadAsync(session.ProjectRoot, ids.MeshAssetId, cancellationToken), ids.SourceIdentity))
+                continue;
+
+            if (!File.Exists(meshPath))
+            {
+                var provenance = new RekallAgeGeometryAttribute(
+                    ProvenanceAttributeName, RekallAgeGeometryDomain.Point, RekallAgeGeometryValueType.String,
+                    topology.PointIds.Select(_ => JsonSerializer.SerializeToElement(ids.SourceIdentity)).ToArray(),
+                    Semantic: "content-source-identity");
+                var created = await session.ExecuteAsync(
+                    "rekall.mesh.create_asset",
+                    JsonSerializer.Serialize(new CreateMeshAssetRequest(
+                        session.ProjectRoot, ids.MeshAssetId, item.DisplayName, topology, [provenance])),
+                    $"Create editable mesh for {item.DisplayName}", "studio", cancellationToken);
+                if (!created.Ok) throw new InvalidOperationException(created.Summary);
+            }
+
+            var published = await session.ExecuteAsync(
+                "rekall.asset.model.publish",
+                JsonSerializer.Serialize(new PublishModelAssetRequest(
+                    session.ProjectRoot, ids.ModelAssetId, item.DisplayName,
+                    new(RekallAgeModelSourceKind.Mesh, ids.MeshAssetId, marker), RekallAgeDocumentRevision.Missing)),
+                $"Publish Model Asset for {item.DisplayName}", "studio", cancellationToken);
+            if (!published.Ok) throw new InvalidOperationException(published.Summary);
+            return ids.ModelAssetId;
+        }
+
+        throw new InvalidDataException("REKALL_CONTENT_MODEL_ID_COLLISION: Could not allocate an imported Model Asset identity.");
     }
 
     private static RekallAgeMeshTopology ToTopology(IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
@@ -251,8 +297,34 @@ internal static class RekallAgeStudioImportedModelPublisher
             cornerPoints, cornerEdges);
     }
 
-    private static string BoundedId(string value) => value.Length <= 128 ? value : value[..128];
+    private static bool MeshBelongsTo(RekallAgeMeshAsset mesh, string sourceIdentity) =>
+        mesh.Attributes.Any(attribute => attribute.Name == ProvenanceAttributeName
+            && attribute.Domain == RekallAgeGeometryDomain.Point
+            && attribute.ValueType == RekallAgeGeometryValueType.String
+            && attribute.Values.Count == mesh.Topology.PointIds.Count
+            && attribute.Values.All(value => value.ValueKind == JsonValueKind.String && value.GetString() == sourceIdentity));
+
+    private static string SanitizeIdPrefix(string value)
+    {
+        var chars = value.Select(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.' ? character : '-')
+            .ToArray();
+        var sanitized = new string(chars).Trim('-', '.', '_');
+        return string.IsNullOrWhiteSpace(sanitized) ? "imported" : sanitized;
+    }
+
+    private static string BoundedHashedId(string prefix, string role, string sourceIdentity, int attempt)
+    {
+        var suffix = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{sourceIdentity}\n{role}\n{attempt}")))
+            .ToLowerInvariant()[..24];
+        var tail = $"-{role}-{suffix}";
+        return prefix[..Math.Min(prefix.Length, 128 - tail.Length)] + tail;
+    }
 }
+
+internal sealed record RekallAgeStudioGeneratedModelIds(
+    string MeshAssetId,
+    string ModelAssetId,
+    string SourceIdentity);
 
 internal sealed class RekallAgeStudioContentDragService(
     IRekallAgeStudioContentPropertyMutationCommand propertyMutation,

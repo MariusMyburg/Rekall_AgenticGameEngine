@@ -9,11 +9,93 @@ using Rekall.Age.Core.Transactions;
 using Rekall.Age.Editor;
 using Rekall.Age.Workflows;
 using Rekall.Age.World;
+using Rekall.Age.Modeling.Commands;
+using Rekall.Age.Modeling.Contracts;
+using Rekall.Age.Assets;
 
 namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioContentDragServiceTests
 {
+    [Fact]
+    public void LongCommonPrefixContentIdsKeepBoundedDistinctCryptographicSuffixes()
+    {
+        var prefix = new string('a', 180);
+        var first = Item(prefix + "-one", "model", [RekallAgeContentCapability.Place], "first.glb") with { Revision = "hash-one" };
+        var second = Item(prefix + "-two", "model", [RekallAgeContentCapability.Place], "second.glb") with { Revision = "hash-two" };
+
+        var firstIds = RekallAgeStudioImportedModelPublisher.GeneratedIds(first, 0);
+        var secondIds = RekallAgeStudioImportedModelPublisher.GeneratedIds(second, 0);
+
+        Assert.InRange(firstIds.MeshAssetId.Length, 1, 128);
+        Assert.InRange(firstIds.ModelAssetId.Length, 1, 128);
+        Assert.NotEqual(firstIds, secondIds);
+        Assert.NotEqual(firstIds.SourceIdentity, secondIds.SourceIdentity);
+        Assert.Matches("-[0-9a-f]{24}$", firstIds.MeshAssetId);
+        Assert.Matches("-[0-9a-f]{24}$", firstIds.ModelAssetId);
+    }
+
+    [Fact]
+    public async Task ConflictingGeneratedAssetIsNotReusedAndPlacedModelKeepsImportedGeometryProvenance()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-content-collision-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var source = Path.Combine(root, "triangle.glb");
+        var secondSource = Path.Combine(root, "triangle-two.glb");
+        await File.WriteAllBytesAsync(source, TriangleGlb());
+        await File.WriteAllBytesAsync(secondSource, TriangleGlb());
+        var session = new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create());
+        Assert.True((await session.CreateProjectAsync(root, "Collision", "Main", ["world"], ["world", "rendering3d"], "test", default)).Ok);
+        var item = Item(new string('x', 180) + "-one", "model", [RekallAgeContentCapability.Place], source)
+            with { DisplayName = new string('x', 180), Revision = "exact-source-hash-one" };
+        var secondItem = Item(new string('x', 180) + "-two", "model", [RekallAgeContentCapability.Place], secondSource)
+            with { DisplayName = new string('x', 180), Revision = "exact-source-hash-two" };
+        var conflict = RekallAgeStudioImportedModelPublisher.GeneratedIds(item, 0);
+        var topology = new RekallAgeMeshTopology(
+            [1, 2, 3], [new(0, 0, 0), new(9, 0, 0), new(0, 9, 0)],
+            [11, 12, 13], [new(0, 1), new(1, 2), new(0, 2)], [21], [0, 3],
+            [31, 32, 33], [0, 1, 2], [0, 1, 2]);
+        var mesh = await session.ExecuteAsync("rekall.mesh.create_asset", JsonSerializer.Serialize(
+            new CreateMeshAssetRequest(root, conflict.MeshAssetId, "Foreign", topology)), "foreign mesh", "test", default);
+        Assert.True(mesh.Ok, mesh.Summary);
+        var model = await session.ExecuteAsync("rekall.asset.model.publish", JsonSerializer.Serialize(
+            new PublishModelAssetRequest(root, conflict.ModelAssetId, "Foreign",
+                new(RekallAgeModelSourceKind.Mesh, conflict.MeshAssetId, "rekall-content:foreign"), "missing")),
+            "foreign model", "test", default);
+        Assert.True(model.Ok, model.Summary);
+
+        var modelAssetId = await RekallAgeStudioImportedModelPublisher.EnsurePublishedAsync(session, item, default);
+        var secondModelAssetId = await RekallAgeStudioImportedModelPublisher.EnsurePublishedAsync(session, secondItem, default);
+        Assert.NotEqual(conflict.ModelAssetId, modelAssetId);
+        Assert.NotEqual(modelAssetId, secondModelAssetId);
+        var published = await new RekallAgeModelAssetStore().LoadAsync(root, modelAssetId, default);
+        var secondPublished = await new RekallAgeModelAssetStore().LoadAsync(root, secondModelAssetId, default);
+        Assert.NotEqual(conflict.MeshAssetId, published.Source.AssetId);
+        Assert.NotEqual(published.Source.AssetId, secondPublished.Source.AssetId);
+        Assert.Equal("rekall-content:" + RekallAgeStudioImportedModelPublisher.GeneratedIds(item, 1).SourceIdentity,
+            published.Source.OutputName);
+        var placed = await session.ExecuteAsync("rekall.scene.instantiate_asset", JsonSerializer.Serialize(new
+        {
+            projectRoot = root, sceneName = "Main", modelAssetId, name = "Imported",
+            position = new { x = 0, y = 0, z = 0 }, rotationDegrees = new { x = 0, y = 0, z = 0 },
+            scale = new { x = 1, y = 1, z = 1 }
+        }), "place", "test", default);
+        Assert.True(placed.Ok, placed.Summary);
+        var secondPlaced = await session.ExecuteAsync("rekall.scene.instantiate_asset", JsonSerializer.Serialize(new
+        {
+            projectRoot = root, sceneName = "Main", modelAssetId = secondModelAssetId, name = "Imported Two",
+            position = new { x = 2, y = 0, z = 0 }, rotationDegrees = new { x = 0, y = 0, z = 0 },
+            scale = new { x = 1, y = 1, z = 1 }
+        }), "place second", "test", default);
+        Assert.True(secondPlaced.Ok, secondPlaced.Summary);
+        var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", default);
+        Assert.Contains(scene.Entities, entity => entity.Components.Any(component =>
+            component.Type == "Rekall.ModelAssetReference"
+            && component.Properties["assetId"]!.GetValue<string>() == modelAssetId));
+        Assert.Contains(scene.Entities, entity => entity.Components.Any(component =>
+            component.Type == "Rekall.ModelAssetReference"
+            && component.Properties["assetId"]!.GetValue<string>() == secondModelAssetId));
+    }
     [Theory]
     [InlineData(".glb")]
     [InlineData(".gltf")]

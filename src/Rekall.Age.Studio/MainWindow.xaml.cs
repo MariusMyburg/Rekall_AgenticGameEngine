@@ -10,7 +10,7 @@ using Serilog;
 
 namespace Rekall.Age.Studio;
 
-public partial class MainWindow : Window
+public partial class MainWindow : Window, INotifyPropertyChanged
 {
     public static RoutedUICommand OpenDocumentationCommand { get; } = new(
         "Open Documentation",
@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private readonly RekallAgeStudioExampleCatalog _exampleCatalog = RekallAgeStudioExampleCatalog.CreateDefault();
     private readonly RekallAgeStudioExampleLibrary _exampleLibrary = new();
     private readonly RekallAgeStudioProjectTransitionCoordinator _projectTransitions = new();
+    private readonly RekallAgeStudioLanguageModelSetupCoordinator _languageModelSetupCoordinator = new();
     private readonly DispatcherTimer _previewTimer;
     private readonly RekallAgeStudioViewportRecoveryState _viewportRecovery =
         new(TimeSpan.FromSeconds(1));
@@ -36,6 +37,12 @@ public partial class MainWindow : Window
     private bool _initializing = true;
     private bool _hadProject;
     private bool _shutdownPrepared;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public bool IsLanguageModelSetupIncomplete => _languageModelSetupCoordinator.IsSetupIncomplete;
+
+    public string LanguageModelSetupStatusText => _languageModelSetupCoordinator.SetupStatusText;
 
     public MainWindow()
     {
@@ -74,10 +81,22 @@ public partial class MainWindow : Window
             var sceneIndex = Array.IndexOf(args, "--scene");
             var projectRoot = projectIndex >= 0 && projectIndex + 1 < args.Length ? args[projectIndex + 1] : null;
             var sceneName = sceneIndex >= 0 && sceneIndex + 1 < args.Length ? args[sceneIndex + 1] : "Main";
-            _layout = await _layoutStore.LoadAsync(CancellationToken.None);
-            ApplyLayout(_layout);
-            await _viewModel.InitializeAsync(projectRoot, sceneName);
-            if (_viewModel.HasProject) SelectWorkspace("World");
+            await RekallAgeStudioStartupSequence.RunAsync(
+                async cancellationToken =>
+                {
+                    _layout = await _layoutStore.LoadAsync(cancellationToken);
+                    ApplyLayout(_layout);
+                },
+                async cancellationToken =>
+                {
+                    await _languageModelSetupCoordinator.InitializeAsync(this, _viewModel, cancellationToken);
+                    NotifyLanguageModelSetupChanged();
+                },
+                cancellationToken => _viewModel.InitializeAsync(projectRoot, sceneName),
+                () => _viewModel.HasProject,
+                () => SelectWorkspace("World"),
+                QueueLanguageModelRefreshIfReady,
+                CancellationToken.None);
             if (_viewModel.HasProject && SceneVulkanViewportHost.Metrics.IsPresentable)
             {
                 await _viewModel.PresentViewportAtHostSizeAsync(SceneVulkanViewportHost.Metrics);
@@ -86,14 +105,6 @@ public partial class MainWindow : Window
             _hadProject = _viewModel.HasProject;
             _initializing = false;
             _previewTimer.Start();
-            _ = Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() =>
-            {
-                if (_viewModel.LanguageModels.Count == 0
-                    && _viewModel.RefreshLanguageModelsCommand.CanExecute(null))
-                {
-                    _viewModel.RefreshLanguageModelsCommand.Execute(null);
-                }
-            }));
         }
         catch (Exception exception)
         {
@@ -370,6 +381,39 @@ public partial class MainWindow : Window
     }
 
     private void OnExitClick(object sender, RoutedEventArgs e) => Close();
+
+    private async void OnLanguageModelSetupClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await _languageModelSetupCoordinator.ShowSetupAsync(this, _viewModel, CancellationToken.None);
+            NotifyLanguageModelSetupChanged();
+            QueueLanguageModelRefreshIfReady();
+        }
+        catch (Exception exception)
+        {
+            Log.Error(exception, "Language-model setup could not be opened.");
+        }
+    }
+
+    private void NotifyLanguageModelSetupChanged()
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsLanguageModelSetupIncomplete)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LanguageModelSetupStatusText)));
+    }
+
+    private void QueueLanguageModelRefreshIfReady()
+    {
+        if (!_languageModelSetupCoordinator.ShouldRefreshLanguageModels) return;
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() =>
+        {
+            if (_viewModel.LanguageModels.Count == 0
+                && _viewModel.RefreshLanguageModelsCommand.CanExecute(null))
+            {
+                _viewModel.RefreshLanguageModelsCommand.Execute(null);
+            }
+        }));
+    }
 
     private void OnOpenDocumentationExecuted(object sender, ExecutedRoutedEventArgs e)
     {

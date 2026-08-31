@@ -436,6 +436,24 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         lock (_operationSync) return _activeOperation;
     }
 
+    internal Task RestoreCompletedSetupAsync(
+        IRekallAgeStudioLanguageModelSetupRestorer restorer,
+        RekallAgeStudioViewModel studio,
+        RekallAgeStudioLanguageModelSetup setup,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(restorer);
+        ArgumentNullException.ThrowIfNull(studio);
+        ArgumentNullException.ThrowIfNull(setup);
+        ThrowIfDisposed();
+        return restorer.RestoreAsync(
+            studio,
+            setup,
+            setup.ProviderId == "openai" ? _activeProviderSettings.OpenAiApiKey : null,
+            setup.ProviderId == "kimi" ? _activeProviderSettings.KimiApiKey : null,
+            cancellationToken);
+    }
+
     public async ValueTask DisposeAsync()
     {
         Task operation;

@@ -306,6 +306,34 @@ public sealed class StudioLayoutTests
     }
 
     [Fact]
+    public void StudioShellOffersSettingsAndConfigureOnlyRecoveryBannersInAuthorAndWorld()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+
+        Assert.Contains("Header=\"_Settings\"", window, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Language Model Setup…\"", window, StringComparison.Ordinal);
+        Assert.Equal(2, Count(window, "AI setup incomplete"));
+        Assert.Equal(2, Count(window, "Content=\"Configure\""));
+        Assert.Contains("IsLanguageModelSetupIncomplete", window, StringComparison.Ordinal);
+        Assert.Contains("OnLanguageModelSetupClick", window, StringComparison.Ordinal);
+        Assert.Contains("MinWidth=\"", window, StringComparison.Ordinal);
+        Assert.Contains("TextWrapping=\"Wrap\"", window, StringComparison.Ordinal);
+    }
+
+    private static int Count(string value, string token)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = value.IndexOf(token, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += token.Length;
+        }
+        return count;
+    }
+
+    [Fact]
     public void WorldWorkspaceExposesTheAdvancedInspectorSurface()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));

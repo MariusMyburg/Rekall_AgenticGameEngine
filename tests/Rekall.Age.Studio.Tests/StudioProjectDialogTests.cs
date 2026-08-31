@@ -5,6 +5,40 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioProjectDialogTests
 {
     [Fact]
+    public async Task StartupLoadsLayoutThenSetupThenProjectAndSelectsWorldForAnOpenedProject()
+    {
+        var events = new List<string>();
+
+        await RekallAgeStudioStartupSequence.RunAsync(
+            _ => { events.Add("layout"); return Task.CompletedTask; },
+            _ => { events.Add("setup"); return Task.CompletedTask; },
+            _ => { events.Add("project"); return Task.CompletedTask; },
+            () => true,
+            () => events.Add("World"),
+            () => events.Add("refresh"),
+            CancellationToken.None);
+
+        Assert.Equal(["layout", "setup", "project", "World", "refresh"], events);
+    }
+
+    [Fact]
+    public async Task StartupDoesNotForceWorldWhenNoProjectWasOpened()
+    {
+        var worldSelections = 0;
+
+        await RekallAgeStudioStartupSequence.RunAsync(
+            _ => Task.CompletedTask,
+            _ => Task.CompletedTask,
+            _ => Task.CompletedTask,
+            () => false,
+            () => worldSelections++,
+            () => { },
+            CancellationToken.None);
+
+        Assert.Equal(0, worldSelections);
+    }
+
+    [Fact]
     public async Task EmptyStudioViewportInvitesProjectSelectionInsteadOfReportingVulkanFailure()
     {
         await using var viewModel = new RekallAgeStudioViewModel();

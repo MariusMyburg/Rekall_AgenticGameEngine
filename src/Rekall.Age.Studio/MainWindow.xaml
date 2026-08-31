@@ -1,4 +1,4 @@
-<Window x:Class="Rekall.Age.Studio.MainWindow"
+<Window x:Class="Rekall.Age.Studio.MainWindow" x:Name="StudioWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Rekall.Age.Studio"
@@ -147,6 +147,9 @@
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>
             <MenuItem x:Name="ExamplesMenu" Header="_Examples" />
+            <MenuItem Header="_Settings">
+                <MenuItem Header="Language Model Setup…" Click="OnLanguageModelSetupClick" />
+            </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_Documentation" InputGestureText="F1"
                           Command="{x:Static local:MainWindow.OpenDocumentationCommand}" />
@@ -234,7 +237,32 @@
                 <Button Content="Inspector" Tag="Inspector" Click="OnTogglePanelClick" />
                 <Button Content="Output" Tag="Output" Click="OnTogglePanelClick" />
             </StackPanel>
-            <local:AuthorWorkspace x:Name="AuthorWorkspaceHost" Grid.Row="1" />
+            <Grid Grid.Row="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Border Padding="10,6" Margin="8,8,8,0" CornerRadius="5"
+                        Background="#332C5364" BorderBrush="{StaticResource Accent}" BorderThickness="1">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsLanguageModelSetupIncomplete, ElementName=StudioWindow}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <WrapPanel Orientation="Horizontal">
+                        <TextBlock Text="AI setup incomplete" TextWrapping="Wrap" VerticalAlignment="Center"
+                                   Foreground="{StaticResource WorkbenchText}" />
+                        <TextBlock Text=" · " Foreground="{StaticResource MutedText}" VerticalAlignment="Center" />
+                        <Button Content="Configure" Click="OnLanguageModelSetupClick" MinWidth="76" Padding="9,3" />
+                    </WrapPanel>
+                </Border>
+                <local:AuthorWorkspace x:Name="AuthorWorkspaceHost" Grid.Row="1" />
+            </Grid>
             <local:CodeWorkspace x:Name="CodeWorkspaceHost" Grid.Row="1" Visibility="Collapsed" />
             <Grid x:Name="WorldWorkspace" Grid.Row="1" Visibility="Collapsed">
             <Grid.ColumnDefinitions>
@@ -914,7 +942,27 @@
                     </Grid>
                 </TabItem>
             </TabControl>
-            <Border x:Name="WorldAuthoringStrip" Grid.Column="0" Grid.ColumnSpan="3" Grid.Row="2"
+            <StackPanel Grid.Column="0" Grid.ColumnSpan="3" Grid.Row="2">
+                <Border Padding="10,6" Margin="8,0,8,6" CornerRadius="5"
+                        Background="#332C5364" BorderBrush="{StaticResource Accent}" BorderThickness="1">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsLanguageModelSetupIncomplete, ElementName=StudioWindow}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <WrapPanel Orientation="Horizontal">
+                        <TextBlock Text="AI setup incomplete" TextWrapping="Wrap" VerticalAlignment="Center"
+                                   Foreground="{StaticResource WorkbenchText}" />
+                        <TextBlock Text=" · " Foreground="{StaticResource MutedText}" VerticalAlignment="Center" />
+                        <Button Content="Configure" Click="OnLanguageModelSetupClick" MinWidth="76" Padding="9,3" />
+                    </WrapPanel>
+                </Border>
+            <Border x:Name="WorldAuthoringStrip"
                     Margin="8,0,8,8" Padding="9,7" CornerRadius="5"
                     Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="1">
                 <Grid>
@@ -977,6 +1025,7 @@
                             Padding="11,5" Margin="5,0,0,0" />
                 </Grid>
             </Border>
+            </StackPanel>
             <GridSplitter Grid.Column="0" Grid.RowSpan="2" Width="5" HorizontalAlignment="Right"
                           Background="Transparent" ResizeDirection="Columns" ResizeBehavior="CurrentAndNext" />
             <GridSplitter Grid.Column="2" Grid.RowSpan="2" Width="5" HorizontalAlignment="Left"

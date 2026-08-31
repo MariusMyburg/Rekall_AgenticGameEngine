@@ -164,6 +164,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string? _sessionOllamaUrl;
     private string? _sessionOpenAiUrl;
     private string? _sessionKimiUrl;
+    private bool _languageModelSetupAllowsAuthoring = true;
     private bool _isBusy;
     private bool _isAgentRunning;
     private bool _isLiveViewportEnabled = true;
@@ -992,6 +993,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public bool HasSessionOpenAiCredential => _sessionOpenAiApiKey is not null;
 
     public bool HasSessionKimiCredential => _sessionKimiApiKey is not null;
+
+    internal bool LanguageModelSetupAllowsAuthoring => _languageModelSetupAllowsAuthoring;
+
+    internal void SetLanguageModelSetupAvailability(bool allowsAuthoring)
+    {
+        if (_languageModelSetupAllowsAuthoring == allowsAuthoring) return;
+        _languageModelSetupAllowsAuthoring = allowsAuthoring;
+        RefreshCommands();
+    }
 
     public RekallAgeCodexApprovalCallback? CodexApprovalHandler { get; set; }
 
@@ -2011,6 +2021,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         && !string.IsNullOrWhiteSpace(CodeSystemNameInput);
     private bool CanRunAgent() => HasEditableProject()
         && !IsAgentRunning
+        && _languageModelSetupAllowsAuthoring
         && _languageModelRunner is not null
         && !string.IsNullOrWhiteSpace(SelectedLanguageModel)
         && !string.IsNullOrWhiteSpace(AgentTaskInput);

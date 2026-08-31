@@ -109,6 +109,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly IRekallAgeStudioContentOpenRouter _contentOpenRouter;
     private readonly RekallAgeStudioContentImportSession _contentImportSession;
     private readonly RekallAgeStudioContentDragService _contentDragService;
+    private readonly IRekallAgeStudioContentPreviewService _contentPreviewService;
     private readonly Action<string> _openPackageFolder;
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
@@ -305,6 +306,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _selectedContentCategory = "All";
     private string _contentSearchText = string.Empty;
     private RekallAgeContentBrowserItem? _selectedContentItem;
+    private RekallAgeStudioContentPreview? _selectedContentPreview;
+    private CancellationTokenSource? _contentPreviewCancellation;
     private string _contentStatusText = "Select project content to inspect or edit.";
     private string _selectedStudioWorkspace = "Author";
     private string _selectedModelingSurface = "mesh-edit";
@@ -469,6 +472,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                     candidate.Id.Equals(contentId, StringComparison.Ordinal));
                 return item is null ? null : RekallAgeStudioContentDragPayload.FromItem(item);
             }));
+        _contentPreviewService = RekallAgeStudioContentPreviewService.CreateDefault();
         _agentRegistry = RekallAgeDefaultCommandRegistry.Create();
         _selectedLanguageModelProvider = _languageModelProviderCatalog.Providers.Single(provider => provider.Id == "ollama");
         _selectedLanguageModel = _selectedLanguageModelProvider.DefaultModel;
@@ -636,8 +640,18 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         get => _selectedContentItem;
         set
         {
-            if (Set(ref _selectedContentItem, value)) RefreshCommands();
+            if (Set(ref _selectedContentItem, value))
+            {
+                RefreshCommands();
+                BeginSelectedContentPreview(value);
+            }
         }
+    }
+
+    public RekallAgeStudioContentPreview? SelectedContentPreview
+    {
+        get => _selectedContentPreview;
+        private set => Set(ref _selectedContentPreview, value);
     }
 
     public string ContentStatusText
@@ -5775,6 +5789,43 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             SelectedContentCategory = "All";
         RefreshContentProjection();
         Replace(AssetLines, content.Items.Select(item => $"{item.Kind}: {item.DisplayName} ({item.Id})"));
+    }
+
+    private void BeginSelectedContentPreview(RekallAgeContentBrowserItem? item)
+    {
+        _contentPreviewCancellation?.Cancel();
+        _contentPreviewCancellation?.Dispose();
+        _contentPreviewCancellation = null;
+        SelectedContentPreview = null;
+        if (item is null) return;
+        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifecycleCancellation.Token);
+        _contentPreviewCancellation = cancellation;
+        _ = LoadSelectedContentPreviewAsync(item, cancellation);
+    }
+
+    private async Task LoadSelectedContentPreviewAsync(
+        RekallAgeContentBrowserItem item, CancellationTokenSource cancellation)
+    {
+        try
+        {
+            var preview = await _contentPreviewService.GetAsync(item, cancellation.Token);
+            if (!cancellation.IsCancellationRequested
+                && ReferenceEquals(_contentPreviewCancellation, cancellation)
+                && SelectedContentItem?.Id == item.Id
+                && SelectedContentItem?.Revision == item.Revision)
+            {
+                SelectedContentPreview = preview;
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_contentPreviewCancellation, cancellation))
+                _contentPreviewCancellation = null;
+            cancellation.Dispose();
+        }
     }
 
     private void RefreshContentProjection()

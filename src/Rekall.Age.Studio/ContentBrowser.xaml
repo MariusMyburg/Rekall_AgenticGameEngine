@@ -8,11 +8,29 @@
              DragEnter="OnFilesDragEnter" DragOver="OnFilesDragOver"
              DragLeave="OnFilesDragLeave" Drop="OnFilesDropped">
     <UserControl.Resources>
+        <Geometry x:Key="IconContentModel">M2,5 L8,1 14,5 8,9 Z M2,5 L2,12 8,16 8,9 M14,5 L14,12 8,16</Geometry>
+        <Geometry x:Key="IconContentImage">M2,2 L14,2 14,14 2,14 Z M4,11 L7,7 9,9 11,6 14,10 M5,5 A1,1 0 1 1 4.99,5</Geometry>
+        <Geometry x:Key="IconContentAudio">M3,6 L7,6 11,2 11,14 7,10 3,10 Z M13,5 C15,7 15,9 13,11</Geometry>
+        <Geometry x:Key="IconContentShader">M8,1 L15,8 8,15 1,8 Z M5,8 L8,5 11,8 8,11 Z</Geometry>
+        <Geometry x:Key="IconContentCode">M6,3 L2,8 6,13 M10,3 L14,8 10,13</Geometry>
         <DataTemplate x:Key="ContentCardTemplate">
             <Grid MinWidth="180" Margin="2">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                 <Border Width="28" Height="28" CornerRadius="4" Background="{StaticResource PanelRaised}" VerticalAlignment="Top">
-                    <Path Data="{StaticResource IconContentFile}" Style="{StaticResource StudioIconPath}" Margin="6" />
+                    <Path Margin="6">
+                        <Path.Style>
+                            <Style TargetType="Path" BasedOn="{StaticResource StudioIconPath}">
+                                <Setter Property="Data" Value="{StaticResource IconContentFile}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Family}" Value="model"><Setter Property="Data" Value="{StaticResource IconContentModel}" /></DataTrigger>
+                                    <DataTrigger Binding="{Binding Family}" Value="texture"><Setter Property="Data" Value="{StaticResource IconContentImage}" /></DataTrigger>
+                                    <DataTrigger Binding="{Binding Family}" Value="audio"><Setter Property="Data" Value="{StaticResource IconContentAudio}" /></DataTrigger>
+                                    <DataTrigger Binding="{Binding Family}" Value="shader"><Setter Property="Data" Value="{StaticResource IconContentShader}" /></DataTrigger>
+                                    <DataTrigger Binding="{Binding Family}" Value="module-source"><Setter Property="Data" Value="{StaticResource IconContentCode}" /></DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Path.Style>
+                    </Path>
                 </Border>
                 <StackPanel Grid.Column="1" Margin="7,0,0,0">
                     <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayName}" />
@@ -106,11 +124,19 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="9">
                         <TextBlock Text="DETAILS" Style="{StaticResource SectionLabel}" />
+                        <Border Height="112" Margin="0,6,0,5" Background="#11161D" BorderBrush="{StaticResource PanelBorder}" BorderThickness="1">
+                            <Grid>
+                                <Path Data="{StaticResource IconContentFile}" Style="{StaticResource StudioIconPath}" Width="32" Height="32" Opacity="0.55" />
+                                <Image Source="{Binding SelectedContentPreview.Thumbnail}" Stretch="Uniform" />
+                            </Grid>
+                        </Border>
                         <TextBlock Text="{Binding SelectedContentItem.DisplayName, TargetNullValue=Nothing selected}" FontWeight="SemiBold" Margin="0,6,0,0" TextWrapping="Wrap" />
                         <TextBlock Text="{Binding SelectedContentItem.Kind}" Foreground="{StaticResource Accent}" Margin="0,3,0,0" />
                         <TextBlock Text="{Binding SelectedContentItem.Origin}" Foreground="{StaticResource MutedText}" />
                         <TextBlock Text="{Binding SelectedContentItem.Path}" ToolTip="{Binding SelectedContentItem.Path}" TextTrimming="CharacterEllipsis" Margin="0,5,0,0" />
                         <TextBlock Text="{Binding SelectedContentItem.Diagnostic}" Foreground="#E4B169" TextWrapping="Wrap" Margin="0,5,0,0" />
+                        <TextBlock Text="{Binding SelectedContentPreview.Health}" Foreground="{StaticResource Accent}" Margin="0,4,0,0" />
+                        <TextBlock Text="{Binding SelectedContentPreview.Summary}" Foreground="#E4B169" TextWrapping="Wrap" />
                         <Button Content="Open" Command="{Binding OpenSelectedContentCommand}" Margin="0,8,0,0" Style="{StaticResource AccentButton}" ToolTip="Open the selected content in its editor" AutomationProperties.Name="Open selected content" />
                         <TextBlock Text="INDEX WARNINGS" Style="{StaticResource SectionLabel}" Margin="0,12,0,4" />
                         <ItemsControl ItemsSource="{Binding ContentWarnings}"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding Summary}" Foreground="#E4B169" TextWrapping="Wrap" Margin="0,2" ToolTip="{Binding Code}" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>

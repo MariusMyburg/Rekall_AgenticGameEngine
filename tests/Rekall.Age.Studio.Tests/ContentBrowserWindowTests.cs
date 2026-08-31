@@ -48,6 +48,12 @@ public sealed class ContentBrowserWindowTests(WpfApplicationTestFixture wpf)
         Assert.Contains("DragOver=\"OnFilesDragOver\"", source, StringComparison.Ordinal);
         Assert.Contains("DragLeave=\"OnFilesDragLeave\"", source, StringComparison.Ordinal);
         Assert.Contains("Drop=\"OnFilesDropped\"", source, StringComparison.Ordinal);
+        Assert.Contains("SelectedContentPreview.Thumbnail", source, StringComparison.Ordinal);
+        Assert.Contains("SelectedContentPreview.Health", source, StringComparison.Ordinal);
+        Assert.Contains("SelectedContentPreview.Summary", source, StringComparison.Ordinal);
+        Assert.Contains("DataTrigger Binding=\"{Binding Family}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IconContentAudio", source, StringComparison.Ordinal);
+        Assert.Contains("IconContentModel", source, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -63,6 +63,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return ValueTask.CompletedTask;
         };
         DataContext = _viewModel;
+        AuthorWorkspaceHost.FixSetupRequested = OpenLanguageModelSetupAsync;
         _languageModelSetupCoordinator.StateChanged += OnLanguageModelSetupStateChanged;
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         SceneVulkanViewportHost.PointerFact += OnSceneViewportPointerFact;
@@ -389,9 +390,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private async void OnLanguageModelSetupClick(object sender, RoutedEventArgs e)
     {
+        await OpenLanguageModelSetupAsync(CancellationToken.None);
+    }
+
+    private async Task OpenLanguageModelSetupAsync(CancellationToken cancellationToken)
+    {
         try
         {
-            await _languageModelSetupCoordinator.ShowSetupAsync(this, _viewModel, CancellationToken.None);
+            await _languageModelSetupCoordinator.ShowSetupAsync(this, _viewModel, cancellationToken);
             NotifyLanguageModelSetupChanged();
             QueueLanguageModelRefreshIfReady();
         }

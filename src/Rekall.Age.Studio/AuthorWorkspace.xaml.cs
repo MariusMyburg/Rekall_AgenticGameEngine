@@ -6,9 +6,16 @@ namespace Rekall.Age.Studio;
 
 public partial class AuthorWorkspace : UserControl
 {
+    internal Func<CancellationToken, Task>? FixSetupRequested { get; set; }
+
     public AuthorWorkspace()
     {
         InitializeComponent();
+    }
+
+    private async void OnFixSetupClick(object sender, RoutedEventArgs e)
+    {
+        if (FixSetupRequested is not null) await FixSetupRequested(CancellationToken.None);
     }
 
     private async void OnApplyOpenAiApiKeyClick(object sender, RoutedEventArgs e)

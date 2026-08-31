@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Rekall.Age.Agent.LanguageModels;
@@ -28,7 +30,92 @@ internal interface IRekallAgeStudioLanguageModelSetupActions
     ValueTask ExecuteAsync(
         string actionId,
         string providerId,
+        IProgress<string>? progress,
         CancellationToken cancellationToken);
+}
+
+internal interface IRekallAgeStudioUriLauncher { void Open(Uri uri); }
+
+internal interface IRekallAgeStudioProcessLauncher
+{
+    ValueTask RunAsync(ProcessStartInfo startInfo, IProgress<string>? progress, CancellationToken cancellationToken);
+}
+
+internal sealed class RekallAgeStudioLanguageModelSetupActions(
+    IRekallAgeStudioUriLauncher? uriLauncher = null,
+    IRekallAgeStudioProcessLauncher? processLauncher = null) : IRekallAgeStudioLanguageModelSetupActions
+{
+    private static readonly Uri OllamaDownloadUri = new("https://ollama.com/download");
+    private readonly IRekallAgeStudioUriLauncher _uriLauncher = uriLauncher ?? SystemUriLauncher.Instance;
+    private readonly IRekallAgeStudioProcessLauncher _processLauncher = processLauncher ?? SystemProcessLauncher.Instance;
+
+    public ValueTask ExecuteAsync(string actionId, string providerId, IProgress<string>? progress, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (actionId == RekallAgeStudioLanguageModelSetupViewModel.OpenOllamaDownloadActionId)
+        {
+            _uriLauncher.Open(OllamaDownloadUri);
+            return ValueTask.CompletedTask;
+        }
+        if (providerId is not ("ollama" or "gguf"))
+            throw new InvalidOperationException("Ollama remediation is available only for local providers.");
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "ollama",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        if (actionId == RekallAgeStudioLanguageModelSetupViewModel.StartOllamaActionId)
+            startInfo.ArgumentList.Add("serve");
+        else if (actionId == RekallAgeStudioLanguageModelSetupViewModel.PullRecommendedOllamaModelActionId)
+        {
+            startInfo.ArgumentList.Add("pull");
+            startInfo.ArgumentList.Add("qwen3.8:27b");
+        }
+        else throw new ArgumentOutOfRangeException(nameof(actionId));
+        return _processLauncher.RunAsync(startInfo, progress, cancellationToken);
+    }
+
+    internal static string Bound(string value) => value.Length <= 240 ? value : value[..240];
+
+    private sealed class SystemUriLauncher : IRekallAgeStudioUriLauncher
+    {
+        public static SystemUriLauncher Instance { get; } = new();
+        public void Open(Uri uri) => Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+    }
+
+    private sealed class SystemProcessLauncher : IRekallAgeStudioProcessLauncher
+    {
+        public static SystemProcessLauncher Instance { get; } = new();
+        public async ValueTask RunAsync(ProcessStartInfo startInfo, IProgress<string>? progress, CancellationToken cancellationToken)
+        {
+            using var process = new Process { StartInfo = startInfo };
+            process.Start();
+            if (startInfo.ArgumentList.Count == 1 && startInfo.ArgumentList[0] == "serve") return;
+            var output = PumpAsync(process.StandardOutput, progress, cancellationToken);
+            var errors = PumpAsync(process.StandardError, progress, cancellationToken);
+            try
+            {
+                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                throw;
+            }
+            await Task.WhenAll(output, errors).ConfigureAwait(false);
+            if (process.ExitCode != 0) throw new InvalidOperationException("Ollama did not complete the requested operation.");
+        }
+
+        private static async Task PumpAsync(StreamReader reader, IProgress<string>? progress, CancellationToken cancellationToken)
+        {
+            while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
+                progress?.Report(Bound(line));
+        }
+    }
 }
 
 internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
@@ -95,12 +182,12 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         _setupStore = setupStore ?? throw new ArgumentNullException(nameof(setupStore));
         _credentialStore = credentialStore ?? throw new ArgumentNullException(nameof(credentialStore));
         _readinessProbe = readinessProbe ?? throw new ArgumentNullException(nameof(readinessProbe));
-        _actions = actions ?? NoOpActions.Instance;
+        _actions = actions ?? new RekallAgeStudioLanguageModelSetupActions();
         _environment = environment ?? SystemEnvironment.Instance;
         _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
         _synchronizationContext = SynchronizationContext.Current;
 
-        NextCommand = CreateCommand(MoveNextAsync, () => CurrentStep < RekallAgeStudioLanguageModelSetupStep.Summary);
+        NextCommand = CreateCommand(MoveNextAsync, CanMoveNext);
         BackCommand = CreateCommand(MoveBackAsync, () => CurrentStep > RekallAgeStudioLanguageModelSetupStep.Welcome);
         RetryCommand = CreateCommand(RetryAsync, () => !_disposed && !string.IsNullOrWhiteSpace(SelectedProviderId));
         SetUpLaterCommand = CreateCommand(SetUpLaterAsync, () => !_disposed);
@@ -254,6 +341,8 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     public RekallAgeAsyncCommand OpenOllamaDownloadCommand { get; }
     public RekallAgeAsyncCommand StartOllamaCommand { get; }
     public RekallAgeAsyncCommand PullRecommendedOllamaModelCommand { get; }
+
+    public string RemediationProgress { get; private set; } = string.Empty;
 
     internal async Task InitializeAsync(CancellationToken cancellationToken)
     {
@@ -440,7 +529,8 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         ClearReadiness();
         return QueueOperationAsync(async (generation, cancellationToken) =>
         {
-            await _actions.ExecuteAsync(actionId, providerId, cancellationToken).ConfigureAwait(false);
+            var progress = new CallbackProgress<string>(PublishRemediationProgress);
+            await _actions.ExecuteAsync(actionId, providerId, progress, cancellationToken).ConfigureAwait(false);
             if (!IsCurrentOperation(providerId, generation)) return;
             var settings = RebuildActiveProviderSettings();
             await ResolveCredentialAndProbeAsync(
@@ -671,8 +761,28 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
 
     private Task MoveNextAsync()
     {
+        if (CurrentStep == RekallAgeStudioLanguageModelSetupStep.Configuration
+            && SelectedProviderId == "gguf"
+            && ReadinessState != RekallAgeLanguageModelReadinessState.Ready) return Task.CompletedTask;
         if (CurrentStep < RekallAgeStudioLanguageModelSetupStep.Summary) CurrentStep++;
         return Task.CompletedTask;
+    }
+
+    private bool CanMoveNext() => !_disposed
+        && CurrentStep < RekallAgeStudioLanguageModelSetupStep.Summary
+        && (CurrentStep != RekallAgeStudioLanguageModelSetupStep.Configuration
+            || SelectedProviderId != "gguf"
+            || ReadinessState == RekallAgeLanguageModelReadinessState.Ready);
+
+    private void PublishRemediationProgress(string value)
+    {
+        void Publish()
+        {
+            RemediationProgress = RekallAgeStudioLanguageModelSetupActions.Bound(value ?? string.Empty);
+            OnPropertyChanged(nameof(RemediationProgress));
+        }
+        if (_synchronizationContext is null || SynchronizationContext.Current == _synchronizationContext) Publish();
+        else _synchronizationContext.Post(_ => Publish(), null);
     }
 
     private Task MoveBackAsync()
@@ -1082,21 +1192,15 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         foreach (var value in values) target.Add(value);
     }
 
-    private sealed class NoOpActions : IRekallAgeStudioLanguageModelSetupActions
-    {
-        public static NoOpActions Instance { get; } = new();
-
-        public ValueTask ExecuteAsync(string actionId, string providerId, CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.CompletedTask;
-        }
-    }
-
     private sealed class SystemEnvironment : IRekallAgeEnvironmentValueSource
     {
         public static SystemEnvironment Instance { get; } = new();
         public string? GetValue(string name) => Environment.GetEnvironmentVariable(name);
+    }
+
+    private sealed class CallbackProgress<T>(Action<T> callback) : IProgress<T>
+    {
+        public void Report(T value) => callback(value);
     }
 
     private sealed class DisabledCommand : ICommand

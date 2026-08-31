@@ -61,8 +61,10 @@
                                     <TextBlock Text="Local Ollama" FontWeight="SemiBold" />
                                     <TextBlock Text="Uses models installed on this PC. No account sign-in is needed."
                                                Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,3,0,7" />
-                                    <Button Content="Refresh local models" Command="{Binding RefreshLanguageModelsCommand}"
-                                            HorizontalAlignment="Left" />
+                                    <WrapPanel>
+                                        <Button Content="Refresh local models" Command="{Binding RefreshLanguageModelsCommand}" />
+                                        <Button Content="Fix setup" Click="OnFixSetupClick" />
+                                    </WrapPanel>
                                 </StackPanel>
                             </Border>
 
@@ -103,6 +105,8 @@
                                     <TextBlock Text="OpenAI API session" FontWeight="SemiBold" />
                                     <TextBlock Text="The key is held in memory for this Studio session only."
                                                Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,3,0,7" />
+                                    <TextBlock Text="{Binding OpenAiCredentialSourceLabel}" Foreground="{StaticResource MutedText}"
+                                               TextWrapping="Wrap" Margin="0,0,0,7" />
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                         <PasswordBox x:Name="OpenAiApiKeyInput" PasswordChar="●" Padding="7,5" />
@@ -128,6 +132,8 @@
                                     <TextBlock Text="Kimi API session" FontWeight="SemiBold" />
                                     <TextBlock Text="The Kimi key is held in memory for this Studio session only. KIMI_API_KEY and MOONSHOT_API_KEY are also supported."
                                                Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,3,0,7" />
+                                    <TextBlock Text="{Binding KimiCredentialSourceLabel}" Foreground="{StaticResource MutedText}"
+                                               TextWrapping="Wrap" Margin="0,0,0,7" />
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                         <PasswordBox x:Name="KimiApiKeyInput" PasswordChar="●" Padding="7,5" />

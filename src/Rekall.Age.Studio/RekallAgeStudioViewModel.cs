@@ -995,6 +995,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool HasSessionKimiCredential => _sessionKimiApiKey is not null;
 
+    public string OpenAiCredentialSourceLabel => HasSessionOpenAiCredential
+        ? "Session key configured in memory"
+        : "No session key; Studio may use OPENAI_API_KEY or a remembered protected key";
+
+    public string KimiCredentialSourceLabel => HasSessionKimiCredential
+        ? "Session key configured in memory"
+        : "No session key; Studio may use KIMI_API_KEY, MOONSHOT_API_KEY, or a remembered protected key";
+
     internal bool LanguageModelSetupAllowsAuthoring => _languageModelSetupAllowsAuthoring;
 
     internal bool LanguageModelSetupBusy => _languageModelSetupBusy;
@@ -1969,6 +1977,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             _sessionKimiUrl = null;
             OnPropertyChanged(nameof(HasSessionOpenAiCredential));
             OnPropertyChanged(nameof(HasSessionKimiCredential));
+            OnPropertyChanged(nameof(OpenAiCredentialSourceLabel));
+            OnPropertyChanged(nameof(KimiCredentialSourceLabel));
             try
             {
                 _lifecycleCancellation.Dispose();
@@ -3952,6 +3962,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             _sessionOpenAiApiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey;
             OnPropertyChanged(nameof(HasSessionOpenAiCredential));
+            OnPropertyChanged(nameof(OpenAiCredentialSourceLabel));
             OnPropertyChanged(nameof(LanguageModelProviders));
             _selectedLanguageModelProvider = LanguageModelProviders.Single(
                 provider => provider.Id == _selectedLanguageModelProvider.Id);
@@ -3996,6 +4007,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             _sessionKimiUrl = normalized.KimiUrl;
             OnPropertyChanged(nameof(HasSessionOpenAiCredential));
             OnPropertyChanged(nameof(HasSessionKimiCredential));
+            OnPropertyChanged(nameof(OpenAiCredentialSourceLabel));
+            OnPropertyChanged(nameof(KimiCredentialSourceLabel));
             OnPropertyChanged(nameof(LanguageModelProviders));
             provider = LanguageModelProviders.Single(candidate =>
                 candidate.Id.Equals(normalized.ProviderId, StringComparison.Ordinal));
@@ -4788,6 +4801,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             _sessionKimiApiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey;
             OnPropertyChanged(nameof(HasSessionKimiCredential));
+            OnPropertyChanged(nameof(KimiCredentialSourceLabel));
             OnPropertyChanged(nameof(LanguageModelProviders));
             _selectedLanguageModelProvider = LanguageModelProviders.Single(
                 provider => provider.Id == _selectedLanguageModelProvider.Id);
@@ -4810,6 +4824,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public async Task ImportGgufModelAsync(string? ggufPath)
     {
+        if (!LanguageModelSetupAllowsAuthoring)
+        {
+            ProviderStatus = "Local model setup needs attention. Choose Fix setup before importing a GGUF model.";
+            ProviderDisplayStatus = ProviderStatus;
+            return;
+        }
         if (!IsGgufSelected)
         {
             ReportLanguageModelProviderFailure(new RekallAgeLanguageModelProviderException(

@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.IO;
+using System.Diagnostics;
 using Rekall.Age.Agent.LanguageModels;
 
 namespace Rekall.Age.Studio.Tests;
@@ -7,6 +8,96 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class LanguageModelSetupViewModelTests
 {
     private const string SentinelSecret = "sentinel-wizard-secret-value";
+
+    [Fact]
+    public async Task OllamaDownloadPageOpensOnlyWhenTheExplicitCommandRuns()
+    {
+        var uriLauncher = new RecordingUriLauncher();
+        var actions = new RekallAgeStudioLanguageModelSetupActions(uriLauncher, new RecordingProcessLauncher());
+        var probe = new RecordingProbe((request, _) => Task.FromResult(
+            Blocked(request.ProviderId, "REKALL_ONBOARDING_OLLAMA_RUNTIME_MISSING", "open-ollama-download")));
+        await using var viewModel = CreateViewModel(probe: probe, actions: actions);
+
+        Assert.Empty(uriLauncher.Opened);
+        await viewModel.SelectProviderAsync("ollama");
+        await viewModel.ExecuteRemediationAsync(RekallAgeStudioLanguageModelSetupViewModel.OpenOllamaDownloadActionId);
+
+        var uri = Assert.Single(uriLauncher.Opened);
+        Assert.Equal("https", uri.Scheme);
+        Assert.Equal("ollama.com", uri.Host);
+    }
+
+    [Fact]
+    public async Task StartOllamaUsesAnArgumentListWithoutShellExecution()
+    {
+        var processes = new RecordingProcessLauncher();
+        var actions = new RekallAgeStudioLanguageModelSetupActions(new RecordingUriLauncher(), processes);
+
+        await actions.ExecuteAsync(
+            RekallAgeStudioLanguageModelSetupViewModel.StartOllamaActionId,
+            "ollama",
+            progress: null,
+            CancellationToken.None);
+
+        var start = Assert.Single(processes.Starts);
+        Assert.Equal("ollama", start.FileName);
+        Assert.False(start.UseShellExecute);
+        Assert.Equal(string.Empty, start.Arguments);
+        Assert.Equal(["serve"], start.ArgumentList);
+    }
+
+    [Fact]
+    public async Task PullRecommendedModelUsesSeparateArgumentsReportsBoundedProgressAndRefreshesReadiness()
+    {
+        var processes = new RecordingProcessLauncher([new string('x', 500), "complete"]);
+        var actions = new RekallAgeStudioLanguageModelSetupActions(new RecordingUriLauncher(), processes);
+        var calls = 0;
+        var probe = new RecordingProbe((request, _) => Task.FromResult(
+            Interlocked.Increment(ref calls) == 1
+                ? Blocked(request.ProviderId, "REKALL_ONBOARDING_NO_MODELS", "pull-qwen3.8:27b")
+                : Ready(request.ProviderId, "qwen3.8:27b")));
+        await using var viewModel = CreateViewModel(probe: probe, actions: actions);
+        await viewModel.SelectProviderAsync("ollama");
+
+        await viewModel.ExecuteRemediationAsync(RekallAgeStudioLanguageModelSetupViewModel.PullRecommendedOllamaModelActionId);
+
+        var start = Assert.Single(processes.Starts);
+        Assert.Equal(["pull", "qwen3.8:27b"], start.ArgumentList);
+        Assert.True(viewModel.RemediationProgress.Length <= 240);
+        Assert.Equal("complete", viewModel.RemediationProgress);
+        Assert.Equal(2, probe.CallCount);
+        Assert.Equal(RekallAgeLanguageModelReadinessState.Ready, viewModel.ReadinessState);
+    }
+
+    [Fact]
+    public async Task PullRecommendedModelPropagatesCancellationToTheProcess()
+    {
+        var processes = new RecordingProcessLauncher { BlockUntilCancelled = true };
+        var actions = new RekallAgeStudioLanguageModelSetupActions(new RecordingUriLauncher(), processes);
+        await using var viewModel = CreateViewModel(actions: actions);
+        using var cancellation = new CancellationTokenSource();
+
+        var pull = actions.ExecuteAsync("pull-qwen3.8:27b", "ollama", null, cancellation.Token).AsTask();
+        await processes.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pull);
+        Assert.True(processes.ObservedCancellation);
+    }
+
+    [Fact]
+    public async Task GgufCannotAdvancePastConfigurationUntilOllamaPrerequisitesAreReady()
+    {
+        var probe = new RecordingProbe((request, _) => Task.FromResult(
+            Blocked(request.ProviderId, "REKALL_ONBOARDING_OLLAMA_SERVICE_STOPPED", "start-ollama")));
+        await using var viewModel = CreateViewModel(probe: probe);
+        await ExecuteAsync(viewModel.NextCommand);
+        await viewModel.SelectProviderAsync("gguf");
+        await ExecuteAsync(viewModel.NextCommand);
+        Assert.Equal(RekallAgeStudioLanguageModelSetupStep.Configuration, viewModel.CurrentStep);
+
+        Assert.False(viewModel.NextCommand.CanExecute(null));
+    }
 
     [Fact]
     public async Task InitialStateStartsAtWelcomeAndNavigatesTheFiveProviderNeutralSteps()
@@ -495,7 +586,7 @@ public sealed class LanguageModelSetupViewModelTests
         IRekallAgeStudioCredentialStore? credentials = null,
         RecordingProbe? probe = null,
         RecordingSetupStore? store = null,
-        RecordingActions? actions = null,
+        IRekallAgeStudioLanguageModelSetupActions? actions = null,
         RecordingEnvironment? environment = null,
         Func<DateTimeOffset>? utcNow = null) => new(
             store ?? new RecordingSetupStore(),
@@ -505,6 +596,31 @@ public sealed class LanguageModelSetupViewModelTests
             actions ?? new RecordingActions((_, _, _) => Task.CompletedTask),
             environment ?? new RecordingEnvironment(new Dictionary<string, string>()),
             utcNow ?? (() => DateTimeOffset.UtcNow));
+
+    private sealed class RecordingUriLauncher : IRekallAgeStudioUriLauncher
+    {
+        public List<Uri> Opened { get; } = [];
+        public void Open(Uri uri) => Opened.Add(uri);
+    }
+
+    private sealed class RecordingProcessLauncher(IReadOnlyList<string>? output = null)
+        : IRekallAgeStudioProcessLauncher
+    {
+        public List<ProcessStartInfo> Starts { get; } = [];
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool BlockUntilCancelled { get; set; }
+        public bool ObservedCancellation { get; private set; }
+
+        public async ValueTask RunAsync(ProcessStartInfo startInfo, IProgress<string>? progress, CancellationToken cancellationToken)
+        {
+            Starts.Add(startInfo);
+            Started.TrySetResult();
+            foreach (var line in output ?? []) progress?.Report(line);
+            if (!BlockUntilCancelled) return;
+            try { await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken); }
+            catch (OperationCanceledException) { ObservedCancellation = true; throw; }
+        }
+    }
 
     private static RekallAgeLanguageModelReadinessResult Ready(string providerId, string model) => new(
         providerId,
@@ -695,7 +811,7 @@ public sealed class LanguageModelSetupViewModelTests
     {
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public async ValueTask ExecuteAsync(string actionId, string providerId, CancellationToken cancellationToken)
+        public async ValueTask ExecuteAsync(string actionId, string providerId, IProgress<string>? progress, CancellationToken cancellationToken)
         {
             Started.TrySetResult();
             await execute(actionId, providerId, cancellationToken);

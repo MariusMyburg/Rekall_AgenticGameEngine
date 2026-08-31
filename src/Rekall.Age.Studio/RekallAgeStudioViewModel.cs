@@ -345,6 +345,20 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
     }
 
+    internal RekallAgeStudioViewModel(
+        RekallAgeWorkbenchSession session,
+        IRekallAgeStudioPreviewSession previewSession,
+        RekallAgeStudioContentImportSession contentImportSession)
+        : this(
+            session,
+            new RekallAgeLanguageModelProviderCatalog(),
+            null,
+            previewSession,
+            null,
+            contentImportSession: contentImportSession)
+    {
+    }
+
     internal RekallAgeStudioViewModel(Action<string> openPackageFolder)
         : this(
             new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
@@ -421,7 +435,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         IRekallAgeStudioPreviewSession previewSession,
         Action<string>? openPackageFolder,
         IRekallAgeStudioMonotonicClock? monotonicClock = null,
-        IRekallAgeGgufImporter? ggufImporter = null)
+        IRekallAgeGgufImporter? ggufImporter = null,
+        RekallAgeStudioContentImportSession? contentImportSession = null)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _languageModelProviderCatalog = languageModelProviderCatalog
@@ -432,7 +447,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _ggufImporter = ggufImporter ?? new RekallAgeOllamaGgufImporter();
         _openPackageFolder = openPackageFolder ?? OpenDirectoryInExplorer;
         _contentOpenRouter = new RekallAgeStudioContentOpenRouter(this);
-        _contentImportSession = new RekallAgeStudioContentImportSession(
+        _contentImportSession = contentImportSession ?? new RekallAgeStudioContentImportSession(
             new RekallAgeStudioAssetImportCommand(),
             async cancellationToken =>
             {
@@ -5484,6 +5499,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 : "No content files were imported.";
             StatusText = ContentStatusText;
             return jobs;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            ContentStatusText = "REKALL_CONTENT_IMPORT_CANCELLED · Content import cancelled; completed results were retained.";
+            StatusText = ContentStatusText;
+            return ImportJobs.ToArray();
         }
         finally
         {

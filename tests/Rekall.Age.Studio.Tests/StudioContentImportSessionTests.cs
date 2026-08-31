@@ -1,6 +1,11 @@
 using Rekall.Age.AssetPipeline;
 using Rekall.Age.AssetPipeline.Commands;
 using System.IO;
+using System.Collections.Concurrent;
+using Rekall.Age.Assets;
+using Rekall.Age.Editor;
+using Rekall.Age.Core.Commands;
+using Rekall.Age.Workflows;
 
 namespace Rekall.Age.Studio.Tests;
 
@@ -105,6 +110,88 @@ public sealed class StudioContentImportSessionTests
         Assert.DoesNotContain(fixture.Root, job.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task ProductionAdapterPersistsEverySuccessfulFileInOneCanonicalBatch()
+    {
+        using var fixture = new ImportFixture();
+        var paths = Enumerable.Range(0, 5).Select(i => fixture.File($"audio-{i}.mp3", [(byte)i, 2, 3])).ToArray();
+        var session = fixture.Session(new RekallAgeStudioAssetImportCommand());
+
+        var jobs = await session.ImportAsync(fixture.Root, paths, CancellationToken.None);
+
+        Assert.All(jobs, job => Assert.Equal("Succeeded", job.Status));
+        var pipeline = await new RekallAgeAssetPipelineStore().LoadAsync(fixture.Root, CancellationToken.None);
+        var catalog = await new RekallAgeAssetCatalogStore().LoadAsync(fixture.Root, CancellationToken.None);
+        Assert.Equal(5, pipeline.Imported.Count);
+        Assert.Equal(5, pipeline.Sources.Count);
+        Assert.Equal(5, catalog.Assets.Count);
+    }
+
+    [Fact]
+    public async Task PublishesAllObservableJobMutationsThroughDispatcherInStableOrder()
+    {
+        using var fixture = new ImportFixture();
+        using var dispatcher = new DedicatedDispatcher();
+        var paths = new[] { fixture.File("first.png"), fixture.File("second.png") };
+        var session = fixture.Session(new FakeImporter(delay: TimeSpan.FromMilliseconds(10)), dispatcher);
+        var observed = new List<(int Thread, string Path, string Status)>();
+        session.Jobs.CollectionChanged += (_, args) =>
+        {
+            if (args.NewItems?[0] is RekallAgeStudioContentImportJob job)
+                observed.Add((Environment.CurrentManagedThreadId, job.SourcePath, job.Status));
+        };
+
+        await Task.Run(async () => await session.ImportAsync(fixture.Root, paths, CancellationToken.None));
+
+        Assert.NotEmpty(observed);
+        Assert.All(observed, change => Assert.Equal(dispatcher.ThreadId, change.Thread));
+        Assert.Equal(paths, session.Jobs.Select(job => job.SourcePath));
+        Assert.All(session.Jobs, job => Assert.Equal("Succeeded", job.Status));
+    }
+
+    [Fact]
+    public async Task OverlappingBatchIsRejectedWithoutResettingActiveJobs()
+    {
+        using var fixture = new ImportFixture();
+        using var cancellation = new CancellationTokenSource();
+        var importer = new FakeImporter(waitForCancellation: true);
+        var session = fixture.Session(importer);
+        var firstPath = fixture.File("first.png");
+        var first = session.ImportAsync(fixture.Root, [firstPath], cancellation.Token).AsTask();
+        await importer.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var overlap = await session.ImportAsync(fixture.Root, [fixture.File("second.png")], CancellationToken.None);
+
+        var rejected = Assert.Single(overlap);
+        Assert.Equal("REKALL_CONTENT_IMPORT_ALREADY_ACTIVE", rejected.Code);
+        Assert.Equal(firstPath, Assert.Single(session.Jobs).SourcePath);
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => first);
+    }
+
+    [Fact]
+    public async Task ViewModelTreatsImportCancellationAsExpectedAndRetainsJobsWithoutValidationFailure()
+    {
+        using var fixture = new ImportFixture();
+        var workbench = new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create());
+        var created = await workbench.CreateProjectAsync(fixture.Root, "Import Test", "Main", [], [], "test", CancellationToken.None);
+        Assert.True(created.Ok, created.Summary);
+        using var cancellation = new CancellationTokenSource();
+        var importer = new FakeImporter(waitForCancellation: true);
+        var contentSession = fixture.Session(importer);
+        await using var viewModel = new RekallAgeStudioViewModel(workbench, new RekallAgeStudioPreviewSession(), contentSession);
+        var task = viewModel.ImportContentAsync([fixture.File("cancel.png")], cancellation.Token);
+        await importer.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        cancellation.Cancel();
+        var jobs = await task;
+
+        Assert.Equal("Cancelled", Assert.Single(jobs).Status);
+        Assert.Contains("REKALL_CONTENT_IMPORT_CANCELLED", viewModel.ContentStatusText, StringComparison.Ordinal);
+        Assert.DoesNotContain(viewModel.ValidationLines, line => line.Contains("REKALL_STUDIO_UNEXPECTED_FAILURE", StringComparison.Ordinal));
+        Assert.False(viewModel.HasActiveContentImports);
+    }
+
     private sealed class ImportFixture : IDisposable
     {
         public string Root { get; } = Path.Combine(Path.GetTempPath(), "rekall-content-import-" + Guid.NewGuid().ToString("N"));
@@ -112,9 +199,10 @@ public sealed class StudioContentImportSessionTests
         public int InvalidationCount { get; private set; }
 
         public ImportFixture() => Directory.CreateDirectory(Root);
-        public string File(string name) { var path = Path.Combine(Root, name); System.IO.File.WriteAllBytes(path, [1]); return path; }
-        public RekallAgeStudioContentImportSession Session(IRekallAgeStudioAssetImportCommand importer) =>
-            new(importer, _ => { RefreshCount++; return ValueTask.CompletedTask; }, _ => { InvalidationCount++; return ValueTask.CompletedTask; });
+        public string File(string name, byte[]? bytes = null) { var path = Path.Combine(Root, name); System.IO.File.WriteAllBytes(path, bytes ?? [1]); return path; }
+        public RekallAgeStudioContentImportSession Session(IRekallAgeStudioAssetImportCommand importer,
+            IRekallAgeStudioContentImportDispatcher? dispatcher = null) =>
+            new(importer, _ => { RefreshCount++; return ValueTask.CompletedTask; }, _ => { InvalidationCount++; return ValueTask.CompletedTask; }, dispatcher: dispatcher);
         public void Dispose() => Directory.Delete(Root, true);
     }
 
@@ -143,5 +231,37 @@ public sealed class StudioContentImportSessionTests
             }
             finally { Interlocked.Decrement(ref _concurrency); }
         }
+    }
+
+    private sealed class DedicatedDispatcher : IRekallAgeStudioContentImportDispatcher, IDisposable
+    {
+        private readonly BlockingCollection<(Action Action, TaskCompletionSource Completion)> _queue = [];
+        private readonly Thread _thread;
+        public int ThreadId { get; private set; }
+
+        public DedicatedDispatcher()
+        {
+            _thread = new Thread(() =>
+            {
+                ThreadId = Environment.CurrentManagedThreadId;
+                foreach (var work in _queue.GetConsumingEnumerable())
+                {
+                    try { work.Action(); work.Completion.SetResult(); }
+                    catch (Exception exception) { work.Completion.SetException(exception); }
+                }
+            });
+            _thread.Start();
+            while (ThreadId == 0) Thread.Yield();
+        }
+
+        public ValueTask InvokeAsync(Action action, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _queue.Add((action, completion), cancellationToken);
+            return new(completion.Task);
+        }
+
+        public void Dispose() { _queue.CompleteAdding(); _thread.Join(); _queue.Dispose(); }
     }
 }

@@ -3,6 +3,41 @@ namespace Rekall.Age.Tests.Editor;
 public sealed class StudioWorkbenchSourceTests
 {
     [Fact]
+    public async Task StudioAuthoringIsUnlimitedByDefaultAndOffersAbortOnlyWhileRunning()
+    {
+        var root = FindRepositoryRoot();
+        var studioDirectory = Path.Combine(root, "src", "Rekall.Age.Studio");
+        var mainWindow = await File.ReadAllTextAsync(Path.Combine(studioDirectory, "MainWindow.xaml"));
+        var authorWorkspace = await File.ReadAllTextAsync(Path.Combine(studioDirectory, "AuthorWorkspace.xaml"));
+        var viewModel = await File.ReadAllTextAsync(Path.Combine(studioDirectory, "RekallAgeStudioViewModel.cs"));
+
+        Assert.Contains("internal int? AgentMaxTurns { get; set; }", viewModel, StringComparison.Ordinal);
+        Assert.DoesNotContain("AgentMaxTurns { get; set; } = 64", viewModel, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Abort\" Command=\"{Binding CancelAgentCommand}\"", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Abort\" Command=\"{Binding CancelAgentCommand}\"", authorWorkspace, StringComparison.Ordinal);
+        Assert.Contains("DataTrigger Binding=\"{Binding IsAgentRunning}\" Value=\"True\"", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("DataTrigger Binding=\"{Binding IsAgentRunning}\" Value=\"True\"", authorWorkspace, StringComparison.Ordinal);
+        Assert.Contains("AI authoring aborted.", viewModel, StringComparison.Ordinal);
+        Assert.DoesNotContain("Cancelling AI authoring", viewModel, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WorldTransformControlsOverlayTheViewportOnlyForASelectionAndViewportClicksSelect()
+    {
+        var root = FindRepositoryRoot();
+        var studioDirectory = Path.Combine(root, "src", "Rekall.Age.Studio");
+        var xaml = await File.ReadAllTextAsync(Path.Combine(studioDirectory, "MainWindow.xaml"));
+        var code = await File.ReadAllTextAsync(Path.Combine(studioDirectory, "MainWindow.xaml.cs"));
+
+        Assert.Contains("x:Name=\"ViewportTransformOverlay\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("HorizontalAlignment=\"Left\" VerticalAlignment=\"Top\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("DataTrigger Binding=\"{Binding HasInspectorSelection}\" Value=\"True\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Border Grid.Row=\"2\" Background=\"#E3151920\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("await _viewModel.SelectViewportEntityAsync(", code, StringComparison.Ordinal);
+        Assert.Contains("fact.Button == RekallAgeStudioViewportPointerButton.Left", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task StudioInspectorUsesTypedInlineEditorsAsPrimaryPropertyWorkflow()
     {
         var root = FindRepositoryRoot();

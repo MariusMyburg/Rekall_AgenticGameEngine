@@ -105,7 +105,7 @@ public sealed class CreateGeometryPrimitiveCommand
         await _store.SaveIfRevisionAsync(request.ProjectRoot, updated, loaded.Revision, context.CancellationToken);
         context.Transaction.RecordChangedResource(_store.GetScenePath(request.ProjectRoot, request.SceneName));
         return RekallAgeCommandResult<CreateGeometryPrimitiveResult>.Success(
-            new CreateGeometryPrimitiveResult(entity.Id, primitive, updated),
+            new CreateGeometryPrimitiveResult(entity.Id, primitive, null),
             $"Created {primitive} geometry primitive '{entity.Name}'.");
     }
 

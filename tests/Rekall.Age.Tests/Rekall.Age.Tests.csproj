@@ -16,6 +16,13 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Removed with the retired CPU scene renderer. Vulkan capture and presentation tests are
+         the authoritative rendering acceptance surface now. -->
+    <Compile Remove="Rendering\CaptureScreenshotCommandTests.cs" />
+    <Compile Remove="Rendering\RuntimeViewportAssetRenderingTests.cs" />
+    <Compile Remove="Rendering\ShapeRenderer2DTests.cs" />
+    <Compile Remove="Runtime\RuntimeAndCaptureTests.cs" />
+    <Compile Remove="Runtime\RuntimeUiTests.cs" />
     <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\src\Rekall.Age.Player.Web\tests\fixtures\webgpu-write-texture-3d-v1.json" Link="Fixtures\webgpu-write-texture-3d-v1.json" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="..\..\src\Rekall.Age.Player.Web\WebGpuProofEvidence.cs" Link="Rendering\WebGpuProofEvidence.cs" />

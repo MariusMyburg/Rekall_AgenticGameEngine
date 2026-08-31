@@ -17,7 +17,6 @@ public sealed class ExecuteRenderPlanCommand
 {
     private readonly RekallAgeRenderPlanStore _store = new();
     private readonly RekallAgeRenderPlanValidator _validator = new();
-    private readonly RekallAgeSoftwareRenderPlanExecutor _softwareExecutor = new();
     private readonly RekallAgeVulkanRenderPlanExecutor _vulkanExecutor;
 
     public ExecuteRenderPlanCommand()
@@ -59,8 +58,7 @@ public sealed class ExecuteRenderPlanCommand
                     issue.Target)).ToArray());
         }
 
-        if (!plan.BackendId.Equals("software", StringComparison.Ordinal)
-            && !plan.BackendId.Equals("vulkan", StringComparison.Ordinal))
+        if (!plan.BackendId.Equals("vulkan", StringComparison.Ordinal))
         {
             return Failure(
                 $"Render backend '{plan.BackendId}' is not executable in this build.",
@@ -75,9 +73,7 @@ public sealed class ExecuteRenderPlanCommand
         RekallAgeRenderPlanExecutionResult execution;
         try
         {
-            execution = plan.BackendId.Equals("vulkan", StringComparison.Ordinal)
-                ? await _vulkanExecutor.ExecuteAsync(plan, request.OutputDirectory, context.CancellationToken)
-                : await _softwareExecutor.ExecuteAsync(plan, request.OutputDirectory, context.CancellationToken);
+            execution = await _vulkanExecutor.ExecuteAsync(plan, request.OutputDirectory, context.CancellationToken);
         }
         catch (InvalidOperationException ex)
         {

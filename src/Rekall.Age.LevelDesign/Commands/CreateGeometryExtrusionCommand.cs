@@ -107,7 +107,7 @@ public sealed class CreateGeometryExtrusionCommand
         await _store.SaveIfRevisionAsync(request.ProjectRoot, updated, loaded.Revision, context.CancellationToken);
         context.Transaction.RecordChangedResource(_store.GetScenePath(request.ProjectRoot, request.SceneName));
         return RekallAgeCommandResult<CreateGeometryExtrusionResult>.Success(
-            new CreateGeometryExtrusionResult(entity.Id, mesh.Vertices.Count, mesh.Indices.Count, updated),
+            new CreateGeometryExtrusionResult(entity.Id, mesh.Vertices.Count, mesh.Indices.Count, null),
             $"Created geometry extrusion '{entity.Name}' with {mesh.Vertices.Count.ToString(CultureInfo.InvariantCulture)} vertices and {mesh.Indices.Count.ToString(CultureInfo.InvariantCulture)} indices.");
     }
 

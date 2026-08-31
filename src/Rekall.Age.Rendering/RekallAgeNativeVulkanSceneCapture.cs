@@ -226,7 +226,7 @@ public sealed class RekallAgeNativeVulkanSceneCapture : IRekallAgeVulkanSceneCap
             };
         }
 
-        var overlay = new RekallAgeRuntimeSoftwareRenderer().RenderUiOverlayRgba(frame, assets);
+        var overlay = new RekallAgeRuntimeUiOverlayRasterizer().Rasterize(frame, assets);
         for (var index = 0; index + 3 < image.Rgba.Length; index += 4)
         {
             var sourceAlpha = overlay[index + 3];

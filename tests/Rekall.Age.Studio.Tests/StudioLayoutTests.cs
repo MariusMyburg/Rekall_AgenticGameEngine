@@ -141,6 +141,30 @@ public sealed class StudioLayoutTests
     }
 
     [Fact]
+    public void ModelingWorkspaceExposesBlenderFamiliarCreationActionsAndEmptyStates()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var workspace = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "ModelingWorkspace.xaml"));
+
+        Assert.Contains("Header=\"Add\"", workspace, StringComparison.Ordinal);
+        Assert.Contains("InputGestureText=\"Shift+A\"", workspace, StringComparison.Ordinal);
+        Assert.Contains("CommandParameter=\"box\"", workspace, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Add Cube\"", workspace, StringComparison.Ordinal);
+        Assert.Contains("Content=\"New Geometry Graph\"", workspace, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Add Node\"", workspace, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StudioVisualAcceptanceUsesVulkanRatherThanSoftwareCapture()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var viewModel = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "RekallAgeStudioViewModel.cs"));
+
+        Assert.DoesNotContain("backendId = \"software\"", viewModel, StringComparison.Ordinal);
+        Assert.Contains("backendId = \"vulkan\"", viewModel, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WorldViewportKeepsVulkanUnavailablePlaceholderAndExternalTransformControls()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));

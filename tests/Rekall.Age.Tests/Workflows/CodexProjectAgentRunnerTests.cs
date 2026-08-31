@@ -239,6 +239,41 @@ public sealed class CodexProjectAgentRunnerTests
     }
 
     [Fact]
+    public async Task FailedTurnReportsAnUnfinishedMcpToolAsTheConcreteFailure()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var fixture = Directory.CreateTempSubdirectory("rekall-codex-unfinished-tool-");
+        try
+        {
+            var process = new FakeCodexProcess();
+            await using var runner = CreateRunner(fixture.FullName, process);
+            var progress = new RecordingProgress<Rekall.Age.Agent.LanguageModels.RekallAgeLanguageModelAgentProgress>();
+            var run = await StartRunThroughTurnAsync(
+                runner, process, fixture.FullName, progress, timeout.Token, timeout.Token);
+            await process.WriteServerLineAsync(
+                """{"method":"item/started","params":{"threadId":"thread-1","turnId":"turn-1","item":{"id":"tool-1","type":"mcpToolCall","server":"rekall-age","tool":"rekall.geometry.create_recipe","status":"inProgress","arguments":{"sceneName":"Main"}}}}""");
+            while (!progress.Values.Any(item => item.Phase == "tool.started"))
+            {
+                await Task.Delay(5, timeout.Token);
+            }
+            await CompleteTurnAsync(process, "failed");
+
+            var result = await run;
+
+            Assert.False(result.Succeeded);
+            Assert.False(result.AgentResult.Completed);
+            var failure = Assert.Single(result.AgentResult.ToolExecutions);
+            Assert.Equal("rekall.geometry.create_recipe", failure.Name);
+            Assert.False(failure.Succeeded);
+            Assert.Contains("before this tool returned", failure.ResultPreview, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(fixture.FullName, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task NoninteractiveApprovalRequestsAreDeniedByDefault()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));

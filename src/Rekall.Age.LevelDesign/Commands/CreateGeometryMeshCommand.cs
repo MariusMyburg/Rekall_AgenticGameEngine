@@ -118,7 +118,7 @@ public sealed class CreateGeometryMeshCommand
         await _store.SaveIfRevisionAsync(request.ProjectRoot, updated, loaded.Revision, context.CancellationToken);
         context.Transaction.RecordChangedResource(_store.GetScenePath(request.ProjectRoot, request.SceneName));
         return RekallAgeCommandResult<CreateGeometryMeshResult>.Success(
-            new CreateGeometryMeshResult(entity.Id, request.Vertices.Count, request.Indices.Count, updated),
+            new CreateGeometryMeshResult(entity.Id, request.Vertices.Count, request.Indices.Count, null),
             $"Created geometry mesh '{entity.Name}' with {request.Vertices.Count.ToString(CultureInfo.InvariantCulture)} vertices and {request.Indices.Count.ToString(CultureInfo.InvariantCulture)} indices.");
     }
 

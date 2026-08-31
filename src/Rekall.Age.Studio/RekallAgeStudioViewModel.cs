@@ -47,6 +47,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly CancellationTokenSource _lifecycleCancellation = new();
     private readonly object _disposeSync = new();
     private readonly object _languageModelLifecycleSync = new();
+    private readonly SemaphoreSlim _agentLiveRefreshGate = new(1, 1);
+    private int _agentLiveRefreshPending;
     private readonly object _renderingOperationsSync = new();
     private readonly HashSet<Task> _activeRenderingOperations = [];
     private readonly RekallAgeAsyncCommand _openCommand;
@@ -132,6 +134,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private double _modalDragStartNormalizedX;
     private readonly RekallAgeAsyncCommand _refreshMeshAssetsCommand;
     private readonly RekallAgeAsyncCommand _createMeshPrimitiveCommand;
+    private readonly RekallAgeAsyncCommand _createMeshPrimitiveFromMenuCommand;
     private readonly RekallAgeAsyncCommand _openMeshAssetCommand;
     private readonly RekallAgeAsyncCommand _frameSelectedMeshViewportCommand;
     private readonly RekallAgeAsyncCommand _toggleMeshViewportProjectionCommand;
@@ -144,6 +147,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeAsyncCommand _applyMeshOperationCommand;
     private readonly RekallAgeAsyncCommand _cancelMeshPreviewCommand;
     private readonly RekallAgeAsyncCommand _refreshModelingGraphsCommand;
+    private readonly RekallAgeAsyncCommand _createModelingGraphCommand;
+    private readonly RekallAgeAsyncCommand _addModelingGraphNodeCommand;
     private readonly RekallAgeAsyncCommand _openModelingGraphCommand;
     private readonly RekallAgeAsyncCommand _evaluateModelingGraphCommand;
     private readonly RekallAgeAsyncCommand _applyModelingGraphParametersCommand;
@@ -316,7 +321,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly List<RekallAgeLanguageModelToolExecution> _lastAgentToolExecutions = [];
     internal bool TreatGauntletAsTerminalSuccess { get; set; }
 
-    internal int? AgentMaxTurns { get; set; } = 64;
+    // Null means the authoring agent may continue until it completes or the user aborts it.
+    internal int? AgentMaxTurns { get; set; }
 
     public RekallAgeStudioViewModel()
         : this(
@@ -577,6 +583,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _openCodeInVsCodeCommand = CreateAsyncCommand(OpenCodeInVsCodeAsync, HasOpenProject);
         _refreshMeshAssetsCommand = CreateAsyncCommand(RefreshMeshAssetsAsync, HasOpenProject);
         _createMeshPrimitiveCommand = CreateAsyncCommand(CreateMeshPrimitiveAsync, CanCreateMeshPrimitive);
+        _createMeshPrimitiveFromMenuCommand = CreateAsyncCommand(
+            CreateMeshPrimitiveFromMenuAsync,
+            parameter => HasEditableProject() && parameter is string primitive && MeshPrimitiveTypes.Contains(primitive));
         _openMeshAssetCommand = CreateAsyncCommand(OpenMeshAssetAsync, CanOpenMeshAsset);
         _frameSelectedMeshViewportCommand = CreateAsyncCommand(
             () => { FrameSelectedMeshViewport(); return Task.CompletedTask; },
@@ -593,6 +602,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _applyMeshOperationCommand = CreateAsyncCommand(ApplyMeshOperationAsync, CanRunMeshOperation);
         _cancelMeshPreviewCommand = CreateAsyncCommand(CancelMeshPreviewAsync, () => HasOpenMesh() && _modeling.Preview is not null);
         _refreshModelingGraphsCommand = CreateAsyncCommand(RefreshModelingGraphsAsync, HasOpenProject);
+        _createModelingGraphCommand = CreateAsyncCommand(CreateModelingGraphAsync, HasOpenProject);
+        _addModelingGraphNodeCommand = CreateAsyncCommand(
+            AddModelingGraphNodeAsync,
+            parameter => HasEditableProject() && _modelingGraph.Graph is not null && parameter is string);
         _openModelingGraphCommand = CreateAsyncCommand(OpenModelingGraphAsync, CanOpenModelingGraph);
         _evaluateModelingGraphCommand = CreateAsyncCommand(EvaluateModelingGraphAsync, CanEvaluateModelingGraph);
         _applyModelingGraphParametersCommand = CreateAsyncCommand(ApplyModelingGraphParametersAsync, CanApplyModelingGraphParameters);
@@ -805,6 +818,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand OpenCodeInVsCodeCommand => _openCodeInVsCodeCommand;
     public ICommand RefreshMeshAssetsCommand => _refreshMeshAssetsCommand;
     public ICommand CreateMeshPrimitiveCommand => _createMeshPrimitiveCommand;
+    public ICommand CreateMeshPrimitiveFromMenuCommand => _createMeshPrimitiveFromMenuCommand;
     public ICommand OpenMeshAssetCommand => _openMeshAssetCommand;
 
     public ICommand FrameSelectedMeshViewportCommand => _frameSelectedMeshViewportCommand;
@@ -819,6 +833,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ICommand ApplyMeshOperationCommand => _applyMeshOperationCommand;
     public ICommand CancelMeshPreviewCommand => _cancelMeshPreviewCommand;
     public ICommand RefreshModelingGraphsCommand => _refreshModelingGraphsCommand;
+    public ICommand CreateModelingGraphCommand => _createModelingGraphCommand;
+    public ICommand AddModelingGraphNodeCommand => _addModelingGraphNodeCommand;
     public ICommand OpenModelingGraphCommand => _openModelingGraphCommand;
     public ICommand EvaluateModelingGraphCommand => _evaluateModelingGraphCommand;
     public ICommand ApplyModelingGraphParametersCommand => _applyModelingGraphParametersCommand;
@@ -1906,7 +1922,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public async Task SelectEntityAsync(RekallAgeSceneEntityNode entity)
     {
         if (IsBusy) return;
-        await RunAsync(() => _session.SelectEntityAsync(entity.EntityId, CancellationToken.None).AsTask());
+        await RunAsync(
+            () => _session.SelectEntityAsync(entity.EntityId, CancellationToken.None).AsTask(),
+            refreshPreviewAfter: true);
     }
 
     public async Task<bool> SelectViewportEntityAsync(
@@ -1920,7 +1938,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (point is null) return false;
         var entityId = _viewportInteraction.Pick(point.Value.X, point.Value.Y);
         if (entityId is null) return false;
-        await RunAsync(() => _session.SelectEntityAsync(entityId, CancellationToken.None).AsTask());
+        await RunAsync(
+            () => _session.SelectEntityAsync(entityId, CancellationToken.None).AsTask(),
+            refreshPreviewAfter: true);
         OnPropertyChanged(nameof(SelectedEntityId));
         return string.Equals(_session.SelectedEntityId, entityId, StringComparison.Ordinal);
     }
@@ -2339,6 +2359,27 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         await OpenMeshAssetAsync();
     }
 
+    private async Task CreateMeshPrimitiveFromMenuAsync(object? parameter)
+    {
+        if (_session.ProjectRoot is null || parameter is not string primitive) return;
+        SelectedMeshPrimitive = primitive;
+        MeshPrimitiveAssetIdInput = UniqueAssetId(
+            $"mesh-{primitive.Replace('_', '-')}",
+            _modeling.ListAssets(_session.ProjectRoot));
+        await CreateMeshPrimitiveAsync();
+        FrameSelectedMeshViewport();
+    }
+
+    private static string UniqueAssetId(string baseId, IReadOnlyList<string> existing)
+    {
+        if (!existing.Contains(baseId, StringComparer.Ordinal)) return baseId;
+        for (var suffix = 2; ; suffix++)
+        {
+            var candidate = $"{baseId}-{suffix}";
+            if (!existing.Contains(candidate, StringComparer.Ordinal)) return candidate;
+        }
+    }
+
     private Task OpenMeshAssetAsync() => RunModelingAsync(async () =>
     {
         _meshViewportCamera = RekallAgeStudioViewportCamera.Identity;
@@ -2671,6 +2712,55 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             ? "No persisted procedural graphs are present in Modeling/Graphs."
             : $"{ModelingGraphAssetIds.Count} procedural graph asset(s) available.";
         return Task.CompletedTask;
+    });
+
+    private Task CreateModelingGraphAsync() => RunGraphModelingAsync(async () =>
+    {
+        if (_session.ProjectRoot is null) throw new InvalidOperationException("Open a project before creating a procedural graph.");
+        var assetId = UniqueAssetId("geometry", _modelingGraph.ListAssets(_session.ProjectRoot));
+        await _modelingGraph.CreateStarterAsync(
+            _session.ProjectRoot,
+            assetId,
+            "Geometry",
+            "rekall.modeling.primitive.box",
+            _lifecycleCancellation.Token);
+        Replace(ModelingGraphAssetIds, _modelingGraph.ListAssets(_session.ProjectRoot));
+        SelectedModelingGraphAssetId = assetId;
+        Replace(ModelingGraphNodes, _modelingGraph.Nodes);
+        Replace(ModelingGraphOutputNames, _modelingGraph.OutputNames);
+        SelectedModelingGraphOutput = _modelingGraph.SelectedOutputName;
+        SelectedModelingGraphNode = ModelingGraphNodes.FirstOrDefault();
+        _modelingGraphNodePositions.Clear();
+        _modelingGraphCanvasNeedsFrame = true;
+        var report = await _modelingGraph.EvaluateAsync(SelectedModelingGraphOutput!, _lifecycleCancellation.Token);
+        Replace(ModelingGraphDiagnosticLines, report.Diagnostics.Select(item =>
+            $"{item.Severity}: {item.Code}{(item.NodeId is null ? string.Empty : $" [{item.NodeId}]")} - {item.Message}"));
+        ModelingGraphSummary = _modelingGraph.EvaluationSummary;
+        RefreshModelingGraphOutputViewport();
+        RefreshModelingGraphCanvas();
+    });
+
+    private Task AddModelingGraphNodeAsync(object? parameter) => RunGraphModelingAsync(async () =>
+    {
+        if (parameter is not string typeId || _modelingGraph.Graph is null) return;
+        var descriptor = _modelingGraphCatalog.Find(typeId, 1)
+            ?? throw new ArgumentException($"Unknown modeling node type '{typeId}'.", nameof(parameter));
+        var nodeId = UniqueAssetId(
+            descriptor.DisplayName.ToLowerInvariant().Replace(' ', '-'),
+            _modelingGraph.Graph.Nodes.Select(node => node.NodeId).ToArray());
+        var node = new RekallAgeModelingGraphNode(
+            nodeId,
+            descriptor.TypeId,
+            descriptor.TypeVersion,
+            new JsonObject());
+        await _modelingGraph.ApplyPatchAsync(
+            new([new(RekallAgeModelingGraphPatchKind.AddNode, Node: node)]),
+            "studio",
+            _lifecycleCancellation.Token);
+        Replace(ModelingGraphNodes, _modelingGraph.Nodes);
+        SelectedModelingGraphNode = ModelingGraphNodes.First(item => item.NodeId == nodeId);
+        ModelingGraphSummary = _modelingGraph.EvaluationSummary;
+        RefreshModelingGraphCanvas();
     });
 
     private Task OpenModelingGraphAsync() => RunGraphModelingAsync(async () =>
@@ -4110,7 +4200,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 agentStopwatch.Elapsed.TotalMilliseconds);
             var reload = await _session.ReloadAsync(CancellationToken.None);
             if (reload.Ok && _session.Model is not null) ApplyModel(_session.Model);
-            StatusText = "AI authoring cancelled.";
+            StatusText = "AI authoring aborted.";
             AgentActivityText = StatusText;
             AppendAgentLine("cancelled by user");
         }
@@ -4137,7 +4227,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             activeRun = _activeAgentRun;
         }
         if (activeRun is null) return;
-        StatusText = "Cancelling AI authoring…";
+        StatusText = "Aborting AI authoring…";
         AgentActivityText = StatusText;
         try
         {
@@ -4690,11 +4780,42 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             AppendAgentLine($"tool failure: {AgentToolFailureSummary(failed.ResultPreview)}");
         }
+        if (progress.ToolExecution is { } completed
+            && RekallAgeStudioAgentLiveRefreshPolicy.ShouldRefresh(completed.Name, completed.Succeeded))
+        {
+            Interlocked.Exchange(ref _agentLiveRefreshPending, 1);
+            _ = RefreshAgentAuthoredSceneAsync();
+        }
         StatusText = progress.Message;
         var operation = progress.ToolExecution is { } activeTool
             ? $"{progress.Phase} · {activeTool.Name} #{activeTool.Sequence}"
             : progress.Phase;
         AgentActivityText = $"Turn {progress.Turn} · {operation} — {progress.Message}";
+    }
+
+    private async Task RefreshAgentAuthoredSceneAsync()
+    {
+        if (!await _agentLiveRefreshGate.WaitAsync(0, _lifecycleCancellation.Token)) return;
+        try
+        {
+            while (Interlocked.Exchange(ref _agentLiveRefreshPending, 0) != 0)
+            {
+                var reload = await _session.ReloadAsync(_lifecycleCancellation.Token);
+                if (!reload.Ok || _session.Model is null) continue;
+                ApplyModel(_session.Model, preserveInspectorDrafts: true);
+                if (Mode == RekallAgeStudioMode.Edit && IsLiveViewportEnabled)
+                {
+                    await RefreshEditPreviewAsync("Live scene updated from AI authoring.");
+                }
+            }
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            _agentLiveRefreshGate.Release();
+        }
     }
 
     private static string AgentToolFailureSummary(string resultPreview)
@@ -4742,7 +4863,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 width = 960,
                 height = 540,
                 debugOverlay = true,
-                backendId = "software"
+                backendId = "vulkan"
             }),
             "Capture Viewport",
             "studio",
@@ -6363,6 +6484,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _applyMeshOperationCommand.RaiseCanExecuteChanged();
         _cancelMeshPreviewCommand.RaiseCanExecuteChanged();
         _refreshModelingGraphsCommand.RaiseCanExecuteChanged();
+        _createMeshPrimitiveFromMenuCommand.RaiseCanExecuteChanged();
+        _createModelingGraphCommand.RaiseCanExecuteChanged();
+        _addModelingGraphNodeCommand.RaiseCanExecuteChanged();
         _openModelingGraphCommand.RaiseCanExecuteChanged();
         _evaluateModelingGraphCommand.RaiseCanExecuteChanged();
         _applyModelingGraphParametersCommand.RaiseCanExecuteChanged();

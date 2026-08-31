@@ -100,7 +100,7 @@ public sealed class VulkanSceneCaptureTests
         var image = await RekallAgePngReader.ReadRgbaAsync(outputPath, CancellationToken.None);
 
         Assert.NotEqual((ulong)1, composited.ByteChecksum);
-        var overlay = new RekallAgeRuntimeSoftwareRenderer().RenderUiOverlayRgba(
+        var overlay = new RekallAgeRuntimeUiOverlayRasterizer().Rasterize(
             frame,
             RekallAgeRuntimeViewportAssetSet.Empty);
         var uiPixel = Enumerable.Range(0, overlay.Length / 4)

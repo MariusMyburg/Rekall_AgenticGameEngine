@@ -65,16 +65,6 @@ public sealed record RekallAgeRenderBackendCatalog(IReadOnlyList<RekallAgeRender
                     "resources",
                     "command-lists",
                     "fences"
-                ]),
-            new RekallAgeRenderBackendDescriptor(
-                "software",
-                "Rekall Software",
-                "available",
-                [
-                    "headless-raster",
-                    "deterministic-preview",
-                    "pixel-buffers",
-                    "png-output"
                 ])
         ]);
     }

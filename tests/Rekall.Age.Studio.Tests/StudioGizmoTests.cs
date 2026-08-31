@@ -1,9 +1,21 @@
 using Rekall.Age.Studio;
+using System.IO;
 
 namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioGizmoTests
 {
+    [Fact]
+    public void EntitySelectionPresentsTheNewEditorOnlyGizmoFrame()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var source = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "RekallAgeStudioViewModel.cs"));
+        var selection = source[source.IndexOf("public async Task SelectEntityAsync", StringComparison.Ordinal)..
+            source.IndexOf("public bool BeginSceneTransform", StringComparison.Ordinal)];
+
+        Assert.Equal(2, selection.Split("refreshPreviewAfter: true", StringSplitOptions.None).Length - 1);
+    }
+
     [Fact]
     public void ProjectedGizmoHitTestsAxesAndMoveUsesLiteralSnappedWorldDelta()
     {

@@ -69,7 +69,7 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
     private readonly TextureBinding _hudTexture;
     private readonly ResourceSet _hudTextureSet;
     private TextureBinding _uiTexture;
-    private readonly RekallAgeRuntimeSoftwareRenderer _softwareRenderer = new();
+    private readonly RekallAgeRuntimeUiOverlayRasterizer _uiOverlayRasterizer = new();
     private SceneRenderTarget _sceneTarget;
     private readonly RekallAgeVulkanSceneMeshBuilder _meshBuilder = new();
     private readonly RekallAgeVulkanSceneBatchBuilder _batchBuilder = new();
@@ -1900,7 +1900,7 @@ public sealed class RekallAgeVeldridVulkanPresentationSession : IRekallAgeVulkan
             _uiTexture = CreateUiTextureBinding(frame.Width, frame.Height);
         }
 
-        var rgba = _softwareRenderer.RenderUiOverlayRgba(frame, _assets);
+        var rgba = _uiOverlayRasterizer.Rasterize(frame, _assets);
         _device.UpdateTexture(
             _uiTexture.Texture,
             rgba,

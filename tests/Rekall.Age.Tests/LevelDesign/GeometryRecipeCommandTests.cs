@@ -38,6 +38,8 @@ public sealed class GeometryRecipeCommandTests
         Assert.Equal(4, result.Value.PartCount);
         Assert.True(result.Value.VertexCount > 300);
         Assert.True(result.Value.IndexCount > 600);
+        Assert.Null(result.Value.Scene);
+        Assert.True(System.Text.Json.JsonSerializer.Serialize(result.Value).Length < 512);
 
         var scene = await store.LoadAsync(root, "Main", CancellationToken.None);
         var entity = Assert.Single(scene.Entities, item => item.Id == result.Value.EntityId);

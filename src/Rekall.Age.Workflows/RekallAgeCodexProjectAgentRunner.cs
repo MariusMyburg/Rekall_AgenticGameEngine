@@ -244,9 +244,14 @@ public sealed class RekallAgeCodexProjectAgentRunner :
             }
 
             stopwatch.Stop();
+            var completedSuccessfully = completion.Status.Equals("completed", StringComparison.OrdinalIgnoreCase);
+            if (!completedSuccessfully)
+            {
+                evidence.FailPendingTools(completion.Status);
+            }
             return CreateResult(
-                succeeded: true,
-                completed: true,
+                succeeded: completedSuccessfully,
+                completed: completedSuccessfully,
                 completion.Status,
                 request,
                 thread,
@@ -257,6 +262,7 @@ public sealed class RekallAgeCodexProjectAgentRunner :
         catch (RekallAgeLanguageModelProviderException error)
         {
             stopwatch.Stop();
+            evidence.FailPendingTools(error.Code);
             if (error.Code == RekallAgeCodexErrorCodes.Cancelled && client is not null)
             {
                 await ResetOwnedClientAsync(client).ConfigureAwait(false);
@@ -276,6 +282,7 @@ public sealed class RekallAgeCodexProjectAgentRunner :
         catch (OperationCanceledException)
         {
             stopwatch.Stop();
+            evidence.FailPendingTools(RekallAgeCodexErrorCodes.Cancelled);
             if (client is not null)
             {
                 await ResetOwnedClientAsync(client).ConfigureAwait(false);
@@ -616,6 +623,7 @@ public sealed class RekallAgeCodexProjectAgentRunner :
         private readonly object _gate = new();
         private readonly StringBuilder _finalContent = new();
         private readonly List<RekallAgeLanguageModelToolExecution> _toolExecutions = [];
+        private readonly Dictionary<string, (string ToolName, JsonObject Arguments)> _pendingTools = new(StringComparer.Ordinal);
         private readonly List<RekallAgeCodexDiagnostic> _diagnostics = [];
         private int _inputTokens;
         private int _outputTokens;
@@ -700,6 +708,15 @@ public sealed class RekallAgeCodexProjectAgentRunner :
                 ?? type;
             if (!notification.Method.EndsWith("completed", StringComparison.Ordinal))
             {
+                var itemId = StringProperty(item, "id");
+                if (itemId is not null)
+                {
+                    var startedArguments = item.TryGetProperty("arguments", out var startedArgumentElement)
+                        && startedArgumentElement.ValueKind == JsonValueKind.Object
+                            ? JsonNode.Parse(startedArgumentElement.GetRawText()) as JsonObject ?? new JsonObject()
+                            : new JsonObject();
+                    lock (_gate) _pendingTools[itemId] = (toolName, startedArguments);
+                }
                 Report("tool.started", toolName);
                 return;
             }
@@ -720,6 +737,7 @@ public sealed class RekallAgeCodexProjectAgentRunner :
             RekallAgeLanguageModelToolExecution execution;
             lock (_gate)
             {
+                if (StringProperty(item, "id") is { } itemId) _pendingTools.Remove(itemId);
                 execution = new RekallAgeLanguageModelToolExecution(
                     _toolExecutions.Count + 1,
                     toolName,
@@ -729,6 +747,26 @@ public sealed class RekallAgeCodexProjectAgentRunner :
                 _toolExecutions.Add(execution);
             }
             Report(succeeded ? "tool.completed" : "tool.failed", $"{toolName}: {preview}", execution);
+        }
+
+        public void FailPendingTools(string turnStatus)
+        {
+            RekallAgeLanguageModelToolExecution[] failed;
+            lock (_gate)
+            {
+                failed = _pendingTools.Values.Select((pending, index) => new RekallAgeLanguageModelToolExecution(
+                    _toolExecutions.Count + index + 1,
+                    pending.ToolName,
+                    pending.Arguments,
+                    false,
+                    $"Codex turn ended with status '{turnStatus}' before this tool returned a completion receipt.")).ToArray();
+                _toolExecutions.AddRange(failed);
+                _pendingTools.Clear();
+            }
+            foreach (var execution in failed)
+            {
+                Report("tool.failed", $"{execution.Name}: {execution.ResultPreview}", execution);
+            }
         }
 
         public void AddDiagnostic(string code, string message)

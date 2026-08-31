@@ -2,6 +2,7 @@ using System.IO;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Contracts;
+using System.Text.Json.Nodes;
 
 namespace Rekall.Age.Studio;
 
@@ -76,6 +77,32 @@ public sealed class RekallAgeStudioModelingGraphSession
     public string EvaluationSummary { get; private set; } = "Open and evaluate a procedural graph to inspect execution evidence.";
 
     public IReadOnlyList<string> ListAssets(string projectRoot) => _store.ListAssetIds(projectRoot);
+
+    public async ValueTask CreateStarterAsync(
+        string projectRoot,
+        string assetId,
+        string name,
+        string primitiveTypeId,
+        CancellationToken cancellationToken)
+    {
+        var descriptor = _catalog.Find(primitiveTypeId, 1)
+            ?? throw new ArgumentException($"Unknown modeling node type '{primitiveTypeId}'.", nameof(primitiveTypeId));
+        if (!descriptor.Ports.Any(port => port.Direction == RekallAgeModelingPortDirection.Output
+                                         && port.ValueType == RekallAgeModelingValueType.Geometry))
+        {
+            throw new ArgumentException($"Modeling node '{descriptor.DisplayName}' does not produce geometry.", nameof(primitiveTypeId));
+        }
+
+        var node = new RekallAgeModelingGraphNode("primitive", descriptor.TypeId, descriptor.TypeVersion, new JsonObject());
+        var graph = RekallAgeModelingGraphAsset.Create(
+            assetId,
+            name,
+            [node],
+            [],
+            [new RekallAgeModelingGraphOutput("mesh", node.NodeId, "geometry")]);
+        await _store.SaveAsync(projectRoot, graph, cancellationToken).ConfigureAwait(false);
+        await OpenAsync(projectRoot, assetId, cancellationToken).ConfigureAwait(false);
+    }
 
     public async ValueTask OpenAsync(string projectRoot, string assetId, CancellationToken cancellationToken)
     {

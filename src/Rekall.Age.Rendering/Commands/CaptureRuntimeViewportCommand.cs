@@ -15,7 +15,7 @@ public sealed record CaptureRuntimeViewportRequest(
     int Width = 320,
     int Height = 180,
     bool DebugOverlay = true,
-    string BackendId = "software",
+    string BackendId = "vulkan",
     string? PreferredDeviceType = "discrete-gpu",
     IReadOnlyList<RekallAgeRuntimeInputFrame>? Inputs = null)
 {
@@ -189,86 +189,13 @@ public sealed class CaptureRuntimeViewportCommand
             request.ProjectRoot,
             frame,
             context.CancellationToken);
-        var backendId = NormalizeBackendId(request.BackendId);
-        if (backendId.Equals("auto", StringComparison.Ordinal))
-        {
-            var probe = await new RekallAgeNativeVulkanBackendProbe().ProbeAsync(context.CancellationToken);
-            backendId = probe.Available ? "vulkan" : "software";
-        }
-
-        if (backendId.Equals("vulkan", StringComparison.Ordinal))
-        {
-            return await CaptureVulkanViewportAsync(
-                request,
-                context,
-                frame,
-                assets,
-                world.Subsystems.Input.Actions,
-                world.ElapsedTime.TotalSeconds);
-        }
-
-        var capture = await new RekallAgeRuntimeSoftwareRenderer().CaptureAsync(
+        return await CaptureVulkanViewportAsync(
+            request,
+            context,
             frame,
-            request.OutputDirectory,
-            $"{world.SceneName}_runtime_{world.FrameIndex:000}.png",
             assets,
-            context.CancellationToken);
-        var frameAnalysis = await AnalyzeCaptureAsync(capture.Captured, capture.ScreenshotPath, context.CancellationToken);
-        var result = new CaptureRuntimeViewportResult(
-            capture.Captured,
-            capture.ScreenshotPath,
-            capture.NonBlank,
-            capture.Width,
-            capture.Height,
-            capture.FrameIndex,
-            capture.ActiveCamera,
-            capture.RenderableCount,
-            frame.Renderables
-                .Select(renderable => renderable.Kind)
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(kind => kind, StringComparer.Ordinal)
-                .ToArray(),
-            frame.Culling.CulledRenderableCount,
-            BuildCulledRenderables(frame),
-            capture.ObservationCount,
-            frame.Observations
-                .Select(observation => observation.Code)
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(code => code, StringComparer.Ordinal)
-                .ToArray(),
-            capture.AssetBackedRenderableCount,
-            capture.FallbackRenderableCount,
-            capture.MissingAssetCount,
-            capture.UnsupportedAssetCount,
-            capture.AssetIssueCodes,
-            "software",
-            false,
-            "software-rasterized",
-            null,
-            frameAnalysis,
-            BuildLayoutDiagnostics(frame, assets))
-        {
-            InputActions = world.Subsystems.Input.Actions,
-            ElapsedSeconds = world.ElapsedTime.TotalSeconds,
-            QualityPlan = frame.ResolvedQualityPlan,
-            GpuTimings = RekallAgeGpuFrameTimingReport.Unavailable(frame.FrameIndex),
-            ResourceBytes = EstimatedResourceBytes(frame.ResolvedQualityPlan),
-            DrawCount = frame.Renderables.Count,
-            SuggestedCommands = BuildSuggestedCommands(request)
-        };
-
-        context.Transaction.RecordChangedResource(capture.ScreenshotPath);
-
-        // The software rasterizer cannot execute post processing, atmospheric scattering or
-        // tone mapping. Say so when the scene actually declares them, rather than returning a
-        // flat image that looks like the scene is wrong.
-        var droppedFeatures = SoftwareBackendUnsupportedFeatures(frame);
-        var summary = droppedFeatures.Count == 0
-            ? $"Captured runtime viewport for scene '{request.SceneName}' at frame {result.FrameIndex} on the software backend."
-            : $"Captured runtime viewport for scene '{request.SceneName}' at frame {result.FrameIndex} on the software backend, "
-              + $"which cannot render {string.Join(", ", droppedFeatures)}. Re-run with backend 'vulkan' to see them.";
-
-        return RekallAgeCommandResult<CaptureRuntimeViewportResult>.Success(result, summary);
+            world.Subsystems.Input.Actions,
+            world.ElapsedTime.TotalSeconds);
     }
 
     private static IReadOnlyList<string> SoftwareBackendUnsupportedFeatures(
@@ -489,11 +416,11 @@ public sealed class CaptureRuntimeViewportCommand
         }
 
         var backendId = NormalizeBackendId(request.BackendId);
-        if (backendId is not "software" and not "vulkan" and not "auto")
+        if (backendId is not "vulkan" and not "auto")
         {
             errors.Add(new RekallAgeCommandError(
                 "REKALL_RUNTIME_VIEWPORT_BACKEND_UNSUPPORTED",
-                "Runtime viewport backend must be 'auto', 'software' or 'vulkan'.",
+                "Runtime viewport capture is Vulkan-only; backend must be 'auto' or 'vulkan'.",
                 request.BackendId));
         }
 
@@ -676,18 +603,13 @@ public sealed class CaptureRuntimeViewportCommand
         plan is null ? 0 : checked(plan.EstimatedTransientBytes + plan.EstimatedPersistentBytes);
 
     /// <summary>
-    /// Unspecified means "auto": prefer the Vulkan path and fall back to the software
-    /// rasterizer only when no Vulkan device is available.
-    ///
-    /// The default used to be "software", which silently produced a flat-shaded image with no
-    /// atmosphere, bloom or tone mapping. An agent capturing a frame to check its scene would
-    /// draw the wrong conclusion from that and start debugging a scene that was already
-    /// correct, so the default now matches what the scene actually declares.
+    /// Unspecified means Vulkan. There is deliberately no renderer fallback: captures must
+    /// prove the same graphics path used by Studio and the shipped player.
     /// </summary>
     private static string NormalizeBackendId(string backendId)
     {
         return string.IsNullOrWhiteSpace(backendId)
-            ? "auto"
+            ? "vulkan"
             : backendId.Trim().ToLowerInvariant();
     }
 
@@ -1621,11 +1543,11 @@ public sealed class CompareQualityPresetsCommand
         var backendId = string.IsNullOrWhiteSpace(request.BackendId)
             ? string.Empty
             : request.BackendId.Trim().ToLowerInvariant();
-        if (backendId is not "software" and not "vulkan")
+        if (backendId is not "vulkan")
         {
             errors.Add(new RekallAgeCommandError(
                 "REKALL_RENDER_QUALITY_COMPARE_BACKEND_UNSUPPORTED",
-                "Quality comparison backend must be 'software' or 'vulkan'.",
+                "Quality comparison is Vulkan-only; backend must be 'vulkan'.",
                 $"requested={request.BackendId}; resolved=unavailable"));
         }
 

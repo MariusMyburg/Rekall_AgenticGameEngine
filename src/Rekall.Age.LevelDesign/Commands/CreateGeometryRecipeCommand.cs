@@ -132,7 +132,7 @@ public sealed class CreateGeometryRecipeCommand
                 request.Parts.Count,
                 mesh.Vertices.Count,
                 mesh.Indices.Count,
-                updated),
+                null),
             $"Created geometry recipe '{request.Name}' with {request.Parts.Count.ToString(CultureInfo.InvariantCulture)} parts, {mesh.Vertices.Count.ToString(CultureInfo.InvariantCulture)} vertices, and {mesh.Indices.Count.ToString(CultureInfo.InvariantCulture)} indices.");
     }
 

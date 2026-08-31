@@ -38,10 +38,21 @@
                     <Border Grid.Column="0" Grid.ColumnSpan="2" Background="#252A30" BorderBrush="{StaticResource PanelBorder}" BorderThickness="1" Padding="5,3">
                         <WrapPanel Orientation="Horizontal">
                             <ComboBox Width="115" ItemsSource="{Binding MeshEditDomains}" SelectedItem="{Binding MeshEditDomain}" />
-                            <TextBlock Text="Add" VerticalAlignment="Center" Margin="12,0,5,0" Foreground="#D0D5DA" />
-                            <ComboBox Width="95" ItemsSource="{Binding MeshPrimitiveTypes}" SelectedItem="{Binding SelectedMeshPrimitive}" />
-                            <TextBox Width="110" Margin="4,0" Text="{Binding MeshPrimitiveAssetIdInput, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button Content="+ Add" Width="66" Padding="6,2" Command="{Binding CreateMeshPrimitiveCommand}" Style="{StaticResource AccentButton}" />
+                            <Menu Margin="10,0,0,0" Background="Transparent" Foreground="{StaticResource WorkbenchText}">
+                                <MenuItem Header="Add" InputGestureText="Shift+A">
+                                    <MenuItem Header="Cube" Command="{Binding CreateMeshPrimitiveFromMenuCommand}" CommandParameter="box" />
+                                    <MenuItem Header="Plane" Command="{Binding CreateMeshPrimitiveFromMenuCommand}" CommandParameter="plane" />
+                                    <MenuItem Header="Grid" Command="{Binding CreateMeshPrimitiveFromMenuCommand}" CommandParameter="grid" />
+                                    <Separator />
+                                    <MenuItem Header="UV Sphere" Command="{Binding CreateMeshPrimitiveFromMenuCommand}" CommandParameter="sphere" />
+                                    <MenuItem Header="Ico Sphere" Command="{Binding CreateMeshPrimitiveFromMenuCommand}" CommandParameter="ico_sphere" />
+                                    <MenuItem Header="Cylinder" Command="{Binding CreateMeshPrimitiveFromMenuCommand}" CommandParameter="cylinder" />
+                                    <MenuItem Header="Cone" Command="{Binding CreateMeshPrimitiveFromMenuCommand}" CommandParameter="cone" />
+                                    <MenuItem Header="Torus" Command="{Binding CreateMeshPrimitiveFromMenuCommand}" CommandParameter="torus" />
+                                    <MenuItem Header="Capsule" Command="{Binding CreateMeshPrimitiveFromMenuCommand}" CommandParameter="capsule" />
+                                    <MenuItem Header="Disc" Command="{Binding CreateMeshPrimitiveFromMenuCommand}" CommandParameter="disc" />
+                                </MenuItem>
+                            </Menu>
                             <Border Width="1" Margin="8,2" Background="{StaticResource PanelBorder}" />
                             <TextBlock Text="Edit" VerticalAlignment="Center" Margin="0,0,5,0" Foreground="#D0D5DA" />
                             <ComboBox Width="155" ItemsSource="{Binding MeshOperationIds}" SelectedItem="{Binding SelectedMeshOperationId}" />
@@ -72,6 +83,14 @@
                             <Image x:Name="MeshViewportImage" Source="{Binding MeshViewportImage}" Stretch="Fill"
                                    MouseLeftButtonDown="OnMeshMouseDown" MouseMove="OnMeshMouseMove"
                                    MouseLeftButtonUp="OnMeshMouseUp" LostMouseCapture="OnMeshLostCapture" Cursor="Cross" />
+                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="No mesh is open" HorizontalAlignment="Center" Foreground="#C8D1DC" FontSize="18" />
+                                <TextBlock Text="Create a primitive to begin editing, or open a mesh from the Content Browser."
+                                           Foreground="{StaticResource MutedText}" Margin="0,6,0,12" />
+                                <Button Content="Add Cube" Command="{Binding CreateMeshPrimitiveFromMenuCommand}" CommandParameter="box"
+                                        Style="{StaticResource AccentButton}" Padding="16,7" HorizontalAlignment="Center" />
+                                <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding MeshViewportImage}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+                            </StackPanel>
                             <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10">
                                 <TextBlock Text="User Perspective" Foreground="#D5D8DC" />
                                 <TextBlock Text="{Binding MeshSummary}" Foreground="#AAB2BC" FontSize="11" />
@@ -169,7 +188,7 @@
             <TabItem Header="Procedural Geometry" Tag="node-contracts">
                 <Grid Margin="7">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="250" /><ColumnDefinition Width="5" /><ColumnDefinition Width="5*" /><ColumnDefinition Width="5" /><ColumnDefinition Width="4*" /></Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" Style="{StaticResource EditorPanel}"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><TextBlock Text="PROCEDURAL GRAPH" FontWeight="SemiBold" /></Border><StackPanel Margin="9"><TextBlock Text="Graph asset" Style="{StaticResource SectionLabel}" /><ComboBox ItemsSource="{Binding ModelingGraphAssetIds}" SelectedItem="{Binding SelectedModelingGraphAssetId}" Margin="0,4,0,6" /><UniformGrid Columns="2"><Button Content="Refresh" Command="{Binding RefreshModelingGraphsCommand}" /><Button Content="Open" Command="{Binding OpenModelingGraphCommand}" /></UniformGrid><TextBlock Text="Named output" Style="{StaticResource SectionLabel}" Margin="0,14,0,0" /><ComboBox ItemsSource="{Binding ModelingGraphOutputNames}" SelectedItem="{Binding SelectedModelingGraphOutput}" Margin="0,4,0,6" /><Button Content="Evaluate Output" Command="{Binding EvaluateModelingGraphCommand}" Style="{StaticResource AccentButton}" /><TextBlock Text="{Binding ModelingGraphSummary}" TextWrapping="Wrap" Foreground="{StaticResource MutedText}" Margin="0,14,0,0" /></StackPanel></DockPanel></Border>
+                    <Border Grid.Column="0" Style="{StaticResource EditorPanel}"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><TextBlock Text="PROCEDURAL GRAPH" FontWeight="SemiBold" /></Border><StackPanel Margin="9"><Button Content="New Geometry Graph" Command="{Binding CreateModelingGraphCommand}" Style="{StaticResource AccentButton}" Margin="0,0,0,9" /><TextBlock Text="Graph asset" Style="{StaticResource SectionLabel}" /><ComboBox ItemsSource="{Binding ModelingGraphAssetIds}" SelectedItem="{Binding SelectedModelingGraphAssetId}" Margin="0,4,0,6" /><UniformGrid Columns="2"><Button Content="Refresh" Command="{Binding RefreshModelingGraphsCommand}" /><Button Content="Open" Command="{Binding OpenModelingGraphCommand}" /></UniformGrid><Menu Margin="0,10,0,0"><MenuItem Header="Add Node"><MenuItem Header="Cube" Command="{Binding AddModelingGraphNodeCommand}" CommandParameter="rekall.modeling.primitive.box" /><MenuItem Header="Grid" Command="{Binding AddModelingGraphNodeCommand}" CommandParameter="rekall.modeling.primitive.grid" /><MenuItem Header="Sphere" Command="{Binding AddModelingGraphNodeCommand}" CommandParameter="rekall.modeling.primitive.sphere" /><MenuItem Header="Cylinder" Command="{Binding AddModelingGraphNodeCommand}" CommandParameter="rekall.modeling.primitive.cylinder" /><MenuItem Header="Transform Geometry" Command="{Binding AddModelingGraphNodeCommand}" CommandParameter="rekall.modeling.geometry.transform" /></MenuItem></Menu><TextBlock Text="Named output" Style="{StaticResource SectionLabel}" Margin="0,14,0,0" /><ComboBox ItemsSource="{Binding ModelingGraphOutputNames}" SelectedItem="{Binding SelectedModelingGraphOutput}" Margin="0,4,0,6" /><Button Content="Evaluate Output" Command="{Binding EvaluateModelingGraphCommand}" Style="{StaticResource AccentButton}" /><TextBlock Text="{Binding ModelingGraphSummary}" TextWrapping="Wrap" Foreground="{StaticResource MutedText}" Margin="0,14,0,0" /></StackPanel></DockPanel></Border>
                     <GridSplitter Grid.Column="1" Width="5" Background="{StaticResource PanelBorder}" />
                     <Border Grid.Column="2" Style="{StaticResource EditorPanel}"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><Grid><TextBlock Text="NODE CONTRACTS" FontWeight="SemiBold" /><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><TextBlock Text="{Binding ModelingGraphCanvasZoomLabel}" VerticalAlignment="Center" Foreground="{StaticResource MutedText}" Margin="0,0,8,0" /><Button Content="Frame All" Padding="7,1" Click="OnResetModelingGraphCanvasView" ToolTip="Reset the graph canvas pan and zoom" /></StackPanel></Grid></Border><Grid><Grid.RowDefinitions><RowDefinition Height="360" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                         <Border Grid.Row="0" Background="{StaticResource ViewportBackground}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,0,0,1">

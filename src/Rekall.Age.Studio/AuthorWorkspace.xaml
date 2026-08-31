@@ -210,7 +210,18 @@
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                 <Button Command="{Binding RunAgentCommand}" Style="{StaticResource AccentButton}"
                                         Padding="16,8" HorizontalAlignment="Stretch" ToolTip="Run the authoring agent" AutomationProperties.Name="Run authoring agent"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconAgent}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Run Agent" /></StackPanel></Button>
-                                <Button Grid.Column="1" Content="Cancel" Command="{Binding CancelAgentCommand}" Padding="16,8" Margin="8,2,2,2" />
+                                <Button Grid.Column="1" Content="Abort" Command="{Binding CancelAgentCommand}" Padding="16,8" Margin="8,2,2,2">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsAgentRunning}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
                             </Grid>
                         </StackPanel>
                     </Border>

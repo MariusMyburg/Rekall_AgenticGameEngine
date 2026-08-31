@@ -8,41 +8,6 @@ namespace Rekall.Age.Rendering;
 
 public sealed class RekallAgeOpenXrSoftwareSceneFrameRenderer
 {
-    public async ValueTask<RekallAgeRuntimeViewportRgbaFrame> RenderAsync(
-        RekallAgeOpenXrHeadsetSoftwareSceneSubmitPlan plan,
-        CancellationToken cancellationToken)
-    {
-        var scene = await BuildSceneAsync(plan, cancellationToken).ConfigureAwait(false);
-        var camera = scene.Frame.ActiveCamera
-            ?? throw new InvalidOperationException("OpenXR scene rendering requires an active camera.");
-        var renderer = new RekallAgePerspectiveSoftwareSceneRenderer();
-        var viewProjection = renderer.CreateCameraViewProjection(
-            camera,
-            plan.RenderWidth,
-            plan.RenderHeight,
-            System.Numerics.Quaternion.Identity,
-            System.Numerics.Vector3.Zero);
-        var pixels = renderer.Render(
-            scene.Batch,
-            plan.RenderWidth,
-            plan.RenderHeight,
-            viewProjection,
-            camera.ClearColor,
-            scene.Textures);
-        return new RekallAgeRuntimeViewportRgbaFrame(
-            plan.RenderWidth,
-            plan.RenderHeight,
-            pixels,
-            scene.Frame.FrameIndex,
-            camera.EntityName,
-            scene.Frame.Renderables.Count,
-            scene.MeshCount,
-            0,
-            0,
-            0,
-            pixels.Any(value => value != 0));
-    }
-
     public async ValueTask<RekallAgeOpenXrPerspectiveSceneFrame> BuildSceneAsync(
         RekallAgeOpenXrHeadsetSoftwareSceneSubmitPlan plan,
         CancellationToken cancellationToken)

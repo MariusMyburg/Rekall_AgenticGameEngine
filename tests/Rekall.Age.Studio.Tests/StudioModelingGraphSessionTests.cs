@@ -9,6 +9,29 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioModelingGraphSessionTests
 {
     [Fact]
+    public async Task CreatesAndOpensAnImmediatelyEvaluatableStarterGeometryGraph()
+    {
+        var root = TemporaryRoot();
+        try
+        {
+            var session = new RekallAgeStudioModelingGraphSession();
+
+            await session.CreateStarterAsync(root, "geometry-1", "Geometry 1", "rekall.modeling.primitive.box", CancellationToken.None);
+            var result = await session.EvaluateAsync("mesh", CancellationToken.None);
+
+            Assert.Equal("geometry-1", session.Graph!.AssetId);
+            Assert.Equal("Box", Assert.Single(session.Nodes).DisplayName);
+            Assert.Equal(["mesh"], session.OutputNames);
+            Assert.True(result.Succeeded);
+            Assert.NotNull(session.OutputMesh);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task OpensPersistedGraphAndExposesCanonicalNodeContracts()
     {
         var root = TemporaryRoot();

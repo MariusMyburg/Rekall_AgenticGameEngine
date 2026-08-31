@@ -157,7 +157,7 @@ public sealed class StudioContentPreviewServiceTests
     public async Task ConcurrentRequestsCoalesceByCompositeIdentityAndRespectGlobalBound()
     {
         var decoder = new BlockingDecoder();
-        var service = new RekallAgeStudioContentPreviewService(decoder, new RecordingModelPreview(), 32, 2);
+        var service = new RekallAgeStudioContentPreviewService(decoder, new RecordingModelPreview(), 32);
         var same = Item("texture", "r1", "same.png", "same");
         var coalesced = Enumerable.Range(0, 6).Select(_ => service.GetAsync(same, CancellationToken.None).AsTask()).ToArray();
         await decoder.WaitForCallsAsync(1);
@@ -171,6 +171,7 @@ public sealed class StudioContentPreviewServiceTests
         decoder.Release();
         await Task.WhenAll(coalesced.Concat(burst));
         Assert.True(decoder.MaximumConcurrency <= 2);
+        Assert.Equal(2, RekallAgeStudioContentPreviewService.DefaultMaximumConcurrency);
     }
 
     [Fact]

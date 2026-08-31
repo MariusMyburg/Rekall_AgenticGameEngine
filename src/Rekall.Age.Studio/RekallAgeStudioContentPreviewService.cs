@@ -114,6 +114,7 @@ internal interface IRekallAgeStudioContentModelPreviewAdapter
 internal sealed class RekallAgeStudioContentPreviewService : IRekallAgeStudioContentPreviewService
 {
     private const int ThumbnailDimension = 192;
+    internal const int DefaultMaximumConcurrency = 2;
     private readonly IRekallAgeStudioContentImageDecoder _decoder;
     private readonly IRekallAgeStudioContentModelPreviewAdapter _models;
     private readonly int _capacity;
@@ -127,7 +128,7 @@ internal sealed class RekallAgeStudioContentPreviewService : IRekallAgeStudioCon
         IRekallAgeStudioContentImageDecoder decoder,
         IRekallAgeStudioContentModelPreviewAdapter models,
         int capacity = 96,
-        int maximumConcurrency = 3)
+        int maximumConcurrency = DefaultMaximumConcurrency)
     {
         _decoder = decoder ?? throw new ArgumentNullException(nameof(decoder));
         _models = models ?? throw new ArgumentNullException(nameof(models));

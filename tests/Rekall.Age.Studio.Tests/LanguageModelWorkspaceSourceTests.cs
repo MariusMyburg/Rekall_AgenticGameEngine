@@ -73,6 +73,38 @@ public sealed class LanguageModelWorkspaceSourceTests
         Assert.Contains("Text=\"{Binding RemediationProgress}\"", xaml, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void DocumentationExplainsFirstLaunchProviderSetupPrivacyAndRecovery()
+    {
+        var root = FindRepositoryRoot();
+        var documentation = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Rekall.Age.Studio",
+            "Documentation",
+            "Rekall-AGE-Documentation.html"));
+
+        Assert.Contains("First-launch language model setup", documentation, StringComparison.Ordinal);
+        Assert.Contains("Settings → Language Model Setup…", documentation, StringComparison.Ordinal);
+        Assert.Contains("Set Up Later", documentation, StringComparison.Ordinal);
+        Assert.Contains("AI setup incomplete", documentation, StringComparison.Ordinal);
+        Assert.Contains("qwen3.8:27b", documentation, StringComparison.Ordinal);
+        Assert.Contains("Ollama is not installed", documentation, StringComparison.Ordinal);
+        Assert.Contains("Ollama is installed but stopped", documentation, StringComparison.Ordinal);
+        Assert.Contains("Ollama has no models", documentation, StringComparison.Ordinal);
+        Assert.Contains("tool-capable model", documentation, StringComparison.Ordinal);
+        Assert.Contains("Session only", documentation, StringComparison.Ordinal);
+        Assert.Contains("environment variable", documentation, StringComparison.Ordinal);
+        Assert.Contains("Remembered securely on this PC", documentation, StringComparison.Ordinal);
+        Assert.Contains("Remove remembered key", documentation, StringComparison.Ordinal);
+        Assert.Contains("current Windows user", documentation, StringComparison.Ordinal);
+        Assert.Contains("not stored in projects or normal settings files", documentation, StringComparison.Ordinal);
+        Assert.Contains("Codex-only", documentation, StringComparison.Ordinal);
+        Assert.Contains("clean installation", documentation, StringComparison.Ordinal);
+        Assert.Contains("GGUF", documentation, StringComparison.Ordinal);
+        Assert.Contains("#language-model-setup", documentation, StringComparison.Ordinal);
+    }
+
     private static int Count(string source, string value) =>
         (source.Length - source.Replace(value, string.Empty, StringComparison.Ordinal).Length) / value.Length;
 

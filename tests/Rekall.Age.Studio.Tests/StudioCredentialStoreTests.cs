@@ -120,6 +120,48 @@ public sealed class StudioCredentialStoreTests
         }
     }
 
+    [Fact]
+    public async Task IsolatedSetupPersistenceNeverWritesSentinelCredentialInPlainText()
+    {
+        using var directory = new TemporaryDirectory();
+        var previous = Environment.GetEnvironmentVariable(RekallAgeStudioLanguageModelSetupStore.SetupRootEnvironmentVariable);
+        const string sentinel = "task-eight-isolated-provider-secret-8f1c4d";
+        try
+        {
+            Environment.SetEnvironmentVariable(
+                RekallAgeStudioLanguageModelSetupStore.SetupRootEnvironmentVariable,
+                directory.Path);
+            var setupStore = new RekallAgeStudioLanguageModelSetupStore();
+            var credentialStore = new RekallAgeStudioDpapiCredentialStore();
+            var setup = RekallAgeStudioLanguageModelSetup.Incomplete with
+            {
+                IsComplete = true,
+                ProviderId = "openai",
+                ModelId = "gpt-5.4",
+                OpenAiUrl = "https://api.openai.com/v1",
+                LastSuccessfulCheckUtc = DateTimeOffset.UtcNow
+            };
+
+            await credentialStore.WriteAsync("openai", sentinel, CancellationToken.None);
+            await setupStore.SaveAsync(setup, CancellationToken.None);
+
+            Assert.Equal(sentinel, await credentialStore.ReadAsync("openai", CancellationToken.None));
+            Assert.Equal("openai", (await setupStore.LoadAsync(CancellationToken.None)).ProviderId);
+            foreach (var file in Directory.EnumerateFiles(directory.Path, "*", SearchOption.AllDirectories))
+            {
+                AssertCredentialFileDoesNotContain(file, sentinel);
+            }
+            Assert.DoesNotContain(sentinel, setup.ToString(), StringComparison.Ordinal);
+            Assert.DoesNotContain(sentinel, credentialStore.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(
+                RekallAgeStudioLanguageModelSetupStore.SetupRootEnvironmentVariable,
+                previous);
+        }
+    }
+
     private static void AssertCredentialFileDoesNotContain(string path, params string[] credentials)
     {
         var content = File.ReadAllBytes(path);

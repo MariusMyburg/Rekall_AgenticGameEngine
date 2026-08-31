@@ -35,7 +35,7 @@ public enum RekallAgeStudioMode
     Play
 }
 
-public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDisposable
+public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDisposable, IRekallAgeStudioContentOpenTarget
 {
     private readonly RekallAgeWorkbenchSession _session;
     private readonly RekallAgeCommandRegistry _agentRegistry;
@@ -51,6 +51,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly HashSet<Task> _activeRenderingOperations = [];
     private readonly RekallAgeAsyncCommand _openCommand;
     private readonly RekallAgeAsyncCommand _createCommand;
+    private readonly RekallAgeAsyncCommand _openSelectedContentCommand;
     private readonly RekallAgeAsyncCommand _addEntityCommand;
     private readonly RekallAgeAsyncCommand _renameEntityCommand;
     private readonly RekallAgeAsyncCommand _duplicateEntityCommand;
@@ -104,6 +105,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeStudioMeshViewportRenderer _meshViewportRenderer = new();
     private readonly RekallAgeModelAssetStore _modelAssetStore = new();
     private readonly IRekallAgeStudioContentIndex _contentIndex = RekallAgeStudioContentIndex.CreateDefault();
+    private readonly IRekallAgeStudioContentOpenRouter _contentOpenRouter;
     private readonly Action<string> _openPackageFolder;
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
@@ -296,6 +298,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _selectedContentCategory = "All";
     private string _contentSearchText = string.Empty;
     private RekallAgeContentBrowserItem? _selectedContentItem;
+    private string _contentStatusText = "Select project content to inspect or edit.";
     private readonly List<RekallAgeLanguageModelToolExecution> _lastAgentToolExecutions = [];
     internal bool TreatGauntletAsTerminalSuccess { get; set; }
 
@@ -319,6 +322,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             previewSession,
             null)
     {
+    }
+
+    internal RekallAgeStudioViewModel(IRekallAgeStudioContentOpenRouter contentOpenRouter)
+        : this()
+    {
+        _contentOpenRouter = contentOpenRouter ?? throw new ArgumentNullException(nameof(contentOpenRouter));
     }
 
     internal RekallAgeStudioViewModel(RekallAgeWorkbenchSession session)
@@ -417,6 +426,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             monotonicClock ?? new RekallAgeStudioStopwatchClock());
         _ggufImporter = ggufImporter ?? new RekallAgeOllamaGgufImporter();
         _openPackageFolder = openPackageFolder ?? OpenDirectoryInExplorer;
+        _contentOpenRouter = new RekallAgeStudioContentOpenRouter(this);
         _agentRegistry = RekallAgeDefaultCommandRegistry.Create();
         _selectedLanguageModelProvider = _languageModelProviderCatalog.Providers.Single(provider => provider.Id == "ollama");
         _selectedLanguageModel = _selectedLanguageModelProvider.DefaultModel;
@@ -437,6 +447,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
         _openCommand = CreateAsyncCommand(OpenFromInputsAsync, CanOpenOrCreate);
         _createCommand = CreateAsyncCommand(CreateFromInputsAsync, CanOpenOrCreate);
+        _openSelectedContentCommand = CreateAsyncCommand(OpenSelectedContentAsync, CanOpenSelectedContent);
         _addEntityCommand = CreateAsyncCommand(AddEntityAsync, HasEditableProject);
         _renameEntityCommand = CreateAsyncCommand(RenameEntityAsync, CanRenameEntity);
         _duplicateEntityCommand = CreateAsyncCommand(DuplicateEntityAsync, HasSelectedEntity);
@@ -564,7 +575,16 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public RekallAgeContentBrowserItem? SelectedContentItem
     {
         get => _selectedContentItem;
-        set => Set(ref _selectedContentItem, value);
+        set
+        {
+            if (Set(ref _selectedContentItem, value)) RefreshCommands();
+        }
+    }
+
+    public string ContentStatusText
+    {
+        get => _contentStatusText;
+        private set => Set(ref _contentStatusText, value);
     }
     public ObservableCollection<string> ValidationLines { get; } = [];
     public ObservableCollection<string> TransactionLines { get; } = [];
@@ -619,6 +639,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public ICommand OpenCommand => _openCommand;
     public ICommand CreateCommand => _createCommand;
+    public ICommand OpenSelectedContentCommand => _openSelectedContentCommand;
     public ICommand AddEntityCommand => _addEntityCommand;
     public ICommand RenameEntityCommand => _renameEntityCommand;
     public ICommand DuplicateEntityCommand => _duplicateEntityCommand;
@@ -5405,6 +5426,103 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         ApplyContentModel(content);
     }
 
+    private bool CanOpenSelectedContent() => HasOpenProject()
+        && SelectedContentItem is { } item
+        && item.Capabilities.Contains(RekallAgeContentCapability.Open, StringComparer.OrdinalIgnoreCase);
+
+    private async Task OpenSelectedContentAsync()
+    {
+        if (SelectedContentItem is null) return;
+        var result = await _contentOpenRouter.OpenAsync(
+            SelectedContentItem, _lifecycleCancellation.Token);
+        ContentStatusText = $"{result.Code} · {result.Summary}";
+        StatusText = ContentStatusText;
+    }
+
+    async ValueTask IRekallAgeStudioContentOpenTarget.SelectMeshAsync(
+        RekallAgeContentBrowserItem item, CancellationToken cancellationToken)
+    {
+        if (_session.ProjectRoot is null) throw new InvalidOperationException("Open a project first.");
+        var assetId = item.DisplayName;
+        if (item.Kind.Equals("model-asset", StringComparison.OrdinalIgnoreCase))
+        {
+            var model = await _modelAssetStore.LoadAsync(_session.ProjectRoot, assetId, cancellationToken);
+            if (model.Source.Kind != RekallAgeModelSourceKind.Mesh)
+                throw new InvalidOperationException("The model does not have an editable mesh source.");
+            assetId = model.Source.AssetId;
+        }
+
+        SelectedMeshAssetId = assetId;
+        await _modeling.OpenAsync(_session.ProjectRoot, assetId, cancellationToken);
+        _modeling.SetDomain(MeshEditDomain);
+        RefreshMeshEditingState();
+    }
+
+    async ValueTask IRekallAgeStudioContentOpenTarget.SelectGraphAsync(
+        RekallAgeContentBrowserItem item, CancellationToken cancellationToken)
+    {
+        if (_session.ProjectRoot is null) throw new InvalidOperationException("Open a project first.");
+        SelectedModelingGraphAssetId = item.DisplayName;
+        await _modelingGraph.OpenAsync(_session.ProjectRoot, SelectedModelingGraphAssetId, cancellationToken);
+        Replace(ModelingGraphNodes, _modelingGraph.Nodes);
+        Replace(ModelingGraphOutputNames, _modelingGraph.OutputNames);
+        SelectedModelingGraphOutput = _modelingGraph.SelectedOutputName;
+        ModelingGraphSummary = _modelingGraph.EvaluationSummary;
+        SelectedModelingGraphNode = ModelingGraphNodes.FirstOrDefault();
+        RefreshModelingGraphCanvas();
+    }
+
+    async ValueTask IRekallAgeStudioContentOpenTarget.SelectMaterialAsync(
+        RekallAgeContentBrowserItem item, CancellationToken cancellationToken)
+    {
+        if (_session.ProjectRoot is null) throw new InvalidOperationException("Open a project first.");
+        var graphId = item.DisplayName;
+        if (item.Kind.Equals("material-instance", StringComparison.OrdinalIgnoreCase))
+        {
+            var instance = await new RekallAgeMaterialInstanceAssetStore()
+                .LoadVersionedAsync(_session.ProjectRoot, item.DisplayName, cancellationToken);
+            graphId = instance.Value.GraphAssetId;
+        }
+
+        SelectedMaterialGraphAssetId = graphId;
+        await _materialGraph.OpenAsync(_session.ProjectRoot, graphId, cancellationToken);
+        Replace(MaterialGraphNodes, _materialGraph.Nodes);
+        MaterialGraphSummary = _materialGraph.EvaluationSummary;
+        SelectedMaterialGraphNode = MaterialGraphNodes.FirstOrDefault();
+    }
+
+    async ValueTask IRekallAgeStudioContentOpenTarget.SelectModuleSourceAsync(
+        RekallAgeContentBrowserItem item, CancellationToken cancellationToken)
+    {
+        if (_session.ProjectRoot is null) throw new InvalidOperationException("Open a project first.");
+        var sources = await _codeSession.RefreshAsync(_session.ProjectRoot, cancellationToken);
+        var source = sources.FirstOrDefault(candidate => PathsEqual(candidate.SourcePath, item.Path!))
+            ?? throw new InvalidOperationException("The module source is no longer available.");
+        await _codeSession.OpenAsync(source, cancellationToken);
+        Replace(CodeSources, sources);
+        SelectedCodeSource = _codeSession.SelectedSource;
+        Set(ref _codeSourceText, _codeSession.SourceText, nameof(CodeSourceText));
+        OnPropertyChanged(nameof(IsCodeDirty));
+        OnPropertyChanged(nameof(SelectedCodeProjectPath));
+        CodeStatusText = $"Editing {source.ModuleName}/{source.FileName}.";
+    }
+
+    ValueTask IRekallAgeStudioContentOpenTarget.SelectShaderAsync(
+        RekallAgeContentBrowserItem item, CancellationToken cancellationToken) =>
+        OpenAssociatedContentAsync(item, cancellationToken);
+
+    ValueTask IRekallAgeStudioContentOpenTarget.OpenAssociatedAsync(
+        RekallAgeContentBrowserItem item, CancellationToken cancellationToken) =>
+        OpenAssociatedContentAsync(item, cancellationToken);
+
+    private static ValueTask OpenAssociatedContentAsync(
+        RekallAgeContentBrowserItem item, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Process.Start(new ProcessStartInfo(item.Path!) { UseShellExecute = true });
+        return ValueTask.CompletedTask;
+    }
+
     private void ApplyContentModel(RekallAgeContentBrowserModel content)
     {
         _contentModel = content;
@@ -5818,6 +5936,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         _openCommand.RaiseCanExecuteChanged();
         _createCommand.RaiseCanExecuteChanged();
+        _openSelectedContentCommand.RaiseCanExecuteChanged();
         _addEntityCommand.RaiseCanExecuteChanged();
         _renameEntityCommand.RaiseCanExecuteChanged();
         _duplicateEntityCommand.RaiseCanExecuteChanged();

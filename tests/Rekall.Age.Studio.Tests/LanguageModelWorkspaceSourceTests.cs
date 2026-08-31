@@ -103,6 +103,9 @@ public sealed class LanguageModelWorkspaceSourceTests
         Assert.Contains("clean installation", documentation, StringComparison.Ordinal);
         Assert.Contains("GGUF", documentation, StringComparison.Ordinal);
         Assert.Contains("#language-model-setup", documentation, StringComparison.Ordinal);
+        Assert.Contains("loopback Ollama endpoint", documentation, StringComparison.Ordinal);
+        Assert.Contains("LAN or remote custom HTTP(S) endpoint", documentation, StringComparison.Ordinal);
+        Assert.Contains("prompts and relevant project context go to that selected remote endpoint", documentation, StringComparison.Ordinal);
     }
 
     private static int Count(string source, string value) =>

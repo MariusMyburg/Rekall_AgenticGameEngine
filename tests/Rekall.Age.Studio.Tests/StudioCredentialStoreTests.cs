@@ -1,5 +1,7 @@
 using System.IO;
+using System.Reflection;
 using System.Text;
+using Rekall.Age.Agent.LanguageModels;
 using Rekall.Age.Studio;
 
 namespace Rekall.Age.Studio.Tests;
@@ -133,6 +135,24 @@ public sealed class StudioCredentialStoreTests
                 directory.Path);
             var setupStore = new RekallAgeStudioLanguageModelSetupStore();
             var credentialStore = new RekallAgeStudioDpapiCredentialStore();
+            var isolatedRoot = Path.GetFullPath(directory.Path)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            Assert.StartsWith(isolatedRoot, Path.GetFullPath(setupStore.Path), StringComparison.OrdinalIgnoreCase);
+            Assert.StartsWith(isolatedRoot, Path.GetFullPath(credentialStore.CredentialDirectory), StringComparison.OrdinalIgnoreCase);
+
+            var capturedTestLog = new List<string>();
+            await using var viewModel = new RekallAgeStudioLanguageModelSetupViewModel(
+                setupStore,
+                credentialStore,
+                new ReadyFakeProviderProbe(),
+                new NoOpSetupActions(),
+                new EmptyEnvironment());
+            viewModel.PropertyChanged += (_, args) =>
+            {
+                capturedTestLog.Add(args.PropertyName ?? "<all properties>");
+                capturedTestLog.AddRange(InspectableStrings(viewModel));
+            };
             var setup = RekallAgeStudioLanguageModelSetup.Incomplete with
             {
                 IsComplete = true,
@@ -142,7 +162,9 @@ public sealed class StudioCredentialStoreTests
                 LastSuccessfulCheckUtc = DateTimeOffset.UtcNow
             };
 
-            await credentialStore.WriteAsync("openai", sentinel, CancellationToken.None);
+            await viewModel.SelectProviderAsync("openai");
+            await viewModel.ApplyApiKeyAsync("openai", sentinel, rememberSecurely: true);
+            capturedTestLog.AddRange(InspectableStrings(viewModel));
             await setupStore.SaveAsync(setup, CancellationToken.None);
 
             Assert.Equal(sentinel, await credentialStore.ReadAsync("openai", CancellationToken.None));
@@ -153,6 +175,10 @@ public sealed class StudioCredentialStoreTests
             }
             Assert.DoesNotContain(sentinel, setup.ToString(), StringComparison.Ordinal);
             Assert.DoesNotContain(sentinel, credentialStore.ToString(), StringComparison.Ordinal);
+            Assert.All(InspectableStrings(viewModel), value =>
+                Assert.DoesNotContain(sentinel, value, StringComparison.Ordinal));
+            Assert.All(capturedTestLog, value =>
+                Assert.DoesNotContain(sentinel, value, StringComparison.Ordinal));
         }
         finally
         {
@@ -160,6 +186,50 @@ public sealed class StudioCredentialStoreTests
                 RekallAgeStudioLanguageModelSetupStore.SetupRootEnvironmentVariable,
                 previous);
         }
+    }
+
+    private static IEnumerable<string> InspectableStrings(RekallAgeStudioLanguageModelSetupViewModel viewModel) =>
+        viewModel.GetType()
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Where(property => property.PropertyType == typeof(string) && property.GetIndexParameters().Length == 0)
+            .Select(property => property.GetValue(viewModel) as string)
+            .Where(value => value is not null)
+            .Cast<string>()
+            .Concat(viewModel.CompatibleModels)
+            .Concat(viewModel.ReadinessRows.SelectMany(row =>
+                new[] { row.Id, row.StatusGlyph, row.Label, row.Detail }));
+
+    private sealed class ReadyFakeProviderProbe : IRekallAgeLanguageModelReadinessProbe
+    {
+        public ValueTask<RekallAgeLanguageModelReadinessResult> ProbeAsync(
+            RekallAgeLanguageModelReadinessRequest request,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(new RekallAgeLanguageModelReadinessResult(
+                request.ProviderId,
+                RekallAgeLanguageModelReadinessState.Ready,
+                "REKALL_ONBOARDING_READY",
+                "Provider ready.",
+                [new("provider", RekallAgeLanguageModelReadinessState.Ready, "Provider ready.")],
+                ["gpt-5.4"],
+                null,
+                false));
+        }
+    }
+
+    private sealed class NoOpSetupActions : IRekallAgeStudioLanguageModelSetupActions
+    {
+        public ValueTask ExecuteAsync(
+            string actionId,
+            string providerId,
+            IProgress<string>? progress,
+            CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    }
+
+    private sealed class EmptyEnvironment : IRekallAgeEnvironmentValueSource
+    {
+        public string? GetValue(string name) => null;
     }
 
     private static void AssertCredentialFileDoesNotContain(string path, params string[] credentials)

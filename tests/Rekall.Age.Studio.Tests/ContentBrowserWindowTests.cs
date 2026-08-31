@@ -56,6 +56,12 @@ public sealed class ContentBrowserWindowTests(WpfApplicationTestFixture wpf)
         Assert.Contains("IconContentModel", source, StringComparison.Ordinal);
         Assert.Contains("Source=\"{Binding Thumbnail}\"", source, StringComparison.Ordinal);
         Assert.Contains("Loaded=\"OnContentThumbnailLoaded\"", source, StringComparison.Ordinal);
+        Assert.Contains("Unloaded=\"OnContentThumbnailUnloaded\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<ItemsPanelTemplate x:Key=\"ContentCardItemsPanel\"><WrapPanel", source, StringComparison.Ordinal);
+        Assert.Contains("VirtualizingPanel.IsVirtualizing=\"True\"", source, StringComparison.Ordinal);
+        Assert.Contains("VirtualizingPanel.VirtualizationMode=\"Recycling\"", source, StringComparison.Ordinal);
+        Assert.Contains("VirtualizingPanel.ScrollUnit=\"Pixel\"", source, StringComparison.Ordinal);
+        Assert.Contains("ContentCompactTemplate", source, StringComparison.Ordinal);
     }
 
     [Fact]

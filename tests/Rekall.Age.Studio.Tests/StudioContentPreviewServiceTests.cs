@@ -138,6 +138,21 @@ public sealed class StudioContentPreviewServiceTests
         Assert.Equal("Healthy", model.PreviewHealth);
     }
 
+    [Fact]
+    public async Task UnloadedCardRealizationCancelsAndCannotPublishLateThumbnail()
+    {
+        var previews = new DeferredPreviewService();
+        var card = new RekallAgeStudioContentCardModel(Item("texture", "r1", "image.png", "image"));
+        using var realization = new CancellationTokenSource();
+
+        var load = ContentBrowser.LoadRealizedPreviewAsync(
+            token => card.LoadPreviewAsync(previews, token), realization.Token);
+        realization.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => load);
+        Assert.Null(card.Thumbnail);
+    }
+
     private static RekallAgeContentBrowserItem Item(string family, string revision, string path, string id = "asset") =>
         new(id, id, family, family, "Imported", path, path, revision, "external", [], "Healthy", null, new());
 

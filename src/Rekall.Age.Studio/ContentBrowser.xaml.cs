@@ -11,6 +11,7 @@ public partial class ContentBrowser : UserControl
 {
     private readonly RekallAgeStudioContentImportPolicy _importPolicy = new();
     private CancellationTokenSource _lifetime = new();
+    private readonly Dictionary<Image, CancellationTokenSource> _thumbnailRealizations = [];
     private Point? _contentDragOrigin;
 
     public ContentBrowser()
@@ -85,7 +86,12 @@ public partial class ContentBrowser : UserControl
         _lifetime = new CancellationTokenSource();
     }
 
-    private void OnUnloaded(object sender, RoutedEventArgs e) => _lifetime.Cancel();
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        _lifetime.Cancel();
+        foreach (var cancellation in _thumbnailRealizations.Values) { cancellation.Cancel(); cancellation.Dispose(); }
+        _thumbnailRealizations.Clear();
+    }
 
     private Task ExecuteUiAsync(Func<CancellationToken, Task> operation) => ExecuteUiOperationAsync(
         operation,
@@ -160,10 +166,45 @@ public partial class ContentBrowser : UserControl
 
     private async void OnContentThumbnailLoaded(object sender, RoutedEventArgs e)
     {
-        if (sender is not Image { DataContext: RekallAgeStudioContentCardModel card }
+        if (sender is not Image image
+            || image.DataContext is not RekallAgeStudioContentCardModel card
             || DataContext is not RekallAgeStudioViewModel viewModel) return;
-        await ExecuteUiAsync(token => viewModel.LoadContentCardPreviewAsync(card, token));
+        CancelThumbnailRealization(image);
+        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _thumbnailRealizations[image] = cancellation;
+        try
+        {
+            await ExecuteUiOperationAsync(
+                token => LoadRealizedPreviewAsync(
+                    previewToken => viewModel.LoadContentCardPreviewAsync(card, previewToken), token),
+                cancellation.Token,
+                (code, summary) => viewModel.ReportContentBrowserFailure(code, summary));
+        }
+        finally
+        {
+            if (_thumbnailRealizations.TryGetValue(image, out var current)
+                && ReferenceEquals(current, cancellation))
+            {
+                _thumbnailRealizations.Remove(image);
+                cancellation.Dispose();
+            }
+        }
     }
+
+    private void OnContentThumbnailUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is Image image) CancelThumbnailRealization(image);
+    }
+
+    private void CancelThumbnailRealization(Image image)
+    {
+        if (!_thumbnailRealizations.Remove(image, out var cancellation)) return;
+        cancellation.Cancel(); cancellation.Dispose();
+    }
+
+    internal static Task LoadRealizedPreviewAsync(
+        Func<CancellationToken, Task> load,
+        CancellationToken cancellationToken) => load(cancellationToken);
 
     private void OnCardViewClick(object sender, RoutedEventArgs e)
     {

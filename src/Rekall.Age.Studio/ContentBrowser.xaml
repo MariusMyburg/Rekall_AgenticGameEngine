@@ -32,7 +32,7 @@
                             </Style>
                         </Path.Style>
                     </Path>
-                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" Loaded="OnContentThumbnailLoaded" />
+                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" Loaded="OnContentThumbnailLoaded" Unloaded="OnContentThumbnailUnloaded" />
                     </Grid>
                 </Border>
                 <StackPanel Grid.Column="1" Margin="7,0,0,0">
@@ -42,7 +42,15 @@
                 </StackPanel>
             </Grid>
         </DataTemplate>
-        <ItemsPanelTemplate x:Key="ContentCardItemsPanel"><WrapPanel /></ItemsPanelTemplate>
+        <DataTemplate x:Key="ContentCompactTemplate">
+            <Grid Margin="2,1">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="22" /><ColumnDefinition Width="*" /><ColumnDefinition Width="90" /></Grid.ColumnDefinitions>
+                <Path Data="{StaticResource IconContentFile}" Style="{StaticResource StudioIconPath}" Width="13" Height="13" />
+                <TextBlock Grid.Column="1" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayName}" />
+                <TextBlock Grid.Column="2" Text="{Binding Family}" Foreground="{StaticResource MutedText}" FontSize="11" />
+            </Grid>
+        </DataTemplate>
+        <ItemsPanelTemplate x:Key="ContentCardItemsPanel"><VirtualizingStackPanel /></ItemsPanelTemplate>
         <ItemsPanelTemplate x:Key="ContentCompactItemsPanel"><VirtualizingStackPanel /></ItemsPanelTemplate>
     </UserControl.Resources>
     <Grid Background="{StaticResource PanelBackground}">
@@ -92,11 +100,14 @@
                 <Grid>
                     <ListView x:Name="ContentItemList" ItemsSource="{Binding FilteredContentCards}"
                               SelectedItem="{Binding SelectedContentCard, Mode=TwoWay}"
-                              ItemTemplate="{StaticResource ContentCardTemplate}"
                               PreviewMouseLeftButtonDown="OnContentItemMouseDown"
                               PreviewMouseMove="OnContentItemMouseMove"
                               MouseDoubleClick="OnContentItemDoubleClick"
-                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              ScrollViewer.CanContentScroll="True"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling"
+                              VirtualizingPanel.ScrollUnit="Pixel">
                         <ListView.InputBindings>
                             <KeyBinding Key="Enter" Command="{Binding OpenSelectedContentCommand}" />
                         </ListView.InputBindings>
@@ -106,9 +117,11 @@
                                 <Setter Property="Foreground" Value="{StaticResource WorkbenchText}" />
                                 <Setter Property="BorderBrush" Value="{StaticResource PanelBorder}" />
                                 <Setter Property="ItemsPanel" Value="{StaticResource ContentCardItemsPanel}" />
+                                <Setter Property="ItemTemplate" Value="{StaticResource ContentCardTemplate}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsChecked, ElementName=CompactContentViewButton}" Value="True">
                                         <Setter Property="ItemsPanel" Value="{StaticResource ContentCompactItemsPanel}" />
+                                        <Setter Property="ItemTemplate" Value="{StaticResource ContentCompactTemplate}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>

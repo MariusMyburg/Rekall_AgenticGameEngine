@@ -204,8 +204,8 @@
                             </Grid>
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                <Button Content="Run Agent" Command="{Binding RunAgentCommand}" Style="{StaticResource AccentButton}"
-                                        Padding="16,8" HorizontalAlignment="Stretch" />
+                                <Button Command="{Binding RunAgentCommand}" Style="{StaticResource AccentButton}"
+                                        Padding="16,8" HorizontalAlignment="Stretch" ToolTip="Run the authoring agent" AutomationProperties.Name="Run authoring agent"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconAgent}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Run Agent" /></StackPanel></Button>
                                 <Button Grid.Column="1" Content="Cancel" Command="{Binding CancelAgentCommand}" Padding="16,8" Margin="8,2,2,2" />
                             </Grid>
                         </StackPanel>

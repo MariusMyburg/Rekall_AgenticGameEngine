@@ -149,7 +149,9 @@
             <MenuItem x:Name="ExamplesMenu" Header="_Examples" />
             <MenuItem Header="_Settings">
                 <MenuItem Header="Language Model Setup…" Click="OnLanguageModelSetupClick"
-                          IsEnabled="{Binding CanOpenLanguageModelSetup, ElementName=StudioWindow}" />
+                          IsEnabled="{Binding CanOpenLanguageModelSetup, ElementName=StudioWindow}">
+                    <MenuItem.Icon><Path Data="{StaticResource IconSettings}" Style="{StaticResource StudioIconPath}" Margin="0" /></MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_Documentation" InputGestureText="F1"
@@ -170,10 +172,8 @@
                            ToolTip="{Binding ProjectPathInput}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                            FontWeight="SemiBold" Margin="0,0,12,0" />
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,12,0">
-                    <Button x:Name="CreateProjectButton" Content="Create Project…" Click="OnCreateProjectClick"
-                            ToolTip="Create a new AGE project" />
-                    <Button x:Name="OpenProjectButton" Content="Open Project…" Click="OnOpenProjectClick"
-                            ToolTip="Choose and open an existing AGE project" />
+                    <Button x:Name="CreateProjectButton" Click="OnCreateProjectClick" ToolTip="Create a new AGE project" AutomationProperties.Name="Create project"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconCreate}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Create Project…" /></StackPanel></Button>
+                    <Button x:Name="OpenProjectButton" Click="OnOpenProjectClick" ToolTip="Choose and open an existing AGE project" AutomationProperties.Name="Open project"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconOpen}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Open Project…" /></StackPanel></Button>
                 </StackPanel>
                 <TextBlock Grid.Column="3" Text="Scene" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{StaticResource MutedText}" />
                 <ComboBox Grid.Column="4" ItemsSource="{Binding SceneNames}" SelectedItem="{Binding SceneNameInput}"
@@ -198,11 +198,11 @@
             <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
             <Button Content="Add Entity" Command="{Binding AddEntityCommand}" />
             <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
-            <Button Content="Simulate" Command="{Binding SimulateCommand}" Style="{StaticResource AccentButton}" ToolTip="Run the scene in this viewport without changing authored state" />
+            <Button Command="{Binding SimulateCommand}" Style="{StaticResource AccentButton}" ToolTip="Run the scene in this viewport without changing authored state" AutomationProperties.Name="Simulate scene"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconPlay}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Simulate" /></StackPanel></Button>
             <Button Content="{Binding PauseSimulationLabel}" Command="{Binding PauseSimulationCommand}" ToolTip="Pause or resume the live simulation clock" />
             <Button Content="Step" Command="{Binding StepSimulationCommand}" ToolTip="Advance a paused simulation by exactly one fixed frame" />
-            <Button Content="Play" Command="{Binding PlayCommand}" ToolTip="Launch the game in the production Player" />
-            <Button Content="Stop" Command="{Binding StopCommand}" ToolTip="Stop Simulate or Play and return to Edit" />
+            <Button Command="{Binding PlayCommand}" ToolTip="Launch the game in the production Player" AutomationProperties.Name="Play game"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconPlay}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Play" /></StackPanel></Button>
+            <Button Command="{Binding StopCommand}" ToolTip="Stop Simulate or Play and return to Edit" AutomationProperties.Name="Stop game or simulation"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconStop}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Stop" /></StackPanel></Button>
             <ToggleButton Content="Live" IsChecked="{Binding IsLiveViewportEnabled, Mode=TwoWay}" Margin="7,2,2,2" ToolTip="Continuously update the viewport while simulating" />
             <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
             <Button Content="Capture" Command="{Binding CaptureCommand}" />
@@ -498,7 +498,7 @@
                                                                     </StackPanel>
                                                                     <ContentControl Grid.Column="1" Content="{Binding}"
                                                                                     ContentTemplateSelector="{StaticResource InspectorEditorTemplateSelector}" />
-                                                                    <Button Grid.Column="2" Content="↶" ToolTip="Reset this property to unset"
+                                                                    <Button Grid.Column="2" ToolTip="Reset this property to unset" AutomationProperties.Name="Reset property to unset"
                                                                             Command="{Binding DataContext.ResetInspectorPropertyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                             CommandParameter="{Binding}" Padding="6,2" Margin="5,0,0,0" VerticalAlignment="Top">
                                                                         <Button.Style>
@@ -507,6 +507,7 @@
                                                                                 <Style.Triggers><DataTrigger Binding="{Binding IsDefined}" Value="False"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
                                                                             </Style>
                                                                         </Button.Style>
+                                                                        <Path Data="{StaticResource IconReset}" Style="{StaticResource StudioIconPath}" Margin="0" Width="13" Height="13" />
                                                                     </Button>
                                                                 </Grid>
                                                                 <TextBlock Text="{Binding ValidationMessage}" Foreground="#FF8A8A" FontSize="10"

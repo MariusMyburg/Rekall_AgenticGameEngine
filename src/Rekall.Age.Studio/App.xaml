@@ -13,6 +13,40 @@
         <SolidColorBrush x:Key="Selection" Color="#214D61" />
         <SolidColorBrush x:Key="EditorHeaderBackground" Color="#20262E" />
         <SolidColorBrush x:Key="ViewportBackground" Color="#090C10" />
+        <!-- Code-native icons remain sharp at any DPI and inherit the foreground of
+             their containing control, so one system works across every theme. -->
+        <Geometry x:Key="IconCreate">M3,2 L13,2 13,14 3,14 Z M5,5 L11,5 M8,3 L8,7</Geometry>
+        <Geometry x:Key="IconOpen">M1,4 L6,4 8,6 15,6 13,14 2,14 Z M2,4 L2,2 7,2 9,4</Geometry>
+        <Geometry x:Key="IconPlay">M3,2 L14,8 3,14 Z</Geometry>
+        <Geometry x:Key="IconStop">M3,3 L13,3 13,13 3,13 Z</Geometry>
+        <Geometry x:Key="IconPause">M3,2 L7,2 7,14 3,14 Z M9,2 L13,2 13,14 9,14 Z</Geometry>
+        <Geometry x:Key="IconStep">M2,2 L5,2 5,14 2,14 Z M6,2 L14,8 6,14 Z</Geometry>
+        <Geometry x:Key="IconSettings">M8,1 L10,2 12,1 15,4 14,6 15,8 14,12 12,12 10,15 6,15 4,12 2,12 1,8 2,6 1,4 4,1 6,2 Z M8,5 A3,3 0 1 0 8,11 A3,3 0 1 0 8,5</Geometry>
+        <Geometry x:Key="IconLocalModel">M2,3 L14,3 14,12 2,12 Z M5,14 L11,14 M8,12 L8,14 M5,6 L7,8 5,10 M9,10 L12,10</Geometry>
+        <Geometry x:Key="IconFileModel">M3,1 L10,1 14,5 14,15 3,15 Z M10,1 L10,5 14,5 M5,9 L12,9 M5,12 L10,12</Geometry>
+        <Geometry x:Key="IconCloud">M4,13 C1,13 1,8 4,8 C4,4 10,3 12,7 C16,7 16,13 12,13 Z</Geometry>
+        <Geometry x:Key="IconAccount">M8,2 A3,3 0 1 0 8,8 A3,3 0 1 0 8,2 M2,15 C2,10 14,10 14,15 Z</Geometry>
+        <Geometry x:Key="IconDownload">M7,1 L9,1 9,9 12,6 14,8 8,14 2,8 4,6 7,9 Z M2,15 L14,15</Geometry>
+        <Geometry x:Key="IconRefresh">M13,6 A5,5 0 1 0 13,11 M13,2 L13,6 9,6</Geometry>
+        <Geometry x:Key="IconBrowse">M1,5 L7,5 9,7 15,7 13,14 2,14 Z M3,5 L3,3 8,3 10,5</Geometry>
+        <Geometry x:Key="IconBack">M9,2 L3,8 9,14 M3,8 L15,8</Geometry>
+        <Geometry x:Key="IconNext">M7,2 L13,8 7,14 M1,8 L13,8</Geometry>
+        <Geometry x:Key="IconCheck">M2,8 L6,12 14,3</Geometry>
+        <Geometry x:Key="IconAgent">M3,5 L13,5 13,14 3,14 Z M8,1 L8,5 M5,9 L5,10 M11,9 L11,10 M6,12 L10,12</Geometry>
+        <Geometry x:Key="IconReset">M13,6 A5,5 0 1 0 13,11 M13,2 L13,6 9,6</Geometry>
+        <Style x:Key="StudioIconPath" TargetType="Path">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="Margin" Value="0,0,7,0" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="StrokeThickness" Value="1.5" />
+            <Setter Property="StrokeStartLineCap" Value="Round" />
+            <Setter Property="StrokeEndLineCap" Value="Round" />
+            <Setter Property="StrokeLineJoin" Value="Round" />
+            <Setter Property="Fill" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Control}}" />
+            <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Control}}" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
         <!-- Prevent native WPF popup controls from inheriting the light Windows
              palette while the rest of Studio uses the dark workbench theme. -->
         <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#1C222B" />

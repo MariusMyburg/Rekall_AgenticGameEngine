@@ -275,13 +275,13 @@ public sealed class StudioLayoutTests
         Assert.Contains("IsOpenAiSelected", author, StringComparison.Ordinal);
         Assert.Contains("IsCodexSelected", author, StringComparison.Ordinal);
         Assert.Contains("IsEditable=\"False\"", author, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Run Agent\"", author, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Run Agent\"", author, StringComparison.Ordinal);
         Assert.Contains("Content=\"Cancel\"", author, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding AgentLines}\"", author, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"CreateProjectButton\"", window, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"OpenProjectButton\"", window, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Create Project…\"", window, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Open Project…\"", window, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Create Project…\"", window, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Open Project…\"", window, StringComparison.Ordinal);
         Assert.Contains("ToolTip=\"{Binding ProjectPathInput}\"", window, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding ProjectContextText}\"", author, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"{Binding ProjectNameInput}\"", author, StringComparison.Ordinal);

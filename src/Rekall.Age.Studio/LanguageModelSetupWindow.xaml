@@ -102,29 +102,29 @@
                         <WrapPanel>
                             <Button Style="{StaticResource ProviderCard}" Tag="ollama" Click="OnProviderCardClick"
                                     ToolTip="Use an Ollama model installed on this PC" AutomationProperties.Name="Choose local Ollama">
-                                <StackPanel><TextBlock Text="Ollama" FontWeight="SemiBold" /><TextBlock Text="Installed models" Foreground="{StaticResource MutedText}" /></StackPanel>
+                                <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconLocalModel}" Style="{StaticResource StudioIconPath}" /><StackPanel><TextBlock Text="Ollama" FontWeight="SemiBold" /><TextBlock Text="Installed models" Foreground="{StaticResource MutedText}" /></StackPanel></StackPanel>
                             </Button>
                             <Button Style="{StaticResource ProviderCard}" Tag="gguf" Click="OnProviderCardClick"
                                     ToolTip="Import a local GGUF model through Ollama" AutomationProperties.Name="Choose local GGUF">
-                                <StackPanel><TextBlock Text="GGUF through Ollama" FontWeight="SemiBold" /><TextBlock Text="A local model file" Foreground="{StaticResource MutedText}" /></StackPanel>
+                                <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconFileModel}" Style="{StaticResource StudioIconPath}" /><StackPanel><TextBlock Text="GGUF through Ollama" FontWeight="SemiBold" /><TextBlock Text="A local model file" Foreground="{StaticResource MutedText}" /></StackPanel></StackPanel>
                             </Button>
                         </WrapPanel>
                         <TextBlock Text="API" Style="{StaticResource SectionLabel}" Margin="0,10,0,6" />
                         <WrapPanel>
                             <Button Style="{StaticResource ProviderCard}" Tag="openai" Click="OnProviderCardClick"
                                     ToolTip="Connect with an OpenAI API key" AutomationProperties.Name="Choose OpenAI API">
-                                <StackPanel><TextBlock Text="OpenAI" FontWeight="SemiBold" /><TextBlock Text="API key connection" Foreground="{StaticResource MutedText}" /></StackPanel>
+                                <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconCloud}" Style="{StaticResource StudioIconPath}" /><StackPanel><TextBlock Text="OpenAI" FontWeight="SemiBold" /><TextBlock Text="API key connection" Foreground="{StaticResource MutedText}" /></StackPanel></StackPanel>
                             </Button>
                             <Button Style="{StaticResource ProviderCard}" Tag="kimi" Click="OnProviderCardClick"
                                     ToolTip="Connect with a Kimi API key" AutomationProperties.Name="Choose Kimi API">
-                                <StackPanel><TextBlock Text="Kimi" FontWeight="SemiBold" /><TextBlock Text="Moonshot API key" Foreground="{StaticResource MutedText}" /></StackPanel>
+                                <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconCloud}" Style="{StaticResource StudioIconPath}" /><StackPanel><TextBlock Text="Kimi" FontWeight="SemiBold" /><TextBlock Text="Moonshot API key" Foreground="{StaticResource MutedText}" /></StackPanel></StackPanel>
                             </Button>
                         </WrapPanel>
                         <TextBlock Text="ACCOUNT" Style="{StaticResource SectionLabel}" Margin="0,10,0,6" />
                         <WrapPanel>
                             <Button Style="{StaticResource ProviderCard}" Tag="codex" Click="OnProviderCardClick"
                                     ToolTip="Use your Codex account" AutomationProperties.Name="Choose Codex account">
-                                <StackPanel><TextBlock Text="Codex" FontWeight="SemiBold" /><TextBlock Text="ChatGPT account" Foreground="{StaticResource MutedText}" /></StackPanel>
+                                <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconAccount}" Style="{StaticResource StudioIconPath}" /><StackPanel><TextBlock Text="Codex" FontWeight="SemiBold" /><TextBlock Text="ChatGPT account" Foreground="{StaticResource MutedText}" /></StackPanel></StackPanel>
                             </Button>
                         </WrapPanel>
                     </StackPanel>
@@ -151,9 +151,9 @@
                                 <TextBlock Text="Ollama URL" Style="{StaticResource SectionLabel}" Margin="0,10,0,5" />
                                 <TextBox Text="{Binding OllamaUrl, UpdateSourceTrigger=PropertyChanged}" ToolTip="The local Ollama server address" AutomationProperties.Name="Ollama server URL" />
                                 <WrapPanel Margin="0,8,0,0">
-                                    <Button x:Name="OpenOllamaDownloadButton" Content="Open Ollama download" Tag="https://ollama.com/download" Click="OnOpenProviderPageClick" HorizontalAlignment="Left" ToolTip="Open the official Ollama download page" AutomationProperties.Name="Open Ollama download page" />
-                                    <Button Content="Start Ollama" Command="{Binding StartOllamaCommand}" HorizontalAlignment="Left" ToolTip="Start the installed Ollama service" AutomationProperties.Name="Start Ollama service" />
-                                    <Button Content="Download qwen3.8:27b" Command="{Binding PullRecommendedOllamaModelCommand}" HorizontalAlignment="Left" ToolTip="Download the recommended local model" AutomationProperties.Name="Download recommended Ollama model" />
+                                    <Button x:Name="OpenOllamaDownloadButton" Tag="https://ollama.com/download" Click="OnOpenProviderPageClick" HorizontalAlignment="Left" ToolTip="Open the official Ollama download page" AutomationProperties.Name="Open Ollama download page"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconCloud}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Open Ollama download" /></StackPanel></Button>
+                                    <Button Command="{Binding StartOllamaCommand}" HorizontalAlignment="Left" ToolTip="Start the installed Ollama service" AutomationProperties.Name="Start Ollama service"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconPlay}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Start Ollama" /></StackPanel></Button>
+                                    <Button Command="{Binding PullRecommendedOllamaModelCommand}" HorizontalAlignment="Left" ToolTip="Download the recommended local model" AutomationProperties.Name="Download recommended Ollama model"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconDownload}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Download qwen3.8:27b" /></StackPanel></Button>
                                 </WrapPanel>
                                 <TextBlock Text="{Binding RemediationProgress}" Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,7,0,0" />
                             </StackPanel>
@@ -169,7 +169,7 @@
                                     <Button Content="Download qwen3.8:27b" Command="{Binding PullRecommendedOllamaModelCommand}" ToolTip="Download the recommended local model" />
                                 </WrapPanel>
                                 <TextBlock Text="{Binding RemediationProgress}" Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,7,0,0" />
-                                <Button x:Name="BrowseGgufButton" Content="Browse for GGUF…" Click="OnBrowseGgufClick" IsEnabled="{Binding CanBrowseGguf}" HorizontalAlignment="Left" ToolTip="Choose a GGUF model file after Ollama is ready" AutomationProperties.Name="Browse for a GGUF model" />
+                                <Button x:Name="BrowseGgufButton" Click="OnBrowseGgufClick" IsEnabled="{Binding CanBrowseGguf}" HorizontalAlignment="Left" ToolTip="Choose a GGUF model file after Ollama is ready" AutomationProperties.Name="Browse for a GGUF model"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconBrowse}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Browse for GGUF…" /></StackPanel></Button>
                                 <TextBlock x:Name="GgufSelectionStatus" Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,0" />
                             </StackPanel>
                         </Border>
@@ -185,7 +185,7 @@
                             <Border.Style><Style TargetType="Border" BasedOn="{StaticResource EditorPanel}"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><MultiDataTrigger><MultiDataTrigger.Conditions><Condition Binding="{Binding CurrentStep}" Value="{x:Static studio:RekallAgeStudioLanguageModelSetupStep.Configuration}" /><Condition Binding="{Binding IsCodexSelected}" Value="True" /></MultiDataTrigger.Conditions><Setter Property="Visibility" Value="Visible" /></MultiDataTrigger></Style.Triggers></Style></Border.Style>
                             <StackPanel><TextBlock Text="Codex account" FontWeight="SemiBold" /><TextBlock Text="Sign in through your Codex account, then retry the readiness check." Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,5,0,8" /><Button Content="Open Codex" Tag="https://chatgpt.com/codex" Click="OnOpenProviderPageClick" HorizontalAlignment="Left" ToolTip="Open the Codex account page" AutomationProperties.Name="Open Codex account page" /></StackPanel>
                         </Border>
-                        <Button Content="Retry readiness check" Command="{Binding RetryCommand}" HorizontalAlignment="Left" MinWidth="170" Padding="14,7" ToolTip="Check the selected provider again" AutomationProperties.Name="Retry provider readiness" />
+                        <Button Command="{Binding RetryCommand}" HorizontalAlignment="Left" MinWidth="170" Padding="14,7" ToolTip="Check the selected provider again" AutomationProperties.Name="Retry provider readiness"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconRefresh}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Retry readiness check" /></StackPanel></Button>
                     </StackPanel>
                 </StackPanel>
 
@@ -206,9 +206,9 @@
             <Button x:Name="SetUpLaterButton" Grid.Column="0" Content="Set up later" IsCancel="True" Click="OnSetUpLaterClick" Style="{StaticResource WizardAction}"
                     HorizontalAlignment="Left" ToolTip="Save this setup as incomplete and return to Studio" AutomationProperties.Name="Set up language model later" />
             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Content="Back" Command="{Binding BackCommand}" Style="{StaticResource BackWizardAction}" ToolTip="Return to the previous setup step" AutomationProperties.Name="Previous setup step" />
-                <Button Content="Next" Command="{Binding NextCommand}" IsDefault="True" Style="{StaticResource NextWizardAction}" ToolTip="Continue to the next setup step" AutomationProperties.Name="Next setup step" />
-                <Button Content="Finish" Click="OnFinishClick" IsDefault="True" Style="{StaticResource FinishWizardAction}" ToolTip="Save a ready language-model setup" AutomationProperties.Name="Finish language model setup" />
+                <Button Command="{Binding BackCommand}" Style="{StaticResource BackWizardAction}" ToolTip="Return to the previous setup step" AutomationProperties.Name="Previous setup step"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconBack}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Back" /></StackPanel></Button>
+                <Button Command="{Binding NextCommand}" IsDefault="True" Style="{StaticResource NextWizardAction}" ToolTip="Continue to the next setup step" AutomationProperties.Name="Next setup step"><StackPanel Orientation="Horizontal"><TextBlock Text="Next" /><Path Data="{StaticResource IconNext}" Style="{StaticResource StudioIconPath}" Margin="7,0,0,0" /></StackPanel></Button>
+                <Button Click="OnFinishClick" IsDefault="True" Style="{StaticResource FinishWizardAction}" ToolTip="Save a ready language-model setup" AutomationProperties.Name="Finish language model setup"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconCheck}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Finish" /></StackPanel></Button>
             </StackPanel>
         </Grid>
     </Grid>

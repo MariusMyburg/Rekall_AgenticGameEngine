@@ -1,4 +1,4 @@
-<Window x:Class="Rekall.Age.Studio.MainWindow"
+<Window x:Class="Rekall.Age.Studio.MainWindow" x:Name="StudioWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Rekall.Age.Studio"
@@ -147,6 +147,12 @@
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>
             <MenuItem x:Name="ExamplesMenu" Header="_Examples" />
+            <MenuItem Header="_Settings">
+                <MenuItem Header="Language Model Setup…" Click="OnLanguageModelSetupClick"
+                          IsEnabled="{Binding CanOpenLanguageModelSetup, ElementName=StudioWindow}">
+                    <MenuItem.Icon><Path Data="{StaticResource IconSettings}" Style="{StaticResource StudioIconPath}" Margin="0" /></MenuItem.Icon>
+                </MenuItem>
+            </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_Documentation" InputGestureText="F1"
                           Command="{x:Static local:MainWindow.OpenDocumentationCommand}" />
@@ -166,10 +172,8 @@
                            ToolTip="{Binding ProjectPathInput}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                            FontWeight="SemiBold" Margin="0,0,12,0" />
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,12,0">
-                    <Button x:Name="CreateProjectButton" Content="Create Project…" Click="OnCreateProjectClick"
-                            ToolTip="Create a new AGE project" />
-                    <Button x:Name="OpenProjectButton" Content="Open Project…" Click="OnOpenProjectClick"
-                            ToolTip="Choose and open an existing AGE project" />
+                    <Button x:Name="CreateProjectButton" Click="OnCreateProjectClick" ToolTip="Create a new AGE project" AutomationProperties.Name="Create project"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconCreate}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Create Project…" /></StackPanel></Button>
+                    <Button x:Name="OpenProjectButton" Click="OnOpenProjectClick" ToolTip="Choose and open an existing AGE project" AutomationProperties.Name="Open project"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconOpen}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Open Project…" /></StackPanel></Button>
                 </StackPanel>
                 <TextBlock Grid.Column="3" Text="Scene" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{StaticResource MutedText}" />
                 <ComboBox Grid.Column="4" ItemsSource="{Binding SceneNames}" SelectedItem="{Binding SceneNameInput}"
@@ -194,11 +198,11 @@
             <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
             <Button Content="Add Entity" Command="{Binding AddEntityCommand}" />
             <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
-            <Button Content="Simulate" Command="{Binding SimulateCommand}" Style="{StaticResource AccentButton}" ToolTip="Run the scene in this viewport without changing authored state" />
+            <Button Command="{Binding SimulateCommand}" Style="{StaticResource AccentButton}" ToolTip="Run the scene in this viewport without changing authored state" AutomationProperties.Name="Simulate scene"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconPlay}" Style="{StaticResource StudioFilledIconPath}" /><TextBlock Text="Simulate" /></StackPanel></Button>
             <Button Content="{Binding PauseSimulationLabel}" Command="{Binding PauseSimulationCommand}" ToolTip="Pause or resume the live simulation clock" />
             <Button Content="Step" Command="{Binding StepSimulationCommand}" ToolTip="Advance a paused simulation by exactly one fixed frame" />
-            <Button Content="Play" Command="{Binding PlayCommand}" ToolTip="Launch the game in the production Player" />
-            <Button Content="Stop" Command="{Binding StopCommand}" ToolTip="Stop Simulate or Play and return to Edit" />
+            <Button Command="{Binding PlayCommand}" ToolTip="Launch the game in the production Player" AutomationProperties.Name="Play game"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconPlay}" Style="{StaticResource StudioFilledIconPath}" /><TextBlock Text="Play" /></StackPanel></Button>
+            <Button Command="{Binding StopCommand}" ToolTip="Stop Simulate or Play and return to Edit" AutomationProperties.Name="Stop game or simulation"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconStop}" Style="{StaticResource StudioFilledIconPath}" /><TextBlock Text="Stop" /></StackPanel></Button>
             <ToggleButton Content="Live" IsChecked="{Binding IsLiveViewportEnabled, Mode=TwoWay}" Margin="7,2,2,2" ToolTip="Continuously update the viewport while simulating" />
             <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
             <Button Content="Capture" Command="{Binding CaptureCommand}" />
@@ -234,7 +238,33 @@
                 <Button Content="Inspector" Tag="Inspector" Click="OnTogglePanelClick" />
                 <Button Content="Output" Tag="Output" Click="OnTogglePanelClick" />
             </StackPanel>
-            <local:AuthorWorkspace x:Name="AuthorWorkspaceHost" Grid.Row="1" />
+            <Grid Grid.Row="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Border Padding="10,6" Margin="8,8,8,0" CornerRadius="5"
+                        Background="#332C5364" BorderBrush="{StaticResource Accent}" BorderThickness="1">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsLanguageModelSetupIncomplete, ElementName=StudioWindow}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <WrapPanel Orientation="Horizontal">
+                        <TextBlock Text="AI setup incomplete" TextWrapping="Wrap" VerticalAlignment="Center"
+                                   Foreground="{StaticResource WorkbenchText}" />
+                        <TextBlock Text=" · " Foreground="{StaticResource MutedText}" VerticalAlignment="Center" />
+                        <Button Content="Configure" Click="OnLanguageModelSetupClick" MinWidth="76" Padding="9,3"
+                                IsEnabled="{Binding CanOpenLanguageModelSetup, ElementName=StudioWindow}" />
+                    </WrapPanel>
+                </Border>
+                <local:AuthorWorkspace x:Name="AuthorWorkspaceHost" Grid.Row="1" />
+            </Grid>
             <local:CodeWorkspace x:Name="CodeWorkspaceHost" Grid.Row="1" Visibility="Collapsed" />
             <Grid x:Name="WorldWorkspace" Grid.Row="1" Visibility="Collapsed">
             <Grid.ColumnDefinitions>
@@ -342,11 +372,20 @@
                             <ComboBox Width="76" ItemsSource="{Binding TransformTools}" SelectedItem="{Binding TransformTool}" />
                             <ComboBox Width="70" Margin="5,0,0,0" ItemsSource="{Binding TransformSpaces}" SelectedItem="{Binding TransformSpace}" />
                             <TextBlock Text="Move" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="8,0,4,0" />
-                            <TextBox Width="45" Text="{Binding MoveSnap, UpdateSourceTrigger=LostFocus}" />
+                            <TextBox x:Name="MoveSnapEditor" MinWidth="64" Padding="8,4"
+                                     AutomationProperties.Name="Move snap distance"
+                                     HorizontalContentAlignment="Right"
+                                     Text="{Binding MoveSnap, UpdateSourceTrigger=LostFocus}" />
                             <TextBlock Text="°" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="8,0,4,0" />
-                            <TextBox Width="40" Text="{Binding RotationSnap, UpdateSourceTrigger=LostFocus}" />
+                            <TextBox x:Name="RotationSnapEditor" MinWidth="64" Padding="8,4"
+                                     AutomationProperties.Name="Rotation snap angle"
+                                     HorizontalContentAlignment="Right"
+                                     Text="{Binding RotationSnap, UpdateSourceTrigger=LostFocus}" />
                             <TextBlock Text="Scale" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="8,0,4,0" />
-                            <TextBox Width="45" Text="{Binding ScaleSnap, UpdateSourceTrigger=LostFocus}" />
+                            <TextBox x:Name="ScaleSnapEditor" MinWidth="64" Padding="8,4"
+                                     AutomationProperties.Name="Scale snap increment"
+                                     HorizontalContentAlignment="Right"
+                                     Text="{Binding ScaleSnap, UpdateSourceTrigger=LostFocus}" />
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -468,7 +507,7 @@
                                                                     </StackPanel>
                                                                     <ContentControl Grid.Column="1" Content="{Binding}"
                                                                                     ContentTemplateSelector="{StaticResource InspectorEditorTemplateSelector}" />
-                                                                    <Button Grid.Column="2" Content="↶" ToolTip="Reset this property to unset"
+                                                                    <Button Grid.Column="2" ToolTip="Reset this property to unset" AutomationProperties.Name="Reset property to unset"
                                                                             Command="{Binding DataContext.ResetInspectorPropertyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                             CommandParameter="{Binding}" Padding="6,2" Margin="5,0,0,0" VerticalAlignment="Top">
                                                                         <Button.Style>
@@ -477,6 +516,7 @@
                                                                                 <Style.Triggers><DataTrigger Binding="{Binding IsDefined}" Value="False"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
                                                                             </Style>
                                                                         </Button.Style>
+                                                                        <Path Data="{StaticResource IconReset}" Style="{StaticResource StudioIconPath}" Margin="0" Width="13" Height="13" />
                                                                     </Button>
                                                                 </Grid>
                                                                 <TextBlock Text="{Binding ValidationMessage}" Foreground="#FF8A8A" FontSize="10"
@@ -914,7 +954,28 @@
                     </Grid>
                 </TabItem>
             </TabControl>
-            <Border x:Name="WorldAuthoringStrip" Grid.Column="0" Grid.ColumnSpan="3" Grid.Row="2"
+            <StackPanel Grid.Column="0" Grid.ColumnSpan="3" Grid.Row="2">
+                <Border Padding="10,6" Margin="8,0,8,6" CornerRadius="5"
+                        Background="#332C5364" BorderBrush="{StaticResource Accent}" BorderThickness="1">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsLanguageModelSetupIncomplete, ElementName=StudioWindow}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <WrapPanel Orientation="Horizontal">
+                        <TextBlock Text="AI setup incomplete" TextWrapping="Wrap" VerticalAlignment="Center"
+                                   Foreground="{StaticResource WorkbenchText}" />
+                        <TextBlock Text=" · " Foreground="{StaticResource MutedText}" VerticalAlignment="Center" />
+                        <Button Content="Configure" Click="OnLanguageModelSetupClick" MinWidth="76" Padding="9,3"
+                                IsEnabled="{Binding CanOpenLanguageModelSetup, ElementName=StudioWindow}" />
+                    </WrapPanel>
+                </Border>
+            <Border x:Name="WorldAuthoringStrip"
                     Margin="8,0,8,8" Padding="9,7" CornerRadius="5"
                     Background="{StaticResource PanelBackground}" BorderBrush="{StaticResource PanelBorder}" BorderThickness="1">
                 <Grid>
@@ -977,6 +1038,7 @@
                             Padding="11,5" Margin="5,0,0,0" />
                 </Grid>
             </Border>
+            </StackPanel>
             <GridSplitter Grid.Column="0" Grid.RowSpan="2" Width="5" HorizontalAlignment="Right"
                           Background="Transparent" ResizeDirection="Columns" ResizeBehavior="CurrentAndNext" />
             <GridSplitter Grid.Column="2" Grid.RowSpan="2" Width="5" HorizontalAlignment="Left"

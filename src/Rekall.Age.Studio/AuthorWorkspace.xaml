@@ -61,8 +61,10 @@
                                     <TextBlock Text="Local Ollama" FontWeight="SemiBold" />
                                     <TextBlock Text="Uses models installed on this PC. No account sign-in is needed."
                                                Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,3,0,7" />
-                                    <Button Content="Refresh local models" Command="{Binding RefreshLanguageModelsCommand}"
-                                            HorizontalAlignment="Left" />
+                                    <WrapPanel>
+                                        <Button Content="Refresh local models" Command="{Binding RefreshLanguageModelsCommand}" />
+                                        <Button Content="Fix setup" Click="OnFixSetupClick" />
+                                    </WrapPanel>
                                 </StackPanel>
                             </Border>
 
@@ -82,7 +84,7 @@
                                     <TextBlock Text="Choose a local GGUF file. Studio imports it through Ollama, then makes it available in the model list."
                                                Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,3,0,7" />
                                     <WrapPanel>
-                                        <Button Content="Browse and import GGUF…" Click="OnImportGgufClick" />
+                                        <Button x:Name="ImportGgufButton" Content="Browse and import GGUF…" Click="OnImportGgufClick" IsEnabled="{Binding CanBrowseGguf}" />
                                         <Button Content="Refresh imported models" Command="{Binding RefreshLanguageModelsCommand}" />
                                     </WrapPanel>
                                 </StackPanel>
@@ -103,6 +105,8 @@
                                     <TextBlock Text="OpenAI API session" FontWeight="SemiBold" />
                                     <TextBlock Text="The key is held in memory for this Studio session only."
                                                Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,3,0,7" />
+                                    <TextBlock Text="{Binding OpenAiCredentialSourceLabel}" Foreground="{StaticResource MutedText}"
+                                               TextWrapping="Wrap" Margin="0,0,0,7" />
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                         <PasswordBox x:Name="OpenAiApiKeyInput" PasswordChar="●" Padding="7,5" />
@@ -128,6 +132,8 @@
                                     <TextBlock Text="Kimi API session" FontWeight="SemiBold" />
                                     <TextBlock Text="The Kimi key is held in memory for this Studio session only. KIMI_API_KEY and MOONSHOT_API_KEY are also supported."
                                                Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,3,0,7" />
+                                    <TextBlock Text="{Binding KimiCredentialSourceLabel}" Foreground="{StaticResource MutedText}"
+                                               TextWrapping="Wrap" Margin="0,0,0,7" />
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                         <PasswordBox x:Name="KimiApiKeyInput" PasswordChar="●" Padding="7,5" />
@@ -198,8 +204,8 @@
                             </Grid>
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                <Button Content="Run Agent" Command="{Binding RunAgentCommand}" Style="{StaticResource AccentButton}"
-                                        Padding="16,8" HorizontalAlignment="Stretch" />
+                                <Button Command="{Binding RunAgentCommand}" Style="{StaticResource AccentButton}"
+                                        Padding="16,8" HorizontalAlignment="Stretch" ToolTip="Run the authoring agent" AutomationProperties.Name="Run authoring agent"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconAgent}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Run Agent" /></StackPanel></Button>
                                 <Button Grid.Column="1" Content="Cancel" Command="{Binding CancelAgentCommand}" Padding="16,8" Margin="8,2,2,2" />
                             </Grid>
                         </StackPanel>

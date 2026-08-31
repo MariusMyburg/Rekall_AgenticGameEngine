@@ -6,9 +6,23 @@ namespace Rekall.Age.Studio;
 
 public partial class AuthorWorkspace : UserControl
 {
-    public AuthorWorkspace()
+    private readonly IRekallAgeStudioGgufFilePicker _ggufFilePicker;
+    internal Func<CancellationToken, Task>? FixSetupRequested { get; set; }
+
+    public AuthorWorkspace() : this(null)
     {
+    }
+
+    internal AuthorWorkspace(
+        IRekallAgeStudioGgufFilePicker? ggufFilePicker)
+    {
+        _ggufFilePicker = ggufFilePicker ?? SystemAuthorGgufFilePicker.Instance;
         InitializeComponent();
+    }
+
+    private async void OnFixSetupClick(object sender, RoutedEventArgs e)
+    {
+        if (FixSetupRequested is not null) await FixSetupRequested(CancellationToken.None);
     }
 
     private async void OnApplyOpenAiApiKeyClick(object sender, RoutedEventArgs e)
@@ -30,14 +44,24 @@ public partial class AuthorWorkspace : UserControl
     private async void OnImportGgufClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not RekallAgeStudioViewModel viewModel) return;
-        var dialog = new OpenFileDialog
+        if (!viewModel.CanBrowseGguf) return;
+        var path = _ggufFilePicker.Pick(Window.GetWindow(this), "Import a local GGUF model");
+        if (path is not null) await viewModel.ImportGgufModelAsync(path);
+    }
+
+    private sealed class SystemAuthorGgufFilePicker : IRekallAgeStudioGgufFilePicker
+    {
+        public static SystemAuthorGgufFilePicker Instance { get; } = new();
+        public string? Pick(Window? owner, string title)
         {
-            Title = "Import a local GGUF model",
-            Filter = "GGUF models (*.gguf)|*.gguf",
-            CheckFileExists = true,
-            Multiselect = false
-        };
-        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
-        await viewModel.ImportGgufModelAsync(dialog.FileName);
+            var dialog = new OpenFileDialog
+            {
+                Title = title,
+                Filter = "GGUF models (*.gguf)|*.gguf",
+                CheckFileExists = true,
+                Multiselect = false
+            };
+            return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
+        }
     }
 }

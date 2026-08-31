@@ -71,6 +71,14 @@ public sealed class WpfApplicationTestFixture : IDisposable
         }).GetAwaiter().GetResult();
     }
 
+    public T Invoke<T>(Func<T> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        T result = default!;
+        Invoke(() => { result = action(); });
+        return result;
+    }
+
     public async Task InvokeAsync(Func<Task> action)
     {
         ArgumentNullException.ThrowIfNull(action);

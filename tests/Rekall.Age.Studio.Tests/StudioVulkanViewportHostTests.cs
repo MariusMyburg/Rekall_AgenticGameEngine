@@ -167,6 +167,8 @@ public sealed class StudioVulkanViewportHostTests
         Assert.Equal(451, surface.Metrics.PixelHeight);
         Assert.Equal(401, surface.Metrics.DipWidth);
         Assert.Equal(226, surface.Metrics.DipHeight);
+        Assert.Single(native.InvalidatedRegions);
+        Assert.Equal(new RekallAgeNativeViewportRegion(new IntPtr(17), 0, 0, 802, 452), native.InvalidatedRegions[0]);
     }
 
     [Fact]
@@ -182,6 +184,28 @@ public sealed class StudioVulkanViewportHostTests
 
         Assert.Equal([false], native.VisibilityChanges);
         Assert.False(surface.Metrics.IsPresentable);
+        Assert.Single(native.InvalidatedRegions);
+    }
+
+    [Fact]
+    public async Task PresentationVisibilityChangeRefreshesTheWpfParentToClearExposedNativePixels()
+    {
+        var native = new RecordingNativeWindow();
+        var surface = new RecordingSurfaceController(native.Order);
+        var core = new RekallAgeVulkanViewportHostCore(native, surface);
+        core.BuildWindow(new IntPtr(17));
+        core.QueueResize(400, 225, 1, 1, isVisible: true);
+        await core.ApplyPendingResizeAsync(CancellationToken.None);
+
+        core.SetPresentationVisible(false);
+
+        Assert.Equal([false], native.VisibilityChanges);
+        Assert.Equal(2, native.InvalidatedRegions.Count);
+
+        core.SetPresentationVisible(false);
+
+        Assert.Equal([false], native.VisibilityChanges);
+        Assert.Equal(2, native.InvalidatedRegions.Count);
     }
 
     [Fact]
@@ -196,7 +220,7 @@ public sealed class StudioVulkanViewportHostTests
 
         core.SetPresentationVisible(false);
 
-        Assert.Equal([true, false], native.VisibilityChanges);
+        Assert.Equal([false], native.VisibilityChanges);
         Assert.True(surface.Metrics.IsPresentable);
         Assert.Equal(0, surface.SuspendCount);
     }
@@ -285,10 +309,11 @@ public sealed class StudioVulkanViewportHostTests
         core.DestroyWindow(child);
         core.DestroyWindow(child);
 
-        Assert.Equal(["presenter", "hwnd"], native.Order);
+        Assert.Equal(["presenter", "hwnd", "invalidate"], native.Order);
         Assert.Equal(1, surface.DisposeCount);
         Assert.Equal(1, native.DestroyCount);
         Assert.Equal(1, native.CreateCount);
+        Assert.Single(native.InvalidatedRegions);
     }
 
     [Fact]
@@ -853,6 +878,8 @@ public sealed class StudioVulkanViewportHostTests
 
         public List<bool> VisibilityChanges { get; } = [];
 
+        public List<RekallAgeNativeViewportRegion> InvalidatedRegions { get; } = [];
+
         public List<string> Order { get; } = [];
 
         public IntPtr CreateChild(IntPtr parent)
@@ -900,6 +927,19 @@ public sealed class StudioVulkanViewportHostTests
         {
             Assert.Equal(_child, hwnd);
             VisibilityChanges.Add(visible);
+        }
+
+        public RekallAgeNativeViewportRegion CaptureParentSurfaceRegion(IntPtr hwnd)
+        {
+            Assert.Equal(_child, hwnd);
+            var size = Resizes.Count == 0 ? (1, 1) : Resizes[^1];
+            return new RekallAgeNativeViewportRegion(new IntPtr(17), 0, 0, size.Item1, size.Item2);
+        }
+
+        public void InvalidateParentSurface(RekallAgeNativeViewportRegion region)
+        {
+            InvalidatedRegions.Add(region);
+            Order.Add("invalidate");
         }
 
         public (int Width, int Height) GetClientSize(IntPtr hwnd)

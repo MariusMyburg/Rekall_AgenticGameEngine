@@ -51,6 +51,22 @@ public sealed class StudioLayoutTests
     }
 
     [Fact]
+    public void WorldTransformSnapEditorsRemainReadableAtScaledDpi()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+
+        Assert.Contains("x:Name=\"MoveSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"RotationSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ScaleSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"Move snap distance\"", window, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"Rotation snap angle\"", window, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"Scale snap increment\"", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("<TextBox Width=\"40\" Text=\"{Binding RotationSnap", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("<TextBox Width=\"45\" Text=\"{Binding MoveSnap", window, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StudioCarriesTheSharedVulkanRuntimePackagesIntoItsExecutableOutput()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
@@ -275,13 +291,13 @@ public sealed class StudioLayoutTests
         Assert.Contains("IsOpenAiSelected", author, StringComparison.Ordinal);
         Assert.Contains("IsCodexSelected", author, StringComparison.Ordinal);
         Assert.Contains("IsEditable=\"False\"", author, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Run Agent\"", author, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Run Agent\"", author, StringComparison.Ordinal);
         Assert.Contains("Content=\"Cancel\"", author, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding AgentLines}\"", author, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"CreateProjectButton\"", window, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"OpenProjectButton\"", window, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Create Project…\"", window, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Open Project…\"", window, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Create Project…\"", window, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Open Project…\"", window, StringComparison.Ordinal);
         Assert.Contains("ToolTip=\"{Binding ProjectPathInput}\"", window, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding ProjectContextText}\"", author, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"{Binding ProjectNameInput}\"", author, StringComparison.Ordinal);
@@ -303,6 +319,37 @@ public sealed class StudioLayoutTests
         Assert.Contains("Command=\"{Binding RunAgentCommand}\"", window, StringComparison.Ordinal);
         Assert.Contains("Key=\"Enter\"", window, StringComparison.Ordinal);
         Assert.Contains("IsIndeterminate=\"True\"", window, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StudioShellOffersSettingsAndConfigureOnlyRecoveryBannersInAuthorAndWorld()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+
+        Assert.Contains("Header=\"_Settings\"", window, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Language Model Setup…\"", window, StringComparison.Ordinal);
+        Assert.Equal(2, Count(window, "AI setup incomplete"));
+        Assert.Equal(2, Count(window, "Content=\"Configure\""));
+        Assert.Contains("IsLanguageModelSetupIncomplete", window, StringComparison.Ordinal);
+        Assert.Contains("OnLanguageModelSetupClick", window, StringComparison.Ordinal);
+        Assert.Equal(
+            3,
+            Count(window, "IsEnabled=\"{Binding CanOpenLanguageModelSetup, ElementName=StudioWindow}\""));
+        Assert.Contains("MinWidth=\"", window, StringComparison.Ordinal);
+        Assert.Contains("TextWrapping=\"Wrap\"", window, StringComparison.Ordinal);
+    }
+
+    private static int Count(string value, string token)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = value.IndexOf(token, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += token.Length;
+        }
+        return count;
     }
 
     [Fact]

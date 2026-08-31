@@ -504,6 +504,25 @@ internal sealed record RekallAgeStudioViewportPointerFact(
     int WheelDelta,
     RekallAgeStudioViewportPointerModifiers Modifiers);
 
+internal readonly record struct RekallAgeNativeViewportRegion(
+    IntPtr Parent,
+    int X,
+    int Y,
+    int Width,
+    int Height)
+{
+    internal RekallAgeNativeViewportRegion Union(RekallAgeNativeViewportRegion other)
+    {
+        if (Parent == IntPtr.Zero) return other;
+        if (other.Parent == IntPtr.Zero || Parent != other.Parent) return this;
+        var left = Math.Min(X, other.X);
+        var top = Math.Min(Y, other.Y);
+        var right = Math.Max(X + Width, other.X + other.Width);
+        var bottom = Math.Max(Y + Height, other.Y + other.Height);
+        return new(Parent, left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
+    }
+}
+
 internal interface IRekallAgeVulkanViewportNativeWindow
 {
     IntPtr CreateChild(IntPtr parent);
@@ -525,6 +544,10 @@ internal interface IRekallAgeVulkanViewportNativeWindow
     void SetVisible(IntPtr hwnd, bool visible)
     {
     }
+
+    RekallAgeNativeViewportRegion CaptureParentSurfaceRegion(IntPtr hwnd) => default;
+
+    void InvalidateParentSurface(RekallAgeNativeViewportRegion region) { }
 
     (int Width, int Height) GetClientSize(IntPtr hwnd);
 
@@ -558,6 +581,7 @@ internal sealed class RekallAgeVulkanViewportHostCore
     private RekallAgeStudioViewportMetrics? _pendingMetrics;
     private bool _messageHandlerAttached;
     private bool _presentationVisible = true;
+    private bool _nativeChildVisible = true;
     private bool _destroyed;
 
     internal RekallAgeVulkanViewportHostCore(
@@ -630,7 +654,13 @@ internal sealed class RekallAgeVulkanViewportHostCore
         }
 
         if (pending is not { } requested || _child == IntPtr.Zero || _destroyed) return;
-        _native.SetVisible(_child, requested.IsPresentable && _presentationVisible);
+        var oldRegion = _native.CaptureParentSurfaceRegion(_child);
+        var requestedVisible = requested.IsPresentable && _presentationVisible;
+        if (_nativeChildVisible != requestedVisible)
+        {
+            _native.SetVisible(_child, requestedVisible);
+            _nativeChildVisible = requestedVisible;
+        }
         RekallAgeStudioViewportMetrics coherent;
         if (!requested.IsPresentable)
         {
@@ -649,14 +679,24 @@ internal sealed class RekallAgeVulkanViewportHostCore
                 cancellationToken);
         }
 
+        var newRegion = _native.CaptureParentSurfaceRegion(_child);
+        _native.InvalidateParentSurface(oldRegion.Union(newRegion));
+
         MetricsChanged?.Invoke(this, coherent);
     }
 
     internal void SetPresentationVisible(bool visible)
     {
+        if (_presentationVisible == visible) return;
         _presentationVisible = visible;
         if (_child == IntPtr.Zero || _destroyed) return;
-        _native.SetVisible(_child, visible && Metrics.IsPresentable);
+        var requestedVisible = visible && Metrics.IsPresentable;
+        if (_nativeChildVisible == requestedVisible) return;
+        var oldRegion = _native.CaptureParentSurfaceRegion(_child);
+        _native.SetVisible(_child, requestedVisible);
+        _nativeChildVisible = requestedVisible;
+        var newRegion = _native.CaptureParentSurfaceRegion(_child);
+        _native.InvalidateParentSurface(oldRegion.Union(newRegion));
     }
 
     internal bool ProcessWindowMessage(int message, IntPtr wParam, IntPtr lParam)
@@ -726,6 +766,7 @@ internal sealed class RekallAgeVulkanViewportHostCore
                 "The Studio Vulkan presenter must be drained and disposed before its child HWND is destroyed.");
         }
 
+        var exposedRegion = _native.CaptureParentSurfaceRegion(_child);
         ReleasePointerCapture(releaseNative: true);
         if (_messageHandlerAttached)
         {
@@ -735,6 +776,8 @@ internal sealed class RekallAgeVulkanViewportHostCore
         _native.DestroyChild(_child);
         _destroyed = true;
         _child = IntPtr.Zero;
+        _nativeChildVisible = false;
+        _native.InvalidateParentSurface(exposedRegion);
     }
 
     private void Emit(
@@ -1023,6 +1066,38 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
         }
     }
 
+    public RekallAgeNativeViewportRegion CaptureParentSurfaceRegion(IntPtr hwnd)
+    {
+        var parent = GetParent(hwnd);
+        if (parent == IntPtr.Zero || !GetWindowRect(hwnd, out var bounds)) return default;
+        var topLeft = new Point(bounds.Left, bounds.Top);
+        var bottomRight = new Point(bounds.Right, bounds.Bottom);
+        _ = MapWindowPoints(IntPtr.Zero, parent, ref topLeft, 1);
+        _ = MapWindowPoints(IntPtr.Zero, parent, ref bottomRight, 1);
+        return new(
+            parent,
+            topLeft.X,
+            topLeft.Y,
+            Math.Max(0, bottomRight.X - topLeft.X),
+            Math.Max(0, bottomRight.Y - topLeft.Y));
+    }
+
+    public void InvalidateParentSurface(RekallAgeNativeViewportRegion region)
+    {
+        if (region.Parent == IntPtr.Zero || region.Width <= 0 || region.Height <= 0) return;
+        var bounds = new Rect
+        {
+            Left = region.X,
+            Top = region.Y,
+            Right = region.X + region.Width,
+            Bottom = region.Y + region.Height
+        };
+        if (!InvalidateRect(region.Parent, ref bounds, erase: false))
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        }
+    }
+
     public (int Width, int Height) GetClientSize(IntPtr hwnd)
     {
         if (!GetClientRect(hwnd, out var rect)) throw new Win32Exception(Marshal.GetLastWin32Error());
@@ -1170,6 +1245,20 @@ internal sealed class RekallAgeWin32VulkanViewportNativeWindow : IRekallAgeVulka
         int width,
         int height,
         uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetParent(IntPtr hwnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int MapWindowPoints(IntPtr from, IntPtr to, ref Point point, uint pointCount);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool InvalidateRect(IntPtr hwnd, ref Rect rect, bool erase);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

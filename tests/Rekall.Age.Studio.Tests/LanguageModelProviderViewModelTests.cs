@@ -13,6 +13,21 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class LanguageModelProviderViewModelTests
 {
     [Fact]
+    public async Task ShutdownClearsBothHostedProviderSessionKeys()
+    {
+        var viewModel = new RekallAgeStudioViewModel(
+            new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+            new EmptyLanguageModel());
+        await viewModel.ApplyOpenAiApiKeyAsync("openai-shutdown-session-key");
+        await viewModel.ApplyKimiApiKeyAsync("kimi-shutdown-session-key");
+
+        await viewModel.DisposeAsync();
+
+        Assert.False(viewModel.HasSessionOpenAiCredential);
+        Assert.False(viewModel.HasSessionKimiCredential);
+    }
+
+    [Fact]
     public async Task KimiSessionKeyUnlocksOnlyKimiAndLoadsOfficialDefaultWithoutExposingKey()
     {
         const string key = "private-studio-kimi-key";
@@ -61,6 +76,7 @@ public sealed class LanguageModelProviderViewModelTests
             importer);
         viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "gguf");
         await viewModel.WaitForLanguageModelProviderTransitionAsync();
+        AllowGgufImport(viewModel);
 
         await viewModel.ImportGgufModelAsync("C:\\private\\model.gguf");
 
@@ -95,6 +111,7 @@ public sealed class LanguageModelProviderViewModelTests
             importer);
         viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "gguf");
         await viewModel.WaitForLanguageModelProviderTransitionAsync();
+        AllowGgufImport(viewModel);
 
         await viewModel.ImportGgufModelAsync("C:\\private\\no-tools.gguf");
 
@@ -117,6 +134,7 @@ public sealed class LanguageModelProviderViewModelTests
             importer);
         viewModel.SelectedLanguageModelProvider = viewModel.LanguageModelProviders.Single(provider => provider.Id == "gguf");
         await viewModel.WaitForLanguageModelProviderTransitionAsync();
+        AllowGgufImport(viewModel);
 
         await viewModel.ImportGgufModelAsync("C:\\private\\model.gguf");
 
@@ -136,6 +154,32 @@ public sealed class LanguageModelProviderViewModelTests
             LastPath = ggufPath;
             return ValueTask.FromResult(import(ggufPath));
         }
+    }
+
+    private static void AllowGgufImport(RekallAgeStudioViewModel viewModel) =>
+        viewModel.SetLocalModelPrerequisiteReadiness(new RekallAgeLanguageModelReadinessResult(
+            "gguf",
+            RekallAgeLanguageModelReadinessState.Blocked,
+            "REKALL_ONBOARDING_NO_MODELS",
+            "No models installed.",
+            [
+                new("ollama-runtime", RekallAgeLanguageModelReadinessState.Ready, "installed"),
+                new("ollama-endpoint", RekallAgeLanguageModelReadinessState.Ready, "identified")
+            ],
+            [],
+            "download-default-model",
+            true));
+
+    private sealed class EmptyLanguageModel : IRekallAgeLanguageModelClient
+    {
+        public string ProviderId => "test";
+
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>([]);
+
+        public ValueTask<RekallAgeLanguageModelResponse> ChatAsync(
+            RekallAgeLanguageModelRequest request,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class KimiModelsHandler(IReadOnlyList<string> models) : HttpMessageHandler

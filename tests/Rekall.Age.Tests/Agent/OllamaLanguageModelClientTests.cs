@@ -8,6 +8,79 @@ namespace Rekall.Age.Tests.Agent;
 public sealed class OllamaLanguageModelClientTests
 {
     [Fact]
+    public async Task GetVersionReturnsOllamaVersion()
+    {
+        var handler = new StubHandler(request =>
+        {
+            Assert.Equal(new Uri("http://127.0.0.1:11434/api/version"), request.RequestUri);
+            return Task.FromResult(JsonResponse("""{"version":"0.33.2"}"""));
+        });
+        using var http = new HttpClient(handler);
+        var client = new RekallAgeOllamaLanguageModelClient(http);
+
+        var version = await client.GetVersionAsync(CancellationToken.None);
+
+        Assert.Equal("0.33.2", version);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"version\":\" \"}")]
+    [InlineData("not-json")]
+    public async Task GetVersionRejectsEndpointThatIsNotOllamaWithoutLeakingBody(string body)
+    {
+        const string sentinel = "provider-private-response";
+        var handler = new StubHandler(_ => Task.FromResult(JsonResponse(body + sentinel)));
+        using var http = new HttpClient(handler);
+        var client = new RekallAgeOllamaLanguageModelClient(http);
+
+        var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(async () =>
+            await client.GetVersionAsync(CancellationToken.None));
+
+        Assert.Equal("REKALL_OLLAMA_ENDPOINT_INVALID", error.Code);
+        Assert.Equal("ollama", error.ProviderId);
+        Assert.DoesNotContain(sentinel, error.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(body, error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetVersionHttpFailureDoesNotLeakResponseBody()
+    {
+        const string sentinel = "provider-private-error-body";
+        var handler = new StubHandler(_ =>
+        {
+            var response = JsonResponse(
+                """{"error":"provider-private-error-body"}""",
+                HttpStatusCode.ServiceUnavailable);
+            response.ReasonPhrase = sentinel;
+            return Task.FromResult(response);
+        });
+        using var http = new HttpClient(handler);
+        var client = new RekallAgeOllamaLanguageModelClient(http);
+
+        var error = await Assert.ThrowsAsync<HttpRequestException>(async () =>
+            await client.GetVersionAsync(CancellationToken.None));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, error.StatusCode);
+        Assert.DoesNotContain(sentinel, error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetVersionRejectsUnboundedVersionIdentity()
+    {
+        var version = new string('1', 129);
+        var handler = new StubHandler(_ => Task.FromResult(JsonResponse($$"""{"version":"{{version}}"}""")));
+        using var http = new HttpClient(handler);
+        var client = new RekallAgeOllamaLanguageModelClient(http);
+
+        var error = await Assert.ThrowsAsync<RekallAgeLanguageModelProviderException>(async () =>
+            await client.GetVersionAsync(CancellationToken.None));
+
+        Assert.Equal("REKALL_OLLAMA_ENDPOINT_INVALID", error.Code);
+        Assert.DoesNotContain(version, error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ChatMapsProviderNeutralMessagesToolsCallsAndUsage()
     {
         string? requestJson = null;

@@ -589,9 +589,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         HierarchyColumn.Width = new GridLength(layout.Panel("Hierarchy").Visible ? layout.Panel("Hierarchy").Size : 0);
         InspectorColumn.Width = new GridLength(layout.Panel("Inspector").Visible ? layout.Panel("Inspector").Size : 0);
         var contentBrowser = layout.Panel("ContentBrowser");
-        OutputRow.Height = new GridLength(layout.Panel("Output").Visible
-            ? (contentBrowser.Visible ? contentBrowser.Size : layout.Panel("Output").Size)
-            : 0);
+        OutputRow.Height = new GridLength(layout.Panel("Output").Visible ? layout.Panel("Output").Size : 0);
         HierarchyPanel.Visibility = layout.Panel("Hierarchy").Visible ? Visibility.Visible : Visibility.Collapsed;
         InspectorPanel.Visibility = layout.Panel("Inspector").Visible ? Visibility.Visible : Visibility.Collapsed;
         OutputTabs.Visibility = layout.Panel("Output").Visible ? Visibility.Visible : Visibility.Collapsed;
@@ -663,6 +661,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         var bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
         var activeOutput = (OutputTabs.SelectedItem as TabItem)?.Header?.ToString() ?? _layout.ActiveOutputTab;
+        var sharedBottomHeight = OutputTabs.Visibility == Visibility.Visible
+            ? Math.Max(190, OutputRow.ActualHeight)
+            : _layout.Panel("Output").Size;
         return RekallAgeStudioLayout.Normalize(_layout with
         {
             WindowX = bounds.X,
@@ -676,8 +677,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             [
                 _layout.Panel("Hierarchy") with { Visible = HierarchyPanel.Visibility == Visibility.Visible, Size = HierarchyPanel.Visibility == Visibility.Visible ? Math.Max(180, HierarchyColumn.ActualWidth) : _layout.Panel("Hierarchy").Size },
                 _layout.Panel("Inspector") with { Visible = InspectorPanel.Visibility == Visibility.Visible, Size = InspectorPanel.Visibility == Visibility.Visible ? Math.Max(180, InspectorColumn.ActualWidth) : _layout.Panel("Inspector").Size },
-                _layout.Panel("Output") with { Visible = OutputTabs.Visibility == Visibility.Visible, Size = OutputTabs.Visibility == Visibility.Visible ? Math.Max(140, OutputRow.ActualHeight) : _layout.Panel("Output").Size },
-                _layout.Panel("ContentBrowser") with { Visible = ContentBrowserPanel.Visibility == Visibility.Visible, Size = ContentBrowserPanel.Visibility == Visibility.Visible ? Math.Max(190, OutputRow.ActualHeight) : _layout.Panel("ContentBrowser").Size }
+                _layout.Panel("Output") with { Visible = OutputTabs.Visibility == Visibility.Visible, Size = sharedBottomHeight },
+                _layout.Panel("ContentBrowser") with { Visible = ContentBrowserPanel.Visibility == Visibility.Visible, Size = sharedBottomHeight }
             ]
         }) ?? RekallAgeStudioLayout.Default;
     }

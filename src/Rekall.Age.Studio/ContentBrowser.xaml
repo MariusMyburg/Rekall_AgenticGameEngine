@@ -4,6 +4,7 @@
              x:Name="ContentBrowserRoot"
              AllowDrop="True"
              AutomationProperties.Name="Content Browser"
+             SizeChanged="OnBrowserSizeChanged"
              DragEnter="OnFilesDragEnter" DragOver="OnFilesDragOver"
              DragLeave="OnFilesDragLeave" Drop="OnFilesDropped">
     <UserControl.Resources>
@@ -30,47 +31,42 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Style="{StaticResource EditorHeader}" Padding="8,6">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="220" /><ColumnDefinition Width="160" />
-                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBox x:Name="ContentSearchBox" Text="{Binding ContentSearchText, UpdateSourceTrigger=PropertyChanged}"
+        <Border Style="{StaticResource EditorHeader}" Padding="8,4">
+            <WrapPanel Orientation="Horizontal">
+                <TextBox x:Name="ContentSearchBox" Width="190" MinWidth="120" Margin="0,2" Text="{Binding ContentSearchText, UpdateSourceTrigger=PropertyChanged}"
                          ToolTip="Search content by name, family, kind, origin, or health"
                          AutomationProperties.Name="Search project content" />
-                <ComboBox x:Name="ContentCategoryPicker" Grid.Column="1" Margin="6,0,0,0"
+                <ComboBox x:Name="ContentCategoryPicker" Width="145" Margin="6,2,0,2"
                           ItemsSource="{Binding ContentCategories}" SelectedItem="{Binding SelectedContentCategory}"
                           ToolTip="Show one content category" AutomationProperties.Name="Filter content category" />
-                <Button x:Name="RefreshContentButton" Grid.Column="2" Margin="6,0,0,0" Click="OnRefreshContentClick"
+                <Button x:Name="RefreshContentButton" Margin="6,2,0,2" Click="OnRefreshContentClick"
                         ToolTip="Refresh project content" AutomationProperties.Name="Refresh project content">
                     <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconRefresh}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Refresh" /></StackPanel>
                 </Button>
-                <Button x:Name="ImportContentButton" Grid.Column="3" Margin="4,0,0,0" Click="OnImportContentClick"
+                <Button x:Name="ImportContentButton" Margin="4,2,0,2" Click="OnImportContentClick"
                         ToolTip="Import model, texture, audio, or shader files" AutomationProperties.Name="Import content files">
                     <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconImport}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Import…" /></StackPanel>
                 </Button>
-                <ToggleButton x:Name="CardContentViewButton" Grid.Column="5" IsChecked="True" Click="OnCardViewClick"
+                <ToggleButton x:Name="CardContentViewButton" Margin="12,2,0,2" IsChecked="True" Click="OnCardViewClick"
                               ToolTip="Show content as cards" AutomationProperties.Name="Card content view">
                     <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconGrid}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Cards" /></StackPanel>
                 </ToggleButton>
-                <ToggleButton x:Name="CompactContentViewButton" Grid.Column="6" Margin="4,0,0,0" Click="OnCompactViewClick"
+                <ToggleButton x:Name="CompactContentViewButton" Margin="4,2,0,2" Click="OnCompactViewClick"
                               ToolTip="Show a compact content list" AutomationProperties.Name="Compact content view">
                     <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconList}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Compact" /></StackPanel>
                 </ToggleButton>
-            </Grid>
+            </WrapPanel>
         </Border>
 
         <Grid Grid.Row="1" Margin="6">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="5" /><ColumnDefinition Width="*" /><ColumnDefinition Width="5" /><ColumnDefinition Width="250" /></Grid.ColumnDefinitions>
-            <Border Style="{StaticResource EditorPanel}" Margin="0,0,5,0">
+            <Grid.ColumnDefinitions><ColumnDefinition x:Name="CategoryColumn" Width="150" /><ColumnDefinition x:Name="CategorySplitterColumn" Width="5" /><ColumnDefinition Width="*" /><ColumnDefinition x:Name="DetailsSplitterColumn" Width="5" /><ColumnDefinition x:Name="DetailsColumn" Width="250" /></Grid.ColumnDefinitions>
+            <Border x:Name="CategoryPanel" Style="{StaticResource EditorPanel}" Margin="0,0,5,0">
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top" Text="CATEGORIES" Style="{StaticResource SectionLabel}" Margin="8,7" />
                     <ListBox ItemsSource="{Binding ContentCategories}" SelectedItem="{Binding SelectedContentCategory}" BorderThickness="0" />
                 </DockPanel>
             </Border>
-            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="Transparent" />
+            <GridSplitter x:Name="CategorySplitter" Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="Transparent" />
             <Border Grid.Column="2" Style="{StaticResource EditorPanel}">
                 <Grid>
                     <ListView x:Name="ContentItemList" ItemsSource="{Binding FilteredContentItems}"
@@ -103,8 +99,8 @@
                     </StackPanel>
                 </Grid>
             </Border>
-            <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" Background="Transparent" />
-            <Border Grid.Column="4" Style="{StaticResource EditorPanel}" Margin="5,0,0,0">
+            <GridSplitter x:Name="DetailsSplitter" Grid.Column="3" Width="5" HorizontalAlignment="Stretch" Background="Transparent" />
+            <Border x:Name="DetailsPanel" Grid.Column="4" Style="{StaticResource EditorPanel}" Margin="5,0,0,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="9">
                         <TextBlock Text="DETAILS" Style="{StaticResource SectionLabel}" />

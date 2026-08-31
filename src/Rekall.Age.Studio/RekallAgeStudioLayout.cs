@@ -88,7 +88,7 @@ internal sealed record RekallAgeStudioLayout(
                 new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 330, 0),
                 new("Inspector", RekallAgeStudioDockRegion.Right, true, 460, 0),
                 new("Output", RekallAgeStudioDockRegion.Bottom, true, 420, 0),
-                new("ContentBrowser", RekallAgeStudioDockRegion.Bottom, true, 320, 0)
+                new("ContentBrowser", RekallAgeStudioDockRegion.Bottom, true, 420, 0)
             ]
         },
         _ => Default
@@ -143,6 +143,10 @@ internal sealed record RekallAgeStudioLayout(
             })
             .OrderBy(panel => Array.IndexOf(PanelIds, panel.Id))
             .ToArray();
+        var sharedBottomHeight = normalizedPanels.Single(panel => panel.Id == "Output").Size;
+        normalizedPanels = normalizedPanels.Select(panel => panel.Id == "ContentBrowser"
+            ? panel with { Size = sharedBottomHeight }
+            : panel).ToArray();
         return candidate with
         {
             WindowX = double.IsFinite(candidate.WindowX) ? candidate.WindowX : double.NaN,

@@ -57,11 +57,68 @@ public sealed class ContentBrowserWindowTests(WpfApplicationTestFixture wpf)
 
         Assert.Contains("DataFormats.FileDrop", source, StringComparison.Ordinal);
         Assert.Contains("Path.IsPathFullyQualified", source, StringComparison.Ordinal);
-        Assert.Contains("File.Exists", source, StringComparison.Ordinal);
+        Assert.Contains("_importPolicy.Classify", source, StringComparison.Ordinal);
         Assert.Contains("ImportContentAsync", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("File.Exists", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ReadAll", source, StringComparison.Ordinal);
         Assert.DoesNotContain("EnumerateFiles", source, StringComparison.Ordinal);
         Assert.DoesNotContain("SearchOption.AllDirectories", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FallibleUiWorkUsesOneLifetimeBoundGuard()
+    {
+        var source = Source("ContentBrowser.xaml.cs");
+
+        Assert.Contains("CancellationTokenSource _lifetime", source, StringComparison.Ordinal);
+        Assert.Contains("Unloaded +=", source, StringComparison.Ordinal);
+        Assert.Contains("ExecuteUiAsync", source, StringComparison.Ordinal);
+        Assert.Contains("OperationCanceledException", source, StringComparison.Ordinal);
+        Assert.Contains("ReportContentBrowserFailure", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("CancellationToken.None", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task UiOperationGuardContainsCancellationAndReportsBoundedFailures()
+    {
+        var reports = new List<(string Code, string Summary)>();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await ContentBrowser.ExecuteUiOperationAsync(
+            token => Task.FromCanceled(token), cancellation.Token,
+            (code, summary) => reports.Add((code, summary)));
+        Assert.Empty(reports);
+
+        await ContentBrowser.ExecuteUiOperationAsync(
+            _ => Task.FromException(new IOException("sentinel-private-path")), CancellationToken.None,
+            (code, summary) => reports.Add((code, summary)));
+        var report = Assert.Single(reports);
+        Assert.Equal("REKALL_CONTENT_BROWSER_UI_FAILED", report.Code);
+        Assert.DoesNotContain("sentinel", report.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(320)]
+    [InlineData(700)]
+    public void ToolbarKeepsPrimaryLabeledActionsVisibleAtNarrowWidths(double width)
+    {
+        wpf.Invoke(() =>
+        {
+            var browser = new ContentBrowser();
+            browser.Measure(new Size(width, 500));
+            browser.Arrange(new Rect(0, 0, width, 500));
+            browser.UpdateLayout();
+
+            foreach (var name in new[] { "ContentSearchBox", "RefreshContentButton", "ImportContentButton" })
+            {
+                var control = Assert.IsAssignableFrom<FrameworkElement>(browser.FindName(name));
+                Assert.True(control.ActualWidth > 0, $"{name} collapsed at {width} DIPs.");
+                var origin = control.TranslatePoint(new Point(), browser);
+                Assert.True(origin.X >= 0 && origin.X + control.ActualWidth <= width + 0.5,
+                    $"{name} clipped at {width} DIPs: x={origin.X}, width={control.ActualWidth}.");
+            }
+        });
     }
 
     private static void AssertControl<T>(FrameworkElement browser, string name, string automationName) where T : FrameworkElement

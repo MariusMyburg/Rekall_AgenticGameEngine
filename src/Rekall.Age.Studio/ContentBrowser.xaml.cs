@@ -9,8 +9,14 @@ namespace Rekall.Age.Studio;
 public partial class ContentBrowser : UserControl
 {
     private readonly RekallAgeStudioContentImportPolicy _importPolicy = new();
+    private CancellationTokenSource _lifetime = new();
 
-    public ContentBrowser() => InitializeComponent();
+    public ContentBrowser()
+    {
+        InitializeComponent();
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
+    }
 
     internal void FocusSearch()
     {
@@ -18,13 +24,13 @@ public partial class ContentBrowser : UserControl
         Keyboard.Focus(ContentSearchBox);
     }
 
-    private async void OnRefreshContentClick(object sender, RoutedEventArgs e)
-    {
-        if (DataContext is RekallAgeStudioViewModel viewModel)
-            await viewModel.RefreshContentBrowserAsync();
-    }
+    private async void OnRefreshContentClick(object sender, RoutedEventArgs e) =>
+        await ExecuteUiAsync(token => DataContext is RekallAgeStudioViewModel viewModel
+            ? viewModel.RefreshContentBrowserAsync(token)
+            : Task.CompletedTask);
 
-    private async void OnImportContentClick(object sender, RoutedEventArgs e)
+    private async void OnImportContentClick(object sender, RoutedEventArgs e) =>
+        await ExecuteUiAsync(async token =>
     {
         if (DataContext is not RekallAgeStudioViewModel viewModel) return;
         var picker = new OpenFileDialog
@@ -35,8 +41,8 @@ public partial class ContentBrowser : UserControl
             Filter = "Supported content|*.glb;*.gltf;*.png;*.jpg;*.jpeg;*.dds;*.ktx2;*.wav;*.mp3;*.glsl;*.vert;*.frag;*.comp;*.hlsl|All files|*.*"
         };
         if (picker.ShowDialog(Window.GetWindow(this)) == true)
-            await viewModel.ImportContentAsync(SafeFiles(picker.FileNames), CancellationToken.None);
-    }
+            await viewModel.ImportContentAsync(SafeCandidates(picker.FileNames), token);
+    });
 
     private void OnFilesDragEnter(object sender, DragEventArgs e) => ApplyDropEffect(e);
     private void OnFilesDragOver(object sender, DragEventArgs e) => ApplyDropEffect(e);
@@ -45,27 +51,78 @@ public partial class ContentBrowser : UserControl
     private async void OnFilesDropped(object sender, DragEventArgs e)
     {
         e.Handled = true;
-        if (DataContext is not RekallAgeStudioViewModel viewModel) return;
-        var files = DroppedFiles(e.Data);
-        if (files.Length > 0) await viewModel.ImportContentAsync(files, CancellationToken.None);
+        var files = DroppedCandidates(e.Data);
+        await ExecuteUiAsync(token => DataContext is RekallAgeStudioViewModel viewModel && files.Length > 0
+            ? viewModel.ImportContentAsync(files, token)
+            : Task.CompletedTask);
     }
 
     private void ApplyDropEffect(DragEventArgs e)
     {
-        e.Effects = DroppedFiles(e.Data).Any(path => _importPolicy.Classify(path).Accepted)
+        e.Effects = DroppedCandidates(e.Data).Length > 0
             ? DragDropEffects.Copy
             : DragDropEffects.None;
         e.Handled = true;
     }
 
-    private static string[] DroppedFiles(IDataObject data) => data.GetDataPresent(DataFormats.FileDrop)
-        ? SafeFiles(data.GetData(DataFormats.FileDrop) as string[] ?? [])
+    private string[] DroppedCandidates(IDataObject data) => data.GetDataPresent(DataFormats.FileDrop)
+        ? SafeCandidates(data.GetData(DataFormats.FileDrop) as string[] ?? [])
         : [];
 
-    private static string[] SafeFiles(IEnumerable<string> paths) => paths
-        .Where(path => !string.IsNullOrWhiteSpace(path) && Path.IsPathFullyQualified(path) && File.Exists(path))
+    private string[] SafeCandidates(IEnumerable<string> paths) => paths
+        .Where(path => !string.IsNullOrWhiteSpace(path)
+            && Path.IsPathFullyQualified(path)
+            && _importPolicy.Classify(path).Accepted)
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .ToArray();
+
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (!_lifetime.IsCancellationRequested) return;
+        _lifetime.Dispose();
+        _lifetime = new CancellationTokenSource();
+    }
+
+    private void OnUnloaded(object sender, RoutedEventArgs e) => _lifetime.Cancel();
+
+    private Task ExecuteUiAsync(Func<CancellationToken, Task> operation) => ExecuteUiOperationAsync(
+        operation,
+        _lifetime.Token,
+        (code, summary) => (DataContext as RekallAgeStudioViewModel)?.ReportContentBrowserFailure(code, summary));
+
+    internal static async Task ExecuteUiOperationAsync(
+        Func<CancellationToken, Task> operation,
+        CancellationToken cancellationToken,
+        Action<string, string> reportFailure)
+    {
+        try
+        {
+            await operation(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+            reportFailure("REKALL_CONTENT_BROWSER_UI_FAILED",
+                "The Content Browser action could not be completed. Retry or inspect Studio logs.");
+        }
+    }
+
+    private void OnBrowserSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var showCategories = e.NewSize.Width >= 480;
+        CategoryColumn.Width = new GridLength(showCategories ? 150 : 0);
+        CategorySplitterColumn.Width = new GridLength(showCategories ? 5 : 0);
+        CategoryPanel.Visibility = showCategories ? Visibility.Visible : Visibility.Collapsed;
+        CategorySplitter.Visibility = CategoryPanel.Visibility;
+
+        var showDetails = e.NewSize.Width >= 650;
+        DetailsColumn.Width = new GridLength(showDetails ? Math.Min(250, e.NewSize.Width * 0.34) : 0);
+        DetailsSplitterColumn.Width = new GridLength(showDetails ? 5 : 0);
+        DetailsPanel.Visibility = showDetails ? Visibility.Visible : Visibility.Collapsed;
+        DetailsSplitter.Visibility = DetailsPanel.Visibility;
+    }
 
     private void OnContentItemDoubleClick(object sender, MouseButtonEventArgs e)
     {

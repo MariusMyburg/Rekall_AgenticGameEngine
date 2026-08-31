@@ -8,7 +8,7 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioLayoutTests
 {
     [Fact]
-    public void WorldHostsOneResizableContentBrowserAndOneReadableTransformStrip()
+    public void WorldHostsAResizableContentBrowserWithoutReplacingTheViewportTransformContract()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
         var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
@@ -17,8 +17,8 @@ public sealed class StudioLayoutTests
         Assert.Contains("<local:ContentBrowser", window, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"ContentBrowserSplitter\"", window, StringComparison.Ordinal);
         Assert.DoesNotContain("Header=\"Assets\"><ListBox ItemsSource=\"{Binding AssetLines}\"", window, StringComparison.Ordinal);
-        Assert.Equal(1, window.Split("x:Name=\"WorldTransformStrip\"", StringSplitOptions.None).Length - 1);
-        Assert.Contains("MinWidth=\"72\"", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("x:Name=\"WorldTransformStrip\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"MoveSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -40,6 +40,25 @@ public sealed class StudioLayoutTests
         Assert.NotNull(migrated);
         Assert.True(migrated.Panel("ContentBrowser").Visible);
         Assert.True(migrated.Panel("ContentBrowser").Size >= 190);
+    }
+
+    [Fact]
+    public void ContentBrowserAndOtherBottomTabsShareOnePersistedHeight()
+    {
+        var debug = RekallAgeStudioLayout.CreatePreset(RekallAgeStudioLayoutPreset.Debug);
+        Assert.Equal("Runtime", debug.ActiveOutputTab);
+        Assert.Equal(420, debug.Panel("Output").Size);
+        Assert.Equal(debug.Panel("Output").Size, debug.Panel("ContentBrowser").Size);
+
+        var contentActive = RekallAgeStudioLayout.Normalize(debug with { ActiveOutputTab = "Content Browser" })!;
+        Assert.Equal(420, contentActive.Panel("Output").Size);
+        Assert.Equal(420, contentActive.Panel("ContentBrowser").Size);
+
+        var code = File.ReadAllText(Path.Combine(
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..")),
+            "src", "Rekall.Age.Studio", "MainWindow.xaml.cs"));
+        Assert.Contains("OutputRow.Height = new GridLength(layout.Panel(\"Output\").Visible ? layout.Panel(\"Output\").Size : 0)", code, StringComparison.Ordinal);
+        Assert.Contains("Size = sharedBottomHeight", code, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -104,9 +123,9 @@ public sealed class StudioLayoutTests
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
         var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
 
-        Assert.Contains("x:Name=\"MoveSnapEditor\" MinWidth=\"72\"", window, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"RotationSnapEditor\" MinWidth=\"72\"", window, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"ScaleSnapEditor\" MinWidth=\"72\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"MoveSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"RotationSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ScaleSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"Move snap distance\"", window, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"Rotation snap angle\"", window, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"Scale snap increment\"", window, StringComparison.Ordinal);

@@ -299,6 +299,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _contentSearchText = string.Empty;
     private RekallAgeContentBrowserItem? _selectedContentItem;
     private string _contentStatusText = "Select project content to inspect or edit.";
+    private string _selectedStudioWorkspace = "Author";
+    private string _selectedModelingSurface = "mesh-edit";
     private readonly List<RekallAgeLanguageModelToolExecution> _lastAgentToolExecutions = [];
     internal bool TreatGauntletAsTerminalSuccess { get; set; }
 
@@ -585,6 +587,16 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         get => _contentStatusText;
         private set => Set(ref _contentStatusText, value);
+    }
+    public string SelectedStudioWorkspace
+    {
+        get => _selectedStudioWorkspace;
+        set => Set(ref _selectedStudioWorkspace, value);
+    }
+    public string SelectedModelingSurface
+    {
+        get => _selectedModelingSurface;
+        set => Set(ref _selectedModelingSurface, value);
     }
     public ObservableCollection<string> ValidationLines { get; } = [];
     public ObservableCollection<string> TransactionLines { get; } = [];
@@ -5428,7 +5440,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     private bool CanOpenSelectedContent() => HasOpenProject()
         && SelectedContentItem is { } item
-        && item.Capabilities.Contains(RekallAgeContentCapability.Open, StringComparer.OrdinalIgnoreCase);
+        && _contentOpenRouter.CanOpen(item);
 
     private async Task OpenSelectedContentAsync()
     {
@@ -5437,6 +5449,19 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             SelectedContentItem, _lifecycleCancellation.Token);
         ContentStatusText = $"{result.Code} · {result.Summary}";
         StatusText = ContentStatusText;
+        if (result.Opened && result.WorkspaceId is { } workspace)
+        {
+            SelectedStudioWorkspace = workspace switch
+            {
+                "modeling" => "Modeling",
+                "code" => "Code",
+                "world" => "World",
+                _ => SelectedStudioWorkspace
+            };
+            if (workspace.Equals("modeling", StringComparison.OrdinalIgnoreCase)
+                && result.SurfaceId is { } surface)
+                SelectedModelingSurface = surface;
+        }
     }
 
     async ValueTask IRekallAgeStudioContentOpenTarget.SelectMeshAsync(
@@ -5452,8 +5477,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             assetId = model.Source.AssetId;
         }
 
-        SelectedMeshAssetId = assetId;
         await _modeling.OpenAsync(_session.ProjectRoot, assetId, cancellationToken);
+        SelectedMeshAssetId = assetId;
         _modeling.SetDomain(MeshEditDomain);
         RefreshMeshEditingState();
     }
@@ -5506,10 +5531,6 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         OnPropertyChanged(nameof(SelectedCodeProjectPath));
         CodeStatusText = $"Editing {source.ModuleName}/{source.FileName}.";
     }
-
-    ValueTask IRekallAgeStudioContentOpenTarget.SelectShaderAsync(
-        RekallAgeContentBrowserItem item, CancellationToken cancellationToken) =>
-        OpenAssociatedContentAsync(item, cancellationToken);
 
     ValueTask IRekallAgeStudioContentOpenTarget.OpenAssociatedAsync(
         RekallAgeContentBrowserItem item, CancellationToken cancellationToken) =>

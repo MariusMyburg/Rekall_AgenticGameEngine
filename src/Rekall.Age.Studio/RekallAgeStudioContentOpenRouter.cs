@@ -14,6 +14,7 @@ internal sealed record RekallAgeStudioContentOpenResult(
 
 internal interface IRekallAgeStudioContentOpenRouter
 {
+    bool CanOpen(RekallAgeContentBrowserItem item);
     ValueTask<RekallAgeStudioContentOpenResult> OpenAsync(
         RekallAgeContentBrowserItem item, CancellationToken cancellationToken);
 }
@@ -24,7 +25,6 @@ internal interface IRekallAgeStudioContentOpenTarget
     ValueTask SelectGraphAsync(RekallAgeContentBrowserItem item, CancellationToken cancellationToken);
     ValueTask SelectMaterialAsync(RekallAgeContentBrowserItem item, CancellationToken cancellationToken);
     ValueTask SelectModuleSourceAsync(RekallAgeContentBrowserItem item, CancellationToken cancellationToken);
-    ValueTask SelectShaderAsync(RekallAgeContentBrowserItem item, CancellationToken cancellationToken);
     ValueTask OpenAssociatedAsync(RekallAgeContentBrowserItem item, CancellationToken cancellationToken);
 }
 
@@ -40,7 +40,7 @@ internal sealed class RekallAgeStudioContentOpenRouter(IRekallAgeStudioContentOp
         ArgumentNullException.ThrowIfNull(item);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!IsKnownRoute(item.EditorRouteId))
+        if (!CanOpen(item))
             return Unavailable("No editor is available for the selected content type.");
         if (string.IsNullOrWhiteSpace(item.Path) || !File.Exists(item.Path))
             return Unavailable("The selected content is no longer available. Refresh the Content Browser and try again.");
@@ -52,9 +52,9 @@ internal sealed class RekallAgeStudioContentOpenRouter(IRekallAgeStudioContentOp
                 "mesh-edit" => await OpenAsync(_target.SelectMeshAsync, item, "modeling", "mesh-edit", cancellationToken),
                 "modeling-graph" => await OpenAsync(_target.SelectGraphAsync, item, "modeling", "node-contracts", cancellationToken),
                 "material-graph" => await OpenAsync(_target.SelectMaterialAsync, item, "modeling", "material-graph", cancellationToken),
-                "material-instance" => await OpenAsync(_target.SelectMaterialAsync, item, "modeling", "material-instance", cancellationToken),
+                "material-instance" => await OpenAsync(_target.SelectMaterialAsync, item, "modeling", "material-graph", cancellationToken),
                 "module-source" => await OpenAsync(_target.SelectModuleSourceAsync, item, "code", "source-edit", cancellationToken),
-                "shader-edit" => await OpenAsync(_target.SelectShaderAsync, item, "code", "shader-edit", cancellationToken),
+                "shader-edit" => await OpenAsync(_target.OpenAssociatedAsync, item, "external", "shader-source", cancellationToken),
                 "texture-preview" or "audio-preview" or "external" => await OpenAsync(
                     _target.OpenAssociatedAsync, item, "external", "associated-application", cancellationToken),
                 _ => Unavailable("No editor is available for the selected content type.")
@@ -86,6 +86,16 @@ internal sealed class RekallAgeStudioContentOpenRouter(IRekallAgeStudioContentOp
     private static bool IsKnownRoute(string route) => route is
         "mesh-edit" or "modeling-graph" or "material-graph" or "material-instance"
         or "module-source" or "shader-edit" or "texture-preview" or "audio-preview" or "external";
+
+    public bool CanOpen(RekallAgeContentBrowserItem item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        if (!IsKnownRoute(item.EditorRouteId)) return false;
+        var capability = item.EditorRouteId is "shader-edit" or "texture-preview" or "audio-preview" or "external"
+            ? RekallAgeContentCapability.OpenExternal
+            : RekallAgeContentCapability.Open;
+        return item.Capabilities.Contains(capability, StringComparer.OrdinalIgnoreCase);
+    }
 
     private static RekallAgeStudioContentOpenResult Unavailable(string summary) =>
         new(false, "REKALL_CONTENT_OPEN_UNAVAILABLE", summary);

@@ -28,8 +28,9 @@
             </Grid>
         </Border>
 
-        <TabControl Grid.Row="1" Background="{StaticResource WorkbenchBackground}" BorderThickness="0">
-            <TabItem Header="Mesh Editing">
+        <TabControl Grid.Row="1" Background="{StaticResource WorkbenchBackground}" BorderThickness="0"
+                    SelectedValuePath="Tag" SelectedValue="{Binding SelectedModelingSurface, Mode=TwoWay}">
+            <TabItem Header="Mesh Editing" Tag="mesh-edit">
                 <Grid Margin="3">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="48" /><ColumnDefinition Width="*" /><ColumnDefinition Width="5" /><ColumnDefinition Width="340" /></Grid.ColumnDefinitions>
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="28" /></Grid.RowDefinitions>
@@ -165,7 +166,7 @@
                 </Grid>
             </TabItem>
 
-            <TabItem Header="Procedural Geometry">
+            <TabItem Header="Procedural Geometry" Tag="node-contracts">
                 <Grid Margin="7">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="250" /><ColumnDefinition Width="5" /><ColumnDefinition Width="5*" /><ColumnDefinition Width="5" /><ColumnDefinition Width="4*" /></Grid.ColumnDefinitions>
                     <Border Grid.Column="0" Style="{StaticResource EditorPanel}"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><TextBlock Text="PROCEDURAL GRAPH" FontWeight="SemiBold" /></Border><StackPanel Margin="9"><TextBlock Text="Graph asset" Style="{StaticResource SectionLabel}" /><ComboBox ItemsSource="{Binding ModelingGraphAssetIds}" SelectedItem="{Binding SelectedModelingGraphAssetId}" Margin="0,4,0,6" /><UniformGrid Columns="2"><Button Content="Refresh" Command="{Binding RefreshModelingGraphsCommand}" /><Button Content="Open" Command="{Binding OpenModelingGraphCommand}" /></UniformGrid><TextBlock Text="Named output" Style="{StaticResource SectionLabel}" Margin="0,14,0,0" /><ComboBox ItemsSource="{Binding ModelingGraphOutputNames}" SelectedItem="{Binding SelectedModelingGraphOutput}" Margin="0,4,0,6" /><Button Content="Evaluate Output" Command="{Binding EvaluateModelingGraphCommand}" Style="{StaticResource AccentButton}" /><TextBlock Text="{Binding ModelingGraphSummary}" TextWrapping="Wrap" Foreground="{StaticResource MutedText}" Margin="0,14,0,0" /></StackPanel></DockPanel></Border>
@@ -188,7 +189,7 @@
                 </Grid>
             </TabItem>
 
-            <TabItem Header="Materials">
+            <TabItem Header="Materials" Tag="material-graph">
                 <Grid Margin="7">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="5" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                     <Border Grid.Column="0" Style="{StaticResource EditorPanel}"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><TextBlock Text="MATERIAL GRAPH" FontWeight="SemiBold" /></Border><StackPanel Margin="9"><TextBlock Text="Graph asset" Style="{StaticResource SectionLabel}" /><ComboBox ItemsSource="{Binding MaterialGraphAssetIds}" SelectedItem="{Binding SelectedMaterialGraphAssetId}" Margin="0,4,0,6" /><UniformGrid Columns="2"><Button Content="Refresh" Command="{Binding RefreshMaterialGraphsCommand}" /><Button Content="Open" Command="{Binding OpenMaterialGraphCommand}" /></UniformGrid><TextBlock Text="{Binding MaterialGraphSummary}" TextWrapping="Wrap" Foreground="{StaticResource MutedText}" Margin="0,14,0,0" /><TextBlock Text="No material-to-pixel preview yet - the engine has no material graph evaluator; editing here is real (persisted through the same revision-safe patch pipeline as procedural geometry) but the result is only visible in the runtime/CLI, not this panel." TextWrapping="Wrap" Foreground="{StaticResource MutedText}" FontSize="10" Margin="0,10,0,0" /></StackPanel></DockPanel></Border>
@@ -196,7 +197,7 @@
                     <Border Grid.Column="2" Style="{StaticResource EditorPanel}"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><TextBlock Text="NODE CONTRACTS" FontWeight="SemiBold" /></Border><Grid><Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions><ListBox ItemsSource="{Binding MaterialGraphNodes}" SelectedItem="{Binding SelectedMaterialGraphNode}" DisplayMemberPath="DisplayName" BorderThickness="0" /><StackPanel Grid.Row="1" Margin="9"><TextBlock Text="TYPED PARAMETERS" Style="{StaticResource SectionLabel}" /><ItemsControl ItemsSource="{Binding MaterialGraphParameterEditors}"><ItemsControl.ItemTemplate><DataTemplate><Grid Margin="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Text="{Binding DisplayName}" /><ComboBox Grid.Column="1" ItemsSource="{Binding EnumChoices}" Text="{Binding ValueText, UpdateSourceTrigger=PropertyChanged}" IsEditable="True" /></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl><Button Content="Apply Parameters" Command="{Binding ApplyMaterialGraphParametersCommand}" Style="{StaticResource AccentButton}" Margin="0,7,0,0" /></StackPanel></Grid></DockPanel></Border>
                 </Grid>
             </TabItem>
-            <TabItem Header="UV / Attributes">
+            <TabItem Header="UV / Attributes" Tag="uv-attributes">
                 <Grid Margin="7">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="5" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                     <Border Grid.Column="0" Style="{StaticResource EditorPanel}"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><TextBlock Text="NAMED ATTRIBUTES" FontWeight="SemiBold" /></Border><ListBox ItemsSource="{Binding MeshAttributeSummaries}" BorderThickness="0" /></DockPanel></Border>
@@ -204,7 +205,7 @@
                     <Border Grid.Column="2" Style="{StaticResource EditorPanel}"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><TextBlock Text="MATERIAL SLOTS" FontWeight="SemiBold" /></Border><StackPanel><ListBox ItemsSource="{Binding MeshMaterialSlotSummaries}" BorderThickness="0" /><TextBlock Text="Attributes and slots reflect the mesh currently open in Mesh Editing. A domain-Corner attribute with a Vector2 value and a uv* name/semantic is a UV layer; this list shows every named attribute the open mesh actually carries, not a fixed UV-only view." TextWrapping="Wrap" Foreground="{StaticResource MutedText}" FontSize="10" Margin="9" /></StackPanel></DockPanel></Border>
                 </Grid>
             </TabItem>
-            <TabItem Header="Animation">
+            <TabItem Header="Animation" Tag="animation">
                 <Grid Margin="7">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="260" /><ColumnDefinition Width="5" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                     <Border Grid.Column="0" Style="{StaticResource EditorPanel}"><DockPanel><Border DockPanel.Dock="Top" Style="{StaticResource EditorHeader}"><TextBlock Text="ANIMATION MIXER" FontWeight="SemiBold" /></Border><StackPanel Margin="9"><TextBlock Text="Selected entity" Style="{StaticResource SectionLabel}" /><TextBlock Text="{Binding SelectedEntityId, TargetNullValue='(none - select one in the scene hierarchy)'}" TextWrapping="Wrap" Margin="0,4,0,10" /><Button Content="Open Mixer" Command="{Binding OpenAnimationMixerCommand}" Style="{StaticResource AccentButton}" /><TextBlock Text="{Binding AnimationMixerSummary}" TextWrapping="Wrap" Foreground="{StaticResource MutedText}" Margin="0,10,0,0" /><TextBlock Text="Edits the entity's authored initial mixer state, persisted the same revision-safe way as any other scene edit. Gameplay modules may still overwrite these values every frame once play starts, exactly as they can overwrite an authored Transform." TextWrapping="Wrap" Foreground="{StaticResource MutedText}" FontSize="10" Margin="0,14,0,0" /></StackPanel></DockPanel></Border>

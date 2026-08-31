@@ -222,11 +222,12 @@
         <Grid>
             <Grid.RowDefinitions><RowDefinition Height="38" /><RowDefinition Height="*" /></Grid.RowDefinitions>
             <TabControl x:Name="WorkspaceSelector" Grid.Row="0" SelectionChanged="OnWorkspaceChanged"
+                        SelectedValuePath="Tag" SelectedValue="{Binding SelectedStudioWorkspace, Mode=TwoWay}"
                         Background="{StaticResource ChromeBackground}" BorderThickness="0,0,0,1">
-                <TabItem Header="Author" />
-                <TabItem Header="World" />
-                <TabItem Header="Code" />
-                <TabItem Header="Modeling" />
+                <TabItem Header="Author" Tag="Author" />
+                <TabItem Header="World" Tag="World" />
+                <TabItem Header="Code" Tag="Code" />
+                <TabItem Header="Modeling" Tag="Modeling" />
             </TabControl>
             <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0">
                 <TextBlock Text="Layout" Foreground="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,5,0" />

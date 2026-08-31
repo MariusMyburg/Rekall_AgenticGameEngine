@@ -1,4 +1,5 @@
 using System.IO;
+using Rekall.Age.Assets;
 using Rekall.Age.Editor.Contracts;
 
 namespace Rekall.Age.Studio.Tests;
@@ -15,10 +16,10 @@ public sealed class StudioContentOpenRouterTests : IDisposable
         { "mesh-edit", "model-asset", "modeling", "mesh-edit" },
         { "modeling-graph", "modeling-graph", "modeling", "node-contracts" },
         { "material-graph", "material-graph", "modeling", "material-graph" },
-        { "material-instance", "material-instance", "modeling", "material-instance" },
+        { "material-instance", "material-instance", "modeling", "material-graph" },
         { "module-source", "module-source", "code", "source-edit" },
-        { "shader-edit", "shader", "code", "shader-edit" },
-        { "shader-edit", "shader-include", "code", "shader-edit" }
+        { "shader-edit", "shader", "external", "shader-source" },
+        { "shader-edit", "shader-include", "external", "shader-source" }
     };
 
     [Theory]
@@ -54,6 +55,59 @@ public sealed class StudioContentOpenRouterTests : IDisposable
         Assert.Equal("external", result.WorkspaceId);
         Assert.Equal("associated-application", result.SurfaceId);
         Assert.Equal([(route, item.Id, item.Path!)], target.Calls);
+    }
+
+    [Fact]
+    public async Task ImportedModelWithArbitraryDisplayNameUsesTruthfulExternalFallback()
+    {
+        var target = new RecordingTarget();
+        var item = Item("external", "model", ExistingFile("spaceship")) with
+        {
+            DisplayName = "My Pretty Spaceship",
+            Origin = "Imported",
+            Capabilities = [RekallAgeContentCapability.OpenExternal]
+        };
+
+        var result = await new RekallAgeStudioContentOpenRouter(target).OpenAsync(item, CancellationToken.None);
+
+        Assert.True(result.Opened);
+        Assert.Equal("external", result.WorkspaceId);
+        Assert.Equal([("external", item.Id, item.Path!)], target.Calls);
+    }
+
+    [Fact]
+    public async Task ImportedModelProjectionUsesStablePathAndExternalCapabilityInsteadOfDisplayNameMeshId()
+    {
+        var importedPath = ExistingFile("imported-model.glb");
+        var sourcePath = ExistingFile("source-model.glb");
+        await new RekallAgeAssetCatalogStore().SaveAsync(_root,
+            RekallAgeAssetCatalogDocument.Empty.AddOrReplace(new(
+                "stable-model-id", "ship", "Arbitrary Friendly Name", "glb", sourcePath, importedPath, "hash")),
+            CancellationToken.None);
+
+        var item = Assert.Single(await new ImportedContentSource().LoadAsync(_root, CancellationToken.None));
+
+        Assert.Equal("stable-model-id", item.Id);
+        Assert.Equal(importedPath, item.Path);
+        Assert.Equal("external", item.EditorRouteId);
+        Assert.Contains(RekallAgeContentCapability.OpenExternal, item.Capabilities);
+        Assert.DoesNotContain(RekallAgeContentCapability.Open, item.Capabilities);
+    }
+
+    [Theory]
+    [InlineData("mesh-edit", "mesh", "open-external")]
+    [InlineData("external", "texture", "open")]
+    [InlineData("shader-edit", "shader", "open")]
+    public async Task RouteRequiresItsSpecificCapability(string route, string kind, string wrongCapability)
+    {
+        var target = new RecordingTarget();
+        var item = Item(route, kind, ExistingFile("capability")) with { Capabilities = [wrongCapability] };
+
+        var result = await new RekallAgeStudioContentOpenRouter(target).OpenAsync(item, CancellationToken.None);
+
+        Assert.False(result.Opened);
+        Assert.Equal("REKALL_CONTENT_OPEN_UNAVAILABLE", result.Code);
+        Assert.Empty(target.Calls);
     }
 
     [Fact]
@@ -142,7 +196,7 @@ public sealed class StudioContentOpenRouterTests : IDisposable
     [Fact]
     public async Task ViewModelOpenCommandProjectsStructuredRouterResultIntoContentStatus()
     {
-        var router = new RecordingRouter(new(true, "REKALL_CONTENT_OPENED", "Opened Content.", "code", "source-edit"));
+        var router = new RecordingRouter(new(true, "REKALL_CONTENT_OPENED", "Opened Content.", "modeling", "node-contracts"));
         await using var viewModel = new RekallAgeStudioViewModel(router);
         var project = Path.Combine(_root, "command-project");
         viewModel.ProjectPathInput = project;
@@ -154,7 +208,61 @@ public sealed class StudioContentOpenRouterTests : IDisposable
         await ((RekallAgeAsyncCommand)viewModel.OpenSelectedContentCommand).ExecuteAsync(null);
 
         Assert.Equal("REKALL_CONTENT_OPENED · Opened Content.", viewModel.ContentStatusText);
+        Assert.Equal("Modeling", viewModel.SelectedStudioWorkspace);
+        Assert.Equal("node-contracts", viewModel.SelectedModelingSurface);
         Assert.Single(router.Items);
+    }
+
+    [Fact]
+    public async Task FailedAuthoredMeshOpenDoesNotMutateSelectedMeshAssetId()
+    {
+        await using var viewModel = new RekallAgeStudioViewModel();
+        var project = Path.Combine(_root, "missing-mesh-project");
+        viewModel.ProjectPathInput = project;
+        viewModel.ProjectNameInput = "Missing Mesh Test";
+        viewModel.SceneNameInput = "Main";
+        await ((RekallAgeAsyncCommand)viewModel.CreateCommand).ExecuteAsync(null);
+        viewModel.SelectedContentItem = Item("mesh-edit", "mesh", ExistingFile("not-an-authored-mesh")) with
+        {
+            DisplayName = "friendly-name-is-not-an-asset-id"
+        };
+
+        await ((RekallAgeAsyncCommand)viewModel.OpenSelectedContentCommand).ExecuteAsync(null);
+
+        Assert.Null(viewModel.SelectedMeshAssetId);
+        Assert.StartsWith("REKALL_CONTENT_OPEN_FAILED", viewModel.ContentStatusText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ProductionCommandRejectsExternalRouteWithoutOpenExternalCapability()
+    {
+        await using var viewModel = new RekallAgeStudioViewModel();
+        var project = Path.Combine(_root, "external-capability-project");
+        viewModel.ProjectPathInput = project;
+        viewModel.ProjectNameInput = "External Capability Test";
+        viewModel.SceneNameInput = "Main";
+        await ((RekallAgeAsyncCommand)viewModel.CreateCommand).ExecuteAsync(null);
+        viewModel.SelectedContentItem = Item("external", "texture", ExistingFile("do-not-launch")) with
+        {
+            Capabilities = [RekallAgeContentCapability.Open]
+        };
+
+        Assert.False(viewModel.OpenSelectedContentCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ShellAndModelingWorkspaceBindToRouterNavigationState()
+    {
+        var repository = FindRepositoryRoot();
+        var shell = File.ReadAllText(Path.Combine(repository, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+        var modeling = File.ReadAllText(Path.Combine(repository, "src", "Rekall.Age.Studio", "ModelingWorkspace.xaml"));
+
+        Assert.Contains("SelectedValue=\"{Binding SelectedStudioWorkspace, Mode=TwoWay}\"", shell, StringComparison.Ordinal);
+        Assert.Contains("SelectedValuePath=\"Tag\"", shell, StringComparison.Ordinal);
+        Assert.Contains("SelectedValue=\"{Binding SelectedModelingSurface, Mode=TwoWay}\"", modeling, StringComparison.Ordinal);
+        Assert.Contains("Tag=\"mesh-edit\"", modeling, StringComparison.Ordinal);
+        Assert.Contains("Tag=\"node-contracts\"", modeling, StringComparison.Ordinal);
+        Assert.Contains("Tag=\"material-graph\"", modeling, StringComparison.Ordinal);
     }
 
     private string ExistingFile(string name)
@@ -166,7 +274,17 @@ public sealed class StudioContentOpenRouterTests : IDisposable
 
     private static RekallAgeContentBrowserItem Item(string route, string kind, string? path) => new(
         "content-id", "Content", "family", kind, "Authored", path, null, "1", route,
-        [RekallAgeContentCapability.Open], "Healthy", null, new());
+        [route is "external" or "texture-preview" or "audio-preview" or "shader-edit"
+            ? RekallAgeContentCapability.OpenExternal
+            : RekallAgeContentCapability.Open], "Healthy", null, new());
+
+    private static string FindRepositoryRoot()
+    {
+        var current = AppContext.BaseDirectory;
+        while (current is not null && !Directory.Exists(Path.Combine(current, "src")))
+            current = Directory.GetParent(current)?.FullName;
+        return current ?? throw new InvalidOperationException("Repository root was not found.");
+    }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
@@ -178,7 +296,6 @@ public sealed class StudioContentOpenRouterTests : IDisposable
         public ValueTask SelectGraphAsync(RekallAgeContentBrowserItem item, CancellationToken token) => Record("modeling-graph", item, token);
         public ValueTask SelectMaterialAsync(RekallAgeContentBrowserItem item, CancellationToken token) => Record(item.EditorRouteId, item, token);
         public ValueTask SelectModuleSourceAsync(RekallAgeContentBrowserItem item, CancellationToken token) => Record("module-source", item, token);
-        public ValueTask SelectShaderAsync(RekallAgeContentBrowserItem item, CancellationToken token) => Record("shader-edit", item, token);
         public ValueTask OpenAssociatedAsync(RekallAgeContentBrowserItem item, CancellationToken token) => Record(item.EditorRouteId, item, token);
 
         private ValueTask Record(string route, RekallAgeContentBrowserItem item, CancellationToken token)
@@ -193,6 +310,9 @@ public sealed class StudioContentOpenRouterTests : IDisposable
     private sealed class RecordingRouter(RekallAgeStudioContentOpenResult result) : IRekallAgeStudioContentOpenRouter
     {
         public List<RekallAgeContentBrowserItem> Items { get; } = [];
+        public bool CanOpen(RekallAgeContentBrowserItem item) =>
+            item.Capabilities.Contains(RekallAgeContentCapability.Open, StringComparer.OrdinalIgnoreCase)
+            || item.Capabilities.Contains(RekallAgeContentCapability.OpenExternal, StringComparer.OrdinalIgnoreCase);
         public ValueTask<RekallAgeStudioContentOpenResult> OpenAsync(RekallAgeContentBrowserItem item, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

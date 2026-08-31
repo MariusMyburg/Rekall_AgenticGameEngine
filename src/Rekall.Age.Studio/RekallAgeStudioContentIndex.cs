@@ -128,9 +128,8 @@ internal sealed class ImportedContentSource : IRekallAgeStudioContentSource
                 "shader" => "shader",
                 _ => normalizedKind
             };
-            var route = family switch { "model" => "mesh-edit", "texture" => "texture-preview", "audio" => "audio-preview", "shader" => "shader-edit", _ => "external" };
-            var capabilities = new List<string> { RekallAgeContentCapability.Open };
-            if (family != "model") capabilities.Add(RekallAgeContentCapability.OpenExternal);
+            var route = family switch { "texture" => "texture-preview", "audio" => "audio-preview", "shader" => "shader-edit", _ => "external" };
+            var capabilities = new List<string> { RekallAgeContentCapability.OpenExternal };
             capabilities.Add(RekallAgeContentCapability.Reveal);
             capabilities.Add(RekallAgeContentCapability.Reimport);
             if (family == "model") capabilities.Add(RekallAgeContentCapability.Place);

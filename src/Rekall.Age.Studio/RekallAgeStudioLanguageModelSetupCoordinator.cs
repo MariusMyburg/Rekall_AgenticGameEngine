@@ -387,7 +387,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupWindowFactory
         {
             _ = window.Dispatcher.BeginInvoke(new Action(() =>
             {
-                if (window.IsVisible) window.Close();
+                window.CloseForCancellation();
             }));
         });
         _ = window.ShowDialog();

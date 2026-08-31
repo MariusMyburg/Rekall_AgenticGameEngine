@@ -43,6 +43,12 @@ public partial class LanguageModelSetupWindow : Window
     internal RekallAgeStudioLanguageModelSetupWindowOutcome Outcome { get; private set; } =
         RekallAgeStudioLanguageModelSetupWindowOutcome.ClosedIncomplete;
 
+    internal void CloseForCancellation()
+    {
+        _allowClose = true;
+        if (IsVisible) Close();
+    }
+
     private void OnProviderCardClick(object sender, RoutedEventArgs e)
     {
         if (sender is Button { Tag: string providerId }) ViewModel.SelectedProviderId = providerId;

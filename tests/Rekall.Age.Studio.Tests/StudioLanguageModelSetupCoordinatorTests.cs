@@ -363,6 +363,32 @@ public sealed class StudioLanguageModelSetupCoordinatorTests(WpfApplicationTestF
     });
 
     [Fact]
+    public Task ProductionWindowFactoryCancellationDoesNotOverwriteHealthySetupAsDeferred() =>
+        wpf.InvokeAsync(async () =>
+        {
+            var owner = new Window();
+            owner.Show();
+            var store = new RecordingSetupStore(CompletedSetup());
+            await using var viewModel = new RekallAgeStudioLanguageModelSetupViewModel(
+                store,
+                new EmptyCredentialStore(),
+                new FixedReadinessProbe(Ready()));
+            await viewModel.InitializeAsync(CancellationToken.None);
+            await viewModel.RefreshCurrentProviderAsync(CancellationToken.None);
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+                await RekallAgeStudioLanguageModelSetupWindowFactory.Instance.ShowAsync(
+                    owner,
+                    viewModel,
+                    cancellation.Token));
+
+            Assert.NotEmpty(store.SavedValues);
+            Assert.All(store.SavedValues, setup => Assert.True(setup.IsComplete));
+            owner.Close();
+        });
+
+    [Fact]
     public Task RecoveryWindowReceivesLoadedProviderModelAndBlockedReadiness() => wpf.InvokeAsync(async () =>
     {
         var setup = CompletedSetup() with

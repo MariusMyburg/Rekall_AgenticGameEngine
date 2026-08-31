@@ -86,6 +86,56 @@ public sealed class LanguageModelSetupViewModelTests
     }
 
     [Fact]
+    public async Task StartOllamaPollsUntilDelayedReadinessBecomesReady()
+    {
+        var probeCount = 0;
+        var probe = new RecordingProbe((request, _) => Task.FromResult(
+            Interlocked.Increment(ref probeCount) < 4
+                ? Blocked(request.ProviderId, "REKALL_ONBOARDING_OLLAMA_SERVICE_STOPPED", "start-ollama")
+                : Ready(request.ProviderId, "qwen3.8:27b")));
+        var delays = 0;
+        var actions = new RecordingActions((_, _, _) => Task.CompletedTask);
+        await using var viewModel = CreateViewModel(
+            probe: probe,
+            actions: actions,
+            remediationDelay: (_, cancellationToken) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                delays++;
+                return Task.CompletedTask;
+            });
+        await viewModel.SelectProviderAsync("ollama");
+
+        await viewModel.ExecuteRemediationAsync("start-ollama");
+
+        Assert.Equal(RekallAgeLanguageModelReadinessState.Ready, viewModel.ReadinessState);
+        Assert.Equal(4, probe.CallCount);
+        Assert.Equal(2, delays);
+    }
+
+    [Fact]
+    public async Task StartOllamaReadinessPollingCancelsWithWizardShutdown()
+    {
+        var delayStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var probe = new RecordingProbe((request, _) => Task.FromResult(
+            Blocked(request.ProviderId, "REKALL_ONBOARDING_OLLAMA_SERVICE_STOPPED", "start-ollama")));
+        var viewModel = CreateViewModel(
+            probe: probe,
+            remediationDelay: async (_, cancellationToken) =>
+            {
+                delayStarted.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            });
+        await viewModel.SelectProviderAsync("ollama");
+
+        var start = viewModel.ExecuteRemediationAsync("start-ollama");
+        await delayStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await viewModel.DisposeAsync();
+
+        Assert.True(start.IsCompleted);
+    }
+
+    [Fact]
     public async Task GgufCannotAdvancePastConfigurationUntilOllamaPrerequisitesAreReady()
     {
         var probe = new RecordingProbe((request, _) => Task.FromResult(
@@ -588,14 +638,16 @@ public sealed class LanguageModelSetupViewModelTests
         RecordingSetupStore? store = null,
         IRekallAgeStudioLanguageModelSetupActions? actions = null,
         RecordingEnvironment? environment = null,
-        Func<DateTimeOffset>? utcNow = null) => new(
+        Func<DateTimeOffset>? utcNow = null,
+        Func<TimeSpan, CancellationToken, Task>? remediationDelay = null) => new(
             store ?? new RecordingSetupStore(),
             credentials ?? new RecordingCredentialStore(),
             probe ?? new RecordingProbe((request, _) => Task.FromResult(
                 Blocked(request.ProviderId, "REKALL_ONBOARDING_NOT_CHECKED", "retry"))),
             actions ?? new RecordingActions((_, _, _) => Task.CompletedTask),
             environment ?? new RecordingEnvironment(new Dictionary<string, string>()),
-            utcNow ?? (() => DateTimeOffset.UtcNow));
+            utcNow ?? (() => DateTimeOffset.UtcNow),
+            remediationDelay);
 
     private sealed class RecordingUriLauncher : IRekallAgeStudioUriLauncher
     {

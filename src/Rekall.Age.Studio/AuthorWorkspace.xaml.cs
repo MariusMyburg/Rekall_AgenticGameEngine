@@ -6,10 +6,20 @@ namespace Rekall.Age.Studio;
 
 public partial class AuthorWorkspace : UserControl
 {
+    private readonly IRekallAgeStudioGgufFilePicker _ggufFilePicker;
+    private readonly Func<RekallAgeStudioViewModel, bool> _canBrowseGguf;
     internal Func<CancellationToken, Task>? FixSetupRequested { get; set; }
 
-    public AuthorWorkspace()
+    public AuthorWorkspace() : this(null)
     {
+    }
+
+    internal AuthorWorkspace(
+        IRekallAgeStudioGgufFilePicker? ggufFilePicker,
+        Func<RekallAgeStudioViewModel, bool>? canBrowseGguf = null)
+    {
+        _ggufFilePicker = ggufFilePicker ?? SystemAuthorGgufFilePicker.Instance;
+        _canBrowseGguf = canBrowseGguf ?? (viewModel => viewModel.CanBrowseGguf);
         InitializeComponent();
     }
 
@@ -37,14 +47,24 @@ public partial class AuthorWorkspace : UserControl
     private async void OnImportGgufClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not RekallAgeStudioViewModel viewModel) return;
-        var dialog = new OpenFileDialog
+        if (!_canBrowseGguf(viewModel)) return;
+        var path = _ggufFilePicker.Pick(Window.GetWindow(this), "Import a local GGUF model");
+        if (path is not null) await viewModel.ImportGgufModelAsync(path);
+    }
+
+    private sealed class SystemAuthorGgufFilePicker : IRekallAgeStudioGgufFilePicker
+    {
+        public static SystemAuthorGgufFilePicker Instance { get; } = new();
+        public string? Pick(Window? owner, string title)
         {
-            Title = "Import a local GGUF model",
-            Filter = "GGUF models (*.gguf)|*.gguf",
-            CheckFileExists = true,
-            Multiselect = false
-        };
-        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
-        await viewModel.ImportGgufModelAsync(dialog.FileName);
+            var dialog = new OpenFileDialog
+            {
+                Title = title,
+                Filter = "GGUF models (*.gguf)|*.gguf",
+                CheckFileExists = true,
+                Multiselect = false
+            };
+            return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
+        }
     }
 }

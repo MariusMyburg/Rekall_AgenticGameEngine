@@ -38,7 +38,8 @@ public sealed class LanguageModelWorkspaceSourceTests
         Assert.Contains("FixSetupRequested", code, StringComparison.Ordinal);
         Assert.Contains("AuthorWorkspaceHost.FixSetupRequested", main, StringComparison.Ordinal);
         Assert.Contains("_languageModelSetupCoordinator.ShowSetupAsync", main, StringComparison.Ordinal);
-        Assert.Contains("if (!LanguageModelSetupAllowsAuthoring)", viewModel, StringComparison.Ordinal);
+        Assert.Contains("if (!CanBrowseGguf)", viewModel, StringComparison.Ordinal);
+        Assert.Contains("IsEnabled=\"{Binding CanBrowseGguf}\"", xaml, StringComparison.Ordinal);
         Assert.Equal(5, Count(xaml, "<DataTrigger Binding=\"{Binding Is"));
         Assert.DoesNotContain("Visibility=\"Visible\" Content=\"Sign in to Codex\"", xaml, StringComparison.Ordinal);
     }

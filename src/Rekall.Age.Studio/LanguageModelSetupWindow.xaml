@@ -169,7 +169,7 @@
                                     <Button Content="Download qwen3.8:27b" Command="{Binding PullRecommendedOllamaModelCommand}" ToolTip="Download the recommended local model" />
                                 </WrapPanel>
                                 <TextBlock Text="{Binding RemediationProgress}" Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,7,0,0" />
-                                <Button Content="Browse for GGUF…" Click="OnBrowseGgufClick" HorizontalAlignment="Left" ToolTip="Choose a GGUF model file" AutomationProperties.Name="Browse for a GGUF model" />
+                                <Button x:Name="BrowseGgufButton" Content="Browse for GGUF…" Click="OnBrowseGgufClick" IsEnabled="{Binding CanBrowseGguf}" HorizontalAlignment="Left" ToolTip="Choose a GGUF model file after Ollama is ready" AutomationProperties.Name="Browse for a GGUF model" />
                                 <TextBlock x:Name="GgufSelectionStatus" Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,0" />
                             </StackPanel>
                         </Border>

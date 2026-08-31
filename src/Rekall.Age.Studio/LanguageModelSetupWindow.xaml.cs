@@ -11,6 +11,11 @@ internal interface IRekallAgeStudioProviderPageLauncher
     void Open(Uri uri);
 }
 
+internal interface IRekallAgeStudioGgufFilePicker
+{
+    string? Pick(Window? owner, string title);
+}
+
 internal enum RekallAgeStudioLanguageModelSetupWindowOutcome
 {
     Completed,
@@ -24,15 +29,18 @@ public partial class LanguageModelSetupWindow : Window
     private bool _closing;
     private bool _deferRequested;
     private readonly IRekallAgeStudioProviderPageLauncher _providerPageLauncher;
+    private readonly IRekallAgeStudioGgufFilePicker _ggufFilePicker;
 
     internal LanguageModelSetupWindow(
         Window owner,
         RekallAgeStudioLanguageModelSetupViewModel viewModel,
-        IRekallAgeStudioProviderPageLauncher? providerPageLauncher = null)
+        IRekallAgeStudioProviderPageLauncher? providerPageLauncher = null,
+        IRekallAgeStudioGgufFilePicker? ggufFilePicker = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ViewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _providerPageLauncher = providerPageLauncher ?? SystemProviderPageLauncher.Instance;
+        _ggufFilePicker = ggufFilePicker ?? SystemGgufFilePicker.Instance;
         Owner = owner;
         DataContext = ViewModel;
         InitializeComponent();
@@ -92,16 +100,24 @@ public partial class LanguageModelSetupWindow : Window
 
     private void OnBrowseGgufClick(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFileDialog
+        if (!ViewModel.CanBrowseGguf) return;
+        var path = _ggufFilePicker.Pick(this, "Choose a local GGUF model");
+        if (path is not null) GgufSelectionStatus.Text = $"Selected: {path}";
+    }
+
+    private sealed class SystemGgufFilePicker : IRekallAgeStudioGgufFilePicker
+    {
+        public static SystemGgufFilePicker Instance { get; } = new();
+        public string? Pick(Window? owner, string title)
         {
-            Title = "Choose a local GGUF model",
-            Filter = "GGUF models (*.gguf)|*.gguf",
-            CheckFileExists = true,
-            Multiselect = false
-        };
-        if (dialog.ShowDialog(this) == true)
-        {
-            GgufSelectionStatus.Text = $"Selected: {dialog.FileName}";
+            var dialog = new OpenFileDialog
+            {
+                Title = title,
+                Filter = "GGUF models (*.gguf)|*.gguf",
+                CheckFileExists = true,
+                Multiselect = false
+            };
+            return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
         }
     }
 

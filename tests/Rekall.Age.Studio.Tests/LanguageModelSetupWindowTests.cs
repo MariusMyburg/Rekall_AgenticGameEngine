@@ -4,6 +4,9 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using Rekall.Age.Agent.LanguageModels;
+using Rekall.Age.Core.Commands;
+using Rekall.Age.Editor;
+using Rekall.Age.Workflows;
 using Rekall.Age.Studio;
 
 namespace Rekall.Age.Studio.Tests;
@@ -145,6 +148,57 @@ public sealed class LanguageModelSetupWindowTests(WpfApplicationTestFixture wpf)
     }
 
     [Fact]
+    public async Task GgufBrowseDoesNotOpenPickerUntilLocalPrerequisitesAreReady()
+    {
+        await wpf.InvokeAsync(async () =>
+        {
+            var owner = new Window();
+            owner.Show();
+            var picker = new RecordingGgufPicker();
+            var blocked = CreateViewModel(probe: new FixedReadinessProbe(RekallAgeLanguageModelReadinessState.Blocked));
+            await blocked.SelectProviderAsync("gguf");
+            var blockedWindow = new LanguageModelSetupWindow(owner, blocked, ggufFilePicker: picker);
+            blockedWindow.Show();
+            Assert.IsType<Button>(blockedWindow.FindName("BrowseGgufButton"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(0, picker.ShowCount);
+            await CloseWindowAsync(blockedWindow);
+
+            var ready = CreateViewModel(probe: new FixedReadinessProbe(RekallAgeLanguageModelReadinessState.Ready));
+            await ready.SelectProviderAsync("gguf");
+            var readyWindow = new LanguageModelSetupWindow(owner, ready, ggufFilePicker: picker);
+            readyWindow.Show();
+            Assert.IsType<Button>(readyWindow.FindName("BrowseGgufButton"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(1, picker.ShowCount);
+            await CloseWindowAsync(readyWindow);
+            owner.Close();
+        });
+    }
+
+    [Fact]
+    public void AuthorGgufBrowseGuardsThePickerBeforeOpeningIt()
+    {
+        wpf.Invoke(() =>
+        {
+            var picker = new RecordingGgufPicker();
+            using var client = new EmptyLanguageModelClient();
+            var studio = new RekallAgeStudioViewModel(
+                new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create()),
+                client);
+            var blocked = new AuthorWorkspace(picker, _ => false) { DataContext = studio };
+            Assert.IsType<Button>(blocked.FindName("ImportGgufButton"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(0, picker.ShowCount);
+
+            var ready = new AuthorWorkspace(picker, _ => true) { DataContext = studio };
+            Assert.IsType<Button>(ready.FindName("ImportGgufButton"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(1, picker.ShowCount);
+        });
+    }
+
+    [Fact]
     public async Task ClosingAVisibleWindowDefersIncompleteSetupAndCancelsActiveProbe()
     {
         await wpf.InvokeAsync(async () =>
@@ -282,6 +336,39 @@ public sealed class LanguageModelSetupWindowTests(WpfApplicationTestFixture wpf)
                 [],
                 "retry",
                 true));
+    }
+
+    private sealed class FixedReadinessProbe(RekallAgeLanguageModelReadinessState state)
+        : IRekallAgeLanguageModelReadinessProbe
+    {
+        public ValueTask<RekallAgeLanguageModelReadinessResult> ProbeAsync(
+            RekallAgeLanguageModelReadinessRequest request,
+            CancellationToken cancellationToken) => ValueTask.FromResult(new RekallAgeLanguageModelReadinessResult(
+                request.ProviderId, state, "fixed", "fixed", [],
+                state == RekallAgeLanguageModelReadinessState.Ready ? ["qwen3.8:27b"] : [],
+                state == RekallAgeLanguageModelReadinessState.Ready ? null : "start-ollama",
+                state != RekallAgeLanguageModelReadinessState.Ready));
+    }
+
+    private sealed class RecordingGgufPicker : IRekallAgeStudioGgufFilePicker
+    {
+        public int ShowCount { get; private set; }
+        public string? Pick(Window? owner, string title)
+        {
+            ShowCount++;
+            return "C:\\models\\ready.gguf";
+        }
+    }
+
+    private sealed class EmptyLanguageModelClient : IRekallAgeLanguageModelClient, IDisposable
+    {
+        public string ProviderId => "test";
+        public ValueTask<IReadOnlyList<RekallAgeLanguageModelInfo>> ListModelsAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<RekallAgeLanguageModelInfo>>([]);
+        public ValueTask<RekallAgeLanguageModelResponse> ChatAsync(
+            RekallAgeLanguageModelRequest request,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+        public void Dispose() { }
     }
 
     private sealed class BlockingReadinessProbe : IRekallAgeLanguageModelReadinessProbe

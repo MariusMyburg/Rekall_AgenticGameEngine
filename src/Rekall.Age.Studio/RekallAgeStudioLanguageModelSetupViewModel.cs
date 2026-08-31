@@ -41,6 +41,15 @@ internal interface IRekallAgeStudioProcessLauncher
     ValueTask RunAsync(ProcessStartInfo startInfo, IProgress<string>? progress, CancellationToken cancellationToken);
 }
 
+internal static class RekallAgeStudioLocalModelReadiness
+{
+    public static bool CanBrowseGguf(string providerId, RekallAgeLanguageModelReadinessState state) =>
+        providerId == "gguf" && state == RekallAgeLanguageModelReadinessState.Ready;
+
+    public static bool CanBrowseGguf(string providerId, bool runtimeReady) =>
+        providerId == "gguf" && runtimeReady;
+}
+
 internal sealed class RekallAgeStudioLanguageModelSetupActions(
     IRekallAgeStudioUriLauncher? uriLauncher = null,
     IRekallAgeStudioProcessLauncher? processLauncher = null) : IRekallAgeStudioLanguageModelSetupActions
@@ -145,6 +154,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     private readonly IRekallAgeStudioLanguageModelSetupActions _actions;
     private readonly IRekallAgeEnvironmentValueSource _environment;
     private readonly Func<DateTimeOffset> _utcNow;
+    private readonly Func<TimeSpan, CancellationToken, Task> _remediationDelay;
     private readonly SynchronizationContext? _synchronizationContext;
     private readonly CancellationTokenSource _lifecycleCancellation = new();
     private readonly object _operationSync = new();
@@ -177,7 +187,8 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         IRekallAgeLanguageModelReadinessProbe readinessProbe,
         IRekallAgeStudioLanguageModelSetupActions? actions = null,
         IRekallAgeEnvironmentValueSource? environment = null,
-        Func<DateTimeOffset>? utcNow = null)
+        Func<DateTimeOffset>? utcNow = null,
+        Func<TimeSpan, CancellationToken, Task>? remediationDelay = null)
     {
         _setupStore = setupStore ?? throw new ArgumentNullException(nameof(setupStore));
         _credentialStore = credentialStore ?? throw new ArgumentNullException(nameof(credentialStore));
@@ -185,6 +196,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         _actions = actions ?? new RekallAgeStudioLanguageModelSetupActions();
         _environment = environment ?? SystemEnvironment.Instance;
         _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
+        _remediationDelay = remediationDelay ?? ((delay, token) => Task.Delay(delay, token));
         _synchronizationContext = SynchronizationContext.Current;
 
         NextCommand = CreateCommand(MoveNextAsync, CanMoveNext);
@@ -234,6 +246,8 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     public bool IsKimiSelected => SelectedProviderId == "kimi";
     public bool IsOpenAiSelected => SelectedProviderId == "openai";
     public bool IsCodexSelected => SelectedProviderId == "codex";
+
+    public bool CanBrowseGguf => RekallAgeStudioLocalModelReadiness.CanBrowseGguf(SelectedProviderId, ReadinessState);
 
     public ObservableCollection<string> CompatibleModels { get; } = [];
     public ObservableCollection<RekallAgeStudioLanguageModelReadinessRow> ReadinessRows { get; } = [];
@@ -533,6 +547,11 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
             await _actions.ExecuteAsync(actionId, providerId, progress, cancellationToken).ConfigureAwait(false);
             if (!IsCurrentOperation(providerId, generation)) return;
             var settings = RebuildActiveProviderSettings();
+            if (actionId == StartOllamaActionId)
+            {
+                await PollLocalReadinessAsync(providerId, settings, generation, cancellationToken).ConfigureAwait(false);
+                return;
+            }
             await ResolveCredentialAndProbeAsync(
                     providerId,
                     SelectedModelId,
@@ -541,6 +560,31 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
                     cancellationToken)
                 .ConfigureAwait(false);
         });
+    }
+
+    private async Task PollLocalReadinessAsync(
+        string providerId,
+        RekallAgeLanguageModelProviderSettings settings,
+        long generation,
+        CancellationToken cancellationToken)
+    {
+        const int maximumAttempts = 6;
+        for (var attempt = 0; attempt < maximumAttempts; attempt++)
+        {
+            if (attempt > 0)
+                await _remediationDelay(TimeSpan.FromMilliseconds(250), cancellationToken).ConfigureAwait(false);
+            var result = await _readinessProbe.ProbeAsync(
+                new RekallAgeLanguageModelReadinessRequest(providerId, SelectedModelId, settings),
+                cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsCurrentOperation(providerId, generation)) return;
+            var sensitiveValues = SensitiveValues(settings);
+            await PublishOnUiAsync(() =>
+            {
+                if (IsCurrentOperation(providerId, generation)) PublishReadiness(result, sensitiveValues);
+            }).ConfigureAwait(false);
+            if (result.State == RekallAgeLanguageModelReadinessState.Ready) return;
+        }
     }
 
     internal Task WaitForActiveOperationAsync()
@@ -905,6 +949,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
             SelectedModelId = string.Empty;
         }
         OnPropertyChanged(nameof(CanFinish));
+        OnPropertyChanged(nameof(CanBrowseGguf));
         RaiseCommands();
     }
 
@@ -955,6 +1000,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         RecommendedActionId = null;
         Replace(CompatibleModels, []);
         Replace(ReadinessRows, []);
+        OnPropertyChanged(nameof(CanBrowseGguf));
     }
 
     private RekallAgeLanguageModelProviderSettings CreateNonSecretSettings() => new()
@@ -1088,6 +1134,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         OnPropertyChanged(nameof(IsKimiSelected));
         OnPropertyChanged(nameof(IsOpenAiSelected));
         OnPropertyChanged(nameof(IsCodexSelected));
+        OnPropertyChanged(nameof(CanBrowseGguf));
         RaiseCommands();
     }
 

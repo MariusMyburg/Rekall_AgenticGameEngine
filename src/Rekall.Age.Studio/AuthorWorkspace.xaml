@@ -84,7 +84,7 @@
                                     <TextBlock Text="Choose a local GGUF file. Studio imports it through Ollama, then makes it available in the model list."
                                                Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,3,0,7" />
                                     <WrapPanel>
-                                        <Button Content="Browse and import GGUF…" Click="OnImportGgufClick" />
+                                        <Button x:Name="ImportGgufButton" Content="Browse and import GGUF…" Click="OnImportGgufClick" IsEnabled="{Binding CanBrowseGguf}" />
                                         <Button Content="Refresh imported models" Command="{Binding RefreshLanguageModelsCommand}" />
                                     </WrapPanel>
                                 </StackPanel>

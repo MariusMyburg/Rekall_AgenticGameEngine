@@ -165,6 +165,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string? _sessionOpenAiUrl;
     private string? _sessionKimiUrl;
     private bool _languageModelSetupAllowsAuthoring = true;
+    private bool _localModelRuntimeReady;
     private bool _languageModelSetupBusy;
     private bool _isBusy;
     private bool _isAgentRunning;
@@ -932,6 +933,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 OnPropertyChanged(nameof(IsKimiSelected));
                 OnPropertyChanged(nameof(IsOpenAiSelected));
                 OnPropertyChanged(nameof(IsCodexSelected));
+                _localModelRuntimeReady = false;
+                OnPropertyChanged(nameof(CanBrowseGguf));
                 QueueLanguageModelProviderTransition(value);
             }
             RefreshCommands();
@@ -976,6 +979,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public bool IsOpenAiSelected => SelectedLanguageModelProvider.Id == "openai";
 
     public bool IsCodexSelected => SelectedLanguageModelProvider.Id == "codex";
+
+    public bool CanBrowseGguf => RekallAgeStudioLocalModelReadiness.CanBrowseGguf(
+        SelectedLanguageModelProvider.Id,
+        _localModelRuntimeReady);
 
     public bool HasUsableLanguageModel => LanguageModels.Contains(SelectedLanguageModel, StringComparer.Ordinal);
 
@@ -4217,6 +4224,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         var previousSelection = SelectedLanguageModel;
         var isOllamaBacked = provider.Id is "ollama" or "gguf";
+        _localModelRuntimeReady = isOllamaBacked;
+        OnPropertyChanged(nameof(CanBrowseGguf));
         var authoringModels = isOllamaBacked
             ? models.Where(model => model.SupportsTools is not false).ToArray()
             : models.ToArray();
@@ -4316,6 +4325,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 || !ReferenceEquals(_languageModelRunner, runner)) return;
             Replace(LanguageModels, []);
             SelectedLanguageModel = string.Empty;
+            InvalidateLocalModelReadiness(provider.Id);
             ReportLanguageModelProviderFailure(exception);
         }
     }
@@ -4330,6 +4340,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             if (!IsCurrentLanguageModelTransitionLocked(provider, generation)) return;
             Replace(LanguageModels, []);
             SelectedLanguageModel = string.Empty;
+            InvalidateLocalModelReadiness(provider.Id);
             ReportLanguageModelProviderFailure(exception);
         }
     }
@@ -4360,6 +4371,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             KimiApiKey = _sessionKimiApiKey ?? ReadFirstEnvironmentValue("KIMI_API_KEY", "MOONSHOT_API_KEY"),
             KimiUrl = _sessionKimiUrl ?? Environment.GetEnvironmentVariable("REKALL_AGE_KIMI_URL")
         };
+    }
+
+    private void InvalidateLocalModelReadiness(string providerId)
+    {
+        if (providerId is not ("ollama" or "gguf")) return;
+        _localModelRuntimeReady = false;
+        OnPropertyChanged(nameof(CanBrowseGguf));
     }
 
     private static string? ReadFirstEnvironmentValue(params string[] names)
@@ -4824,7 +4842,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public async Task ImportGgufModelAsync(string? ggufPath)
     {
-        if (!LanguageModelSetupAllowsAuthoring)
+        if (!CanBrowseGguf)
         {
             ProviderStatus = "Local model setup needs attention. Choose Fix setup before importing a GGUF model.";
             ProviderDisplayStatus = ProviderStatus;

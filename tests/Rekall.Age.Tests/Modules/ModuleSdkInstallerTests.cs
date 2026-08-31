@@ -22,6 +22,7 @@ public sealed class ModuleSdkInstallerTests
         Assert.True(File.Exists(result.ManifestPath));
         var props = await File.ReadAllTextAsync(result.PropsPath);
         Assert.Contains("Rekall.Age.Modules.dll", props);
+        Assert.Contains("Rekall.Age.Modeling.dll", props);
         Assert.DoesNotContain(Path.GetFullPath("."), props, StringComparison.OrdinalIgnoreCase);
     }
 

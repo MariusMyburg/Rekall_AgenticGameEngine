@@ -1,4 +1,6 @@
 using System.Text.Json.Nodes;
+using Rekall.Age.Modeling;
+using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.Modules;
 using Rekall.Age.Runtime.Abstractions;
 
@@ -354,7 +356,7 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
     }
 
     /// <summary>
-    /// Scatters procedurally generated trees (see ProceduralTreeGenerator) along both shoulders
+    /// Scatters trees from AGE's generic realistic procedural-tree generator along both shoulders
     /// of the road, well outside the guard rails so they read as roadside dressing rather than a
     /// driving hazard. Every tree in a chunk shares the chunk's own deterministic seed sequence,
     /// so a given seed always regrows the identical forest - the same replay-stability guarantee
@@ -363,7 +365,7 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
     private static RekallAgeRuntimeWorld SpawnRoadsideTrees(RekallAgeRuntimeWorld world, int chunkIndex, double startX, int seed)
     {
         const int treesPerSide = 1;
-        const double spawnChance = 0.5; // thins concurrent tree count further - see the per-frame render cost note on ProceduralTreeGenerator
+        const double spawnChance = 0.5;
         for (var side = -1; side <= 1; side += 2)
         {
             for (var slot = 0; slot < treesPerSide; slot++)
@@ -378,15 +380,21 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
                 var lateral = RekallAgeRuntimeModuleSdk.DeterministicRange(seed, sequenceBase + 2, RoadHalfWidth + 2.5, RoadHalfWidth + 9);
                 var x = startX + alongChunk;
                 var treeSeed = seed + chunkIndex + (side > 0 ? 500 : 0) + slot;
-                var mesh = ProceduralTreeGenerator.Generate(treeSeed, sequenceBase + 3);
+                var treeLod = RekallAgeProceduralTreeGenerator.GenerateLod(
+                    $"road-tree-{treeSeed}-{sequenceBase}", "Roadside oak",
+                    RekallAgeProceduralTreeSettings.TemperateOak(treeSeed), level: 1);
+                // The moving road uses the balanced middle LOD. Static authored scenes can save
+                // all three generated surfaces and connect them with the ordinary Rekall.LodGroup.
+                var barkMesh = ToGeometryMesh(treeLod.Bark);
+                var foliageMesh = ToGeometryMesh(treeLod.Foliage);
                 var treeId = $"tree-{chunkIndex}-{side}-{slot}";
                 var tree = RekallAgeRuntimeModuleSdk.CreateEntity(treeId, $"Tree {chunkIndex}/{side}/{slot}")
                     .WithTag("road-chunk")
                     .WithPosition3D(new RekallAgeRuntimeVector3(x, 0, lateral * side))
                     .UpsertComponent("Rekall.GeometryMesh", new JsonObject
                     {
-                        ["vertices"] = mesh.Vertices,
-                        ["indices"] = mesh.Indices
+                        ["vertices"] = barkMesh.Vertices,
+                        ["indices"] = barkMesh.Indices
                     })
                     .UpsertComponent("Rekall.Material", new JsonObject
                     {
@@ -398,10 +406,48 @@ public sealed class MidnightRiderSystem : IRekallAgeRuntimeModuleSystem
                     .UpsertComponent("Rekall.CapsuleCollider3D", new JsonObject { ["radius"] = 0.24, ["length"] = 1.6 })
                     .UpsertComponent("Rekall.PhysicsMaterial3D", new JsonObject { ["friction"] = 0.9, ["restitution"] = 0.05 });
                 world = world.AddEntity(tree);
+
+                var leaves = RekallAgeRuntimeModuleSdk.CreateEntity($"{treeId}-foliage", $"Tree {chunkIndex}/{side}/{slot} foliage")
+                    .WithTag("road-chunk")
+                    .WithTag("foliage")
+                    .WithPosition3D(new RekallAgeRuntimeVector3(x, 0, lateral * side))
+                    .UpsertComponent("Rekall.GeometryMesh", new JsonObject
+                    {
+                        ["vertices"] = foliageMesh.Vertices,
+                        ["indices"] = foliageMesh.Indices
+                    })
+                    .UpsertComponent("Rekall.Material", new JsonObject
+                    {
+                        ["baseColor"] = "#315b24",
+                        ["metallicFactor"] = 0.0,
+                        ["roughnessFactor"] = 0.78,
+                        ["alphaMode"] = "mask",
+                        ["alphaCutoff"] = 0.5
+                    })
+                    .UpsertComponent("Rekall.MeshRenderer", new JsonObject { ["active"] = true, ["castShadows"] = true, ["receiveShadows"] = true });
+                world = world.AddEntity(leaves);
             }
         }
 
         return world;
+    }
+
+    private static (JsonArray Vertices, JsonArray Indices) ToGeometryMesh(RekallAgeMeshAsset mesh)
+    {
+        var compiled = new RekallAgeMeshCompiler().Compile(mesh);
+        var vertices = new JsonArray();
+        foreach (var vertex in compiled.Vertices)
+        {
+            vertices.Add(new JsonObject
+            {
+                ["x"] = vertex.Position.X, ["y"] = vertex.Position.Y, ["z"] = vertex.Position.Z,
+                ["nx"] = vertex.Normal.X, ["ny"] = vertex.Normal.Y, ["nz"] = vertex.Normal.Z,
+                ["u"] = vertex.Uv.X, ["v"] = vertex.Uv.Y,
+                ["r"] = vertex.Color.X, ["g"] = vertex.Color.Y, ["b"] = vertex.Color.Z, ["a"] = vertex.Color.W
+            });
+        }
+        var indices = new JsonArray(compiled.Indices.Select(index => (JsonNode?)JsonValue.Create(index)).ToArray());
+        return (vertices, indices);
     }
 
     private static RekallAgeRuntimeWorld SpawnStreetLight(RekallAgeRuntimeWorld world, int chunkIndex, double x, double lateralOffset)

@@ -7313,3 +7313,21 @@ least 2026-08-22 (long before this session's tree work), at wildly varying frame
 At every verified milestone, update the timestamp, verified status, current
 gaps, in-progress item, and next item in this file in the same commit as the
 milestone documentation or immediately after the verification completes.
+## 2026-09-01 (realistic procedural trees)
+
+- Replaced Midnight Rider's deliberately stylized two-generation/octet-blob tree generator with
+  the generic `RekallAgeProceduralTreeGenerator` in `Rekall.Age.Modeling`.
+- The temperate-oak preset now produces deterministic broad, asymmetric crown architecture with
+  phyllotactic primary placement, apical/tropic bias, droop, curved hierarchical branchlets,
+  exponential taper, non-circular bark rings, visible root flare, parallel-transport normals,
+  and longitudinal bark UVs.
+- Bark and foliage are separate mesh/material surfaces. Foliage is made from hundreds of
+  atlas-ready crossed pointed leaf silhouettes rather than octahedral blobs or untextured
+  rectangles. Three monotonic LOD recipes bound branch resolution and leaf counts; runtime
+  callers may generate only the selected LOD to avoid unused work.
+- Enabled the renderer's already-implemented `mask` alpha mode in the public `Rekall.Material`
+  schema, making alpha-cutout foliage authorable without adding a vegetation-specific shader.
+- Added `Rekall.Age.Modeling.dll` to the project-local module SDK so agent-authored modules can
+  consume generic modeling generators. Midnight Rider now uses the balanced middle tier as two
+  ordinary bark/foliage entities, and a 10-frame runtime inspection spawned both surfaces with
+  zero runtime observations.

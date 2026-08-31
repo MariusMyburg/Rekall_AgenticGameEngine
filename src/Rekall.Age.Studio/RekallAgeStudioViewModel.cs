@@ -5477,6 +5477,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             && property.Name.Equals("assetId", StringComparison.OrdinalIgnoreCase))?
         .Value;
 
+    internal async Task RefreshContentBrowserAsync()
+    {
+        await RefreshContentAsync();
+        ContentStatusText = $"Content refreshed · {ContentItems.Count} item(s).";
+        StatusText = ContentStatusText;
+    }
+
     private async Task RefreshContentAsync()
     {
         if (_session.ProjectRoot is null) return;

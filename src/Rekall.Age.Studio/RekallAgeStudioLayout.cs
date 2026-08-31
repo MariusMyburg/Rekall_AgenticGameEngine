@@ -35,11 +35,11 @@ internal sealed record RekallAgeStudioLayout(
     string ActiveOutputTab,
     IReadOnlyList<RekallAgeStudioDockPanelLayout> Panels)
 {
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 5;
 
-    private static readonly string[] PanelIds = ["Hierarchy", "Inspector", "Output"];
+    private static readonly string[] PanelIds = ["Hierarchy", "Inspector", "Output", "ContentBrowser"];
     private static readonly HashSet<string> OutputTabs = new(
-        ["Validation", "Assets", "Overview", "Actions", "Runtime", "Transactions", "Imports"],
+        ["Content Browser", "Validation", "Overview", "Actions", "Rendering", "Runtime", "Transactions", "Imports", "Delivery"],
         StringComparer.Ordinal);
 
     public string ActiveWorkspace { get; init; } = "Author";
@@ -51,11 +51,12 @@ internal sealed record RekallAgeStudioLayout(
         1500,
         940,
         false,
-        "Validation",
+        "Content Browser",
         [
             new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 340, 0),
             new("Inspector", RekallAgeStudioDockRegion.Right, true, 460, 0),
-            new("Output", RekallAgeStudioDockRegion.Bottom, true, 260, 0)
+            new("Output", RekallAgeStudioDockRegion.Bottom, true, 260, 0),
+            new("ContentBrowser", RekallAgeStudioDockRegion.Bottom, true, 260, 0)
         ])
     {
         ActiveWorkspace = "Author"
@@ -74,7 +75,8 @@ internal sealed record RekallAgeStudioLayout(
             [
                 new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 360, 0),
                 new("Inspector", RekallAgeStudioDockRegion.Right, true, 500, 0),
-                new("Output", RekallAgeStudioDockRegion.Bottom, true, 280, 0)
+                new("Output", RekallAgeStudioDockRegion.Bottom, true, 280, 0),
+                new("ContentBrowser", RekallAgeStudioDockRegion.Bottom, true, 280, 0)
             ]
         },
         RekallAgeStudioLayoutPreset.Debug => Default with
@@ -85,7 +87,8 @@ internal sealed record RekallAgeStudioLayout(
             [
                 new("Hierarchy", RekallAgeStudioDockRegion.Left, true, 330, 0),
                 new("Inspector", RekallAgeStudioDockRegion.Right, true, 460, 0),
-                new("Output", RekallAgeStudioDockRegion.Bottom, true, 420, 0)
+                new("Output", RekallAgeStudioDockRegion.Bottom, true, 420, 0),
+                new("ContentBrowser", RekallAgeStudioDockRegion.Bottom, true, 320, 0)
             ]
         },
         _ => Default
@@ -93,7 +96,7 @@ internal sealed record RekallAgeStudioLayout(
 
     public static RekallAgeStudioLayout? Normalize(RekallAgeStudioLayout? candidate)
     {
-        if (candidate is null || candidate.Version is not (1 or 2 or 3 or CurrentVersion) || candidate.Panels is null)
+        if (candidate is null || candidate.Version is not (1 or 2 or 3 or 4 or CurrentVersion) || candidate.Panels is null)
         {
             return null;
         }
@@ -109,6 +112,17 @@ internal sealed record RekallAgeStudioLayout(
         };
 
         var panels = candidate.Panels.ToArray();
+        if (sourceVersion < CurrentVersion
+            && panels.Length == 3
+            && panels.All(panel => panel is not null)
+            && panels.All(panel => !panel.Id.Equals("ContentBrowser", StringComparison.Ordinal)))
+        {
+            var outputSize = panels.FirstOrDefault(panel => panel.Id.Equals("Output", StringComparison.Ordinal))?.Size
+                ?? Default.Panel("ContentBrowser").Size;
+            panels = [.. panels, Default.Panel("ContentBrowser") with { Size = Math.Max(190, outputSize) }];
+            if (candidate.ActiveOutputTab.Equals("Assets", StringComparison.Ordinal))
+                candidate = candidate with { ActiveOutputTab = "Content Browser" };
+        }
         if (panels.Length != PanelIds.Length
             || panels.Any(panel => panel is null || string.IsNullOrWhiteSpace(panel.Id))
             || panels.Select(panel => panel.Id).Distinct(StringComparer.Ordinal).Count() != PanelIds.Length
@@ -116,7 +130,7 @@ internal sealed record RekallAgeStudioLayout(
         {
             return null;
         }
-        if (sourceVersion < CurrentVersion)
+        if (sourceVersion < 4)
         {
             panels = MigrateLegacyPanelWidths(panels);
         }
@@ -174,8 +188,8 @@ internal sealed record RekallAgeStudioLayout(
     {
         var fallback = Default.Panel(id).Size;
         if (!double.IsFinite(value)) return fallback;
-        return id.Equals("Output", StringComparison.Ordinal)
-            ? Math.Clamp(value, 140, 640)
+        return id is "Output" or "ContentBrowser"
+            ? Math.Clamp(value, id == "ContentBrowser" ? 190 : 140, 640)
             : Math.Clamp(value, 180, 720);
     }
 }

@@ -147,6 +147,10 @@
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>
             <MenuItem x:Name="ExamplesMenu" Header="_Examples" />
+            <MenuItem Header="_View">
+                <MenuItem Header="_Content Browser" Click="OnShowContentBrowserClick"
+                          ToolTip="Restore and focus the project Content Browser" />
+            </MenuItem>
             <MenuItem Header="_Settings">
                 <MenuItem Header="Language Model Setup…" Click="OnLanguageModelSetupClick"
                           IsEnabled="{Binding CanOpenLanguageModelSetup, ElementName=StudioWindow}">
@@ -367,23 +371,23 @@
                                        TextAlignment="Center" TextWrapping="Wrap" MaxWidth="540" />
                         </StackPanel>
                     </Grid>
-                    <Border Grid.Row="2" Background="#E3151920" BorderBrush="#394451" BorderThickness="1,1,0,0" Padding="5">
+                    <Border x:Name="WorldTransformStrip" Grid.Row="2" Background="#E3151920" BorderBrush="#394451" BorderThickness="1,1,0,0" Padding="5">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="Transform" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="3,0,5,0" />
                             <ComboBox Width="76" ItemsSource="{Binding TransformTools}" SelectedItem="{Binding TransformTool}" />
                             <ComboBox Width="70" Margin="5,0,0,0" ItemsSource="{Binding TransformSpaces}" SelectedItem="{Binding TransformSpace}" />
                             <TextBlock Text="Move" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="8,0,4,0" />
-                            <TextBox x:Name="MoveSnapEditor" MinWidth="64" Padding="8,4"
+                            <TextBox x:Name="MoveSnapEditor" MinWidth="72" Padding="8,4"
                                      AutomationProperties.Name="Move snap distance"
                                      HorizontalContentAlignment="Right"
                                      Text="{Binding MoveSnap, UpdateSourceTrigger=LostFocus}" />
                             <TextBlock Text="°" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="8,0,4,0" />
-                            <TextBox x:Name="RotationSnapEditor" MinWidth="64" Padding="8,4"
+                            <TextBox x:Name="RotationSnapEditor" MinWidth="72" Padding="8,4"
                                      AutomationProperties.Name="Rotation snap angle"
                                      HorizontalContentAlignment="Right"
                                      Text="{Binding RotationSnap, UpdateSourceTrigger=LostFocus}" />
                             <TextBlock Text="Scale" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="8,0,4,0" />
-                            <TextBox x:Name="ScaleSnapEditor" MinWidth="64" Padding="8,4"
+                            <TextBox x:Name="ScaleSnapEditor" MinWidth="72" Padding="8,4"
                                      AutomationProperties.Name="Scale snap increment"
                                      HorizontalContentAlignment="Right"
                                      Text="{Binding ScaleSnap, UpdateSourceTrigger=LostFocus}" />
@@ -773,7 +777,9 @@
                     </TabControl>
                 </TabItem>
                 <TabItem Header="Validation"><ListBox ItemsSource="{Binding ValidationLines}" /></TabItem>
-                <TabItem Header="Assets"><ListBox ItemsSource="{Binding AssetLines}" /></TabItem>
+                <TabItem x:Name="ContentBrowserPanel" Header="Content Browser">
+                    <local:ContentBrowser x:Name="ContentBrowserHost" />
+                </TabItem>
                 <TabItem Header="Overview"><ListBox ItemsSource="{Binding SceneSummaryLines}" /></TabItem>
                 <TabItem Header="Actions"><ListBox ItemsSource="{Binding ActionLines}" /></TabItem>
                 <TabItem Header="Rendering">
@@ -955,6 +961,9 @@
                     </Grid>
                 </TabItem>
             </TabControl>
+            <GridSplitter x:Name="ContentBrowserSplitter" Grid.Column="1" Grid.Row="1"
+                          Height="5" VerticalAlignment="Top" HorizontalAlignment="Stretch"
+                          Background="Transparent" ResizeDirection="Rows" ResizeBehavior="PreviousAndCurrent" />
             <StackPanel Grid.Column="0" Grid.ColumnSpan="3" Grid.Row="2">
                 <Border Padding="10,6" Margin="8,0,8,6" CornerRadius="5"
                         Background="#332C5364" BorderBrush="{StaticResource Accent}" BorderThickness="1">

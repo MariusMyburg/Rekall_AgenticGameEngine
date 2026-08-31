@@ -8,6 +8,54 @@ namespace Rekall.Age.Studio.Tests;
 public sealed class StudioLayoutTests
 {
     [Fact]
+    public void WorldHostsOneResizableContentBrowserAndOneReadableTransformStrip()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+
+        Assert.Contains("x:Name=\"ContentBrowserPanel\"", window, StringComparison.Ordinal);
+        Assert.Contains("<local:ContentBrowser", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ContentBrowserSplitter\"", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("Header=\"Assets\"><ListBox ItemsSource=\"{Binding AssetLines}\"", window, StringComparison.Ordinal);
+        Assert.Equal(1, window.Split("x:Name=\"WorldTransformStrip\"", StringSplitOptions.None).Length - 1);
+        Assert.Contains("MinWidth=\"72\"", window, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ContentBrowserLayoutIsVisibleByDefaultAndMigratesOlderLayouts()
+    {
+        var layout = RekallAgeStudioLayout.Default;
+
+        Assert.True(layout.Panel("ContentBrowser").Visible);
+        Assert.True(layout.Panel("ContentBrowser").Size >= 190);
+        Assert.Equal("Content Browser", layout.ActiveOutputTab);
+
+        var legacy = layout with
+        {
+            Version = 4,
+            Panels = layout.Panels.Where(panel => panel.Id != "ContentBrowser").ToArray()
+        };
+        var migrated = RekallAgeStudioLayout.Normalize(legacy);
+
+        Assert.NotNull(migrated);
+        Assert.True(migrated.Panel("ContentBrowser").Visible);
+        Assert.True(migrated.Panel("ContentBrowser").Size >= 190);
+    }
+
+    [Fact]
+    public void ViewMenuCanRestoreAndFocusTheContentBrowser()
+    {
+        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
+        var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+        var codeBehind = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml.cs"));
+
+        Assert.Contains("Header=\"_View\"", window, StringComparison.Ordinal);
+        Assert.Contains("Header=\"_Content Browser\"", window, StringComparison.Ordinal);
+        Assert.Contains("OnShowContentBrowserClick", window, StringComparison.Ordinal);
+        Assert.Contains("ContentBrowserHost.Focus()", codeBehind, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void WorldViewportHostsRekallAgeVulkanViewportHostInsteadOfSceneViewportImage()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
@@ -56,9 +104,9 @@ public sealed class StudioLayoutTests
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
         var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
 
-        Assert.Contains("x:Name=\"MoveSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"RotationSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"ScaleSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"MoveSnapEditor\" MinWidth=\"72\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"RotationSnapEditor\" MinWidth=\"72\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ScaleSnapEditor\" MinWidth=\"72\"", window, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"Move snap distance\"", window, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"Rotation snap angle\"", window, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"Scale snap increment\"", window, StringComparison.Ordinal);
@@ -82,9 +130,9 @@ public sealed class StudioLayoutTests
         var layout = RekallAgeStudioLayout.Default;
 
         Assert.Equal(RekallAgeStudioLayout.CurrentVersion, layout.Version);
-        Assert.Equal(4, layout.Version);
+        Assert.Equal(5, layout.Version);
         Assert.Equal("Author", layout.ActiveWorkspace);
-        Assert.Equal(["Hierarchy", "Inspector", "Output"], layout.Panels.Select(panel => panel.Id).Order().ToArray());
+        Assert.Equal(["ContentBrowser", "Hierarchy", "Inspector", "Output"], layout.Panels.Select(panel => panel.Id).Order().ToArray());
         Assert.All(layout.Panels, panel => Assert.True(panel.Visible));
         Assert.InRange(layout.WindowWidth, 1120, 3840);
         Assert.InRange(layout.WindowHeight, 700, 2160);
@@ -121,7 +169,7 @@ public sealed class StudioLayoutTests
         };
         var migrated = RekallAgeStudioLayout.Normalize(legacyDefault)!;
 
-        Assert.Equal(4, migrated.Version);
+        Assert.Equal(5, migrated.Version);
         Assert.Equal(340, migrated.Panel("Hierarchy").Size);
         Assert.Equal(460, migrated.Panel("Inspector").Size);
 
@@ -155,7 +203,7 @@ public sealed class StudioLayoutTests
     }
 
     [Fact]
-    public void LayoutVersionFourRepairsUndersizedVersionThreeWorldPanelsThatClipInspectorActions()
+    public void CurrentLayoutRepairsUndersizedVersionThreeWorldPanelsThatClipInspectorActions()
     {
         var undersizedVersionThree = RekallAgeStudioLayout.Default with
         {
@@ -170,7 +218,7 @@ public sealed class StudioLayoutTests
 
         var migrated = RekallAgeStudioLayout.Normalize(undersizedVersionThree)!;
 
-        Assert.Equal(4, migrated.Version);
+        Assert.Equal(5, migrated.Version);
         Assert.Equal(340, migrated.Panel("Hierarchy").Size);
         Assert.Equal(460, migrated.Panel("Inspector").Size);
     }
@@ -186,7 +234,7 @@ public sealed class StudioLayoutTests
             var first = RekallAgeStudioLayout.Default with
             {
                 WindowWidth = 1400,
-                ActiveOutputTab = "Assets",
+                ActiveOutputTab = "Content Browser",
                 ActiveWorkspace = "Modeling"
             };
             await store.SaveAsync(first, CancellationToken.None);
@@ -202,7 +250,7 @@ public sealed class StudioLayoutTests
             var loaded = await store.LoadAsync(CancellationToken.None);
 
             Assert.Equal(1660, loaded.WindowWidth);
-            Assert.Equal("Assets", loaded.ActiveOutputTab);
+            Assert.Equal("Content Browser", loaded.ActiveOutputTab);
             Assert.Equal("Modeling", loaded.ActiveWorkspace);
             Assert.False(loaded.Panel("Inspector").Visible);
             Assert.Equal(RekallAgeStudioDockRegion.Left, loaded.Panel("Inspector").Region);
@@ -410,6 +458,7 @@ public sealed class StudioLayoutTests
         {
             var invalid = RekallAgeStudioLayout.Default with
             {
+                Version = 4,
                 WindowWidth = 99_000,
                 WindowHeight = double.NaN,
                 Panels =

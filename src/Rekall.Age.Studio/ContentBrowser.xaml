@@ -1,0 +1,135 @@
+<UserControl x:Class="Rekall.Age.Studio.ContentBrowser"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Name="ContentBrowserRoot"
+             AllowDrop="True"
+             AutomationProperties.Name="Content Browser"
+             DragEnter="OnFilesDragEnter" DragOver="OnFilesDragOver"
+             DragLeave="OnFilesDragLeave" Drop="OnFilesDropped">
+    <UserControl.Resources>
+        <DataTemplate x:Key="ContentCardTemplate">
+            <Grid MinWidth="180" Margin="2">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <Border Width="28" Height="28" CornerRadius="4" Background="{StaticResource PanelRaised}" VerticalAlignment="Top">
+                    <Path Data="{StaticResource IconContentFile}" Style="{StaticResource StudioIconPath}" Margin="6" />
+                </Border>
+                <StackPanel Grid.Column="1" Margin="7,0,0,0">
+                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayName}" />
+                    <TextBlock Text="{Binding Family}" Foreground="{StaticResource MutedText}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Health}" Foreground="{StaticResource Accent}" FontSize="10" />
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+        <ItemsPanelTemplate x:Key="ContentCardItemsPanel"><WrapPanel /></ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="ContentCompactItemsPanel"><VirtualizingStackPanel /></ItemsPanelTemplate>
+    </UserControl.Resources>
+    <Grid Background="{StaticResource PanelBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource EditorHeader}" Padding="8,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="220" /><ColumnDefinition Width="160" />
+                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="ContentSearchBox" Text="{Binding ContentSearchText, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Search content by name, family, kind, origin, or health"
+                         AutomationProperties.Name="Search project content" />
+                <ComboBox x:Name="ContentCategoryPicker" Grid.Column="1" Margin="6,0,0,0"
+                          ItemsSource="{Binding ContentCategories}" SelectedItem="{Binding SelectedContentCategory}"
+                          ToolTip="Show one content category" AutomationProperties.Name="Filter content category" />
+                <Button x:Name="RefreshContentButton" Grid.Column="2" Margin="6,0,0,0" Click="OnRefreshContentClick"
+                        ToolTip="Refresh project content" AutomationProperties.Name="Refresh project content">
+                    <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconRefresh}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Refresh" /></StackPanel>
+                </Button>
+                <Button x:Name="ImportContentButton" Grid.Column="3" Margin="4,0,0,0" Click="OnImportContentClick"
+                        ToolTip="Import model, texture, audio, or shader files" AutomationProperties.Name="Import content files">
+                    <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconImport}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Import…" /></StackPanel>
+                </Button>
+                <ToggleButton x:Name="CardContentViewButton" Grid.Column="5" IsChecked="True" Click="OnCardViewClick"
+                              ToolTip="Show content as cards" AutomationProperties.Name="Card content view">
+                    <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconGrid}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Cards" /></StackPanel>
+                </ToggleButton>
+                <ToggleButton x:Name="CompactContentViewButton" Grid.Column="6" Margin="4,0,0,0" Click="OnCompactViewClick"
+                              ToolTip="Show a compact content list" AutomationProperties.Name="Compact content view">
+                    <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconList}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Compact" /></StackPanel>
+                </ToggleButton>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="6">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="5" /><ColumnDefinition Width="*" /><ColumnDefinition Width="5" /><ColumnDefinition Width="250" /></Grid.ColumnDefinitions>
+            <Border Style="{StaticResource EditorPanel}" Margin="0,0,5,0">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="CATEGORIES" Style="{StaticResource SectionLabel}" Margin="8,7" />
+                    <ListBox ItemsSource="{Binding ContentCategories}" SelectedItem="{Binding SelectedContentCategory}" BorderThickness="0" />
+                </DockPanel>
+            </Border>
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="Transparent" />
+            <Border Grid.Column="2" Style="{StaticResource EditorPanel}">
+                <Grid>
+                    <ListView x:Name="ContentItemList" ItemsSource="{Binding FilteredContentItems}"
+                              SelectedItem="{Binding SelectedContentItem, Mode=TwoWay}"
+                              ItemTemplate="{StaticResource ContentCardTemplate}"
+                              MouseDoubleClick="OnContentItemDoubleClick"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListView.InputBindings>
+                            <KeyBinding Key="Enter" Command="{Binding OpenSelectedContentCommand}" />
+                        </ListView.InputBindings>
+                        <ListView.Style>
+                            <Style TargetType="ListView">
+                                <Setter Property="Background" Value="#151A21" />
+                                <Setter Property="Foreground" Value="{StaticResource WorkbenchText}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource PanelBorder}" />
+                                <Setter Property="ItemsPanel" Value="{StaticResource ContentCardItemsPanel}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsChecked, ElementName=CompactContentViewButton}" Value="True">
+                                        <Setter Property="ItemsPanel" Value="{StaticResource ContentCompactItemsPanel}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListView.Style>
+                    </ListView>
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                        <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding FilteredContentItems.Count}" Value="0"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+                        <Path Data="{StaticResource IconImport}" Style="{StaticResource StudioIconPath}" Width="28" Height="28" Margin="0,0,0,8" />
+                        <TextBlock Text="No project content matches this view." HorizontalAlignment="Center" />
+                        <TextBlock Text="Import files or drag and drop them here." Foreground="{StaticResource MutedText}" Margin="0,4,0,0" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+            <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Stretch" Background="Transparent" />
+            <Border Grid.Column="4" Style="{StaticResource EditorPanel}" Margin="5,0,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="9">
+                        <TextBlock Text="DETAILS" Style="{StaticResource SectionLabel}" />
+                        <TextBlock Text="{Binding SelectedContentItem.DisplayName, TargetNullValue=Nothing selected}" FontWeight="SemiBold" Margin="0,6,0,0" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding SelectedContentItem.Kind}" Foreground="{StaticResource Accent}" Margin="0,3,0,0" />
+                        <TextBlock Text="{Binding SelectedContentItem.Origin}" Foreground="{StaticResource MutedText}" />
+                        <TextBlock Text="{Binding SelectedContentItem.Path}" ToolTip="{Binding SelectedContentItem.Path}" TextTrimming="CharacterEllipsis" Margin="0,5,0,0" />
+                        <TextBlock Text="{Binding SelectedContentItem.Diagnostic}" Foreground="#E4B169" TextWrapping="Wrap" Margin="0,5,0,0" />
+                        <Button Content="Open" Command="{Binding OpenSelectedContentCommand}" Margin="0,8,0,0" Style="{StaticResource AccentButton}" ToolTip="Open the selected content in its editor" AutomationProperties.Name="Open selected content" />
+                        <TextBlock Text="INDEX WARNINGS" Style="{StaticResource SectionLabel}" Margin="0,12,0,4" />
+                        <ItemsControl ItemsSource="{Binding ContentWarnings}"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding Summary}" Foreground="#E4B169" TextWrapping="Wrap" Margin="0,2" ToolTip="{Binding Code}" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" BorderBrush="{StaticResource PanelBorder}" BorderThickness="0,1,0,0" Padding="8,5">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="{Binding ContentStatusText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding ContentStatusText}" />
+                    <ItemsControl ItemsSource="{Binding ImportJobs}" MaxHeight="54"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding Summary}" Foreground="{StaticResource MutedText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding SourcePath}" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="{Binding ContentImportSummary}" Foreground="{StaticResource MutedText}" VerticalAlignment="Center" Margin="12,0,0,0" />
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

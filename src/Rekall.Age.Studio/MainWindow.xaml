@@ -147,6 +147,10 @@
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>
             <MenuItem x:Name="ExamplesMenu" Header="_Examples" />
+            <MenuItem Header="_View">
+                <MenuItem Header="_Content Browser" Click="OnShowContentBrowserClick"
+                          ToolTip="Restore and focus the project Content Browser" />
+            </MenuItem>
             <MenuItem Header="_Settings">
                 <MenuItem Header="Language Model Setup…" Click="OnLanguageModelSetupClick"
                           IsEnabled="{Binding CanOpenLanguageModelSetup, ElementName=StudioWindow}">
@@ -222,11 +226,12 @@
         <Grid>
             <Grid.RowDefinitions><RowDefinition Height="38" /><RowDefinition Height="*" /></Grid.RowDefinitions>
             <TabControl x:Name="WorkspaceSelector" Grid.Row="0" SelectionChanged="OnWorkspaceChanged"
+                        SelectedValuePath="Tag" SelectedValue="{Binding SelectedStudioWorkspace, Mode=TwoWay}"
                         Background="{StaticResource ChromeBackground}" BorderThickness="0,0,0,1">
-                <TabItem Header="Author" />
-                <TabItem Header="World" />
-                <TabItem Header="Code" />
-                <TabItem Header="Modeling" />
+                <TabItem Header="Author" Tag="Author" />
+                <TabItem Header="World" Tag="World" />
+                <TabItem Header="Code" Tag="Code" />
+                <TabItem Header="Modeling" Tag="Modeling" />
             </TabControl>
             <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0">
                 <TextBlock Text="Layout" Foreground="{StaticResource MutedText}" VerticalAlignment="Center" Margin="0,0,5,0" />
@@ -341,7 +346,8 @@
                     </Border>
                     <Grid Grid.Row="1">
                         <local:RekallAgeVulkanViewportHost x:Name="SceneVulkanViewportHost"
-                            Cursor="Cross" ToolTip="Select scene entities directly through the Vulkan viewport." />
+                            Cursor="Cross" ToolTip="Select scene entities directly through the Vulkan viewport. Drop model content here to place it."
+                            AllowDrop="True" DragOver="OnSceneViewportDragOver" Drop="OnSceneViewportDrop" />
                         <StackPanel x:Name="NoProjectViewportPlaceholder"
                                     HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock Text="REKALL AGE" Foreground="{StaticResource Accent}" FontSize="28"
@@ -506,6 +512,9 @@
                                                                         </StackPanel>
                                                                     </StackPanel>
                                                                     <ContentControl Grid.Column="1" Content="{Binding}"
+                                                                                    AllowDrop="True"
+                                                                                    DragOver="OnInspectorPropertyDragOver"
+                                                                                    Drop="OnInspectorPropertyDrop"
                                                                                     ContentTemplateSelector="{StaticResource InspectorEditorTemplateSelector}" />
                                                                     <Button Grid.Column="2" ToolTip="Reset this property to unset" AutomationProperties.Name="Reset property to unset"
                                                                             Command="{Binding DataContext.ResetInspectorPropertyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -772,7 +781,9 @@
                     </TabControl>
                 </TabItem>
                 <TabItem Header="Validation"><ListBox ItemsSource="{Binding ValidationLines}" /></TabItem>
-                <TabItem Header="Assets"><ListBox ItemsSource="{Binding AssetLines}" /></TabItem>
+                <TabItem x:Name="ContentBrowserPanel" Header="Content Browser">
+                    <local:ContentBrowser x:Name="ContentBrowserHost" />
+                </TabItem>
                 <TabItem Header="Overview"><ListBox ItemsSource="{Binding SceneSummaryLines}" /></TabItem>
                 <TabItem Header="Actions"><ListBox ItemsSource="{Binding ActionLines}" /></TabItem>
                 <TabItem Header="Rendering">
@@ -954,6 +965,9 @@
                     </Grid>
                 </TabItem>
             </TabControl>
+            <GridSplitter x:Name="ContentBrowserSplitter" Grid.Column="1" Grid.Row="1"
+                          Height="5" VerticalAlignment="Top" HorizontalAlignment="Stretch"
+                          Background="Transparent" ResizeDirection="Rows" ResizeBehavior="PreviousAndCurrent" />
             <StackPanel Grid.Column="0" Grid.ColumnSpan="3" Grid.Row="2">
                 <Border Padding="10,6" Margin="8,0,8,6" CornerRadius="5"
                         Background="#332C5364" BorderBrush="{StaticResource Accent}" BorderThickness="1">

@@ -260,12 +260,14 @@ public sealed class WorkbenchSessionTests
         var session = CreateSession();
         Assert.True((await session.CreateProjectAsync(
             root, "Undoable", "Main", ["world"], ["world"], "studio", CancellationToken.None)).Ok);
-        Assert.True((await session.ExecuteAsync(
+        var created = await session.ExecuteAsync(
             "rekall.entity.create",
             JsonSerializer.Serialize(new { projectRoot = root, sceneName = "Main", name = "Undo Me", tags = Array.Empty<string>() }),
             "Create Undo Me",
             "studio",
-            CancellationToken.None)).Ok);
+            CancellationToken.None);
+        Assert.True(created.Ok);
+        Assert.False(string.IsNullOrWhiteSpace(created.TransactionId));
         Assert.True(session.CanUndo);
         Assert.Contains(session.Model!.Scene.RootEntities, entity => entity.Name == "Undo Me");
 

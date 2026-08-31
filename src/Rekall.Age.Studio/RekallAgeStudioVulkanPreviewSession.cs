@@ -12,7 +12,8 @@ namespace Rekall.Age.Studio;
 internal sealed record RekallAgeStudioPreviewFrame(
     RekallAgeVulkanPresentationFrame Presentation,
     RekallAgeStudioViewportInteractionSnapshot Interaction,
-    RekallAgeStudioProjectModuleDiagnostic? ProjectModuleDiagnostic = null)
+    RekallAgeStudioProjectModuleDiagnostic? ProjectModuleDiagnostic = null,
+    RekallAgeStudioViewportPlacementContext? PlacementContext = null)
 {
     public int FrameIndex => Presentation.FrameIndex;
 
@@ -464,7 +465,8 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
         return new RekallAgeStudioPreviewFrame(
             presentation,
             RekallAgeStudioViewportInteractionBuilder.Build(viewportFrame, world.Entities),
-            projectModuleDiagnostic);
+            projectModuleDiagnostic,
+            RekallAgeStudioViewportPlacementContext.From(viewportFrame.ActiveCamera));
     }
 
     private async ValueTask<RekallAgeStudioViewportDependencyChange> ApplyExternalDependencyChangesAsync(

@@ -35,7 +35,7 @@ public enum RekallAgeStudioMode
     Play
 }
 
-public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDisposable
+public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDisposable, IRekallAgeStudioContentOpenTarget
 {
     private readonly RekallAgeWorkbenchSession _session;
     private readonly RekallAgeCommandRegistry _agentRegistry;
@@ -51,6 +51,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly HashSet<Task> _activeRenderingOperations = [];
     private readonly RekallAgeAsyncCommand _openCommand;
     private readonly RekallAgeAsyncCommand _createCommand;
+    private readonly RekallAgeAsyncCommand _openSelectedContentCommand;
+    private readonly RekallAgeAsyncCommand _importContentCommand;
     private readonly RekallAgeAsyncCommand _addEntityCommand;
     private readonly RekallAgeAsyncCommand _renameEntityCommand;
     private readonly RekallAgeAsyncCommand _duplicateEntityCommand;
@@ -103,6 +105,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly RekallAgeStudioModelingGraphSession _modelingGraph = new();
     private readonly RekallAgeStudioMeshViewportRenderer _meshViewportRenderer = new();
     private readonly RekallAgeModelAssetStore _modelAssetStore = new();
+    private readonly IRekallAgeStudioContentIndex _contentIndex = RekallAgeStudioContentIndex.CreateDefault();
+    private readonly IRekallAgeStudioContentOpenRouter _contentOpenRouter;
+    private readonly RekallAgeStudioContentImportSession _contentImportSession;
+    private readonly RekallAgeStudioContentDragService _contentDragService;
+    private readonly IRekallAgeStudioContentPreviewService _contentPreviewService;
+    private readonly IRekallAgeStudioExternalContentLauncher _externalContentLauncher;
     private readonly Action<string> _openPackageFolder;
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
@@ -169,6 +177,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private bool _languageModelSetupBusy;
     private bool _isBusy;
     private bool _isAgentRunning;
+    private bool _hasActiveContentImports;
+    private int _contentImportActive;
     private bool _isLiveViewportEnabled = true;
     private bool _isSimulationPaused;
     private Task? _disposeTask;
@@ -262,6 +272,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _viewportUnavailableReason = string.Empty;
     private string _worldViewportRenderStyle = "Textured";
     private RekallAgeStudioViewportInteractionSnapshot? _viewportInteraction;
+    private RekallAgeStudioViewportPlacementContext _viewportPlacementContext =
+        RekallAgeStudioViewportPlacementContext.From(null);
     private RekallAgeStudioSceneGizmo? _sceneGizmo;
     private RekallAgeStudioTransformGesture? _sceneTransformGesture;
     private RekallAgeStudioTransformUpdate? _sceneTransformUpdate;
@@ -291,6 +303,15 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _renderWorkloadText = "0 draws · 0 dispatches";
     private RekallAgeWorkbenchRenderDebugViewModel? _selectedRenderDebugView;
     private RekallAgeWorkbenchModel? _currentModel;
+    private RekallAgeContentBrowserModel _contentModel = RekallAgeContentBrowserModel.Empty;
+    private string _selectedContentCategory = "All";
+    private string _contentSearchText = string.Empty;
+    private RekallAgeContentBrowserItem? _selectedContentItem;
+    private RekallAgeStudioContentPreview? _selectedContentPreview;
+    private CancellationTokenSource? _contentPreviewCancellation;
+    private string _contentStatusText = "Select project content to inspect or edit.";
+    private string _selectedStudioWorkspace = "Author";
+    private string _selectedModelingSurface = "mesh-edit";
     private readonly List<RekallAgeLanguageModelToolExecution> _lastAgentToolExecutions = [];
     internal bool TreatGauntletAsTerminalSuccess { get; set; }
 
@@ -316,6 +337,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
     }
 
+    internal RekallAgeStudioViewModel(IRekallAgeStudioContentOpenRouter contentOpenRouter)
+        : this()
+    {
+        _contentOpenRouter = contentOpenRouter ?? throw new ArgumentNullException(nameof(contentOpenRouter));
+    }
+
     internal RekallAgeStudioViewModel(RekallAgeWorkbenchSession session)
         : this(
             session,
@@ -323,6 +350,33 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             null,
             new RekallAgeStudioPreviewSession(),
             null)
+    {
+    }
+
+    internal RekallAgeStudioViewModel(
+        RekallAgeWorkbenchSession session,
+        IRekallAgeStudioExternalContentLauncher externalContentLauncher)
+        : this(
+            session,
+            new RekallAgeLanguageModelProviderCatalog(),
+            null,
+            new RekallAgeStudioPreviewSession(),
+            null,
+            externalContentLauncher: externalContentLauncher)
+    {
+    }
+
+    internal RekallAgeStudioViewModel(
+        RekallAgeWorkbenchSession session,
+        IRekallAgeStudioPreviewSession previewSession,
+        RekallAgeStudioContentImportSession contentImportSession)
+        : this(
+            session,
+            new RekallAgeLanguageModelProviderCatalog(),
+            null,
+            previewSession,
+            null,
+            contentImportSession: contentImportSession)
     {
     }
 
@@ -402,7 +456,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         IRekallAgeStudioPreviewSession previewSession,
         Action<string>? openPackageFolder,
         IRekallAgeStudioMonotonicClock? monotonicClock = null,
-        IRekallAgeGgufImporter? ggufImporter = null)
+        IRekallAgeGgufImporter? ggufImporter = null,
+        RekallAgeStudioContentImportSession? contentImportSession = null,
+        IRekallAgeStudioExternalContentLauncher? externalContentLauncher = null)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _languageModelProviderCatalog = languageModelProviderCatalog
@@ -412,6 +468,29 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             monotonicClock ?? new RekallAgeStudioStopwatchClock());
         _ggufImporter = ggufImporter ?? new RekallAgeOllamaGgufImporter();
         _openPackageFolder = openPackageFolder ?? OpenDirectoryInExplorer;
+        _externalContentLauncher = externalContentLauncher ?? new RekallAgeStudioShellExternalContentLauncher();
+        _contentOpenRouter = new RekallAgeStudioContentOpenRouter(this);
+        _contentImportSession = contentImportSession ?? new RekallAgeStudioContentImportSession(
+            new RekallAgeStudioAssetImportCommand(),
+            async cancellationToken =>
+            {
+                if (_session.ProjectRoot is null) return;
+                var content = await _contentIndex.RefreshAsync(_session.ProjectRoot, cancellationToken);
+                ApplyContentModel(content);
+            },
+            cancellationToken => _previewSession.InvalidateAssetsAsync(cancellationToken));
+        _contentDragService = new RekallAgeStudioContentDragService(
+            new RekallAgeStudioContentPropertyMutationCommand(ExecuteContentPropertyMutationAsync),
+            new RekallAgeStudioContentPlacementCommand(ExecuteContentPlacementAsync),
+            new RekallAgeStudioContentDragResolver((contentId, contentKind, contentOrigin) =>
+            {
+                var item = _contentModel.Items.FirstOrDefault(candidate =>
+                    candidate.Id.Equals(contentId, StringComparison.Ordinal)
+                    && candidate.Kind.Equals(contentKind, StringComparison.OrdinalIgnoreCase)
+                    && candidate.Origin.Equals(contentOrigin, StringComparison.OrdinalIgnoreCase));
+                return item is null ? null : RekallAgeStudioContentDragPayload.FromItem(item);
+            }));
+        _contentPreviewService = RekallAgeStudioContentPreviewService.CreateDefault();
         _agentRegistry = RekallAgeDefaultCommandRegistry.Create();
         _selectedLanguageModelProvider = _languageModelProviderCatalog.Providers.Single(provider => provider.Id == "ollama");
         _selectedLanguageModel = _selectedLanguageModelProvider.DefaultModel;
@@ -432,6 +511,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
         _openCommand = CreateAsyncCommand(OpenFromInputsAsync, CanOpenOrCreate);
         _createCommand = CreateAsyncCommand(CreateFromInputsAsync, CanOpenOrCreate);
+        _openSelectedContentCommand = CreateAsyncCommand(OpenSelectedContentAsync, CanOpenSelectedContent);
+        _importContentCommand = CreateAsyncCommand(
+            ImportContentAsync,
+            parameter => HasOpenProject() && !HasActiveContentImports && parameter is IEnumerable<string>);
         _addEntityCommand = CreateAsyncCommand(AddEntityAsync, HasEditableProject);
         _renameEntityCommand = CreateAsyncCommand(RenameEntityAsync, CanRenameEntity);
         _duplicateEntityCommand = CreateAsyncCommand(DuplicateEntityAsync, HasSelectedEntity);
@@ -532,6 +615,88 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     public ObservableCollection<RekallAgeStudioInspectorComponentEditorModel> InspectorComponentEditors { get; } = [];
     public ObservableCollection<RekallAgeStudioInspectorPropertyEditorModel> InspectorPropertyEditors { get; } = [];
     public ObservableCollection<string> AssetLines { get; } = [];
+    public ObservableCollection<RekallAgeContentBrowserItem> ContentItems { get; } = [];
+    public ObservableCollection<RekallAgeContentBrowserItem> FilteredContentItems { get; } = [];
+    public ObservableCollection<RekallAgeStudioContentCardModel> ContentCards { get; } = [];
+    public ObservableCollection<RekallAgeStudioContentCardModel> FilteredContentCards { get; } = [];
+    public ObservableCollection<RekallAgeContentBrowserWarning> ContentWarnings { get; } = [];
+    public ObservableCollection<RekallAgeStudioContentImportJob> ImportJobs => _contentImportSession.Jobs;
+    public ObservableCollection<string> ContentCategories { get; } = ["All"];
+
+    public string SelectedContentCategory
+    {
+        get => _selectedContentCategory;
+        set
+        {
+            if (Set(ref _selectedContentCategory, string.IsNullOrWhiteSpace(value) ? "All" : value))
+                RefreshContentProjection();
+        }
+    }
+
+    public string ContentSearchText
+    {
+        get => _contentSearchText;
+        set
+        {
+            if (Set(ref _contentSearchText, value ?? string.Empty)) RefreshContentProjection();
+        }
+    }
+
+    public bool HasActiveContentImports
+    {
+        get => _hasActiveContentImports;
+        private set
+        {
+            if (Set(ref _hasActiveContentImports, value)) RefreshCommands();
+        }
+    }
+
+    public string ContentImportSummary => ImportJobs.Count == 0
+        ? "No content imports."
+        : $"{ImportJobs.Count(job => job.Status == "Succeeded")} imported, {ImportJobs.Count(job => job.Status is "Failed" or "Rejected")} not imported.";
+
+    public RekallAgeContentBrowserItem? SelectedContentItem
+    {
+        get => _selectedContentItem;
+        set
+        {
+            if (Set(ref _selectedContentItem, value))
+            {
+                RefreshCommands();
+                BeginSelectedContentPreview(value);
+                OnPropertyChanged(nameof(SelectedContentCard));
+            }
+        }
+    }
+
+    public RekallAgeStudioContentCardModel? SelectedContentCard
+    {
+        get => SelectedContentItem is null ? null : ContentCards.FirstOrDefault(card =>
+            card.Key == RekallAgeStudioContentKey.From(SelectedContentItem));
+        set => SelectedContentItem = value?.Item;
+    }
+
+    public RekallAgeStudioContentPreview? SelectedContentPreview
+    {
+        get => _selectedContentPreview;
+        private set => Set(ref _selectedContentPreview, value);
+    }
+
+    public string ContentStatusText
+    {
+        get => _contentStatusText;
+        private set => Set(ref _contentStatusText, value);
+    }
+    public string SelectedStudioWorkspace
+    {
+        get => _selectedStudioWorkspace;
+        set => Set(ref _selectedStudioWorkspace, value);
+    }
+    public string SelectedModelingSurface
+    {
+        get => _selectedModelingSurface;
+        set => Set(ref _selectedModelingSurface, value);
+    }
     public ObservableCollection<string> ValidationLines { get; } = [];
     public ObservableCollection<string> TransactionLines { get; } = [];
     public ObservableCollection<string> ImportLines { get; } = [];
@@ -585,6 +750,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public ICommand OpenCommand => _openCommand;
     public ICommand CreateCommand => _createCommand;
+    public ICommand OpenSelectedContentCommand => _openSelectedContentCommand;
+    public ICommand ImportContentCommand => _importContentCommand;
     public ICommand AddEntityCommand => _addEntityCommand;
     public ICommand RenameEntityCommand => _renameEntityCommand;
     public ICommand DuplicateEntityCommand => _duplicateEntityCommand;
@@ -4931,6 +5098,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         var wasViewportAvailable = ViewportAvailable;
         _viewportInteraction = frame.Interaction;
+        _viewportPlacementContext = frame.PlacementContext ?? RekallAgeStudioViewportPlacementContext.From(null);
         RefreshSceneGizmo();
         PreviewFrameIndex = frame.FrameIndex;
         ViewportRenderableCount = frame.RenderableCount;
@@ -5173,6 +5341,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                     _session.Model,
                     preserveInspectorDrafts: !result.Ok || rejectedInspectorRow is not null,
                     discardInspectorDraft: result.Ok ? rejectedInspectorRow : null);
+                await RefreshContentAsync();
             }
             if (result.Ok)
             {
@@ -5331,7 +5500,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (selectedNode is not null) RefreshPropertySchemas();
         RefreshInspectorComponents();
         RebuildInspectorPropertyEditors(model, preserveInspectorDrafts, discardInspectorDraft);
-        Replace(AssetLines, model.Assets.Assets.Select(asset => $"{asset.Kind}: {asset.DisplayName} ({asset.AssetId})"));
+        ApplyContentModel(model.Content);
         if (_session.ProjectRoot is not null)
         {
             Replace(MeshAssetIds, _modeling.ListAssets(_session.ProjectRoot));
@@ -5362,6 +5531,355 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         .Properties.FirstOrDefault(property => property.IsDefined
             && property.Name.Equals("assetId", StringComparison.OrdinalIgnoreCase))?
         .Value;
+
+    internal async Task RefreshContentBrowserAsync(CancellationToken cancellationToken)
+    {
+        if (_session.ProjectRoot is not null)
+        {
+            var content = await _contentIndex.RefreshAsync(_session.ProjectRoot, cancellationToken);
+            ApplyContentModel(content);
+        }
+        ContentStatusText = $"Content refreshed · {ContentItems.Count} item(s).";
+        StatusText = ContentStatusText;
+    }
+
+    internal void ReportContentBrowserFailure(string code, string summary)
+    {
+        ContentStatusText = $"{code} · {summary}";
+        StatusText = ContentStatusText;
+    }
+
+    internal bool CanAssignContent(
+        RekallAgeStudioContentDragPayload payload,
+        RekallAgeStudioInspectorPropertyEditorModel row)
+    {
+        var target = ContentPropertyTarget(row);
+        return target is not null && _contentDragService.CanAssign(payload, target);
+    }
+
+    internal ValueTask<RekallAgeStudioContentDropResult> AssignContentAsync(
+        RekallAgeStudioContentDragPayload payload,
+        RekallAgeStudioInspectorPropertyEditorModel row,
+        CancellationToken cancellationToken)
+    {
+        var target = ContentPropertyTarget(row);
+        return target is null
+            ? ValueTask.FromResult(new RekallAgeStudioContentDropResult(false,
+                "REKALL_CONTENT_DROP_TARGET_UNAVAILABLE", "Select an editable asset-reference property first."))
+            : _contentDragService.AssignAsync(payload, target, cancellationToken);
+    }
+
+    internal bool CanPlaceContent(RekallAgeStudioContentDragPayload payload) =>
+        HasEditableProject() && _contentDragService.CanPlace(payload);
+
+    internal ValueTask<RekallAgeStudioContentDropResult> PlaceContentAsync(
+        RekallAgeStudioContentDragPayload payload,
+        double normalizedX,
+        double normalizedY,
+        double aspectRatio,
+        CancellationToken cancellationToken) =>
+        _contentDragService.PlaceAsync(payload,
+            _viewportPlacementContext.TargetAt(normalizedX, normalizedY, aspectRatio), cancellationToken);
+
+    internal async Task ApplyContentDropResultAsync(
+        RekallAgeStudioContentDropResult result,
+        CancellationToken cancellationToken)
+    {
+        ContentStatusText = $"{result.Code} · {result.Summary}";
+        StatusText = ContentStatusText;
+        if (!result.Applied) return;
+        if (_session.Model is not null) ApplyModel(_session.Model);
+        if (IsLiveViewportEnabled && Mode == RekallAgeStudioMode.Edit)
+            await RefreshEditPreviewAsync(result.Summary);
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    private RekallAgeStudioContentPropertyTarget? ContentPropertyTarget(
+        RekallAgeStudioInspectorPropertyEditorModel row)
+    {
+        if (_session.SelectedEntityId is not { } entityId || string.IsNullOrWhiteSpace(row.AssetKind)) return null;
+        var entity = SelectedEntityNode();
+        return new(entityId, row.ComponentType, row.Name, row.AssetKind, entity?.Locked == true, PropertyLocked: false);
+    }
+
+    private async ValueTask<RekallAgeStudioContentCommandEvidence> ExecuteContentPropertyMutationAsync(
+        RekallAgeStudioContentPropertyMutation request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _session.ExecuteAsync(
+            request.Tool,
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = _session.ProjectRoot,
+                sceneName = _session.SceneName,
+                entityId = request.EntityId,
+                componentType = request.ComponentType,
+                propertyName = request.PropertyName,
+                value = request.PropertyValue
+            }),
+            $"Assign content to {request.ComponentType}.{request.PropertyName}", "studio", cancellationToken);
+        return ContentCommandEvidence(result);
+    }
+
+    private async ValueTask<RekallAgeStudioContentCommandEvidence> ExecuteContentPlacementAsync(
+        RekallAgeStudioContentPlacement request,
+        CancellationToken cancellationToken)
+    {
+        var content = _contentModel.Items.FirstOrDefault(item => item.Id.Equals(request.ModelAssetId, StringComparison.Ordinal));
+        var modelAssetId = content switch
+        {
+            { Kind: var kind } when kind.Equals("model-asset", StringComparison.OrdinalIgnoreCase) => content.DisplayName,
+            { Origin: "Imported", Family: "model" } =>
+                await RekallAgeStudioImportedModelPublisher.EnsurePublishedAsync(_session, content, cancellationToken),
+            _ => request.ModelAssetId
+        };
+        var result = await _session.ExecuteAsync(
+            "rekall.scene.instantiate_asset",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = _session.ProjectRoot,
+                sceneName = _session.SceneName,
+                modelAssetId,
+                name = content?.DisplayName ?? modelAssetId,
+                position = new { x = request.Position.X, y = request.Position.Y, z = request.Position.Z },
+                rotationDegrees = new { x = 0, y = 0, z = 0 },
+                scale = new { x = 1, y = 1, z = 1 }
+            }),
+            $"Place Model Asset {modelAssetId}", "studio", cancellationToken);
+        return ContentCommandEvidence(result);
+    }
+
+    private static RekallAgeStudioContentCommandEvidence ContentCommandEvidence(
+        RekallAgeWorkbenchOperationResult result) => new(
+            result.Ok,
+            result.Ok ? "REKALL_CONTENT_DROP_APPLIED" : result.Errors.FirstOrDefault()?.Code ?? "REKALL_CONTENT_DROP_FAILED",
+            result.Summary,
+            result.TransactionId);
+
+    private async Task RefreshContentAsync()
+    {
+        if (_session.ProjectRoot is null) return;
+        var content = await _contentIndex.RefreshAsync(_session.ProjectRoot, _lifecycleCancellation.Token);
+        ApplyContentModel(content);
+    }
+
+    internal async Task<IReadOnlyList<RekallAgeStudioContentImportJob>> ImportContentAsync(
+        IEnumerable<string> sourcePaths,
+        CancellationToken cancellationToken)
+    {
+        if (_session.ProjectRoot is null) return [];
+        if (Interlocked.CompareExchange(ref _contentImportActive, 1, 0) != 0)
+            return [new(string.Empty, "other", "Rejected", "REKALL_CONTENT_IMPORT_ALREADY_ACTIVE",
+                "Another content import batch is already running.")];
+        HasActiveContentImports = true;
+        try
+        {
+            var jobs = await _contentImportSession.ImportAsync(_session.ProjectRoot, sourcePaths, cancellationToken);
+            OnPropertyChanged(nameof(ContentImportSummary));
+            var succeeded = jobs.Count(job => job.Status == "Succeeded");
+            ContentStatusText = succeeded > 0
+                ? $"Imported {succeeded} content file(s)."
+                : "No content files were imported.";
+            StatusText = ContentStatusText;
+            return jobs;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            ContentStatusText = "REKALL_CONTENT_IMPORT_CANCELLED · Content import cancelled; completed results were retained.";
+            StatusText = ContentStatusText;
+            return ImportJobs.ToArray();
+        }
+        finally
+        {
+            OnPropertyChanged(nameof(ContentImportSummary));
+            HasActiveContentImports = false;
+            Interlocked.Exchange(ref _contentImportActive, 0);
+        }
+    }
+
+    private Task ImportContentAsync(object? parameter) => parameter is IEnumerable<string> paths
+        ? ImportContentAsync(paths, _lifecycleCancellation.Token)
+        : Task.CompletedTask;
+
+    private bool CanOpenSelectedContent() => HasOpenProject()
+        && SelectedContentItem is { } item
+        && _contentOpenRouter.CanOpen(item);
+
+    private async Task OpenSelectedContentAsync()
+    {
+        if (SelectedContentItem is null) return;
+        var result = await _contentOpenRouter.OpenAsync(
+            SelectedContentItem, _lifecycleCancellation.Token);
+        ContentStatusText = $"{result.Code} · {result.Summary}";
+        StatusText = ContentStatusText;
+        if (result.Opened && result.WorkspaceId is { } workspace)
+        {
+            SelectedStudioWorkspace = workspace switch
+            {
+                "modeling" => "Modeling",
+                "code" => "Code",
+                "world" => "World",
+                _ => SelectedStudioWorkspace
+            };
+            if (workspace.Equals("modeling", StringComparison.OrdinalIgnoreCase)
+                && result.SurfaceId is { } surface)
+                SelectedModelingSurface = surface;
+        }
+    }
+
+    async ValueTask IRekallAgeStudioContentOpenTarget.SelectMeshAsync(
+        RekallAgeContentBrowserItem item, CancellationToken cancellationToken)
+    {
+        if (_session.ProjectRoot is null) throw new InvalidOperationException("Open a project first.");
+        var assetId = item.DisplayName;
+        if (item.Origin.Equals("Imported", StringComparison.OrdinalIgnoreCase)
+            && item.Family.Equals("model", StringComparison.OrdinalIgnoreCase))
+        {
+            var publishedId = await RekallAgeStudioImportedModelPublisher.EnsurePublishedAsync(_session, item, cancellationToken);
+            var model = await _modelAssetStore.LoadAsync(_session.ProjectRoot, publishedId, cancellationToken);
+            assetId = model.Source.AssetId;
+        }
+        else if (item.Kind.Equals("model-asset", StringComparison.OrdinalIgnoreCase))
+        {
+            var model = await _modelAssetStore.LoadAsync(_session.ProjectRoot, assetId, cancellationToken);
+            if (model.Source.Kind != RekallAgeModelSourceKind.Mesh)
+                throw new InvalidOperationException("The model does not have an editable mesh source.");
+            assetId = model.Source.AssetId;
+        }
+
+        await _modeling.OpenAsync(_session.ProjectRoot, assetId, cancellationToken);
+        SelectedMeshAssetId = assetId;
+        _modeling.SetDomain(MeshEditDomain);
+        RefreshMeshEditingState();
+    }
+
+    async ValueTask IRekallAgeStudioContentOpenTarget.SelectGraphAsync(
+        RekallAgeContentBrowserItem item, CancellationToken cancellationToken)
+    {
+        if (_session.ProjectRoot is null) throw new InvalidOperationException("Open a project first.");
+        SelectedModelingGraphAssetId = item.DisplayName;
+        await _modelingGraph.OpenAsync(_session.ProjectRoot, SelectedModelingGraphAssetId, cancellationToken);
+        Replace(ModelingGraphNodes, _modelingGraph.Nodes);
+        Replace(ModelingGraphOutputNames, _modelingGraph.OutputNames);
+        SelectedModelingGraphOutput = _modelingGraph.SelectedOutputName;
+        ModelingGraphSummary = _modelingGraph.EvaluationSummary;
+        SelectedModelingGraphNode = ModelingGraphNodes.FirstOrDefault();
+        RefreshModelingGraphCanvas();
+    }
+
+    async ValueTask IRekallAgeStudioContentOpenTarget.SelectMaterialAsync(
+        RekallAgeContentBrowserItem item, CancellationToken cancellationToken)
+    {
+        if (_session.ProjectRoot is null) throw new InvalidOperationException("Open a project first.");
+        var graphId = item.DisplayName;
+        if (item.Kind.Equals("material-instance", StringComparison.OrdinalIgnoreCase))
+        {
+            var instance = await new RekallAgeMaterialInstanceAssetStore()
+                .LoadVersionedAsync(_session.ProjectRoot, item.DisplayName, cancellationToken);
+            graphId = instance.Value.GraphAssetId;
+        }
+
+        SelectedMaterialGraphAssetId = graphId;
+        await _materialGraph.OpenAsync(_session.ProjectRoot, graphId, cancellationToken);
+        Replace(MaterialGraphNodes, _materialGraph.Nodes);
+        MaterialGraphSummary = _materialGraph.EvaluationSummary;
+        SelectedMaterialGraphNode = MaterialGraphNodes.FirstOrDefault();
+    }
+
+    async ValueTask IRekallAgeStudioContentOpenTarget.SelectModuleSourceAsync(
+        RekallAgeContentBrowserItem item, CancellationToken cancellationToken)
+    {
+        if (_session.ProjectRoot is null) throw new InvalidOperationException("Open a project first.");
+        var sources = await _codeSession.RefreshAsync(_session.ProjectRoot, cancellationToken);
+        var source = sources.FirstOrDefault(candidate => PathsEqual(candidate.SourcePath, item.Path!))
+            ?? throw new InvalidOperationException("The module source is no longer available.");
+        await _codeSession.OpenAsync(source, cancellationToken);
+        Replace(CodeSources, sources);
+        SelectedCodeSource = _codeSession.SelectedSource;
+        Set(ref _codeSourceText, _codeSession.SourceText, nameof(CodeSourceText));
+        OnPropertyChanged(nameof(IsCodeDirty));
+        OnPropertyChanged(nameof(SelectedCodeProjectPath));
+        CodeStatusText = $"Editing {source.ModuleName}/{source.FileName}.";
+    }
+
+    ValueTask IRekallAgeStudioContentOpenTarget.OpenAssociatedAsync(
+        RekallAgeContentBrowserItem item, CancellationToken cancellationToken) =>
+        _externalContentLauncher.OpenAsync(item.Path!, cancellationToken);
+
+
+    private void ApplyContentModel(RekallAgeContentBrowserModel content)
+    {
+        _contentModel = content;
+        Replace(ContentItems, content.Items);
+        var existingCards = ContentCards.ToDictionary(card => card.Key);
+        var cards = content.Items.Select(item =>
+        {
+            if (existingCards.TryGetValue(RekallAgeStudioContentKey.From(item), out var card)) { card.Update(item); return card; }
+            return new RekallAgeStudioContentCardModel(item);
+        }).ToArray();
+        Replace(ContentCards, cards);
+        Replace(ContentWarnings, content.Warnings);
+        Replace(ContentCategories, RekallAgeStudioContentProjection.Categories(content.Items));
+        if (!ContentCategories.Contains(SelectedContentCategory, StringComparer.OrdinalIgnoreCase))
+            SelectedContentCategory = "All";
+        RefreshContentProjection();
+        Replace(AssetLines, content.Items.Select(item => $"{item.Kind}: {item.DisplayName} ({item.Id})"));
+    }
+
+    private void BeginSelectedContentPreview(RekallAgeContentBrowserItem? item)
+    {
+        _contentPreviewCancellation?.Cancel();
+        _contentPreviewCancellation?.Dispose();
+        _contentPreviewCancellation = null;
+        SelectedContentPreview = null;
+        if (item is null) return;
+        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifecycleCancellation.Token);
+        _contentPreviewCancellation = cancellation;
+        _ = LoadSelectedContentPreviewAsync(item, cancellation);
+    }
+
+    private async Task LoadSelectedContentPreviewAsync(
+        RekallAgeContentBrowserItem item, CancellationTokenSource cancellation)
+    {
+        try
+        {
+            var preview = await _contentPreviewService.GetAsync(item, cancellation.Token);
+            if (!cancellation.IsCancellationRequested
+                && ReferenceEquals(_contentPreviewCancellation, cancellation)
+                && SelectedContentItem is { } selected
+                && RekallAgeStudioContentKey.From(selected) == RekallAgeStudioContentKey.From(item)
+                && SelectedContentItem?.Revision == item.Revision)
+            {
+                SelectedContentPreview = preview;
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_contentPreviewCancellation, cancellation))
+                _contentPreviewCancellation = null;
+            cancellation.Dispose();
+        }
+    }
+
+    private void RefreshContentProjection()
+    {
+        var selectedKey = SelectedContentItem is null ? (RekallAgeStudioContentKey?)null : RekallAgeStudioContentKey.From(SelectedContentItem);
+        Replace(FilteredContentItems, RekallAgeStudioContentProjection.Filter(
+            _contentModel.Items, SelectedContentCategory, ContentSearchText));
+        var visibleKeys = FilteredContentItems.Select(RekallAgeStudioContentKey.From).ToHashSet();
+        Replace(FilteredContentCards, ContentCards.Where(card => visibleKeys.Contains(card.Key)));
+        SelectedContentItem = selectedKey is null
+            ? null
+            : FilteredContentItems.FirstOrDefault(item => RekallAgeStudioContentKey.From(item) == selectedKey.Value);
+        OnPropertyChanged(nameof(SelectedContentCard));
+    }
+
+    internal Task LoadContentCardPreviewAsync(
+        RekallAgeStudioContentCardModel card, CancellationToken cancellationToken) =>
+        card.LoadPreviewAsync(_contentPreviewService, cancellationToken);
 
     private void ApplyRendering(
         RekallAgeWorkbenchRenderQualityModel rendering,
@@ -5754,6 +6272,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         _openCommand.RaiseCanExecuteChanged();
         _createCommand.RaiseCanExecuteChanged();
+        _openSelectedContentCommand.RaiseCanExecuteChanged();
+        _importContentCommand.RaiseCanExecuteChanged();
         _addEntityCommand.RaiseCanExecuteChanged();
         _renameEntityCommand.RaiseCanExecuteChanged();
         _duplicateEntityCommand.RaiseCanExecuteChanged();

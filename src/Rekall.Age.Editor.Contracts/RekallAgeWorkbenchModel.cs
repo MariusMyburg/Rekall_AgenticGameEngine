@@ -12,6 +12,8 @@ public sealed record RekallAgeWorkbenchModel(
     RekallAgeWorkbenchSceneSummaryModel SceneSummary,
     RekallAgeWorkbenchActionPaletteModel Actions)
 {
+    public RekallAgeContentBrowserModel Content { get; init; } = RekallAgeContentBrowserModel.Empty;
+
     public RekallAgeWorkbenchRenderQualityModel Rendering { get; init; } =
         RekallAgeWorkbenchRenderQualityModel.Empty("High");
 }

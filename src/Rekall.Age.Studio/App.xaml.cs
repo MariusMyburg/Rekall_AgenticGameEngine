@@ -32,6 +32,14 @@ public partial class App : Application
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
             Log.Information("Rekall Studio starting. LogDirectory={LogDirectory}", StudioLogDirectory);
             base.OnStartup(e);
+            if (e.Args.Contains(RekallAgeStudioContentBrowserAcceptance.Switch, StringComparer.Ordinal))
+            {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                var succeeded = await RekallAgeStudioContentBrowserAcceptance.RunAsync(e.Args, CancellationToken.None);
+                Log.Information("Studio Content Browser acceptance completed. Succeeded={Succeeded}", succeeded);
+                Shutdown(succeeded ? 0 : 4);
+                return;
+            }
             if (e.Args.Contains(RekallAgeStudioAutomation.AutomationSwitch, StringComparer.Ordinal))
             {
                 ShutdownMode = ShutdownMode.OnExplicitShutdown;

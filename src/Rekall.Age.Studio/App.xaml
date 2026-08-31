@@ -34,6 +34,10 @@
         <Geometry x:Key="IconCheck">M2,8 L6,12 14,3</Geometry>
         <Geometry x:Key="IconAgent">M3,5 L13,5 13,14 3,14 Z M8,1 L8,5 M5,9 L5,10 M11,9 L11,10 M6,12 L10,12</Geometry>
         <Geometry x:Key="IconReset">M13,6 A5,5 0 1 0 13,11 M13,2 L13,6 9,6</Geometry>
+        <Geometry x:Key="IconContentFile">M3,1 L10,1 14,5 14,15 3,15 Z M10,1 L10,5 14,5</Geometry>
+        <Geometry x:Key="IconImport">M2,13 L14,13 M8,2 L8,10 M4,6 L8,10 12,6</Geometry>
+        <Geometry x:Key="IconGrid">M2,2 L7,2 7,7 2,7 Z M9,2 L14,2 14,7 9,7 Z M2,9 L7,9 7,14 2,14 Z M9,9 L14,9 14,14 9,14 Z</Geometry>
+        <Geometry x:Key="IconList">M2,3 L4,3 M6,3 L14,3 M2,8 L4,8 M6,8 L14,8 M2,13 L4,13 M6,13 L14,13</Geometry>
         <Style x:Key="StudioIconPath" TargetType="Path">
             <Setter Property="Width" Value="16" />
             <Setter Property="Height" Value="16" />

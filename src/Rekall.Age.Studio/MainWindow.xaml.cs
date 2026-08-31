@@ -37,6 +37,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _initializing = true;
     private bool _hadProject;
     private bool _shutdownPrepared;
+    private readonly CancellationTokenSource _contentDropCancellation = new();
+    private readonly object _contentDropSync = new();
+    private readonly HashSet<Task> _contentDropTasks = [];
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -588,10 +591,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         HierarchyColumn.Width = new GridLength(layout.Panel("Hierarchy").Visible ? layout.Panel("Hierarchy").Size : 0);
         InspectorColumn.Width = new GridLength(layout.Panel("Inspector").Visible ? layout.Panel("Inspector").Size : 0);
+        var contentBrowser = layout.Panel("ContentBrowser");
         OutputRow.Height = new GridLength(layout.Panel("Output").Visible ? layout.Panel("Output").Size : 0);
         HierarchyPanel.Visibility = layout.Panel("Hierarchy").Visible ? Visibility.Visible : Visibility.Collapsed;
         InspectorPanel.Visibility = layout.Panel("Inspector").Visible ? Visibility.Visible : Visibility.Collapsed;
         OutputTabs.Visibility = layout.Panel("Output").Visible ? Visibility.Visible : Visibility.Collapsed;
+        ContentBrowserPanel.Visibility = contentBrowser.Visible ? Visibility.Visible : Visibility.Collapsed;
+        ContentBrowserSplitter.Visibility = layout.Panel("Output").Visible ? Visibility.Visible : Visibility.Collapsed;
         foreach (var item in OutputTabs.Items.OfType<TabItem>())
         {
             if (string.Equals(item.Header?.ToString(), layout.ActiveOutputTab, StringComparison.Ordinal))
@@ -635,10 +641,32 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ApplyLayout(_layout);
     }
 
+    private void OnShowContentBrowserClick(object sender, RoutedEventArgs e)
+    {
+        _layout = CaptureLayout();
+        _layout = _layout with
+        {
+            ActiveOutputTab = "Content Browser",
+            Panels = _layout.Panels.Select(panel => panel.Id switch
+            {
+                "Output" => panel with { Visible = true },
+                "ContentBrowser" => panel with { Visible = true, Size = Math.Max(190, panel.Size) },
+                _ => panel
+            }).ToArray()
+        };
+        ApplyLayout(_layout);
+        OutputTabs.SelectedItem = ContentBrowserPanel;
+        ContentBrowserHost.Focus();
+        ContentBrowserHost.FocusSearch();
+    }
+
     private RekallAgeStudioLayout CaptureLayout()
     {
         var bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
         var activeOutput = (OutputTabs.SelectedItem as TabItem)?.Header?.ToString() ?? _layout.ActiveOutputTab;
+        var sharedBottomHeight = OutputTabs.Visibility == Visibility.Visible
+            ? Math.Max(190, OutputRow.ActualHeight)
+            : _layout.Panel("Output").Size;
         return RekallAgeStudioLayout.Normalize(_layout with
         {
             WindowX = bounds.X,
@@ -652,7 +680,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             [
                 _layout.Panel("Hierarchy") with { Visible = HierarchyPanel.Visibility == Visibility.Visible, Size = HierarchyPanel.Visibility == Visibility.Visible ? Math.Max(180, HierarchyColumn.ActualWidth) : _layout.Panel("Hierarchy").Size },
                 _layout.Panel("Inspector") with { Visible = InspectorPanel.Visibility == Visibility.Visible, Size = InspectorPanel.Visibility == Visibility.Visible ? Math.Max(180, InspectorColumn.ActualWidth) : _layout.Panel("Inspector").Size },
-                _layout.Panel("Output") with { Visible = OutputTabs.Visibility == Visibility.Visible, Size = OutputTabs.Visibility == Visibility.Visible ? Math.Max(140, OutputRow.ActualHeight) : _layout.Panel("Output").Size }
+                _layout.Panel("Output") with { Visible = OutputTabs.Visibility == Visibility.Visible, Size = sharedBottomHeight },
+                _layout.Panel("ContentBrowser") with { Visible = ContentBrowserPanel.Visibility == Visibility.Visible, Size = sharedBottomHeight }
             ]
         }) ?? RekallAgeStudioLayout.Default;
     }
@@ -726,6 +755,99 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             Log.Error(exception, "Studio Vulkan viewport failed to present after resize.");
         }
+    }
+
+    private void OnInspectorPropertyDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = sender is FrameworkElement { DataContext: RekallAgeStudioInspectorPropertyEditorModel row }
+            && TryGetContentDragPayload(e.Data, out var payload)
+            && _viewModel.CanAssignContent(payload, row)
+                ? DragDropEffects.Copy
+                : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnInspectorPropertyDrop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not FrameworkElement { DataContext: RekallAgeStudioInspectorPropertyEditorModel row }
+            || !TryGetContentDragPayload(e.Data, out var payload)) return;
+        StartContentDrop(token => _viewModel.AssignContentAsync(payload, row, token).AsTask());
+    }
+
+    private void OnSceneViewportDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = TryGetContentDragPayload(e.Data, out var payload) && _viewModel.CanPlaceContent(payload)
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnSceneViewportDrop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not FrameworkElement element || element.ActualWidth <= 0 || element.ActualHeight <= 0
+            || !TryGetContentDragPayload(e.Data, out var payload)) return;
+        var point = e.GetPosition(element);
+        StartContentDrop(token => _viewModel.PlaceContentAsync(
+            payload,
+            Math.Clamp(point.X / element.ActualWidth, 0, 1),
+            Math.Clamp(point.Y / element.ActualHeight, 0, 1),
+            element.ActualWidth / element.ActualHeight,
+            token).AsTask());
+    }
+
+    private void StartContentDrop(Func<CancellationToken, Task<RekallAgeStudioContentDropResult>> operation)
+    {
+        if (_contentDropCancellation.IsCancellationRequested) return;
+        var task = ExecuteContentDropUiAsync(operation, _contentDropCancellation.Token);
+        lock (_contentDropSync) _contentDropTasks.Add(task);
+        _ = ObserveContentDropAsync(task);
+    }
+
+    private async Task ObserveContentDropAsync(Task task)
+    {
+        try { await task; }
+        finally { lock (_contentDropSync) _contentDropTasks.Remove(task); }
+    }
+
+    private async Task ExecuteContentDropUiAsync(
+        Func<CancellationToken, Task<RekallAgeStudioContentDropResult>> operation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await operation(cancellationToken);
+            await _viewModel.ApplyContentDropResultAsync(result, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _viewModel.ReportContentBrowserFailure("REKALL_CONTENT_DROP_CANCELLED", "Content drop cancelled.");
+        }
+        catch (Exception exception) when (IsExpectedContentDropFailure(exception))
+        {
+            _viewModel.ReportContentBrowserFailure("REKALL_CONTENT_DROP_FAILED",
+                "The content drop could not be completed. Inspect Studio logs for details.");
+            Log.Warning(exception, "Studio content drop failed.");
+        }
+        catch (Exception exception)
+        {
+            _viewModel.ReportContentBrowserFailure("REKALL_CONTENT_DROP_FAILED",
+                "The content drop could not be completed. Inspect Studio logs for details.");
+            Log.Error(exception, "Unexpected Studio content drop failure was contained.");
+        }
+    }
+
+    private static bool IsExpectedContentDropFailure(Exception exception) =>
+        exception is System.Text.Json.JsonException or ArgumentException or InvalidOperationException
+            or IOException or UnauthorizedAccessException;
+
+    private static bool TryGetContentDragPayload(IDataObject data, out RekallAgeStudioContentDragPayload payload)
+    {
+        payload = null!;
+        if (!data.GetDataPresent(RekallAgeStudioContentDragService.DataFormat)
+            || data.GetData(RekallAgeStudioContentDragService.DataFormat) is not string json) return false;
+        return RekallAgeStudioContentDragPayload.TryParse(json, out payload);
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -902,6 +1024,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (!_shutdownPrepared)
         {
             if (!await ResolveDirtyCodeAsync()) return;
+            _contentDropCancellation.Cancel();
+            Task[] contentDrops;
+            lock (_contentDropSync) contentDrops = _contentDropTasks.ToArray();
+            await Task.WhenAll(contentDrops);
             _previewTimer.Stop();
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             SceneVulkanViewportHost.PointerFact -= OnSceneViewportPointerFact;

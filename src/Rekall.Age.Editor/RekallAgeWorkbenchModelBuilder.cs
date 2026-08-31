@@ -134,9 +134,72 @@ public sealed class RekallAgeWorkbenchModelBuilder
             BuildSceneSummary(scene),
             BuildActionPalette(manifest.Capabilities))
         {
+            Content = BuildImportedContent(assets.Assets),
             Rendering = BuildRenderingPanel(runtimeWorld)
         };
     }
+
+    private static RekallAgeContentBrowserModel BuildImportedContent(
+        IReadOnlyList<RekallAgeAssetDocument> assets)
+    {
+        var items = assets
+            .Select(ToImportedContentItem)
+            .OrderBy(item => item.Family, StringComparer.Ordinal)
+            .ThenBy(item => item.DisplayName, StringComparer.Ordinal)
+            .ThenBy(item => item.Id, StringComparer.Ordinal)
+            .ToArray();
+        return new RekallAgeContentBrowserModel(items, []);
+    }
+
+    private static RekallAgeContentBrowserItem ToImportedContentItem(RekallAgeAssetDocument asset)
+    {
+        var kind = asset.Kind.Trim().ToLowerInvariant();
+        var family = kind switch
+        {
+            "model" or "mesh" or "gltf" or "glb" => "model",
+            "texture" or "sprite" or "image" => "texture",
+            "audio" or "sound" => "audio",
+            "shader" => "shader",
+            _ => kind
+        };
+        var (route, capabilities) = family switch
+        {
+            "model" => ("mesh-edit", ImportedCapabilities(RekallAgeContentCapability.Place)),
+            "texture" => ("texture-preview", ImportedCapabilities(RekallAgeContentCapability.Assign)),
+            "audio" => ("audio-preview", ImportedCapabilities(RekallAgeContentCapability.Assign)),
+            "shader" => ("shader-edit", ImportedCapabilities(RekallAgeContentCapability.Assign)),
+            _ => ("external", ImportedCapabilities(RekallAgeContentCapability.OpenExternal))
+        };
+        var preview = new RekallAgeContentPreviewMetadata(
+            asset.TextureMetadata?.Width,
+            asset.TextureMetadata?.Height,
+            asset.GlbMetadata?.MeshCount,
+            asset.GlbMetadata?.MaterialCount,
+            asset.GlbMetadata?.AnimationCount);
+
+        return new RekallAgeContentBrowserItem(
+            asset.Id,
+            asset.DisplayName,
+            family,
+            kind,
+            "Imported",
+            asset.ImportedPath,
+            asset.SourcePath,
+            asset.ContentHash,
+            route,
+            capabilities,
+            "Healthy",
+            null,
+            preview);
+    }
+
+    private static IReadOnlyList<string> ImportedCapabilities(params string[] additional) =>
+        [
+            RekallAgeContentCapability.Open,
+            RekallAgeContentCapability.Reveal,
+            RekallAgeContentCapability.Reimport,
+            .. additional
+        ];
 
     private static RekallAgeSceneGraphModel BuildSceneGraph(RekallAgeSceneDocument scene)
     {

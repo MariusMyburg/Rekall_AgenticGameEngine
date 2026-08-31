@@ -95,7 +95,7 @@ internal sealed class RekallAgeStudioAssetImportCommand : IRekallAgeStudioAssetI
     public async ValueTask<ImportAssetWithReportResult> ImportAsync(
         string projectRoot, string sourcePath, string kind, CancellationToken cancellationToken)
     {
-        var normalizedRoot = Path.GetFullPath(projectRoot);
+        var normalizedRoot = NormalizeProjectGateKey(projectRoot);
         var gate = ProjectGates.GetOrAdd(normalizedRoot, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(cancellationToken);
         try
@@ -114,6 +114,17 @@ internal sealed class RekallAgeStudioAssetImportCommand : IRekallAgeStudioAssetI
             return result.Value;
         }
         finally { gate.Release(); }
+    }
+
+    internal static string NormalizeProjectGateKey(string projectRoot)
+    {
+        var fullRoot = Path.GetFullPath(projectRoot);
+        var root = Path.GetPathRoot(fullRoot);
+        return root is not null && fullRoot.Equals(root, OperatingSystem.IsWindows()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal)
+            ? root
+            : fullRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
 }
 

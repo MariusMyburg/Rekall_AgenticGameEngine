@@ -128,6 +128,26 @@ public sealed class StudioContentImportSessionTests
     }
 
     [Fact]
+    public async Task EquivalentProjectRootSpellingsShareProductionMutationGateAndPersistBothImports()
+    {
+        using var fixture = new ImportFixture();
+        var equivalentRoot = fixture.Root + Path.DirectorySeparatorChar;
+        Assert.Equal(
+            RekallAgeStudioAssetImportCommand.NormalizeProjectGateKey(fixture.Root),
+            RekallAgeStudioAssetImportCommand.NormalizeProjectGateKey(equivalentRoot));
+        var importer = new RekallAgeStudioAssetImportCommand();
+
+        await Task.WhenAll(
+            importer.ImportAsync(fixture.Root, fixture.File("first.mp3", [1, 2, 3]), "audio", CancellationToken.None).AsTask(),
+            importer.ImportAsync(equivalentRoot, fixture.File("second.mp3", [4, 5, 6]), "audio", CancellationToken.None).AsTask());
+
+        var pipeline = await new RekallAgeAssetPipelineStore().LoadAsync(fixture.Root, CancellationToken.None);
+        var catalog = await new RekallAgeAssetCatalogStore().LoadAsync(fixture.Root, CancellationToken.None);
+        Assert.Equal(2, pipeline.Imported.Count);
+        Assert.Equal(2, catalog.Assets.Count);
+    }
+
+    [Fact]
     public async Task PublishesAllObservableJobMutationsThroughDispatcherInStableOrder()
     {
         using var fixture = new ImportFixture();
@@ -189,6 +209,33 @@ public sealed class StudioContentImportSessionTests
         Assert.Equal("Cancelled", Assert.Single(jobs).Status);
         Assert.Contains("REKALL_CONTENT_IMPORT_CANCELLED", viewModel.ContentStatusText, StringComparison.Ordinal);
         Assert.DoesNotContain(viewModel.ValidationLines, line => line.Contains("REKALL_STUDIO_UNEXPECTED_FAILURE", StringComparison.Ordinal));
+        Assert.False(viewModel.HasActiveContentImports);
+    }
+
+    [Fact]
+    public async Task ViewModelOverlappingImportCannotClearOrOverwriteActiveBatchState()
+    {
+        using var fixture = new ImportFixture();
+        var workbench = new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create());
+        var created = await workbench.CreateProjectAsync(fixture.Root, "Overlap Test", "Main", [], [], "test", CancellationToken.None);
+        Assert.True(created.Ok, created.Summary);
+        using var cancellation = new CancellationTokenSource();
+        var importer = new FakeImporter(waitForCancellation: true);
+        var contentSession = fixture.Session(importer);
+        await using var viewModel = new RekallAgeStudioViewModel(workbench, new RekallAgeStudioPreviewSession(), contentSession);
+        var activePath = fixture.File("active.png");
+        var first = viewModel.ImportContentAsync([activePath], cancellation.Token);
+        await importer.Started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var activeStatus = viewModel.ContentStatusText;
+
+        var overlap = await viewModel.ImportContentAsync([fixture.File("overlap.png")], CancellationToken.None);
+
+        Assert.Equal("REKALL_CONTENT_IMPORT_ALREADY_ACTIVE", Assert.Single(overlap).Code);
+        Assert.True(viewModel.HasActiveContentImports);
+        Assert.Equal(activeStatus, viewModel.ContentStatusText);
+        Assert.Equal(activePath, Assert.Single(viewModel.ImportJobs).SourcePath);
+        cancellation.Cancel();
+        await first;
         Assert.False(viewModel.HasActiveContentImports);
     }
 

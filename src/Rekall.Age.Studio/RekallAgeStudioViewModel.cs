@@ -175,6 +175,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private bool _isBusy;
     private bool _isAgentRunning;
     private bool _hasActiveContentImports;
+    private int _contentImportActive;
     private bool _isLiveViewportEnabled = true;
     private bool _isSimulationPaused;
     private Task? _disposeTask;
@@ -5488,6 +5489,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         CancellationToken cancellationToken)
     {
         if (_session.ProjectRoot is null) return [];
+        if (Interlocked.CompareExchange(ref _contentImportActive, 1, 0) != 0)
+            return [new(string.Empty, "other", "Rejected", "REKALL_CONTENT_IMPORT_ALREADY_ACTIVE",
+                "Another content import batch is already running.")];
         HasActiveContentImports = true;
         try
         {
@@ -5510,6 +5514,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             OnPropertyChanged(nameof(ContentImportSummary));
             HasActiveContentImports = false;
+            Interlocked.Exchange(ref _contentImportActive, 0);
         }
     }
 

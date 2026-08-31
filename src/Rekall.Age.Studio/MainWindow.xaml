@@ -346,7 +346,8 @@
                     </Border>
                     <Grid Grid.Row="1">
                         <local:RekallAgeVulkanViewportHost x:Name="SceneVulkanViewportHost"
-                            Cursor="Cross" ToolTip="Select scene entities directly through the Vulkan viewport." />
+                            Cursor="Cross" ToolTip="Select scene entities directly through the Vulkan viewport. Drop model content here to place it."
+                            AllowDrop="True" DragOver="OnSceneViewportDragOver" Drop="OnSceneViewportDrop" />
                         <StackPanel x:Name="NoProjectViewportPlaceholder"
                                     HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock Text="REKALL AGE" Foreground="{StaticResource Accent}" FontSize="28"
@@ -511,6 +512,9 @@
                                                                         </StackPanel>
                                                                     </StackPanel>
                                                                     <ContentControl Grid.Column="1" Content="{Binding}"
+                                                                                    AllowDrop="True"
+                                                                                    DragOver="OnInspectorPropertyDragOver"
+                                                                                    Drop="OnInspectorPropertyDrop"
                                                                                     ContentTemplateSelector="{StaticResource InspectorEditorTemplateSelector}" />
                                                                     <Button Grid.Column="2" ToolTip="Reset this property to unset" AutomationProperties.Name="Reset property to unset"
                                                                             Command="{Binding DataContext.ResetInspectorPropertyCommand, RelativeSource={RelativeSource AncestorType=Window}}"

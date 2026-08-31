@@ -72,6 +72,8 @@
                     <ListView x:Name="ContentItemList" ItemsSource="{Binding FilteredContentItems}"
                               SelectedItem="{Binding SelectedContentItem, Mode=TwoWay}"
                               ItemTemplate="{StaticResource ContentCardTemplate}"
+                              PreviewMouseLeftButtonDown="OnContentItemMouseDown"
+                              PreviewMouseMove="OnContentItemMouseMove"
                               MouseDoubleClick="OnContentItemDoubleClick"
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListView.InputBindings>

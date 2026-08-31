@@ -108,6 +108,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly IRekallAgeStudioContentIndex _contentIndex = RekallAgeStudioContentIndex.CreateDefault();
     private readonly IRekallAgeStudioContentOpenRouter _contentOpenRouter;
     private readonly RekallAgeStudioContentImportSession _contentImportSession;
+    private readonly RekallAgeStudioContentDragService _contentDragService;
     private readonly Action<string> _openPackageFolder;
     private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
@@ -269,6 +270,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string _viewportUnavailableReason = string.Empty;
     private string _worldViewportRenderStyle = "Textured";
     private RekallAgeStudioViewportInteractionSnapshot? _viewportInteraction;
+    private RekallAgeStudioViewportPlacementContext _viewportPlacementContext =
+        RekallAgeStudioViewportPlacementContext.From(null);
     private RekallAgeStudioSceneGizmo? _sceneGizmo;
     private RekallAgeStudioTransformGesture? _sceneTransformGesture;
     private RekallAgeStudioTransformUpdate? _sceneTransformUpdate;
@@ -457,6 +460,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 ApplyContentModel(content);
             },
             cancellationToken => _previewSession.InvalidateAssetsAsync(cancellationToken));
+        _contentDragService = new RekallAgeStudioContentDragService(
+            new RekallAgeStudioContentPropertyMutationCommand(ExecuteContentPropertyMutationAsync),
+            new RekallAgeStudioContentPlacementCommand(ExecuteContentPlacementAsync));
         _agentRegistry = RekallAgeDefaultCommandRegistry.Create();
         _selectedLanguageModelProvider = _languageModelProviderCatalog.Providers.Single(provider => provider.Id == "ollama");
         _selectedLanguageModel = _selectedLanguageModelProvider.DefaultModel;
@@ -5044,6 +5050,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     {
         var wasViewportAvailable = ViewportAvailable;
         _viewportInteraction = frame.Interaction;
+        _viewportPlacementContext = frame.PlacementContext ?? RekallAgeStudioViewportPlacementContext.From(null);
         RefreshSceneGizmo();
         PreviewFrameIndex = frame.FrameIndex;
         ViewportRenderableCount = frame.RenderableCount;
@@ -5493,6 +5500,108 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         ContentStatusText = $"{code} · {summary}";
         StatusText = ContentStatusText;
     }
+
+    internal bool CanAssignContent(
+        RekallAgeStudioContentDragPayload payload,
+        RekallAgeStudioInspectorPropertyEditorModel row)
+    {
+        var target = ContentPropertyTarget(row);
+        return target is not null && _contentDragService.CanAssign(payload, target);
+    }
+
+    internal ValueTask<RekallAgeStudioContentDropResult> AssignContentAsync(
+        RekallAgeStudioContentDragPayload payload,
+        RekallAgeStudioInspectorPropertyEditorModel row,
+        CancellationToken cancellationToken)
+    {
+        var target = ContentPropertyTarget(row);
+        return target is null
+            ? ValueTask.FromResult(new RekallAgeStudioContentDropResult(false,
+                "REKALL_CONTENT_DROP_TARGET_UNAVAILABLE", "Select an editable asset-reference property first."))
+            : _contentDragService.AssignAsync(payload, target, cancellationToken);
+    }
+
+    internal bool CanPlaceContent(RekallAgeStudioContentDragPayload payload) =>
+        HasEditableProject() && _contentDragService.CanPlace(payload);
+
+    internal ValueTask<RekallAgeStudioContentDropResult> PlaceContentAsync(
+        RekallAgeStudioContentDragPayload payload,
+        double normalizedX,
+        double normalizedY,
+        double aspectRatio,
+        CancellationToken cancellationToken) =>
+        _contentDragService.PlaceAsync(payload,
+            _viewportPlacementContext.TargetAt(normalizedX, normalizedY, aspectRatio), cancellationToken);
+
+    internal async Task ApplyContentDropResultAsync(
+        RekallAgeStudioContentDropResult result,
+        CancellationToken cancellationToken)
+    {
+        ContentStatusText = $"{result.Code} · {result.Summary}";
+        StatusText = ContentStatusText;
+        if (!result.Applied) return;
+        if (_session.Model is not null) ApplyModel(_session.Model);
+        if (IsLiveViewportEnabled && Mode == RekallAgeStudioMode.Edit)
+            await RefreshEditPreviewAsync(result.Summary);
+        cancellationToken.ThrowIfCancellationRequested();
+    }
+
+    private RekallAgeStudioContentPropertyTarget? ContentPropertyTarget(
+        RekallAgeStudioInspectorPropertyEditorModel row)
+    {
+        if (_session.SelectedEntityId is not { } entityId || string.IsNullOrWhiteSpace(row.AssetKind)) return null;
+        var entity = SelectedEntityNode();
+        return new(entityId, row.ComponentType, row.Name, row.AssetKind, entity?.Locked == true, PropertyLocked: false);
+    }
+
+    private async ValueTask<RekallAgeStudioContentCommandEvidence> ExecuteContentPropertyMutationAsync(
+        RekallAgeStudioContentPropertyMutation request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _session.ExecuteAsync(
+            request.Tool,
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = _session.ProjectRoot,
+                sceneName = _session.SceneName,
+                entityId = request.EntityId,
+                componentType = request.ComponentType,
+                propertyName = request.PropertyName,
+                value = request.PropertyValue
+            }),
+            $"Assign content to {request.ComponentType}.{request.PropertyName}", "studio", cancellationToken);
+        return ContentCommandEvidence(result);
+    }
+
+    private async ValueTask<RekallAgeStudioContentCommandEvidence> ExecuteContentPlacementAsync(
+        RekallAgeStudioContentPlacement request,
+        CancellationToken cancellationToken)
+    {
+        var content = _contentModel.Items.FirstOrDefault(item => item.Id.Equals(request.ModelAssetId, StringComparison.Ordinal));
+        var modelAssetId = content?.Kind.Equals("model-asset", StringComparison.OrdinalIgnoreCase) == true
+            ? content.DisplayName
+            : request.ModelAssetId;
+        var result = await _session.ExecuteAsync(
+            "rekall.scene.instantiate_asset",
+            JsonSerializer.Serialize(new
+            {
+                projectRoot = _session.ProjectRoot,
+                sceneName = _session.SceneName,
+                modelAssetId,
+                position = new { x = request.Position.X, y = request.Position.Y, z = request.Position.Z },
+                rotationDegrees = new { x = 0, y = 0, z = 0 },
+                scale = new { x = 1, y = 1, z = 1 }
+            }),
+            $"Place Model Asset {modelAssetId}", "studio", cancellationToken);
+        return ContentCommandEvidence(result);
+    }
+
+    private static RekallAgeStudioContentCommandEvidence ContentCommandEvidence(
+        RekallAgeWorkbenchOperationResult result) => new(
+            result.Ok,
+            result.Ok ? "REKALL_CONTENT_DROP_APPLIED" : result.Errors.FirstOrDefault()?.Code ?? "REKALL_CONTENT_DROP_FAILED",
+            result.Summary,
+            result.TransactionId);
 
     private async Task RefreshContentAsync()
     {

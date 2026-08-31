@@ -153,8 +153,13 @@ internal abstract class StoredIdContentSource(string family, string kind, string
         return ValueTask.FromResult<IReadOnlyList<RekallAgeContentBrowserItem>>(List(projectRoot).Select(id =>
             new RekallAgeContentBrowserItem($"{family}:{id}", id, family, kind, "Authored", PathFor(projectRoot, id), null,
                 File.Exists(PathFor(projectRoot, id)) ? File.GetLastWriteTimeUtc(PathFor(projectRoot, id)).Ticks.ToString() : null,
-                route, [RekallAgeContentCapability.Open, RekallAgeContentCapability.Reveal], "Healthy", null, new())).ToArray());
+                route, Capabilities(kind), "Healthy", null, new())).ToArray());
     }
+
+    private static IReadOnlyList<string> Capabilities(string contentKind) =>
+        contentKind.Equals("model-asset", StringComparison.OrdinalIgnoreCase)
+            ? [RekallAgeContentCapability.Open, RekallAgeContentCapability.Reveal, RekallAgeContentCapability.Place]
+            : [RekallAgeContentCapability.Open, RekallAgeContentCapability.Reveal];
 }
 
 internal sealed class MeshContentSource() : StoredIdContentSource("model", "mesh", "mesh-edit")

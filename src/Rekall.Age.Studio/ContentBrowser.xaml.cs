@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Rekall.Age.Editor.Contracts;
 
 namespace Rekall.Age.Studio;
 
@@ -10,6 +11,7 @@ public partial class ContentBrowser : UserControl
 {
     private readonly RekallAgeStudioContentImportPolicy _importPolicy = new();
     private CancellationTokenSource _lifetime = new();
+    private Point? _contentDragOrigin;
 
     public ContentBrowser()
     {
@@ -128,6 +130,32 @@ public partial class ContentBrowser : UserControl
     {
         if (DataContext is RekallAgeStudioViewModel viewModel && viewModel.OpenSelectedContentCommand.CanExecute(null))
             viewModel.OpenSelectedContentCommand.Execute(null);
+    }
+
+    private void OnContentItemMouseDown(object sender, MouseButtonEventArgs e) =>
+        _contentDragOrigin = e.GetPosition(ContentItemList);
+
+    private void OnContentItemMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || _contentDragOrigin is not { } origin
+            || ContentItemList.SelectedItem is not RekallAgeContentBrowserItem item)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(ContentItemList);
+        if (Math.Abs(current.X - origin.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(current.Y - origin.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        _contentDragOrigin = null;
+        var payload = RekallAgeStudioContentDragPayload.FromItem(item);
+        if (payload.Operations.Count == 0) return;
+        var data = new DataObject();
+        data.SetData(RekallAgeStudioContentDragService.DataFormat, payload.ToJson());
+        DragDrop.DoDragDrop(ContentItemList, data, DragDropEffects.Copy);
     }
 
     private void OnCardViewClick(object sender, RoutedEventArgs e)

@@ -12,7 +12,8 @@ public sealed record RekallAgeWorkbenchOperationResult(
     bool Ok,
     string Summary,
     object? Value,
-    IReadOnlyList<RekallAgeCommandError> Errors);
+    IReadOnlyList<RekallAgeCommandError> Errors,
+    string? TransactionId = null);
 
 public sealed class RekallAgeWorkbenchSession
 {
@@ -287,7 +288,9 @@ public sealed class RekallAgeWorkbenchSession
             model = ApplyRenderingEvidence(model, ProjectRoot, SceneName);
             Model = model;
             SelectedEntityId = model.Inspector.SelectedEntityId;
-            return new RekallAgeWorkbenchOperationResult(true, result.Summary, result.Value, result.Errors);
+            return new RekallAgeWorkbenchOperationResult(
+                true, result.Summary, result.Value, result.Errors,
+                transaction.ResourcePreimages.Count > 0 ? transaction.Id : null);
         }
         finally
         {

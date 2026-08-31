@@ -754,6 +754,66 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
+    private void OnInspectorPropertyDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = sender is FrameworkElement { DataContext: RekallAgeStudioInspectorPropertyEditorModel row }
+            && TryGetContentDragPayload(e.Data, out var payload)
+            && _viewModel.CanAssignContent(payload, row)
+                ? DragDropEffects.Copy
+                : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void OnInspectorPropertyDrop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not FrameworkElement { DataContext: RekallAgeStudioInspectorPropertyEditorModel row }
+            || !TryGetContentDragPayload(e.Data, out var payload)) return;
+        await ApplyContentDropResultAsync(
+            await _viewModel.AssignContentAsync(payload, row, CancellationToken.None));
+    }
+
+    private void OnSceneViewportDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = TryGetContentDragPayload(e.Data, out var payload) && _viewModel.CanPlaceContent(payload)
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void OnSceneViewportDrop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not FrameworkElement element || element.ActualWidth <= 0 || element.ActualHeight <= 0
+            || !TryGetContentDragPayload(e.Data, out var payload)) return;
+        var point = e.GetPosition(element);
+        await ApplyContentDropResultAsync(await _viewModel.PlaceContentAsync(
+            payload,
+            Math.Clamp(point.X / element.ActualWidth, 0, 1),
+            Math.Clamp(point.Y / element.ActualHeight, 0, 1),
+            element.ActualWidth / element.ActualHeight,
+            CancellationToken.None));
+    }
+
+    private Task ApplyContentDropResultAsync(RekallAgeStudioContentDropResult result) =>
+        _viewModel.ApplyContentDropResultAsync(result, CancellationToken.None);
+
+    private static bool TryGetContentDragPayload(IDataObject data, out RekallAgeStudioContentDragPayload payload)
+    {
+        payload = null!;
+        if (!data.GetDataPresent(RekallAgeStudioContentDragService.DataFormat)
+            || data.GetData(RekallAgeStudioContentDragService.DataFormat) is not string json) return false;
+        try
+        {
+            payload = RekallAgeStudioContentDragPayload.FromJson(json);
+            return true;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return false;
+        }
+    }
+
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(RekallAgeStudioViewModel.HasProject))

@@ -314,7 +314,87 @@ public sealed class StudioVulkanViewportHostTests
             MakeLParam(10, 20));
 
         Assert.Equal(1, native.AttachMessageHandlerCount);
-        Assert.Contains(facts, fact => fact.Kind == RekallAgeStudioViewportPointerKind.Down);
+        Assert.Contains(facts, fact =>
+            fact.Kind == RekallAgeStudioViewportPointerKind.Down
+            && fact.Button == RekallAgeStudioViewportPointerButton.Left);
+    }
+
+    [Fact]
+    public void MiddleAndRightButtonMessagesPreserveButtonIdentityAndFocus()
+    {
+        var native = new RecordingNativeWindow();
+        var surface = new RecordingSurfaceController(native.Order);
+        var core = new RekallAgeVulkanViewportHostCore(native, surface);
+        core.BuildWindow(new IntPtr(17));
+        var facts = new List<RekallAgeStudioViewportPointerFact>();
+        core.PointerFact += (_, fact) => facts.Add(fact);
+
+        Assert.True(core.ProcessWindowMessage(
+            RekallAgeVulkanViewportHostCore.WmMiddleButtonDown,
+            new IntPtr(0x0014),
+            MakeLParam(10, 20)));
+        Assert.True(core.ProcessWindowMessage(
+            RekallAgeVulkanViewportHostCore.WmMiddleButtonUp,
+            IntPtr.Zero,
+            MakeLParam(11, 21)));
+        Assert.True(core.ProcessWindowMessage(
+            RekallAgeVulkanViewportHostCore.WmRightButtonDown,
+            new IntPtr(0x000A),
+            MakeLParam(30, 40)));
+        Assert.True(core.ProcessWindowMessage(
+            RekallAgeVulkanViewportHostCore.WmRightButtonUp,
+            IntPtr.Zero,
+            MakeLParam(31, 41)));
+
+        Assert.Equal(2, native.FocusCount);
+        Assert.Collection(facts,
+            fact =>
+            {
+                Assert.Equal(RekallAgeStudioViewportPointerKind.Down, fact.Kind);
+                Assert.Equal(RekallAgeStudioViewportPointerButton.Middle, fact.Button);
+                Assert.Equal(
+                    RekallAgeStudioViewportPointerModifiers.MiddleButton | RekallAgeStudioViewportPointerModifiers.Shift,
+                    fact.Modifiers);
+            },
+            fact =>
+            {
+                Assert.Equal(RekallAgeStudioViewportPointerKind.Up, fact.Kind);
+                Assert.Equal(RekallAgeStudioViewportPointerButton.Middle, fact.Button);
+            },
+            fact =>
+            {
+                Assert.Equal(RekallAgeStudioViewportPointerKind.Down, fact.Kind);
+                Assert.Equal(RekallAgeStudioViewportPointerButton.Right, fact.Button);
+                Assert.Equal(
+                    RekallAgeStudioViewportPointerModifiers.RightButton | RekallAgeStudioViewportPointerModifiers.Control,
+                    fact.Modifiers);
+            },
+            fact =>
+            {
+                Assert.Equal(RekallAgeStudioViewportPointerKind.Up, fact.Kind);
+                Assert.Equal(RekallAgeStudioViewportPointerButton.Right, fact.Button);
+            });
+    }
+
+    [Fact]
+    public void CaptureChangedClearsCaptureWithoutReleasingAnAlreadyLostNativeCapture()
+    {
+        var native = new RecordingNativeWindow();
+        var surface = new RecordingSurfaceController(native.Order);
+        var core = new RekallAgeVulkanViewportHostCore(native, surface);
+        core.BuildWindow(new IntPtr(17));
+        var facts = new List<RekallAgeStudioViewportPointerFact>();
+        core.PointerFact += (_, fact) => facts.Add(fact);
+
+        core.CapturePointer();
+        Assert.True(core.ProcessWindowMessage(
+            RekallAgeVulkanViewportHostCore.WmCaptureChanged,
+            IntPtr.Zero,
+            IntPtr.Zero));
+
+        Assert.False(core.HasPointerCapture);
+        Assert.Equal(0, native.ReleaseCaptureCount);
+        Assert.Contains(facts, fact => fact.Kind == RekallAgeStudioViewportPointerKind.CaptureLost);
     }
 
     [Fact]

@@ -400,9 +400,11 @@ public sealed class StudioLayoutTests
         Assert.Contains("x:Name=\"AuthorWorkspaceHost\"", window, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"ModelingWorkspaceHost\"", window, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"ProjectBar\"", window, StringComparison.Ordinal);
-        Assert.Contains("MeshViewportImage", modeling, StringComparison.Ordinal);
+        Assert.Contains("local:RekallAgeVulkanViewportHost", modeling, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"MeshVulkanViewportHost\"", modeling, StringComparison.Ordinal);
+        Assert.DoesNotContain("x:Name=\"MeshViewportImage\"", modeling, StringComparison.Ordinal);
         Assert.Contains("ModelingGraphViewportImage", modeling, StringComparison.Ordinal);
-        Assert.Contains("CreateMeshPrimitiveCommand", modeling, StringComparison.Ordinal);
+        Assert.Contains("CreateMeshPrimitiveFromMenuCommand", modeling, StringComparison.Ordinal);
         Assert.Contains("MeshOperationIds", modeling, StringComparison.Ordinal);
         Assert.Contains("PreviewMeshOperationCommand", modeling, StringComparison.Ordinal);
         Assert.Contains("ApplyMeshOperationCommand", modeling, StringComparison.Ordinal);

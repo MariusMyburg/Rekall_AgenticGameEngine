@@ -361,6 +361,8 @@ internal static class RekallAgeStudioSceneGizmoRenderables
 
 internal static class RekallAgeStudioViewportOverlayRenderables
 {
+    internal const string SelectionColor = "#ff9f32";
+
     public static IReadOnlyList<RekallAgeRuntimeViewportRenderable> CreateGrid(int halfExtent = 20, double spacing = 1)
     {
         if (halfExtent < 1) throw new ArgumentOutOfRangeException(nameof(halfExtent));
@@ -419,7 +421,7 @@ internal static class RekallAgeStudioViewportOverlayRenderables
         return Lines(
             $"__studio_selection_{selected.EntityId}",
             $"Selected {selected.EntityName}",
-            "#ff9f32",
+            SelectionColor,
             segments,
             0.035,
             int.MaxValue - 10,

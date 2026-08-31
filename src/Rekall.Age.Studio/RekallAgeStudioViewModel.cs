@@ -114,7 +114,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private readonly IRekallAgeStudioContentPreviewService _contentPreviewService;
     private readonly IRekallAgeStudioExternalContentLauncher _externalContentLauncher;
     private readonly Action<string> _openPackageFolder;
-    private RekallAgeStudioMeshViewportFrame? _meshViewportFrame;
+    private RekallAgeStudioMeshViewportInteractionSnapshot? _meshVulkanInteraction;
+    private RekallAgeStudioMeshVulkanPreviewSession? _meshVulkanPreviewSession;
+    private RekallAgeStudioViewportMetrics _meshVulkanMetrics;
+    private int _meshVulkanPresentationPending;
     private RekallAgeStudioMeshTransformGesture? _meshTransformGesture;
     private RekallAgeStudioViewportCamera _meshViewportCamera = RekallAgeStudioViewportCamera.Identity;
     private readonly RekallAgeStudioModelingGraphCanvasRenderer _modelingGraphCanvasRenderer = new();
@@ -589,10 +592,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _openMeshAssetCommand = CreateAsyncCommand(OpenMeshAssetAsync, CanOpenMeshAsset);
         _frameSelectedMeshViewportCommand = CreateAsyncCommand(
             () => { FrameSelectedMeshViewport(); return Task.CompletedTask; },
-            () => _meshViewportFrame is not null);
+            () => _meshVulkanInteraction is not null);
         _toggleMeshViewportProjectionCommand = CreateAsyncCommand(
             () => { ToggleMeshViewportProjection(); return Task.CompletedTask; },
-            () => _meshViewportFrame is not null);
+            () => _meshVulkanInteraction is not null);
         _publishModelCommand = CreateAsyncCommand(PublishModelAsync, CanPublishModel);
         _placeModelCommand = CreateAsyncCommand(PlaceModelAsync, CanPlaceModel);
         _publishAndPlaceModelCommand = CreateAsyncCommand(PublishAndPlaceModelAsync, CanPublishAndPlaceModel);
@@ -1572,10 +1575,10 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public void SelectMeshViewportElement(double normalizedX, double normalizedY, bool extend, bool toggle)
     {
-        if (_meshViewportFrame is null || _modeling.Mesh is null || normalizedX is < 0 or > 1 || normalizedY is < 0 or > 1) return;
-        var id = _meshViewportRenderer.Pick(_meshViewportFrame, MeshEditDomain,
-            normalizedX * _meshViewportFrame.Image.PixelWidth,
-            normalizedY * _meshViewportFrame.Image.PixelHeight);
+        if (_meshVulkanInteraction is null || _modeling.Mesh is null || normalizedX is < 0 or > 1 || normalizedY is < 0 or > 1) return;
+        var id = _meshVulkanInteraction.Pick(MeshEditDomain,
+            normalizedX * _meshVulkanInteraction.FrameWidth,
+            normalizedY * _meshVulkanInteraction.FrameHeight);
         if (!id.HasValue) return;
         SelectedMeshElementId = id;
         _modeling.Select(id.Value, extend || ExtendMeshSelection, toggle || ToggleMeshSelection);
@@ -1584,37 +1587,34 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool BeginMeshViewportTransform(double normalizedX, double normalizedY)
     {
-        if (IsBusy || MeshEditDomain != RekallAgeGeometryDomain.Point || _meshViewportFrame is null ||
+        if (IsBusy || MeshEditDomain != RekallAgeGeometryDomain.Point || _meshVulkanInteraction is null ||
             normalizedX is < 0 or > 1 || normalizedY is < 0 or > 1) return false;
-        _meshTransformGesture = _meshViewportRenderer.BeginTransform(
-            _meshViewportFrame,
-            normalizedX * _meshViewportFrame.Image.PixelWidth,
-            normalizedY * _meshViewportFrame.Image.PixelHeight);
+        _meshTransformGesture = _meshVulkanInteraction.BeginTransform(
+            normalizedX * _meshVulkanInteraction.FrameWidth,
+            normalizedY * _meshVulkanInteraction.FrameHeight);
         return _meshTransformGesture is not null;
     }
 
     public void UpdateMeshViewportTransform(double normalizedX, double normalizedY)
     {
-        if (_meshViewportFrame is null || _meshTransformGesture is null) return;
-        var translation = _meshViewportRenderer.ResolveTranslation(
-            _meshViewportFrame,
+        if (_meshVulkanInteraction is null || _meshTransformGesture is null) return;
+        var translation = _meshVulkanInteraction.ResolveTranslation(
             _meshTransformGesture,
-            normalizedX * _meshViewportFrame.Image.PixelWidth,
-            normalizedY * _meshViewportFrame.Image.PixelHeight);
+            normalizedX * _meshVulkanInteraction.FrameWidth,
+            normalizedY * _meshVulkanInteraction.FrameHeight);
         StatusText = $"Move {_meshTransformGesture.Axis}: {translation.X:0.###}, {translation.Y:0.###}, {translation.Z:0.###}";
     }
 
     public Task CompleteMeshViewportTransformAsync(double normalizedX, double normalizedY)
     {
-        var frame = _meshViewportFrame;
+        var frame = _meshVulkanInteraction;
         var gesture = _meshTransformGesture;
         _meshTransformGesture = null;
         if (frame is null || gesture is null) return Task.CompletedTask;
-        var translation = _meshViewportRenderer.ResolveTranslation(
-            frame,
+        var translation = frame.ResolveTranslation(
             gesture,
-            normalizedX * frame.Image.PixelWidth,
-            normalizedY * frame.Image.PixelHeight);
+            normalizedX * frame.FrameWidth,
+            normalizedY * frame.FrameHeight);
         if (Math.Abs(translation.X) + Math.Abs(translation.Y) + Math.Abs(translation.Z) <= 1e-9)
         {
             StatusText = MeshSummary;
@@ -1859,6 +1859,64 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         }
     }
 
+    internal void AttachMeshVulkanPreviewSession(RekallAgeStudioMeshVulkanPreviewSession session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        if (_meshVulkanPreviewSession is not null && !ReferenceEquals(_meshVulkanPreviewSession, session))
+        {
+            throw new InvalidOperationException("The Modeling Vulkan viewport session is already attached.");
+        }
+        _meshVulkanPreviewSession = session;
+        QueueMeshVulkanPresentation();
+    }
+
+    internal RekallAgeStudioViewportCamera MeshViewportCamera => _meshViewportCamera;
+
+    internal async Task PresentMeshViewportAtHostSizeAsync(RekallAgeStudioViewportMetrics metrics)
+    {
+        _meshVulkanMetrics = metrics;
+        var session = _meshVulkanPreviewSession;
+        if (session is null || !metrics.IsPresentable) return;
+        session.SetRenderStyle(RekallAgeStudioViewportRenderStyles.Parse(MeshViewportRenderStyle));
+        var projectRoot = _session.ProjectRoot ?? AppContext.BaseDirectory;
+        RekallAgeStudioMeshVulkanPreviewFrame presented;
+        var mesh = _modeling.Preview?.Mesh ?? _modeling.Mesh;
+        if (mesh is null)
+        {
+            presented = await session.PresentEmptyAsync(
+                projectRoot, metrics.PixelWidth, metrics.PixelHeight, _meshViewportCamera, _lifecycleCancellation.Token);
+        }
+        else
+        {
+            presented = await session.PresentAsync(
+                projectRoot, mesh, MeshEditDomain, _modeling.SelectedElementIds,
+                metrics.PixelWidth, metrics.PixelHeight, _modeling.Preview is not null,
+                _meshViewportCamera, _lifecycleCancellation.Token);
+        }
+        _meshVulkanInteraction = presented.Interaction;
+        RefreshCommands();
+    }
+
+    private async void QueueMeshVulkanPresentation()
+    {
+        if (_meshVulkanPreviewSession is null || !_meshVulkanMetrics.IsPresentable
+            || Interlocked.Exchange(ref _meshVulkanPresentationPending, 1) != 0) return;
+        try
+        {
+            while (Interlocked.Exchange(ref _meshVulkanPresentationPending, 0) != 0)
+            {
+                await PresentMeshViewportAtHostSizeAsync(_meshVulkanMetrics);
+            }
+        }
+        catch (OperationCanceledException) when (_lifecycleCancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            Log.Warning(exception, "Could not present the Modeling Vulkan viewport.");
+        }
+    }
+
     public double MoveSnap
     {
         get => _moveSnap;
@@ -2075,7 +2133,22 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             previewFailure = exception;
         }
 
-        var terminalCleanupComplete = _previewSession.IsDisposalComplete;
+        if (_meshVulkanPreviewSession is not null)
+        {
+            try
+            {
+                await _meshVulkanPreviewSession.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                previewFailure = previewFailure is null
+                    ? exception
+                    : new AggregateException(previewFailure, exception);
+            }
+        }
+
+        var terminalCleanupComplete = _previewSession.IsDisposalComplete
+            && (_meshVulkanPreviewSession?.IsDisposalComplete ?? true);
         if (terminalCleanupComplete)
         {
             lock (_disposeSync)
@@ -3133,8 +3206,9 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         {
             Replace(MeshElementIds, []); Replace(MeshOperationIds, []); Replace(MeshSelectionLines, []);
             Replace(MeshAttributeSummaries, []); Replace(MeshMaterialSlotSummaries, []);
-            _meshViewportFrame = null;
-            MeshViewportImage = _meshViewportRenderer.RenderEmpty(640, 360, _meshViewportCamera);
+            _meshVulkanInteraction = null;
+            MeshViewportImage = null;
+            QueueMeshVulkanPresentation();
             RefreshCommands();
             return;
         }
@@ -3160,16 +3234,8 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         if (SelectedMeshElementId is null || !MeshElementIds.Contains(SelectedMeshElementId.Value)) SelectedMeshElementId = MeshElementIds.Count == 0 ? null : MeshElementIds[0];
         Replace(MeshSelectionLines, _modeling.SelectedElementIds.Select((id, index) => $"{index + 1}. {MeshEditDomain} {id}{(id == _modeling.ActiveElementId ? " (active)" : string.Empty)}"));
         MeshSummary = $"{mesh.Name} r{mesh.Revision} · {mesh.Topology.PointIds.Count} points · {mesh.Topology.EdgeIds.Count} edges · {mesh.Topology.FaceIds.Count} faces · {_modeling.SelectedElementIds.Count} selected{(_modeling.Preview is null ? string.Empty : " · PREVIEW")}";
-        _meshViewportFrame = _meshViewportRenderer.Render(
-            mesh,
-            MeshEditDomain,
-            _modeling.SelectedElementIds,
-            640,
-            360,
-            _modeling.Preview is not null,
-            _meshViewportCamera,
-            RekallAgeStudioViewportRenderStyles.Parse(MeshViewportRenderStyle));
-        MeshViewportImage = _meshViewportFrame.Image;
+        MeshViewportImage = null;
+        QueueMeshVulkanPresentation();
         OnPropertyChanged(nameof(MeshEditDomain)); RefreshCommands();
     }
 

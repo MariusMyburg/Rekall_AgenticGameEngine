@@ -484,7 +484,9 @@ internal enum RekallAgeStudioViewportPointerKind
 internal enum RekallAgeStudioViewportPointerButton
 {
     None,
-    Left
+    Left,
+    Middle,
+    Right
 }
 
 [Flags]
@@ -493,7 +495,9 @@ internal enum RekallAgeStudioViewportPointerModifiers
     None = 0,
     LeftButton = 1,
     Shift = 2,
-    Control = 4
+    Control = 4,
+    RightButton = 8,
+    MiddleButton = 16
 }
 
 internal sealed record RekallAgeStudioViewportPointerFact(
@@ -570,6 +574,10 @@ internal sealed class RekallAgeVulkanViewportHostCore
     internal const int WmMouseMove = 0x0200;
     internal const int WmLeftButtonDown = 0x0201;
     internal const int WmLeftButtonUp = 0x0202;
+    internal const int WmRightButtonDown = 0x0204;
+    internal const int WmRightButtonUp = 0x0205;
+    internal const int WmMiddleButtonDown = 0x0207;
+    internal const int WmMiddleButtonUp = 0x0208;
     internal const int WmMouseWheel = 0x020A;
     internal const int WmCaptureChanged = 0x0215;
     internal const int WmDpiChanged = 0x02E0;
@@ -719,6 +727,26 @@ internal sealed class RekallAgeVulkanViewportHostCore
                     RekallAgeStudioViewportPointerButton.Left, 0, Modifiers(wParam));
                 ReleasePointerCapture(releaseNative: true);
                 return true;
+            case WmMiddleButtonDown:
+                _native.Focus(_child);
+                Emit(RekallAgeStudioViewportPointerKind.Down, ClientPoint(lParam),
+                    RekallAgeStudioViewportPointerButton.Middle, 0, Modifiers(wParam));
+                return true;
+            case WmMiddleButtonUp:
+                Emit(RekallAgeStudioViewportPointerKind.Up, ClientPoint(lParam),
+                    RekallAgeStudioViewportPointerButton.Middle, 0, Modifiers(wParam));
+                ReleasePointerCapture(releaseNative: true);
+                return true;
+            case WmRightButtonDown:
+                _native.Focus(_child);
+                Emit(RekallAgeStudioViewportPointerKind.Down, ClientPoint(lParam),
+                    RekallAgeStudioViewportPointerButton.Right, 0, Modifiers(wParam));
+                return true;
+            case WmRightButtonUp:
+                Emit(RekallAgeStudioViewportPointerKind.Up, ClientPoint(lParam),
+                    RekallAgeStudioViewportPointerButton.Right, 0, Modifiers(wParam));
+                ReleasePointerCapture(releaseNative: true);
+                return true;
             case WmMouseWheel:
                 var screen = DecodePoint(lParam);
                 var client = _native.ScreenToClient(_child, screen.X, screen.Y);
@@ -820,8 +848,10 @@ internal sealed class RekallAgeVulkanViewportHostCore
         var keys = unchecked((ushort)(unchecked((uint)wParam.ToInt64()) & 0xFFFF));
         var result = RekallAgeStudioViewportPointerModifiers.None;
         if ((keys & 0x0001) != 0) result |= RekallAgeStudioViewportPointerModifiers.LeftButton;
+        if ((keys & 0x0002) != 0) result |= RekallAgeStudioViewportPointerModifiers.RightButton;
         if ((keys & 0x0004) != 0) result |= RekallAgeStudioViewportPointerModifiers.Shift;
         if ((keys & 0x0008) != 0) result |= RekallAgeStudioViewportPointerModifiers.Control;
+        if ((keys & 0x0010) != 0) result |= RekallAgeStudioViewportPointerModifiers.MiddleButton;
         return result;
     }
 

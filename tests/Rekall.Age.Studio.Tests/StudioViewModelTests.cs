@@ -1559,7 +1559,7 @@ public sealed class StudioViewModelTests
 
             Assert.Equal("hero-box", viewModel.SelectedMeshAssetId);
             Assert.Contains("hero-box", viewModel.MeshAssetIds);
-            Assert.NotNull(viewModel.MeshViewportImage);
+            Assert.Null(viewModel.MeshViewportImage);
             Assert.Equal("hero-box", viewModel.ModelAssetIdInput);
             Assert.Equal("Hero Box", viewModel.ModelAssetDisplayNameInput);
             Assert.Equal("Hero Box", viewModel.ModelEntityNameInput);
@@ -1826,7 +1826,7 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
-    public async Task OrbitingMeshViewportChangesRenderedImageWithoutMutatingMeshData()
+    public async Task OrbitingNativeMeshViewportChangesCameraWithoutMutatingMeshData()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-orbit-camera-" + Guid.NewGuid().ToString("N"));
         try
@@ -1844,12 +1844,13 @@ public sealed class StudioViewModelTests
             viewModel.SelectedMeshPrimitive = "box";
             viewModel.MeshPrimitiveAssetIdInput = "hero-box";
             await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
-            var before = viewModel.MeshViewportImage;
+            var before = viewModel.MeshViewportCamera;
             var mesh = await new RekallAgeMeshAssetStore().LoadAsync(root, "hero-box", CancellationToken.None);
 
             viewModel.OrbitMeshViewport(0.4, 0.1);
 
-            Assert.NotSame(before, viewModel.MeshViewportImage);
+            Assert.NotEqual(before, viewModel.MeshViewportCamera);
+            Assert.Null(viewModel.MeshViewportImage);
             var meshAfterOrbit = await new RekallAgeMeshAssetStore().LoadAsync(root, "hero-box", CancellationToken.None);
             Assert.Equal(mesh.Revision, meshAfterOrbit.Revision);
         }
@@ -1881,34 +1882,23 @@ public sealed class StudioViewModelTests
             viewModel.MeshPrimitiveAssetIdInput = "box-b";
             await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
             // box-b is now open at the identity camera (CreateMeshPrimitiveAsync opens what it creates).
-            var identityImageForBoxB = viewModel.MeshViewportImage;
+            var identityCameraForBoxB = viewModel.MeshViewportCamera;
 
             viewModel.SelectedMeshAssetId = "box-a";
             await ExecuteAsync(viewModel.OpenMeshAssetCommand);
             viewModel.OrbitMeshViewport(0.6, 0.2);
-            var orbitedImageForBoxA = viewModel.MeshViewportImage;
-            Assert.NotSame(identityImageForBoxB, orbitedImageForBoxA);
+            var orbitedCameraForBoxA = viewModel.MeshViewportCamera;
+            Assert.NotEqual(identityCameraForBoxB, orbitedCameraForBoxA);
 
             viewModel.SelectedMeshAssetId = "box-b";
             await ExecuteAsync(viewModel.OpenMeshAssetCommand);
 
             // Re-opening box-b must start at the identity camera again, not inherit box-a's orbit.
-            var reopenedBoxBBytes = ToBytes(viewModel.MeshViewportImage!);
-            var identityBoxBBytes = ToBytes(identityImageForBoxB!);
-            Assert.Equal(identityBoxBBytes, reopenedBoxBBytes);
+            Assert.Equal(identityCameraForBoxB, viewModel.MeshViewportCamera);
         }
         finally
         {
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
-        }
-
-        static byte[] ToBytes(System.Windows.Media.Imaging.BitmapSource image)
-        {
-            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
-            using var stream = new MemoryStream();
-            encoder.Save(stream);
-            return stream.ToArray();
         }
     }
 
@@ -1961,7 +1951,7 @@ public sealed class StudioViewModelTests
     }
 
     [Fact]
-    public async Task PanningAndZoomingMeshViewportEachChangeTheRenderedCameraView()
+    public async Task PanningAndZoomingNativeMeshViewportEachChangeTheCamera()
     {
         var root = Path.Combine(Path.GetTempPath(), "rekall-age-studio-pan-zoom-camera-" + Guid.NewGuid().ToString("N"));
         try
@@ -1979,56 +1969,40 @@ public sealed class StudioViewModelTests
             viewModel.SelectedMeshPrimitive = "box";
             viewModel.MeshPrimitiveAssetIdInput = "camera-box";
             await ExecuteAsync(viewModel.CreateMeshPrimitiveCommand);
-            var initial = ToBytes(viewModel.MeshViewportImage!);
+            var initial = viewModel.MeshViewportCamera;
 
             viewModel.PanMeshViewport(80, -35);
-            var panned = ToBytes(viewModel.MeshViewportImage!);
+            var panned = viewModel.MeshViewportCamera;
             viewModel.ZoomMeshViewport(1.7);
-            var zoomed = ToBytes(viewModel.MeshViewportImage!);
+            var zoomed = viewModel.MeshViewportCamera;
 
-            Assert.False(initial.SequenceEqual(panned));
-            Assert.False(panned.SequenceEqual(zoomed));
+            Assert.NotEqual(initial, panned);
+            Assert.NotEqual(panned, zoomed);
+            Assert.Null(viewModel.MeshViewportImage);
         }
         finally
         {
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
-
-        static byte[] ToBytes(System.Windows.Media.Imaging.BitmapSource image)
-        {
-            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
-            using var stream = new MemoryStream();
-            encoder.Save(stream);
-            return stream.ToArray();
-        }
     }
 
     [Fact]
-    public async Task EmptyMeshViewportStillRendersACameraAwareGrid()
+    public async Task EmptyNativeMeshViewportStillMaintainsACameraAwareView()
     {
         await using var viewModel = new RekallAgeStudioViewModel();
-        var initial = ToBytes(Assert.IsAssignableFrom<System.Windows.Media.Imaging.BitmapSource>(viewModel.MeshViewportImage));
+        var initial = viewModel.MeshViewportCamera;
 
         viewModel.OrbitMeshViewport(0.45, 0.2);
-        var orbited = ToBytes(viewModel.MeshViewportImage!);
+        var orbited = viewModel.MeshViewportCamera;
         viewModel.PanMeshViewport(70, -25);
-        var panned = ToBytes(viewModel.MeshViewportImage!);
+        var panned = viewModel.MeshViewportCamera;
         viewModel.ZoomMeshViewport(1.5);
-        var zoomed = ToBytes(viewModel.MeshViewportImage!);
+        var zoomed = viewModel.MeshViewportCamera;
 
-        Assert.False(initial.SequenceEqual(orbited));
-        Assert.False(orbited.SequenceEqual(panned));
-        Assert.False(panned.SequenceEqual(zoomed));
-
-        static byte[] ToBytes(System.Windows.Media.Imaging.BitmapSource image)
-        {
-            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
-            using var stream = new MemoryStream();
-            encoder.Save(stream);
-            return stream.ToArray();
-        }
+        Assert.NotEqual(initial, orbited);
+        Assert.NotEqual(orbited, panned);
+        Assert.NotEqual(panned, zoomed);
+        Assert.Null(viewModel.MeshViewportImage);
     }
 
     [Fact]

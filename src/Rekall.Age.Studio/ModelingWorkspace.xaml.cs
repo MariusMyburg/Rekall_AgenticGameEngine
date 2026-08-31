@@ -11,18 +11,21 @@ public partial class ModelingWorkspace : UserControl
     private bool _panning;
     private bool _modalOperationDragging;
     private System.Windows.Point _lastNavigationPoint;
+    private readonly RekallAgeStudioMeshVulkanPreviewSession _meshPreviewSession;
+    private RekallAgeStudioViewModel? _attachedViewModel;
 
     public ModelingWorkspace()
     {
         InitializeComponent();
-        // Attached in code-behind rather than XAML: WPF XAML cannot declare two handlers for the
-        // same routed event (MouseMove) on one element, but a routed event supports any number of
-        // CLR subscribers, so the orbit/pan/zoom navigation handlers are added alongside the
-        // existing gizmo-drag/selection handlers already declared in the markup.
-        MeshViewportImage.MouseDown += OnMeshViewportMouseDown;
-        MeshViewportImage.MouseMove += OnMeshViewportMouseMoveForNavigation;
-        MeshViewportImage.MouseUp += OnMeshViewportMouseUpForNavigation;
-        MeshViewportImage.MouseWheel += OnMeshViewportWheel;
+        _meshPreviewSession = new(MeshVulkanViewportHost);
+        MeshVulkanViewportHost.PointerFact += OnMeshViewportPointerFact;
+        MeshVulkanViewportHost.MetricsChanged += OnMeshViewportMetricsChanged;
+        DataContextChanged += (_, _) => AttachMeshViewport();
+        Loaded += (_, _) =>
+        {
+            AttachMeshViewport();
+            _ = PresentMeshViewportAsync(MeshVulkanViewportHost.Metrics);
+        };
     }
 
     private RekallAgeStudioViewModel? ViewModel => DataContext as RekallAgeStudioViewModel;
@@ -35,120 +38,128 @@ public partial class ModelingWorkspace : UserControl
             ViewModel.SelectedMeshOperationId = "loop_cut_edges";
     }
 
-    private void OnMeshMouseDown(object sender, MouseButtonEventArgs e)
+    private void AttachMeshViewport()
     {
-        if (ViewModel is null || sender is not Image image || image.ActualWidth <= 0 || image.ActualHeight <= 0) return;
-        var point = e.GetPosition(image);
-        var modifiers = Keyboard.Modifiers;
-        if (modifiers.HasFlag(ModifierKeys.Alt) && ViewModel.BeginModalMeshOperationDrag(point.X / image.ActualWidth))
+        if (ViewModel is not { } viewModel || ReferenceEquals(viewModel, _attachedViewModel)) return;
+        if (_attachedViewModel is not null)
         {
-            // Blender-style modal parameter drag (Alt+left-drag): live-previews the selected
-            // operation's numeric parameter as the mouse moves instead of gizmo-dragging a point
-            // or selecting an element, so it must claim the gesture before either of those do.
-            _modalOperationDragging = true;
-            image.CaptureMouse();
+            throw new InvalidOperationException("The Modeling Vulkan viewport cannot change ViewModel ownership after attachment.");
         }
-        else if (ViewModel.BeginMeshViewportTransform(point.X / image.ActualWidth, point.Y / image.ActualHeight))
-        {
-            _dragging = true;
-            image.CaptureMouse();
-        }
-        else
-        {
-            ViewModel.SelectMeshViewportElement(
-                point.X / image.ActualWidth,
-                point.Y / image.ActualHeight,
-                modifiers.HasFlag(ModifierKeys.Shift),
-                modifiers.HasFlag(ModifierKeys.Control));
-        }
-        e.Handled = true;
+        _attachedViewModel = viewModel;
+        viewModel.AttachMeshVulkanPreviewSession(_meshPreviewSession);
     }
 
-    private async void OnMeshMouseMove(object sender, MouseEventArgs e)
+    private async void OnMeshViewportMetricsChanged(object? sender, RekallAgeStudioViewportMetrics metrics) =>
+        await PresentMeshViewportAsync(metrics);
+
+    private async Task PresentMeshViewportAsync(RekallAgeStudioViewportMetrics metrics)
     {
-        if (_orbiting || _panning || ViewModel is null || sender is not Image image) return;
-        var point = e.GetPosition(image);
-        if (_modalOperationDragging)
+        if (ViewModel is null || !metrics.IsPresentable) return;
+        try
         {
-            await ViewModel.UpdateModalMeshOperationDragAsync(point.X / image.ActualWidth);
-            e.Handled = true;
+            await ViewModel.PresentMeshViewportAtHostSizeAsync(metrics);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async void OnMeshViewportPointerFact(object? sender, RekallAgeStudioViewportPointerFact fact)
+    {
+        var viewModel = ViewModel;
+        var metrics = MeshVulkanViewportHost.Metrics;
+        if (viewModel is null || !metrics.IsPresentable) return;
+        var normalizedX = Math.Clamp(fact.DisplayX / Math.Max(1, metrics.DipWidth), 0, 1);
+        var normalizedY = Math.Clamp(fact.DisplayY / Math.Max(1, metrics.DipHeight), 0, 1);
+
+        if (fact.Kind == RekallAgeStudioViewportPointerKind.Down
+            && fact.Button == RekallAgeStudioViewportPointerButton.Middle)
+        {
+            _lastNavigationPoint = new(fact.DisplayX, fact.DisplayY);
+            _panning = fact.Modifiers.HasFlag(RekallAgeStudioViewportPointerModifiers.Shift);
+            _orbiting = !_panning;
+            MeshVulkanViewportHost.CapturePointer();
             return;
         }
-        if (!_dragging) return;
-        ViewModel.UpdateMeshViewportTransform(point.X / image.ActualWidth, point.Y / image.ActualHeight);
-        e.Handled = true;
-    }
-
-    private async void OnMeshMouseUp(object sender, MouseButtonEventArgs e)
-    {
-        if (ViewModel is null || sender is not Image image) return;
-        var point = e.GetPosition(image);
-        if (_modalOperationDragging)
+        if (fact.Kind == RekallAgeStudioViewportPointerKind.Down
+            && fact.Button == RekallAgeStudioViewportPointerButton.Left)
         {
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)
+                && viewModel.BeginModalMeshOperationDrag(normalizedX))
+            {
+                _modalOperationDragging = true;
+                MeshVulkanViewportHost.CapturePointer();
+            }
+            else if (viewModel.BeginMeshViewportTransform(normalizedX, normalizedY))
+            {
+                _dragging = true;
+                MeshVulkanViewportHost.CapturePointer();
+            }
+            else
+            {
+                viewModel.SelectMeshViewportElement(
+                    normalizedX,
+                    normalizedY,
+                    fact.Modifiers.HasFlag(RekallAgeStudioViewportPointerModifiers.Shift),
+                    fact.Modifiers.HasFlag(RekallAgeStudioViewportPointerModifiers.Control));
+            }
+            return;
+        }
+        if (fact.Kind == RekallAgeStudioViewportPointerKind.Move && (_orbiting || _panning))
+        {
+            var point = new System.Windows.Point(fact.DisplayX, fact.DisplayY);
+            var delta = point - _lastNavigationPoint;
+            _lastNavigationPoint = point;
+            if (_orbiting) viewModel.OrbitMeshViewport(delta.X * 0.01, delta.Y * 0.01);
+            else viewModel.PanMeshViewport(delta.X, delta.Y);
+            return;
+        }
+        if (fact.Kind == RekallAgeStudioViewportPointerKind.Move && _modalOperationDragging)
+        {
+            await viewModel.UpdateModalMeshOperationDragAsync(normalizedX);
+            return;
+        }
+        if (fact.Kind == RekallAgeStudioViewportPointerKind.Move && _dragging)
+        {
+            viewModel.UpdateMeshViewportTransform(normalizedX, normalizedY);
+            return;
+        }
+        if (fact.Kind == RekallAgeStudioViewportPointerKind.Up
+            && fact.Button == RekallAgeStudioViewportPointerButton.Middle)
+        {
+            _orbiting = false;
+            _panning = false;
+            return;
+        }
+        if (fact.Kind == RekallAgeStudioViewportPointerKind.Up
+            && fact.Button == RekallAgeStudioViewportPointerButton.Left)
+        {
+            if (_modalOperationDragging)
+            {
+                _modalOperationDragging = false;
+                await viewModel.CompleteModalMeshOperationDragAsync(normalizedX);
+            }
+            else if (_dragging)
+            {
+                _dragging = false;
+                await viewModel.CompleteMeshViewportTransformAsync(normalizedX, normalizedY);
+            }
+            return;
+        }
+        if (fact.Kind == RekallAgeStudioViewportPointerKind.Wheel)
+        {
+            viewModel.ZoomMeshViewport(fact.WheelDelta > 0 ? 1.1 : 1 / 1.1);
+            return;
+        }
+        if (fact.Kind is RekallAgeStudioViewportPointerKind.CaptureLost or RekallAgeStudioViewportPointerKind.FocusLost)
+        {
+            _orbiting = false;
+            _panning = false;
+            if (_modalOperationDragging) viewModel.CancelModalMeshOperationDrag();
+            if (_dragging) viewModel.CancelMeshViewportTransform();
             _modalOperationDragging = false;
-            image.ReleaseMouseCapture();
-            await ViewModel.CompleteModalMeshOperationDragAsync(point.X / image.ActualWidth);
-            e.Handled = true;
-            return;
+            _dragging = false;
         }
-        if (!_dragging) return;
-        _dragging = false;
-        image.ReleaseMouseCapture();
-        await ViewModel.CompleteMeshViewportTransformAsync(point.X / image.ActualWidth, point.Y / image.ActualHeight);
-        e.Handled = true;
-    }
-
-    private void OnMeshLostCapture(object sender, MouseEventArgs e)
-    {
-        if (_modalOperationDragging)
-        {
-            _modalOperationDragging = false;
-            ViewModel?.CancelModalMeshOperationDrag();
-            return;
-        }
-        if (!_dragging || ViewModel is null) return;
-        _dragging = false;
-        ViewModel.CancelMeshViewportTransform();
-    }
-
-    /// <summary>Starts an orbit (middle-drag) or pan (shift + middle-drag) navigation gesture.</summary>
-    private void OnMeshViewportMouseDown(object sender, MouseButtonEventArgs e)
-    {
-        if (ViewModel is null || sender is not Image image || e.ChangedButton != MouseButton.Middle) return;
-        _lastNavigationPoint = e.GetPosition(image);
-        _panning = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
-        _orbiting = !_panning;
-        image.CaptureMouse();
-        e.Handled = true;
-    }
-
-    /// <summary>Applies an in-progress orbit/pan gesture's mouse-delta to the viewport camera.</summary>
-    private void OnMeshViewportMouseMoveForNavigation(object sender, MouseEventArgs e)
-    {
-        if (ViewModel is null || sender is not Image image || (!_orbiting && !_panning)) return;
-        var point = e.GetPosition(image);
-        var delta = point - _lastNavigationPoint;
-        _lastNavigationPoint = point;
-        if (_orbiting) ViewModel.OrbitMeshViewport(delta.X * 0.01, delta.Y * 0.01);
-        else ViewModel.PanMeshViewport(delta.X, delta.Y);
-        e.Handled = true;
-    }
-
-    private void OnMeshViewportMouseUpForNavigation(object sender, MouseButtonEventArgs e)
-    {
-        if (sender is not Image image || e.ChangedButton != MouseButton.Middle) return;
-        _orbiting = false;
-        _panning = false;
-        image.ReleaseMouseCapture();
-        e.Handled = true;
-    }
-
-    /// <summary>Scroll-wheel dolly zoom.</summary>
-    private void OnMeshViewportWheel(object sender, MouseWheelEventArgs e)
-    {
-        if (ViewModel is null) return;
-        ViewModel.ZoomMeshViewport(e.Delta > 0 ? 1.1 : 1 / 1.1);
-        e.Handled = true;
     }
 
     private bool _draggingGraphNode;

@@ -1,8 +1,12 @@
 using System.IO;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace Rekall.Age.Studio.Tests;
 
-public sealed class StudioIconSystemTests
+[Collection(WpfApplicationTestCollection.Name)]
+public sealed class StudioIconSystemTests(WpfApplicationTestFixture wpf)
 {
     [Fact]
     public void AppDefinesReusableThemeableVectorIconSystem()
@@ -15,7 +19,40 @@ public sealed class StudioIconSystemTests
         Assert.Contains("x:Key=\"IconSettings\"", app, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"IconLocalModel\"", app, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"IconCloud\"", app, StringComparison.Ordinal);
-        Assert.Contains("Property=\"Fill\" Value=\"{Binding Foreground, RelativeSource={RelativeSource AncestorType=Control}}\"", app, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"StudioFilledIconPath\"", app, StringComparison.Ordinal);
+        Assert.Contains("Property=\"Fill\" Value=\"Transparent\"", app, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RuntimeResourcesSeparateOutlineAndSilhouetteRenderingSemantics()
+    {
+        wpf.Invoke(() =>
+        {
+            var outline = Assert.IsType<Style>(Application.Current.Resources["StudioIconPath"]);
+            var filled = Assert.IsType<Style>(Application.Current.Resources["StudioFilledIconPath"]);
+            var outlineFill = outline.Setters.OfType<Setter>().Single(setter => setter.Property == System.Windows.Shapes.Shape.FillProperty);
+            var filledStroke = filled.Setters.OfType<Setter>().Single(setter => setter.Property == System.Windows.Shapes.Shape.StrokeProperty);
+
+            Assert.Equal(Brushes.Transparent, outlineFill.Value);
+            Assert.Equal(Brushes.Transparent, filledStroke.Value);
+            Assert.Same(outline, filled.BasedOn);
+        });
+    }
+
+    [Theory]
+    [InlineData("IconCreate", 3)]
+    [InlineData("IconLocalModel", 5)]
+    [InlineData("IconFileModel", 4)]
+    [InlineData("IconAgent", 5)]
+    public void CompoundOutlineIconsRetainIndependentDetailFigures(string resourceKey, int minimumFigures)
+    {
+        wpf.Invoke(() =>
+        {
+            var geometry = Assert.IsAssignableFrom<Geometry>(Application.Current.Resources[resourceKey]);
+            var flattened = geometry.GetFlattenedPathGeometry();
+            Assert.True(flattened.Figures.Count >= minimumFigures,
+                $"{resourceKey} should keep its interior details as independent visible figures.");
+        });
     }
 
     [Fact]
@@ -28,6 +65,8 @@ public sealed class StudioIconSystemTests
         Assert.Contains("{StaticResource IconBack}", wizard, StringComparison.Ordinal);
         Assert.Contains("{StaticResource IconNext}", wizard, StringComparison.Ordinal);
         Assert.Contains("{StaticResource IconCheck}", wizard, StringComparison.Ordinal);
+        Assert.Contains("Data=\"{StaticResource IconLocalModel}\" Style=\"{StaticResource StudioIconPath}\"", wizard, StringComparison.Ordinal);
+        Assert.Contains("Data=\"{StaticResource IconCloud}\" Style=\"{StaticResource StudioFilledIconPath}\"", wizard, StringComparison.Ordinal);
         Assert.Contains("Text=\"Back\"", wizard, StringComparison.Ordinal);
         Assert.Contains("Text=\"Next\"", wizard, StringComparison.Ordinal);
         Assert.Contains("Text=\"Finish\"", wizard, StringComparison.Ordinal);
@@ -44,6 +83,7 @@ public sealed class StudioIconSystemTests
         Assert.Contains("{StaticResource IconOpen}", main, StringComparison.Ordinal);
         Assert.Contains("{StaticResource IconPlay}", main, StringComparison.Ordinal);
         Assert.Contains("{StaticResource IconStop}", main, StringComparison.Ordinal);
+        Assert.Contains("Data=\"{StaticResource IconPlay}\" Style=\"{StaticResource StudioFilledIconPath}\"", main, StringComparison.Ordinal);
         Assert.Contains("Text=\"Simulate\"", main, StringComparison.Ordinal);
         Assert.Contains("ToolTip=\"Run the scene", main, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"Simulate scene\"", main, StringComparison.Ordinal);

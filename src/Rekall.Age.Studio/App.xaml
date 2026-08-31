@@ -43,9 +43,13 @@
             <Setter Property="StrokeStartLineCap" Value="Round" />
             <Setter Property="StrokeEndLineCap" Value="Round" />
             <Setter Property="StrokeLineJoin" Value="Round" />
-            <Setter Property="Fill" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Control}}" />
+            <Setter Property="Fill" Value="Transparent" />
             <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Control}}" />
             <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
+        <Style x:Key="StudioFilledIconPath" TargetType="Path" BasedOn="{StaticResource StudioIconPath}">
+            <Setter Property="Fill" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Control}}" />
+            <Setter Property="Stroke" Value="Transparent" />
         </Style>
         <!-- Prevent native WPF popup controls from inheriting the light Windows
              palette while the rest of Studio uses the dark workbench theme. -->

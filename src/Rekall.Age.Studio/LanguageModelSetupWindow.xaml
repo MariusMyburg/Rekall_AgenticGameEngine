@@ -113,18 +113,18 @@
                         <WrapPanel>
                             <Button Style="{StaticResource ProviderCard}" Tag="openai" Click="OnProviderCardClick"
                                     ToolTip="Connect with an OpenAI API key" AutomationProperties.Name="Choose OpenAI API">
-                                <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconCloud}" Style="{StaticResource StudioIconPath}" /><StackPanel><TextBlock Text="OpenAI" FontWeight="SemiBold" /><TextBlock Text="API key connection" Foreground="{StaticResource MutedText}" /></StackPanel></StackPanel>
+                                <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconCloud}" Style="{StaticResource StudioFilledIconPath}" /><StackPanel><TextBlock Text="OpenAI" FontWeight="SemiBold" /><TextBlock Text="API key connection" Foreground="{StaticResource MutedText}" /></StackPanel></StackPanel>
                             </Button>
                             <Button Style="{StaticResource ProviderCard}" Tag="kimi" Click="OnProviderCardClick"
                                     ToolTip="Connect with a Kimi API key" AutomationProperties.Name="Choose Kimi API">
-                                <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconCloud}" Style="{StaticResource StudioIconPath}" /><StackPanel><TextBlock Text="Kimi" FontWeight="SemiBold" /><TextBlock Text="Moonshot API key" Foreground="{StaticResource MutedText}" /></StackPanel></StackPanel>
+                                <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconCloud}" Style="{StaticResource StudioFilledIconPath}" /><StackPanel><TextBlock Text="Kimi" FontWeight="SemiBold" /><TextBlock Text="Moonshot API key" Foreground="{StaticResource MutedText}" /></StackPanel></StackPanel>
                             </Button>
                         </WrapPanel>
                         <TextBlock Text="ACCOUNT" Style="{StaticResource SectionLabel}" Margin="0,10,0,6" />
                         <WrapPanel>
                             <Button Style="{StaticResource ProviderCard}" Tag="codex" Click="OnProviderCardClick"
                                     ToolTip="Use your Codex account" AutomationProperties.Name="Choose Codex account">
-                                <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconAccount}" Style="{StaticResource StudioIconPath}" /><StackPanel><TextBlock Text="Codex" FontWeight="SemiBold" /><TextBlock Text="ChatGPT account" Foreground="{StaticResource MutedText}" /></StackPanel></StackPanel>
+                                <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconAccount}" Style="{StaticResource StudioFilledIconPath}" /><StackPanel><TextBlock Text="Codex" FontWeight="SemiBold" /><TextBlock Text="ChatGPT account" Foreground="{StaticResource MutedText}" /></StackPanel></StackPanel>
                             </Button>
                         </WrapPanel>
                     </StackPanel>
@@ -151,9 +151,9 @@
                                 <TextBlock Text="Ollama URL" Style="{StaticResource SectionLabel}" Margin="0,10,0,5" />
                                 <TextBox Text="{Binding OllamaUrl, UpdateSourceTrigger=PropertyChanged}" ToolTip="The local Ollama server address" AutomationProperties.Name="Ollama server URL" />
                                 <WrapPanel Margin="0,8,0,0">
-                                    <Button x:Name="OpenOllamaDownloadButton" Tag="https://ollama.com/download" Click="OnOpenProviderPageClick" HorizontalAlignment="Left" ToolTip="Open the official Ollama download page" AutomationProperties.Name="Open Ollama download page"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconCloud}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Open Ollama download" /></StackPanel></Button>
-                                    <Button Command="{Binding StartOllamaCommand}" HorizontalAlignment="Left" ToolTip="Start the installed Ollama service" AutomationProperties.Name="Start Ollama service"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconPlay}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Start Ollama" /></StackPanel></Button>
-                                    <Button Command="{Binding PullRecommendedOllamaModelCommand}" HorizontalAlignment="Left" ToolTip="Download the recommended local model" AutomationProperties.Name="Download recommended Ollama model"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconDownload}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Download qwen3.8:27b" /></StackPanel></Button>
+                                    <Button x:Name="OpenOllamaDownloadButton" Tag="https://ollama.com/download" Click="OnOpenProviderPageClick" HorizontalAlignment="Left" ToolTip="Open the official Ollama download page" AutomationProperties.Name="Open Ollama download page"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconCloud}" Style="{StaticResource StudioFilledIconPath}" /><TextBlock Text="Open Ollama download" /></StackPanel></Button>
+                                    <Button Command="{Binding StartOllamaCommand}" HorizontalAlignment="Left" ToolTip="Start the installed Ollama service" AutomationProperties.Name="Start Ollama service"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconPlay}" Style="{StaticResource StudioFilledIconPath}" /><TextBlock Text="Start Ollama" /></StackPanel></Button>
+                                    <Button Command="{Binding PullRecommendedOllamaModelCommand}" HorizontalAlignment="Left" ToolTip="Download the recommended local model" AutomationProperties.Name="Download recommended Ollama model"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconDownload}" Style="{StaticResource StudioFilledIconPath}" /><TextBlock Text="Download qwen3.8:27b" /></StackPanel></Button>
                                 </WrapPanel>
                                 <TextBlock Text="{Binding RemediationProgress}" Foreground="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,7,0,0" />
                             </StackPanel>

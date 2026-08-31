@@ -198,11 +198,11 @@
             <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
             <Button Content="Add Entity" Command="{Binding AddEntityCommand}" />
             <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
-            <Button Command="{Binding SimulateCommand}" Style="{StaticResource AccentButton}" ToolTip="Run the scene in this viewport without changing authored state" AutomationProperties.Name="Simulate scene"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconPlay}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Simulate" /></StackPanel></Button>
+            <Button Command="{Binding SimulateCommand}" Style="{StaticResource AccentButton}" ToolTip="Run the scene in this viewport without changing authored state" AutomationProperties.Name="Simulate scene"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconPlay}" Style="{StaticResource StudioFilledIconPath}" /><TextBlock Text="Simulate" /></StackPanel></Button>
             <Button Content="{Binding PauseSimulationLabel}" Command="{Binding PauseSimulationCommand}" ToolTip="Pause or resume the live simulation clock" />
             <Button Content="Step" Command="{Binding StepSimulationCommand}" ToolTip="Advance a paused simulation by exactly one fixed frame" />
-            <Button Command="{Binding PlayCommand}" ToolTip="Launch the game in the production Player" AutomationProperties.Name="Play game"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconPlay}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Play" /></StackPanel></Button>
-            <Button Command="{Binding StopCommand}" ToolTip="Stop Simulate or Play and return to Edit" AutomationProperties.Name="Stop game or simulation"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconStop}" Style="{StaticResource StudioIconPath}" /><TextBlock Text="Stop" /></StackPanel></Button>
+            <Button Command="{Binding PlayCommand}" ToolTip="Launch the game in the production Player" AutomationProperties.Name="Play game"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconPlay}" Style="{StaticResource StudioFilledIconPath}" /><TextBlock Text="Play" /></StackPanel></Button>
+            <Button Command="{Binding StopCommand}" ToolTip="Stop Simulate or Play and return to Edit" AutomationProperties.Name="Stop game or simulation"><StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconStop}" Style="{StaticResource StudioFilledIconPath}" /><TextBlock Text="Stop" /></StackPanel></Button>
             <ToggleButton Content="Live" IsChecked="{Binding IsLiveViewportEnabled, Mode=TwoWay}" Margin="7,2,2,2" ToolTip="Continuously update the viewport while simulating" />
             <Border Width="1" Margin="7,4" Background="{StaticResource PanelBorder}" />
             <Button Content="Capture" Command="{Binding CaptureCommand}" />

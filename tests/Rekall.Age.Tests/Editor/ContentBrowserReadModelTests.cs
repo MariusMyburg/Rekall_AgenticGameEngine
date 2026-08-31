@@ -1,3 +1,4 @@
+using Rekall.Age.Assets;
 using Rekall.Age.Assets.Commands;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
@@ -9,6 +10,49 @@ namespace Rekall.Age.Tests.Editor;
 
 public sealed class ContentBrowserReadModelTests
 {
+    [Fact]
+    public async Task ImportedProjectionPreservesCatalogKindAndUsesExactRoutesAndCapabilities()
+    {
+        var root = TestPaths.CreateTempDirectory();
+        await new RekallAgeProjectStore().SaveAsync(
+            root,
+            RekallAgeProjectManifest.Create("Content Contracts", ["world"]),
+            CancellationToken.None);
+        await new RekallAgeSceneStore().SaveAsync(
+            root,
+            RekallAgeSceneDocument.Create("Main", ["world"]),
+            CancellationToken.None);
+        var catalog = RekallAgeAssetCatalogDocument.Empty
+            .AddOrReplace(Asset("model-id", "Model", "model"))
+            .AddOrReplace(Asset("texture-id", "Texture", " Texture "))
+            .AddOrReplace(Asset("audio-id", "Audio", "audio"))
+            .AddOrReplace(Asset("unknown-id", "Unknown", "Custom.Kind"));
+        await new RekallAgeAssetCatalogStore().SaveAsync(root, catalog, CancellationToken.None);
+
+        var content = (await new RekallAgeWorkbenchModelBuilder()
+            .BuildAsync(root, "Main", CancellationToken.None)).Content;
+
+        var model = Assert.Single(content.Items, item => item.Id == "model-id");
+        Assert.Equal("mesh-edit", model.EditorRouteId);
+        Assert.Equal(["open", "reveal", "reimport", "place"], model.Capabilities);
+
+        var texture = Assert.Single(content.Items, item => item.Id == "texture-id");
+        Assert.Equal(" Texture ", texture.Kind);
+        Assert.Equal("texture", texture.Family);
+        Assert.Equal("texture-preview", texture.EditorRouteId);
+        Assert.Equal(["open", "open-external", "reveal", "reimport", "assign"], texture.Capabilities);
+
+        var audio = Assert.Single(content.Items, item => item.Id == "audio-id");
+        Assert.Equal("audio-preview", audio.EditorRouteId);
+        Assert.Equal(["open", "open-external", "reveal", "reimport", "assign"], audio.Capabilities);
+
+        var unknown = Assert.Single(content.Items, item => item.Id == "unknown-id");
+        Assert.Equal("Custom.Kind", unknown.Kind);
+        Assert.Equal("custom.kind", unknown.Family);
+        Assert.Equal("external", unknown.EditorRouteId);
+        Assert.Equal(["open", "open-external", "reveal", "reimport"], unknown.Capabilities);
+    }
+
     [Fact]
     public async Task WorkbenchProjectsImportedAssetsIntoProviderNeutralContentWithoutChangingLegacyAssets()
     {
@@ -82,6 +126,15 @@ public sealed class ContentBrowserReadModelTests
         WriteUInt32BigEndian(bytes, 20, height);
         return bytes;
     }
+
+    private static RekallAgeAssetDocument Asset(string id, string displayName, string kind) => new(
+        id,
+        displayName.ToLowerInvariant(),
+        displayName,
+        kind,
+        $"C:/source/{id}.bin",
+        $"C:/project/Assets/{id}.bin",
+        $"hash-{id}");
 
     private static byte[] CreateMinimalGlb()
     {

@@ -164,11 +164,11 @@ public sealed class RekallAgeWorkbenchModelBuilder
         };
         var (route, capabilities) = family switch
         {
-            "model" => ("mesh-edit", ImportedCapabilities(RekallAgeContentCapability.Place)),
-            "texture" => ("texture-preview", ImportedCapabilities(RekallAgeContentCapability.Assign)),
-            "audio" => ("audio-preview", ImportedCapabilities(RekallAgeContentCapability.Assign)),
-            "shader" => ("shader-edit", ImportedCapabilities(RekallAgeContentCapability.Assign)),
-            _ => ("external", ImportedCapabilities(RekallAgeContentCapability.OpenExternal))
+            "model" => ("mesh-edit", ImportedCapabilities(false, RekallAgeContentCapability.Place)),
+            "texture" => ("texture-preview", ImportedCapabilities(true, RekallAgeContentCapability.Assign)),
+            "audio" => ("audio-preview", ImportedCapabilities(true, RekallAgeContentCapability.Assign)),
+            "shader" => ("shader-edit", ImportedCapabilities(true, RekallAgeContentCapability.Assign)),
+            _ => ("external", ImportedCapabilities(true))
         };
         var preview = new RekallAgeContentPreviewMetadata(
             asset.TextureMetadata?.Width,
@@ -181,7 +181,7 @@ public sealed class RekallAgeWorkbenchModelBuilder
             asset.Id,
             asset.DisplayName,
             family,
-            kind,
+            asset.Kind,
             "Imported",
             asset.ImportedPath,
             asset.SourcePath,
@@ -193,13 +193,21 @@ public sealed class RekallAgeWorkbenchModelBuilder
             preview);
     }
 
-    private static IReadOnlyList<string> ImportedCapabilities(params string[] additional) =>
-        [
-            RekallAgeContentCapability.Open,
-            RekallAgeContentCapability.Reveal,
-            RekallAgeContentCapability.Reimport,
-            .. additional
-        ];
+    private static IReadOnlyList<string> ImportedCapabilities(
+        bool opensExternally,
+        params string[] additional)
+    {
+        var capabilities = new List<string> { RekallAgeContentCapability.Open };
+        if (opensExternally)
+        {
+            capabilities.Add(RekallAgeContentCapability.OpenExternal);
+        }
+
+        capabilities.Add(RekallAgeContentCapability.Reveal);
+        capabilities.Add(RekallAgeContentCapability.Reimport);
+        capabilities.AddRange(additional);
+        return capabilities.ToArray();
+    }
 
     private static RekallAgeSceneGraphModel BuildSceneGraph(RekallAgeSceneDocument scene)
     {

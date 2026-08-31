@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -118,6 +119,40 @@ public sealed class StudioViewModelTests
         using var secretOnly = JsonDocument.Parse("""{"apiKey":"secret"}""");
         Assert.False(RekallAgeCodexApprovalPresenter.TryFormat(
             new RekallAgeCodexApprovalRequest("item/commandExecution/requestApproval", secretOnly.RootElement.Clone()), out _));
+    }
+
+    [Fact]
+    public void CodexApprovalSessionCanRememberOneMcpToolWithoutApprovingOthers()
+    {
+        var session = new RekallAgeCodexApprovalSession();
+        using var firstDocument = JsonDocument.Parse(
+            """{"serverName":"rekall-age","message":"Allow the rekall-age MCP server to run tool 'rekall.context.scene_summary'?"}""");
+        using var secondDocument = JsonDocument.Parse(
+            """{"serverName":"rekall-age","message":"Allow the rekall-age MCP server to run tool 'rekall.validation.scene'?"}""");
+        var first = new RekallAgeCodexApprovalRequest("mcpServer/elicitation/request", firstDocument.RootElement.Clone());
+        var second = new RekallAgeCodexApprovalRequest("mcpServer/elicitation/request", secondDocument.RootElement.Clone());
+
+        Assert.False(session.IsApproved(first));
+        session.ApproveAction(first);
+
+        Assert.True(session.IsApproved(first));
+        Assert.False(session.IsApproved(second));
+    }
+
+    [Fact]
+    public void CodexApprovalSessionCanPreapproveEveryActionUntilCleared()
+    {
+        var session = new RekallAgeCodexApprovalSession { ApproveAll = true };
+        using var document = JsonDocument.Parse("""{"command":["dotnet","build"],"cwd":"C:\\Game"}""");
+        var request = new RekallAgeCodexApprovalRequest(
+            "item/commandExecution/requestApproval",
+            document.RootElement.Clone());
+
+        Assert.True(session.IsApproved(request));
+
+        session.Clear();
+        Assert.False(session.ApproveAll);
+        Assert.False(session.IsApproved(request));
     }
 
     [Fact]
@@ -1712,17 +1747,25 @@ public sealed class StudioViewModelTests
             viewModel.SelectedModelingGraphAssetId = "link-test-graph";
             await ExecuteAsync(viewModel.OpenModelingGraphCommand);
 
-            // Recompute the exact same layout/render the view model just produced internally, so the
-            // port click coordinates below are derived rather than guessed against a private frame.
-            var catalog = RekallAgeModelingNodeCatalog.CreateDefault();
-            var positions = RekallAgeStudioModelingGraphLayout.ComputeDefaultPositions(nodes, links);
-            var renderer = new RekallAgeStudioModelingGraphCanvasRenderer();
-            var frame = renderer.Render(nodes, links, positions, catalog, "box2", 640, 360);
+            // Use the frame Studio actually rendered. The opening view is fit-to-canvas and may
+            // differ from a separately reconstructed baseline as layout behavior evolves.
+            var frameField = typeof(RekallAgeStudioViewModel).GetField(
+                "_modelingGraphCanvasFrame",
+                BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var frame = Assert.IsType<RekallAgeStudioModelingGraphCanvasFrame>(frameField.GetValue(viewModel));
             var box2Output = frame.PortPoints[new RekallAgeStudioModelingGraphPortKey("box2", "geometry", true)];
             var joinInput = frame.PortPoints[new RekallAgeStudioModelingGraphPortKey("join", "geometry", false)];
 
             await viewModel.ClickModelingGraphCanvasAsync(box2Output.X / 640, box2Output.Y / 360);
+            var pendingField = typeof(RekallAgeStudioViewModel).GetField(
+                "_modelingGraphPendingLinkPort",
+                BindingFlags.Instance | BindingFlags.NonPublic)!;
+            Assert.Equal(
+                new RekallAgeStudioModelingGraphPortKey("box2", "geometry", true),
+                Assert.IsType<RekallAgeStudioModelingGraphPortKey>(pendingField.GetValue(viewModel)));
             await viewModel.ClickModelingGraphCanvasAsync(joinInput.X / 640, joinInput.Y / 360);
+            Assert.Null(pendingField.GetValue(viewModel));
+            Assert.DoesNotContain(viewModel.ModelingGraphDiagnosticLines, line => line.StartsWith("error:", StringComparison.Ordinal));
 
             var persisted = await new RekallAgeModelingGraphAssetStore().LoadAsync(root, "link-test-graph", CancellationToken.None);
             Assert.Contains(persisted.Links, link =>
@@ -2893,6 +2936,16 @@ public sealed class StudioViewModelTests
         {
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task CancellingWithoutAnActiveAuthoringRunKeepsTheIdleStatus()
+    {
+        await using var viewModel = new RekallAgeStudioViewModel();
+
+        await ExecuteAsync(viewModel.CancelAgentCommand);
+
+        Assert.Equal("AI authoring is idle.", viewModel.AgentActivityText);
     }
 
     [Fact]

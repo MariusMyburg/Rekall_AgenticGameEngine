@@ -79,12 +79,14 @@ public sealed class StudioLayoutTests
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
         var window = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml"));
+        var codeBehind = File.ReadAllText(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml.cs"));
 
         Assert.Contains("local:RekallAgeVulkanViewportHost", window, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"SceneVulkanViewportHost\"", window, StringComparison.Ordinal);
         Assert.DoesNotContain("SceneViewportImage", window, StringComparison.Ordinal);
         Assert.DoesNotContain("Source=\"{Binding ViewportImage}\"", window, StringComparison.Ordinal);
-        Assert.DoesNotContain("SceneGizmoCanvas", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("SceneGizmoPopup", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("SceneGizmoOverlayCanvas", window, StringComparison.Ordinal);
     }
 
     [Fact]

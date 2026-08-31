@@ -46,6 +46,18 @@ public sealed class BouncingBallExampleSceneTests
         Assert.Equal(3, capture.Value.RenderableCount);
         Assert.Equal(0, capture.Value.FallbackRenderableCount);
         Assert.True(File.Exists(capture.Value.ScreenshotPath));
+        var capturedImage = await RekallAgePngReader.ReadRgbaAsync(
+            capture.Value.ScreenshotPath,
+            CancellationToken.None);
+        var visibleRedPixels = Enumerable.Range(0, capturedImage.Width * capturedImage.Height)
+            .Count(index =>
+            {
+                var pixel = capturedImage.GetPixel(index % capturedImage.Width, index / capturedImage.Width);
+                return pixel.R >= 96 && pixel.R >= pixel.G * 1.5 && pixel.R >= pixel.B * 1.5;
+            });
+        Assert.True(
+            visibleRedPixels >= 25,
+            $"Expected the authored camera to show the red bouncing ball, but found only {visibleRedPixels} red pixels.");
     }
 
     [Fact]

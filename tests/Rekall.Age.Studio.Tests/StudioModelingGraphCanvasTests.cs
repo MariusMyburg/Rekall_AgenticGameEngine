@@ -20,6 +20,16 @@ public sealed class StudioModelingGraphLayoutTests
     }
 
     [Fact]
+    public void AdjacentColumnsLeaveRoomBetweenNodePorts()
+    {
+        var nodes = new[] { Node("a"), Node("b") };
+
+        var positions = RekallAgeStudioModelingGraphLayout.ComputeDefaultPositions(nodes, [Link("a", "b")]);
+
+        Assert.True(positions["b"].X - positions["a"].X > 220);
+    }
+
+    [Fact]
     public void IndependentNodesWithNoLinksShareTheFirstColumn()
     {
         var nodes = new[] { Node("a"), Node("b") };

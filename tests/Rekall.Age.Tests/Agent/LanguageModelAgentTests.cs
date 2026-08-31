@@ -2598,6 +2598,37 @@ public sealed class LanguageModelAgentTests
         Assert.Equal("Pong is proven.", result.FinalContent);
     }
 
+    [Fact]
+    public void CameraFacingAwayCaptureDoesNotSatisfyVisualEvidence()
+    {
+        var tracker = new RekallAgeTaskEvidenceTracker("Create a game with an on-screen HUD.", enabled: true);
+        var output = new JsonObject
+        {
+            ["value"] = new JsonObject
+            {
+                ["captured"] = true,
+                ["frameIndex"] = 1,
+                ["renderableKinds"] = new JsonArray("mesh", "ui"),
+                ["frameAnalysis"] = new JsonObject
+                {
+                    ["analyzed"] = true,
+                    ["visuallyInformative"] = true,
+                    ["dominantColorRatio"] = 0.72,
+                    ["warningCodes"] = new JsonArray()
+                },
+                ["layoutDiagnostics"] = new JsonObject
+                {
+                    ["warningCodes"] = new JsonArray("REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT")
+                }
+            }
+        };
+
+        tracker.Observe("rekall.render.capture_runtime_viewport", new JsonObject(), output, succeeded: true);
+
+        Assert.True(tracker.TryBuildMissingEvidencePrompt(out var prompt));
+        Assert.Contains("UI renderable", prompt, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class ScriptedModelClient(params RekallAgeLanguageModelResponse[] responses) : IRekallAgeLanguageModelClient
     {
         private int _index;

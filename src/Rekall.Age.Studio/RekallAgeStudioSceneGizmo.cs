@@ -1,5 +1,7 @@
 namespace Rekall.Age.Studio;
 
+using Rekall.Age.Rendering.Abstractions;
+
 public enum RekallAgeStudioTransformTool
 {
     Select,
@@ -221,4 +223,112 @@ internal sealed class RekallAgeStudioTransformGesture
             (RekallAgeStudioTransformTool.Scale, RekallAgeStudioTransformAxis.Z) => "scaleZ",
             _ => throw new ArgumentOutOfRangeException()
         };
+}
+
+internal static class RekallAgeStudioSceneGizmoRenderables
+{
+    private const double AxisLength = 1.6;
+    private const double Thickness = 0.075;
+
+    public static IReadOnlyList<RekallAgeRuntimeViewportRenderable> Create(
+        RekallAgeStudioTransformTool tool,
+        RekallAgeStudioTransformSpace space,
+        double x,
+        double y,
+        double z,
+        double pitch,
+        double yaw,
+        double roll)
+    {
+        if (tool is RekallAgeStudioTransformTool.Select) return [];
+        var rotationX = space is RekallAgeStudioTransformSpace.Local ? pitch : 0;
+        var rotationY = space is RekallAgeStudioTransformSpace.Local ? yaw : 0;
+        var rotationZ = space is RekallAgeStudioTransformSpace.Local ? roll : 0;
+        return
+        [
+            Axis(RekallAgeStudioTransformAxis.X, "#ef4c56", tool, x, y, z, rotationX, rotationY, rotationZ),
+            Axis(RekallAgeStudioTransformAxis.Y, "#53d175", tool, x, y, z, rotationX, rotationY, rotationZ),
+            Axis(RekallAgeStudioTransformAxis.Z, "#4e91ff", tool, x, y, z, rotationX, rotationY, rotationZ)
+        ];
+    }
+
+    private static RekallAgeRuntimeViewportRenderable Axis(
+        RekallAgeStudioTransformAxis axis,
+        string color,
+        RekallAgeStudioTransformTool tool,
+        double x,
+        double y,
+        double z,
+        double rotationX,
+        double rotationY,
+        double rotationZ)
+    {
+        var segments = tool is RekallAgeStudioTransformTool.Rotate
+            ? Ring(axis)
+            : Straight(axis, tool is RekallAgeStudioTransformTool.Scale);
+        return new RekallAgeRuntimeViewportRenderable(
+            $"__studio_gizmo_{axis.ToString().ToLowerInvariant()}",
+            $"Studio {tool} {axis}",
+            "mesh",
+            null,
+            x,
+            y,
+            z,
+            int.MaxValue - (int)axis,
+            RotationX: rotationX,
+            RotationY: rotationY,
+            RotationZ: rotationZ,
+            MaterialColor: color,
+            EmissiveColor: color,
+            EmissiveStrength: 4,
+            LineSegments: new RekallAgeRuntimeViewportLineSegments(segments, Thickness),
+            Layer: "studio-editor")
+        {
+            CastShadows = false,
+            ReceiveShadows = false
+        };
+    }
+
+    private static IReadOnlyList<RekallAgeRuntimeViewportLineSegment> Straight(
+        RekallAgeStudioTransformAxis axis,
+        bool scaleHandle)
+    {
+        var end = axis switch
+        {
+            RekallAgeStudioTransformAxis.X => (X: AxisLength, Y: 0d, Z: 0d),
+            RekallAgeStudioTransformAxis.Y => (X: 0d, Y: AxisLength, Z: 0d),
+            _ => (X: 0d, Y: 0d, Z: AxisLength)
+        };
+        var segments = new List<RekallAgeRuntimeViewportLineSegment>
+        {
+            new(0, 0, 0, end.X, end.Y, end.Z)
+        };
+        var size = scaleHandle ? 0.13 : 0.18;
+        segments.Add(new(end.X - size, end.Y, end.Z, end.X, end.Y, end.Z));
+        segments.Add(new(end.X, end.Y - size, end.Z, end.X, end.Y, end.Z));
+        segments.Add(new(end.X, end.Y, end.Z - size, end.X, end.Y, end.Z));
+        return segments;
+    }
+
+    private static IReadOnlyList<RekallAgeRuntimeViewportLineSegment> Ring(RekallAgeStudioTransformAxis axis)
+    {
+        const int steps = 48;
+        var segments = new RekallAgeRuntimeViewportLineSegment[steps];
+        for (var index = 0; index < steps; index++)
+        {
+            var a = index * Math.Tau / steps;
+            var b = (index + 1) * Math.Tau / steps;
+            var from = RingPoint(axis, a);
+            var to = RingPoint(axis, b);
+            segments[index] = new(from.X, from.Y, from.Z, to.X, to.Y, to.Z);
+        }
+        return segments;
+    }
+
+    private static (double X, double Y, double Z) RingPoint(RekallAgeStudioTransformAxis axis, double angle) => axis switch
+    {
+        RekallAgeStudioTransformAxis.X => (0, Math.Cos(angle) * AxisLength, Math.Sin(angle) * AxisLength),
+        RekallAgeStudioTransformAxis.Y => (Math.Cos(angle) * AxisLength, 0, Math.Sin(angle) * AxisLength),
+        _ => (Math.Cos(angle) * AxisLength, Math.Sin(angle) * AxisLength, 0)
+    };
 }

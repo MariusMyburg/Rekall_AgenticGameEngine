@@ -22,6 +22,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly RekallAgeStudioExampleCatalog _exampleCatalog = RekallAgeStudioExampleCatalog.CreateDefault();
     private readonly RekallAgeStudioExampleLibrary _exampleLibrary = new();
     private readonly RekallAgeStudioProjectTransitionCoordinator _projectTransitions = new();
+    private readonly RekallAgeCodexApprovalSession _codexApprovalSession = new();
     private readonly RekallAgeStudioLanguageModelSetupCoordinator _languageModelSetupCoordinator = new();
     private readonly DispatcherTimer _previewTimer;
     private readonly RekallAgeStudioViewportRecoveryState _viewportRecovery =
@@ -322,18 +323,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             return RekallAgeCodexApprovalDecision.Decline;
         }
-        var choice = await Dispatcher.InvokeAsync(() => MessageBox.Show(
-            this,
-            $"Codex requests approval for this action:\n\n{summary}\n\nAllow this action?",
-            "Codex approval",
-            MessageBoxButton.YesNoCancel,
-            MessageBoxImage.Question));
-        return choice switch
+        _codexApprovalSession.ApproveAll = _viewModel.PreapproveAllCodexActionsForSession;
+        if (_codexApprovalSession.IsApproved(request)) return RekallAgeCodexApprovalDecision.Accept;
+
+        var choice = await Dispatcher.InvokeAsync(() =>
         {
-            MessageBoxResult.Yes => RekallAgeCodexApprovalDecision.Accept,
-            MessageBoxResult.Cancel => RekallAgeCodexApprovalDecision.Cancel,
-            _ => RekallAgeCodexApprovalDecision.Decline
-        };
+            var dialog = new CodexApprovalDialog(summary) { Owner = this };
+            dialog.ShowDialog();
+            return dialog.Choice;
+        });
+        if (choice == RekallAgeCodexApprovalChoice.AllowActionForSession)
+        {
+            _codexApprovalSession.ApproveAction(request);
+        }
+        else if (choice == RekallAgeCodexApprovalChoice.AllowAllForSession)
+        {
+            _codexApprovalSession.ApproveAll = true;
+            _viewModel.PreapproveAllCodexActionsForSession = true;
+        }
+        return choice == RekallAgeCodexApprovalChoice.Deny
+            ? RekallAgeCodexApprovalDecision.Decline
+            : RekallAgeCodexApprovalDecision.Accept;
     }
 
     private async void OnCreateProjectClick(object sender, RoutedEventArgs e)

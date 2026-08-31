@@ -227,6 +227,12 @@ internal sealed class RekallAgeTaskEvidenceTracker
             return;
         }
 
+        if (Find(value, "layoutDiagnostics") is JsonObject layoutDiagnostics
+            && HasWarning(layoutDiagnostics, "REKALL_VIEWPORT_CAMERA_FACES_AWAY_FROM_CONTENT"))
+        {
+            return;
+        }
+
         if (_requirements.RequireFullViewportCoverage
             && (ReadDouble(analysis, "dominantColorRatio") >= 0.95
                 || HasWarning(analysis, "REKALL_VIEWPORT_LOW_VISUAL_COVERAGE")))

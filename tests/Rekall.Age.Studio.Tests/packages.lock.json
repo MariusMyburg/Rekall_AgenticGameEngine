@@ -550,6 +550,7 @@
         "type": "Project",
         "dependencies": {
           "Rekall.Age.Agent": "[0.1.0-preview.1, )",
+          "Rekall.Age.AssetPipeline": "[0.1.0-preview.1, )",
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
           "Rekall.Age.Editor": "[0.1.0-preview.1, )",
           "Rekall.Age.Editor.Contracts": "[0.1.0-preview.1, )",

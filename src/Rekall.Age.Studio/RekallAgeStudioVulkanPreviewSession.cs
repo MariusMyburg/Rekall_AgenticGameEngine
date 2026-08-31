@@ -50,9 +50,13 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
     private int _assetRevision;
     private bool _assetsDirty;
     private RekallAgeStudioViewportRenderStyle _renderStyle = RekallAgeStudioViewportRenderStyle.Textured;
+    private RekallAgeRuntimeViewportRenderable[] _editorRenderables = [];
     private RekallAgeStudioProjectModuleDiagnostic? _projectModuleDiagnostic;
     private IRekallAgeStudioViewportDependencyMonitor? _dependencyMonitor;
     private bool _disposeStarted;
+
+    public void SetEditorRenderables(IReadOnlyList<RekallAgeRuntimeViewportRenderable> renderables) =>
+        _editorRenderables = renderables.Count == 0 ? [] : renderables.ToArray();
     private bool _disposalComplete;
 
     internal RekallAgeStudioVulkanPreviewSession(IRekallAgeStudioViewportPresenter presenter)
@@ -451,6 +455,14 @@ internal sealed class RekallAgeStudioVulkanPreviewSession : IRekallAgeStudioPrev
         CancellationToken cancellationToken)
     {
         var styledFrame = RekallAgeStudioViewportStyleAdapter.Apply(viewportFrame, _renderStyle);
+        var editorRenderables = _editorRenderables;
+        if (editorRenderables.Length > 0)
+        {
+            styledFrame = styledFrame with
+            {
+                Renderables = styledFrame.Renderables.Concat(editorRenderables).ToArray()
+            };
+        }
         var presentation = await _presenter.PresentAsync(
             styledFrame,
             assets,

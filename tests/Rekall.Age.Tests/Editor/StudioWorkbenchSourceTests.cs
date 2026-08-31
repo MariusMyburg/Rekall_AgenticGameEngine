@@ -65,8 +65,10 @@ public sealed class StudioWorkbenchSourceTests
         var mainWindowCode = await File.ReadAllTextAsync(Path.Combine(root, "src", "Rekall.Age.Studio", "MainWindow.xaml.cs"));
         var code = await File.ReadAllTextAsync(Path.Combine(root, "src", "Rekall.Age.Studio", "RekallAgeStudioViewModel.cs"));
 
-        Assert.Contains("Content=\"Open Project…\" Click=\"OnOpenProjectClick\"", mainWindowXaml, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Create Project…\" Click=\"OnCreateProjectClick\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"OpenProjectButton\" Click=\"OnOpenProjectClick\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("<TextBlock Text=\"Open Project…\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"CreateProjectButton\" Click=\"OnCreateProjectClick\"", mainWindowXaml, StringComparison.Ordinal);
+        Assert.Contains("<TextBlock Text=\"Create Project…\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"ExamplesMenu\" Header=\"_Examples\"", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("SystemColors.MenuBrushKey", mainWindowXaml, StringComparison.Ordinal);
         Assert.Contains("SystemColors.MenuTextBrushKey", mainWindowXaml, StringComparison.Ordinal);

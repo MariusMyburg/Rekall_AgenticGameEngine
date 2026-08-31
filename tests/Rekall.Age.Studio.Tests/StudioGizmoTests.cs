@@ -57,6 +57,29 @@ public sealed class StudioGizmoTests
         Assert.Null(RekallAgeStudioSceneGizmo.Create(Snapshot(), "cube", locked: true));
     }
 
+    [Theory]
+    [InlineData(RekallAgeStudioTransformTool.Move, 4)]
+    [InlineData(RekallAgeStudioTransformTool.Scale, 4)]
+    [InlineData(RekallAgeStudioTransformTool.Rotate, 48)]
+    public void VulkanSceneGizmoUsesEditorOnlyAxisGeometry(
+        RekallAgeStudioTransformTool tool,
+        int expectedSegmentCount)
+    {
+        var renderables = RekallAgeStudioSceneGizmoRenderables.Create(
+            tool, RekallAgeStudioTransformSpace.Local, 1, 2, 3, 10, 20, 30);
+
+        Assert.Equal(3, renderables.Count);
+        Assert.All(renderables, renderable =>
+        {
+            Assert.Equal("studio-editor", renderable.Layer);
+            Assert.Equal("mesh", renderable.Kind);
+            Assert.Equal((1d, 2d, 3d), (renderable.X, renderable.Y, renderable.Z));
+            Assert.Equal((10d, 20d, 30d), (renderable.RotationX, renderable.RotationY, renderable.RotationZ));
+            Assert.Equal(expectedSegmentCount, renderable.LineSegments!.Segments.Count);
+            Assert.False(renderable.CastShadows);
+        });
+    }
+
     private static RekallAgeStudioViewportInteractionSnapshot Snapshot() => new(
         320,
         180,

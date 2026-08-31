@@ -201,6 +201,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private RekallAgeLanguageModelProviderDescriptor _selectedLanguageModelProvider = null!;
     private string _selectedLanguageModel = string.Empty;
     private string _selectedReasoningEffort = "medium";
+    private bool _preapproveAllCodexActionsForSession;
     private string _providerStatus = string.Empty;
     private string _providerDisplayStatus = string.Empty;
     private string _agentTaskInput = string.Empty;
@@ -1147,6 +1148,12 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
 
     public bool IsCodexSelected => SelectedLanguageModelProvider.Id == "codex";
 
+    public bool PreapproveAllCodexActionsForSession
+    {
+        get => _preapproveAllCodexActionsForSession;
+        set => Set(ref _preapproveAllCodexActionsForSession, value);
+    }
+
     public bool CanBrowseGguf => RekallAgeStudioLocalModelReadiness.CanBrowseGguf(
         SelectedLanguageModelProvider.Id,
         _localModelRuntimeReady);
@@ -1808,14 +1815,17 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         get => _transformTool;
         set
         {
-            if (Set(ref _transformTool, value)) OnPropertyChanged(nameof(SceneGizmoHandles));
+            if (Set(ref _transformTool, value)) RefreshSceneGizmo();
         }
     }
 
     public RekallAgeStudioTransformSpace TransformSpace
     {
         get => _transformSpace;
-        set => Set(ref _transformSpace, value);
+        set
+        {
+            if (Set(ref _transformSpace, value)) RefreshSceneGizmo();
+        }
     }
 
     public double MoveSnap
@@ -4118,14 +4128,14 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private async Task CancelAgentAsync()
     {
         _agentCancellation?.Cancel();
-        StatusText = "Cancelling AI authoring…";
-        AgentActivityText = StatusText;
         Task? activeRun;
         lock (_languageModelLifecycleSync)
         {
             activeRun = _activeAgentRun;
         }
         if (activeRun is null) return;
+        StatusText = "Cancelling AI authoring…";
+        AgentActivityText = StatusText;
         try
         {
             await activeRun;
@@ -5929,6 +5939,17 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         _sceneGizmo = _viewportInteraction is null || selected is null || !hasTransform3D
             ? null
             : RekallAgeStudioSceneGizmo.Create(_viewportInteraction, selected.EntityId, selected.Locked);
+        _previewSession.SetEditorRenderables(_sceneGizmo is null || TransformTool is RekallAgeStudioTransformTool.Select
+            ? []
+            : RekallAgeStudioSceneGizmoRenderables.Create(
+                TransformTool,
+                TransformSpace,
+                InspectorNumber("Rekall.Transform3D", "x", 0),
+                InspectorNumber("Rekall.Transform3D", "y", 0),
+                InspectorNumber("Rekall.Transform3D", "z", 0),
+                InspectorNumber("Rekall.Transform3D", "pitch", 0),
+                InspectorNumber("Rekall.Transform3D", "yaw", 0),
+                InspectorNumber("Rekall.Transform3D", "roll", 0)));
         OnPropertyChanged(nameof(SceneGizmoHandles));
     }
 

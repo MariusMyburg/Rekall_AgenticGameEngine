@@ -14,8 +14,8 @@ internal static class RekallAgeStudioModelingGraphLayout
     public static IReadOnlyDictionary<string, Point> ComputeDefaultPositions(
         IReadOnlyList<RekallAgeModelingGraphNode> nodes,
         IReadOnlyList<RekallAgeModelingGraphLink> links,
-        double columnWidth = 220,
-        double rowHeight = 110)
+        double columnWidth = 260,
+        double rowHeight = 150)
     {
         ArgumentNullException.ThrowIfNull(nodes);
         ArgumentNullException.ThrowIfNull(links);

@@ -37,6 +37,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _initializing = true;
     private bool _hadProject;
     private bool _shutdownPrepared;
+    private readonly CancellationTokenSource _contentDropCancellation = new();
+    private readonly object _contentDropSync = new();
+    private readonly HashSet<Task> _contentDropTasks = [];
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -764,13 +767,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         e.Handled = true;
     }
 
-    private async void OnInspectorPropertyDrop(object sender, DragEventArgs e)
+    private void OnInspectorPropertyDrop(object sender, DragEventArgs e)
     {
         e.Handled = true;
         if (sender is not FrameworkElement { DataContext: RekallAgeStudioInspectorPropertyEditorModel row }
             || !TryGetContentDragPayload(e.Data, out var payload)) return;
-        await ApplyContentDropResultAsync(
-            await _viewModel.AssignContentAsync(payload, row, CancellationToken.None));
+        StartContentDrop(token => _viewModel.AssignContentAsync(payload, row, token).AsTask());
     }
 
     private void OnSceneViewportDragOver(object sender, DragEventArgs e)
@@ -781,37 +783,71 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         e.Handled = true;
     }
 
-    private async void OnSceneViewportDrop(object sender, DragEventArgs e)
+    private void OnSceneViewportDrop(object sender, DragEventArgs e)
     {
         e.Handled = true;
         if (sender is not FrameworkElement element || element.ActualWidth <= 0 || element.ActualHeight <= 0
             || !TryGetContentDragPayload(e.Data, out var payload)) return;
         var point = e.GetPosition(element);
-        await ApplyContentDropResultAsync(await _viewModel.PlaceContentAsync(
+        StartContentDrop(token => _viewModel.PlaceContentAsync(
             payload,
             Math.Clamp(point.X / element.ActualWidth, 0, 1),
             Math.Clamp(point.Y / element.ActualHeight, 0, 1),
             element.ActualWidth / element.ActualHeight,
-            CancellationToken.None));
+            token).AsTask());
     }
 
-    private Task ApplyContentDropResultAsync(RekallAgeStudioContentDropResult result) =>
-        _viewModel.ApplyContentDropResultAsync(result, CancellationToken.None);
+    private void StartContentDrop(Func<CancellationToken, Task<RekallAgeStudioContentDropResult>> operation)
+    {
+        if (_contentDropCancellation.IsCancellationRequested) return;
+        var task = ExecuteContentDropUiAsync(operation, _contentDropCancellation.Token);
+        lock (_contentDropSync) _contentDropTasks.Add(task);
+        _ = ObserveContentDropAsync(task);
+    }
+
+    private async Task ObserveContentDropAsync(Task task)
+    {
+        try { await task; }
+        finally { lock (_contentDropSync) _contentDropTasks.Remove(task); }
+    }
+
+    private async Task ExecuteContentDropUiAsync(
+        Func<CancellationToken, Task<RekallAgeStudioContentDropResult>> operation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await operation(cancellationToken);
+            await _viewModel.ApplyContentDropResultAsync(result, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _viewModel.ReportContentBrowserFailure("REKALL_CONTENT_DROP_CANCELLED", "Content drop cancelled.");
+        }
+        catch (Exception exception) when (IsExpectedContentDropFailure(exception))
+        {
+            _viewModel.ReportContentBrowserFailure("REKALL_CONTENT_DROP_FAILED",
+                "The content drop could not be completed. Inspect Studio logs for details.");
+            Log.Warning(exception, "Studio content drop failed.");
+        }
+        catch (Exception exception)
+        {
+            _viewModel.ReportContentBrowserFailure("REKALL_CONTENT_DROP_FAILED",
+                "The content drop could not be completed. Inspect Studio logs for details.");
+            Log.Error(exception, "Unexpected Studio content drop failure was contained.");
+        }
+    }
+
+    private static bool IsExpectedContentDropFailure(Exception exception) =>
+        exception is System.Text.Json.JsonException or ArgumentException or InvalidOperationException
+            or IOException or UnauthorizedAccessException;
 
     private static bool TryGetContentDragPayload(IDataObject data, out RekallAgeStudioContentDragPayload payload)
     {
         payload = null!;
         if (!data.GetDataPresent(RekallAgeStudioContentDragService.DataFormat)
             || data.GetData(RekallAgeStudioContentDragService.DataFormat) is not string json) return false;
-        try
-        {
-            payload = RekallAgeStudioContentDragPayload.FromJson(json);
-            return true;
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            return false;
-        }
+        return RekallAgeStudioContentDragPayload.TryParse(json, out payload);
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -988,6 +1024,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         if (!_shutdownPrepared)
         {
             if (!await ResolveDirtyCodeAsync()) return;
+            _contentDropCancellation.Cancel();
+            Task[] contentDrops;
+            lock (_contentDropSync) contentDrops = _contentDropTasks.ToArray();
+            await Task.WhenAll(contentDrops);
             _previewTimer.Stop();
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             SceneVulkanViewportHost.PointerFact -= OnSceneViewportPointerFact;

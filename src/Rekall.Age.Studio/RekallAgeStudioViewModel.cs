@@ -462,7 +462,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             cancellationToken => _previewSession.InvalidateAssetsAsync(cancellationToken));
         _contentDragService = new RekallAgeStudioContentDragService(
             new RekallAgeStudioContentPropertyMutationCommand(ExecuteContentPropertyMutationAsync),
-            new RekallAgeStudioContentPlacementCommand(ExecuteContentPlacementAsync));
+            new RekallAgeStudioContentPlacementCommand(ExecuteContentPlacementAsync),
+            new RekallAgeStudioContentDragResolver(contentId =>
+            {
+                var item = _contentModel.Items.FirstOrDefault(candidate =>
+                    candidate.Id.Equals(contentId, StringComparison.Ordinal));
+                return item is null ? null : RekallAgeStudioContentDragPayload.FromItem(item);
+            }));
         _agentRegistry = RekallAgeDefaultCommandRegistry.Create();
         _selectedLanguageModelProvider = _languageModelProviderCatalog.Providers.Single(provider => provider.Id == "ollama");
         _selectedLanguageModel = _selectedLanguageModelProvider.DefaultModel;
@@ -5578,9 +5584,13 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
         CancellationToken cancellationToken)
     {
         var content = _contentModel.Items.FirstOrDefault(item => item.Id.Equals(request.ModelAssetId, StringComparison.Ordinal));
-        var modelAssetId = content?.Kind.Equals("model-asset", StringComparison.OrdinalIgnoreCase) == true
-            ? content.DisplayName
-            : request.ModelAssetId;
+        var modelAssetId = content switch
+        {
+            { Kind: var kind } when kind.Equals("model-asset", StringComparison.OrdinalIgnoreCase) => content.DisplayName,
+            { Origin: "Imported", Family: "model" } =>
+                await RekallAgeStudioImportedModelPublisher.EnsurePublishedAsync(_session, content, cancellationToken),
+            _ => request.ModelAssetId
+        };
         var result = await _session.ExecuteAsync(
             "rekall.scene.instantiate_asset",
             JsonSerializer.Serialize(new
@@ -5588,6 +5598,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
                 projectRoot = _session.ProjectRoot,
                 sceneName = _session.SceneName,
                 modelAssetId,
+                name = content?.DisplayName ?? modelAssetId,
                 position = new { x = request.Position.X, y = request.Position.Y, z = request.Position.Z },
                 rotationDegrees = new { x = 0, y = 0, z = 0 },
                 scale = new { x = 1, y = 1, z = 1 }

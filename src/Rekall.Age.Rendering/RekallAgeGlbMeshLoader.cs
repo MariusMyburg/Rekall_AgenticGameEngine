@@ -21,7 +21,9 @@ public sealed class RekallAgeGlbMeshLoader
         CancellationToken cancellationToken)
     {
         var bytes = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
-        var glb = ReadGlb(bytes);
+        var glb = Path.GetExtension(path).Equals(".gltf", StringComparison.OrdinalIgnoreCase)
+            ? await ReadGltfAsync(path, bytes, cancellationToken).ConfigureAwait(false)
+            : ReadGlb(bytes);
         using var document = JsonDocument.Parse(glb.Json);
         var root = document.RootElement;
         if (!root.TryGetProperty("meshes", out var meshesElement) || meshesElement.ValueKind != JsonValueKind.Array)
@@ -1232,6 +1234,42 @@ public sealed class RekallAgeGlbMeshLoader
         }
 
         return new GlbPayload(json, bin);
+    }
+
+    private static async ValueTask<GlbPayload> ReadGltfAsync(
+        string path, byte[] json, CancellationToken cancellationToken)
+    {
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        if (!root.TryGetProperty("buffers", out var buffers) || buffers.ValueKind != JsonValueKind.Array
+            || buffers.GetArrayLength() == 0 || !buffers[0].TryGetProperty("uri", out var uriElement)
+            || uriElement.ValueKind != JsonValueKind.String)
+        {
+            return new(json, ReadOnlyMemory<byte>.Empty);
+        }
+
+        var uri = uriElement.GetString() ?? string.Empty;
+        byte[] bin;
+        if (uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
+            var separator = uri.IndexOf(',');
+            if (separator < 0) throw new InvalidDataException("glTF buffer data URI is invalid.");
+            var metadata = uri[..separator];
+            var payload = uri[(separator + 1)..];
+            bin = metadata.EndsWith(";base64", StringComparison.OrdinalIgnoreCase)
+                ? Convert.FromBase64String(payload)
+                : System.Text.Encoding.UTF8.GetBytes(Uri.UnescapeDataString(payload));
+        }
+        else
+        {
+            var directory = Path.GetDirectoryName(Path.GetFullPath(path))!;
+            var binPath = Path.GetFullPath(Path.Combine(directory, Uri.UnescapeDataString(uri)));
+            if (!binPath.StartsWith(directory + Path.DirectorySeparatorChar,
+                    OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                throw new InvalidDataException("glTF buffer path escapes the source directory.");
+            bin = await File.ReadAllBytesAsync(binPath, cancellationToken).ConfigureAwait(false);
+        }
+        return new(json, bin);
     }
 
     private static IReadOnlyList<JsonElement> ReadArray(JsonElement root, string name)

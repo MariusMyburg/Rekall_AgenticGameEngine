@@ -1,7 +1,15 @@
 using System.Numerics;
 using System.Text.Json;
+using System.IO;
 using Rekall.Age.Editor.Contracts;
 using Rekall.Age.Rendering.Abstractions;
+using Rekall.Age.Rendering;
+using Rekall.Age.Editor;
+using Rekall.Age.Modeling.Commands;
+using Rekall.Age.Modeling.Contracts;
+using Rekall.Age.AssetPipeline.Commands;
+using Rekall.Age.Assets;
+using Rekall.Age.Core.Persistence;
 
 namespace Rekall.Age.Studio;
 
@@ -33,6 +41,20 @@ internal sealed record RekallAgeStudioContentDragPayload(
             throw new JsonException("The Studio content drag payload has no stable content identity.");
         }
         return payload with { Operations = payload.Operations?.ToArray() ?? [] };
+    }
+
+    public static bool TryParse(string? json, out RekallAgeStudioContentDragPayload payload)
+    {
+        payload = null!;
+        try
+        {
+            payload = FromJson(json!);
+            return true;
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException or NotSupportedException)
+        {
+            return false;
+        }
     }
 
     public bool Supports(string operation) => Operations.Contains(operation, StringComparer.OrdinalIgnoreCase);
@@ -120,6 +142,17 @@ internal interface IRekallAgeStudioContentPlacementCommand
         RekallAgeStudioContentPlacement request, CancellationToken cancellationToken);
 }
 
+internal interface IRekallAgeStudioContentDragResolver
+{
+    RekallAgeStudioContentDragPayload? Resolve(string contentId);
+}
+
+internal sealed class RekallAgeStudioContentDragResolver(
+    Func<string, RekallAgeStudioContentDragPayload?> resolve) : IRekallAgeStudioContentDragResolver
+{
+    public RekallAgeStudioContentDragPayload? Resolve(string contentId) => resolve(contentId);
+}
+
 internal sealed class RekallAgeStudioContentPropertyMutationCommand(
     Func<RekallAgeStudioContentPropertyMutation, CancellationToken, ValueTask<RekallAgeStudioContentCommandEvidence>> execute)
     : IRekallAgeStudioContentPropertyMutationCommand
@@ -138,9 +171,93 @@ internal sealed class RekallAgeStudioContentPlacementCommand(
         execute(request, cancellationToken);
 }
 
+internal static class RekallAgeStudioImportedModelPublisher
+{
+    public static async ValueTask<string> EnsurePublishedAsync(
+        RekallAgeWorkbenchSession session,
+        RekallAgeContentBrowserItem item,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(item);
+        if (session.ProjectRoot is null) throw new InvalidOperationException("Open a project before placing content.");
+        var modelAssetId = BoundedId(item.Id + "-model");
+        var modelStore = new RekallAgeModelAssetStore();
+        if (File.Exists(modelStore.GetModelPath(session.ProjectRoot, modelAssetId))) return modelAssetId;
+
+        var sourcePath = item.SourcePath ?? item.Path
+            ?? throw new InvalidOperationException("The imported model source is unavailable.");
+        var meshes = await new RekallAgeGlbMeshLoader().LoadAsync(item.Id, sourcePath, cancellationToken);
+        if (meshes.Count == 0) throw new InvalidDataException("The imported model contains no triangle geometry.");
+        var meshAssetId = BoundedId(item.Id + "-mesh");
+        var topology = ToTopology(meshes);
+        var created = await session.ExecuteAsync(
+            "rekall.mesh.create_asset",
+            JsonSerializer.Serialize(new CreateMeshAssetRequest(
+                session.ProjectRoot, meshAssetId, item.DisplayName, topology)),
+            $"Create editable mesh for {item.DisplayName}", "studio", cancellationToken);
+        if (!created.Ok && created.Errors.All(error => error.Code != "REKALL_MESH_ASSET_EXISTS"))
+            throw new InvalidOperationException(created.Summary);
+
+        var published = await session.ExecuteAsync(
+            "rekall.asset.model.publish",
+            JsonSerializer.Serialize(new PublishModelAssetRequest(
+                session.ProjectRoot, modelAssetId, item.DisplayName,
+                new(RekallAgeModelSourceKind.Mesh, meshAssetId), RekallAgeDocumentRevision.Missing)),
+            $"Publish Model Asset for {item.DisplayName}", "studio", cancellationToken);
+        if (!published.Ok) throw new InvalidOperationException(published.Summary);
+        return modelAssetId;
+    }
+
+    private static RekallAgeMeshTopology ToTopology(IReadOnlyList<RekallAgeVulkanSceneMesh> meshes)
+    {
+        var positions = new List<RekallAgeGeometryVector3>();
+        var faces = new List<int[]>();
+        foreach (var mesh in meshes)
+        {
+            var offset = positions.Count;
+            positions.AddRange(mesh.Vertices.Select(vertex =>
+                new RekallAgeGeometryVector3(vertex.X, vertex.Y, vertex.Z)));
+            for (var index = 0; index + 2 < mesh.Indices.Count; index += 3)
+                faces.Add([offset + checked((int)mesh.Indices[index]),
+                    offset + checked((int)mesh.Indices[index + 1]),
+                    offset + checked((int)mesh.Indices[index + 2])]);
+        }
+
+        var edgeMap = new Dictionary<(int, int), int>();
+        var edges = new List<RekallAgeMeshEdgePointIndices>();
+        var cornerPoints = new List<int>();
+        var cornerEdges = new List<int>();
+        var offsets = new List<int> { 0 };
+        foreach (var face in faces)
+        {
+            for (var index = 0; index < face.Length; index++)
+            {
+                var a = face[index]; var b = face[(index + 1) % face.Length];
+                var key = a < b ? (a, b) : (b, a);
+                if (!edgeMap.TryGetValue(key, out var edge))
+                {
+                    edge = edges.Count; edgeMap[key] = edge; edges.Add(new(a, b));
+                }
+                cornerPoints.Add(a); cornerEdges.Add(edge);
+            }
+            offsets.Add(cornerPoints.Count);
+        }
+        return new(
+            Enumerable.Range(1, positions.Count).Select(index => (ulong)index).ToArray(), positions,
+            Enumerable.Range(1, edges.Count).Select(index => (ulong)(10_000 + index)).ToArray(), edges,
+            Enumerable.Range(1, faces.Count).Select(index => (ulong)(20_000 + index)).ToArray(), offsets,
+            Enumerable.Range(1, cornerPoints.Count).Select(index => (ulong)(30_000 + index)).ToArray(),
+            cornerPoints, cornerEdges);
+    }
+
+    private static string BoundedId(string value) => value.Length <= 128 ? value : value[..128];
+}
+
 internal sealed class RekallAgeStudioContentDragService(
     IRekallAgeStudioContentPropertyMutationCommand propertyMutation,
-    IRekallAgeStudioContentPlacementCommand placement)
+    IRekallAgeStudioContentPlacementCommand placement,
+    IRekallAgeStudioContentDragResolver resolver)
 {
     internal const string DataFormat = "Rekall.AGE.Studio.Content.v1";
     public async ValueTask<RekallAgeStudioContentDropResult> AssignAsync(
@@ -152,7 +269,9 @@ internal sealed class RekallAgeStudioContentDragService(
         ArgumentNullException.ThrowIfNull(target);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!payload.Supports(RekallAgeContentCapability.Assign))
+        if (!TryResolve(payload, out var current, out var rejection)) return rejection;
+
+        if (!current.Supports(RekallAgeContentCapability.Assign))
         {
             return Rejected("REKALL_CONTENT_DROP_NOT_ASSIGNABLE", "This content does not support property assignment.");
         }
@@ -160,14 +279,14 @@ internal sealed class RekallAgeStudioContentDragService(
         {
             return Rejected("REKALL_CONTENT_DROP_LOCKED", "Unlock the entity and property before assigning content.");
         }
-        if (!Compatible(payload.ContentKind, target.AssetKind))
+        if (!Compatible(current.ContentKind, target.AssetKind))
         {
             return Rejected("REKALL_CONTENT_DROP_INCOMPATIBLE", "The content kind is incompatible with this property.");
         }
 
         var evidence = await propertyMutation.ExecuteAsync(
             new("rekall.component.set_property", target.EntityId, target.ComponentType,
-                target.PropertyName, payload.ContentId), cancellationToken);
+                target.PropertyName, current.ContentId), cancellationToken);
         return FromEvidence(evidence);
     }
 
@@ -180,24 +299,50 @@ internal sealed class RekallAgeStudioContentDragService(
         ArgumentNullException.ThrowIfNull(target);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!payload.Supports(RekallAgeContentCapability.Place) || NormalizeKind(payload.ContentKind) != "model")
+        if (!TryResolve(payload, out var current, out var rejection)) return rejection;
+
+        if (!current.Supports(RekallAgeContentCapability.Place) || NormalizeKind(current.ContentKind) != "model")
         {
             return Rejected("REKALL_CONTENT_DROP_NOT_PLACEABLE", "Only place-capable model content can be dropped into the viewport.");
         }
 
         var position = target.WorldHit ?? CameraFrontPosition(target);
         var evidence = await placement.ExecuteAsync(
-            new("rekall.model_asset.instantiate", payload.ContentId, position), cancellationToken);
+            new("rekall.model_asset.instantiate", current.ContentId, position), cancellationToken);
         return FromEvidence(evidence);
     }
 
     public bool CanAssign(RekallAgeStudioContentDragPayload payload, RekallAgeStudioContentPropertyTarget target) =>
-        payload.Supports(RekallAgeContentCapability.Assign)
+        TryResolve(payload, out var current, out _)
+        && current.Supports(RekallAgeContentCapability.Assign)
         && !target.EntityLocked && !target.PropertyLocked
-        && Compatible(payload.ContentKind, target.AssetKind);
+        && Compatible(current.ContentKind, target.AssetKind);
 
     public bool CanPlace(RekallAgeStudioContentDragPayload payload) =>
-        payload.Supports(RekallAgeContentCapability.Place) && NormalizeKind(payload.ContentKind) == "model";
+        TryResolve(payload, out var current, out _)
+        && current.Supports(RekallAgeContentCapability.Place) && NormalizeKind(current.ContentKind) == "model";
+
+    private bool TryResolve(
+        RekallAgeStudioContentDragPayload claimed,
+        out RekallAgeStudioContentDragPayload current,
+        out RekallAgeStudioContentDropResult rejection)
+    {
+        current = resolver.Resolve(claimed.ContentId)!;
+        if (current is null)
+        {
+            rejection = Rejected("REKALL_CONTENT_DROP_STALE", "The dragged content is no longer present in the current project index.");
+            return false;
+        }
+        if (!claimed.ContentKind.Equals(current.ContentKind, StringComparison.OrdinalIgnoreCase)
+            || !claimed.Operations.ToHashSet(StringComparer.OrdinalIgnoreCase)
+                .SetEquals(current.Operations))
+        {
+            rejection = Rejected("REKALL_CONTENT_DROP_PAYLOAD_MISMATCH", "The drag data no longer matches the current indexed content.");
+            return false;
+        }
+        rejection = null!;
+        return true;
+    }
 
     private static bool Compatible(string contentKind, string assetKind) =>
         NormalizeKind(contentKind).Equals(NormalizeKind(assetKind), StringComparison.Ordinal);

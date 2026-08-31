@@ -3,11 +3,52 @@ using System.IO;
 using System.Text.Json;
 using Rekall.Age.Editor.Contracts;
 using Rekall.Age.Studio;
+using Rekall.Age.AssetPipeline.Commands;
+using Rekall.Age.Core.Commands;
+using Rekall.Age.Core.Transactions;
+using Rekall.Age.Editor;
+using Rekall.Age.Workflows;
+using Rekall.Age.World;
 
 namespace Rekall.Age.Studio.Tests;
 
 public sealed class StudioContentDragServiceTests
 {
+    [Theory]
+    [InlineData(".glb")]
+    [InlineData(".gltf")]
+    public async Task ImportedGltfFamilyPublishesAndPlacesThroughCanonicalModelAssetCommands(string extension)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "rekall-content-drag-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var source = Path.Combine(root, "triangle" + extension);
+        await File.WriteAllBytesAsync(source, extension == ".glb" ? TriangleGlb() : TriangleGltf());
+        var session = new RekallAgeWorkbenchSession(RekallAgeDefaultCommandRegistry.Create());
+        Assert.True((await session.CreateProjectAsync(root, "Drag", "Main", ["world"], ["world", "rendering3d"], "test", default)).Ok);
+        var registry = new RekallAgeCommandRegistry();
+        registry.Register(new ImportAssetWithReportCommand());
+        var imported = await registry.ExecuteAsync<ImportAssetWithReportRequest, ImportAssetWithReportResult>(
+            "rekall.asset.import_report", new(root, source, "model", "Triangle"),
+            new("test", RekallAgeTransaction.Begin("import"), default));
+        Assert.True(imported.Ok, imported.Summary);
+        var report = imported.Value.Report;
+        var item = new RekallAgeContentBrowserItem(report.AssetId, "Triangle", "model", "model", "Imported",
+            report.ImportedPath, report.SourcePath, "1", "external", [RekallAgeContentCapability.Place], "Healthy", null, new());
+
+        var modelAssetId = await RekallAgeStudioImportedModelPublisher.EnsurePublishedAsync(session, item, default);
+        var placed = await session.ExecuteAsync("rekall.scene.instantiate_asset", JsonSerializer.Serialize(new
+        {
+            projectRoot = root, sceneName = "Main", modelAssetId, name = "Triangle",
+            position = new { x = 0, y = 0, z = 0 }, rotationDegrees = new { x = 0, y = 0, z = 0 },
+            scale = new { x = 1, y = 1, z = 1 }
+        }), "place", "test", default);
+
+        Assert.True(placed.Ok, placed.Summary);
+        var scene = await new RekallAgeSceneStore().LoadAsync(root, "Main", default);
+        Assert.Contains(scene.Entities, entity => entity.Components.Any(component =>
+            component.Type == "Rekall.ModelAssetReference"
+            && component.Properties["assetId"]!.GetValue<string>() == modelAssetId));
+    }
     [Fact]
     public void StudioWiresPrivateThresholdDragAndCopyOnlyInspectorAndViewportTargets()
     {
@@ -24,6 +65,11 @@ public sealed class StudioContentDragServiceTests
         Assert.Contains("OnSceneViewportDrop", window, StringComparison.Ordinal);
         Assert.Contains("DragDropEffects.Copy", codeBehind, StringComparison.Ordinal);
         Assert.Contains("ApplyContentDropResultAsync", codeBehind, StringComparison.Ordinal);
+        Assert.DoesNotContain("async void OnInspectorPropertyDrop", codeBehind, StringComparison.Ordinal);
+        Assert.DoesNotContain("async void OnSceneViewportDrop", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("_contentDropCancellation", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("catch (Exception exception) when (IsExpectedContentDropFailure(exception))", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("RekallAgeStudioContentDragPayload.TryParse", codeBehind, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -40,6 +86,15 @@ public sealed class StudioContentDragServiceTests
         Assert.DoesNotContain("sentinel", json, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(["contentId", "contentKind", "operations"],
             JsonDocument.Parse(json).RootElement.EnumerateObject().Select(property => property.Name).Order().ToArray());
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("{")]
+    public void MalformedPayloadIsRejectedWithoutThrowing(string json)
+    {
+        Assert.False(RekallAgeStudioContentDragPayload.TryParse(json, out _));
     }
 
     [Fact]
@@ -96,7 +151,8 @@ public sealed class StudioContentDragServiceTests
     public async Task ModelPlacementUsesRenderDerivedWorldHit()
     {
         var placements = new RecordingPlacementCommand();
-        var result = await Service(placements: placements).PlaceAsync(
+        var result = await Service(placements: placements,
+            resolver: new FixedResolver(Payload("rover", "model", RekallAgeContentCapability.Place))).PlaceAsync(
             Payload("rover", "model", RekallAgeContentCapability.Place),
             new(new Vector3(10, 2, -4), new Vector3(0, 3, -8), Vector3.UnitZ, 5),
             CancellationToken.None);
@@ -112,7 +168,8 @@ public sealed class StudioContentDragServiceTests
     public async Task ModelPlacementFallsBackDeterministicallyInFrontOfCamera()
     {
         var placements = new RecordingPlacementCommand();
-        await Service(placements: placements).PlaceAsync(
+        await Service(placements: placements,
+            resolver: new FixedResolver(Payload("rover", "model-asset", RekallAgeContentCapability.Place))).PlaceAsync(
             Payload("rover", "model-asset", RekallAgeContentCapability.Place),
             new(null, new Vector3(1, 2, 3), Vector3.UnitZ, 6),
             CancellationToken.None);
@@ -145,9 +202,67 @@ public sealed class StudioContentDragServiceTests
         Assert.Empty(mutations.Requests);
     }
 
+    [Fact]
+    public async Task ForgedKindOrOperationIsRejectedAgainstCurrentContent()
+    {
+        var mutations = new RecordingMutationCommand();
+        var service = Service(mutations: mutations,
+            resolver: new FixedResolver(Payload("asset_texture", "texture", RekallAgeContentCapability.Assign)));
+
+        var result = await service.AssignAsync(
+            Payload("asset_texture", "audio", RekallAgeContentCapability.Assign, RekallAgeContentCapability.Place),
+            new("entity", "component", "property", "texture", false, false), CancellationToken.None);
+
+        Assert.Equal("REKALL_CONTENT_DROP_PAYLOAD_MISMATCH", result.Code);
+        Assert.Empty(mutations.Requests);
+    }
+
+    [Fact]
+    public async Task StaleContentIdIsRejectedBeforeMutation()
+    {
+        var mutations = new RecordingMutationCommand();
+        var result = await Service(mutations: mutations, resolver: new FixedResolver(null)).AssignAsync(
+            Payload("removed", "texture", RekallAgeContentCapability.Assign),
+            new("entity", "component", "property", "texture", false, false), CancellationToken.None);
+
+        Assert.Equal("REKALL_CONTENT_DROP_STALE", result.Code);
+        Assert.Empty(mutations.Requests);
+    }
+
+    [Fact]
+    public async Task InFlightAssignmentCancellationPropagates()
+    {
+        var mutation = new BlockingMutationCommand();
+        using var cancellation = new CancellationTokenSource();
+        var pending = Service(mutations: mutation).AssignAsync(
+            Payload("texture", "texture", RekallAgeContentCapability.Assign),
+            new("entity", "component", "property", "texture", false, false), cancellation.Token).AsTask();
+        await mutation.Started.Task;
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+    }
+
+    [Fact]
+    public async Task InFlightPlacementCancellationPropagates()
+    {
+        var placement = new BlockingPlacementCommand();
+        using var cancellation = new CancellationTokenSource();
+        var pending = new RekallAgeStudioContentDragService(
+            new RecordingMutationCommand(), placement,
+            new FixedResolver(Payload("model", "model", RekallAgeContentCapability.Place))).PlaceAsync(
+            Payload("model", "model", RekallAgeContentCapability.Place),
+            new(null, Vector3.Zero, Vector3.UnitZ, 5), cancellation.Token).AsTask();
+        await placement.Started.Task;
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+    }
+
     private static RekallAgeStudioContentDragService Service(
-        RecordingMutationCommand? mutations = null, RecordingPlacementCommand? placements = null) =>
-        new(mutations ?? new(), placements ?? new());
+        IRekallAgeStudioContentPropertyMutationCommand? mutations = null,
+        RecordingPlacementCommand? placements = null,
+        IRekallAgeStudioContentDragResolver? resolver = null) =>
+        new(mutations ?? new RecordingMutationCommand(), placements ?? new(),
+            resolver ?? new HeuristicResolver());
 
     private static RekallAgeStudioContentDragPayload Payload(string id, string kind, params string[] operations) =>
         new(id, kind, operations);
@@ -157,6 +272,47 @@ public sealed class StudioContentDragServiceTests
 
     private static string Source(string fileName) => File.ReadAllText(Path.Combine(
         AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "Rekall.Age.Studio", fileName));
+
+    private static byte[] TriangleGlb()
+    {
+        const string json = """
+        {"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"mesh":0}],
+         "meshes":[{"primitives":[{"attributes":{"POSITION":0},"indices":1}]}],
+         "buffers":[{"byteLength":42}],
+         "bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36},{"buffer":0,"byteOffset":36,"byteLength":6}],
+         "accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},{"bufferView":1,"componentType":5123,"count":3,"type":"SCALAR"}]}
+        """;
+        var jsonBytes = System.Text.Encoding.UTF8.GetBytes(json);
+        var jsonLength = (jsonBytes.Length + 3) / 4 * 4;
+        var binLength = 44;
+        var bytes = new byte[12 + 8 + jsonLength + 8 + binLength];
+        static void U32(byte[] target, int offset, uint value) => BitConverter.GetBytes(value).CopyTo(target, offset);
+        U32(bytes, 0, 0x46546C67); U32(bytes, 4, 2); U32(bytes, 8, (uint)bytes.Length);
+        U32(bytes, 12, (uint)jsonLength); U32(bytes, 16, 0x4E4F534A);
+        jsonBytes.CopyTo(bytes, 20); Array.Fill<byte>(bytes, 0x20, 20 + jsonBytes.Length, jsonLength - jsonBytes.Length);
+        var binHeader = 20 + jsonLength; U32(bytes, binHeader, (uint)binLength); U32(bytes, binHeader + 4, 0x004E4942);
+        var bin = binHeader + 8;
+        var positions = new float[] { 0, 0, 0, 1, 0, 0, 0, 1, 0 };
+        for (var index = 0; index < positions.Length; index++) BitConverter.GetBytes(positions[index]).CopyTo(bytes, bin + index * 4);
+        new ushort[] { 0, 1, 2 }.SelectMany(BitConverter.GetBytes).ToArray().CopyTo(bytes, bin + 36);
+        return bytes;
+    }
+
+    private static byte[] TriangleGltf()
+    {
+        var bin = new byte[42];
+        var positions = new float[] { 0, 0, 0, 1, 0, 0, 0, 1, 0 };
+        for (var index = 0; index < positions.Length; index++) BitConverter.GetBytes(positions[index]).CopyTo(bin, index * 4);
+        new ushort[] { 0, 1, 2 }.SelectMany(BitConverter.GetBytes).ToArray().CopyTo(bin, 36);
+        var json = $$"""
+        {"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"mesh":0}],
+         "meshes":[{"primitives":[{"attributes":{"POSITION":0},"indices":1}]}],
+         "buffers":[{"byteLength":42,"uri":"data:application/octet-stream;base64,{{Convert.ToBase64String(bin)}}"}],
+         "bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36},{"buffer":0,"byteOffset":36,"byteLength":6}],
+         "accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},{"bufferView":1,"componentType":5123,"count":3,"type":"SCALAR"}]}
+        """;
+        return System.Text.Encoding.UTF8.GetBytes(json);
+    }
 
     private sealed class RecordingMutationCommand : IRekallAgeStudioContentPropertyMutationCommand
     {
@@ -177,6 +333,46 @@ public sealed class StudioContentDragServiceTests
             cancellationToken.ThrowIfCancellationRequested();
             Requests.Add(request);
             return ValueTask.FromResult(new RekallAgeStudioContentCommandEvidence(true, "OK", "placed", "tx-place"));
+        }
+    }
+
+    private sealed class FixedResolver(RekallAgeStudioContentDragPayload? current) : IRekallAgeStudioContentDragResolver
+    {
+        public RekallAgeStudioContentDragPayload? Resolve(string contentId) =>
+            current?.ContentId == contentId ? current : null;
+    }
+
+    private sealed class HeuristicResolver : IRekallAgeStudioContentDragResolver
+    {
+        public RekallAgeStudioContentDragPayload? Resolve(string contentId) => contentId switch
+        {
+            "rover" => Payload(contentId, "model", RekallAgeContentCapability.Place),
+            "asset_audio" => Payload(contentId, "audio", RekallAgeContentCapability.Assign),
+            _ => Payload(contentId, "texture", RekallAgeContentCapability.Assign)
+        };
+    }
+
+    private sealed class BlockingMutationCommand : IRekallAgeStudioContentPropertyMutationCommand
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public async ValueTask<RekallAgeStudioContentCommandEvidence> ExecuteAsync(
+            RekallAgeStudioContentPropertyMutation request, CancellationToken cancellationToken)
+        {
+            Started.SetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException();
+        }
+    }
+
+    private sealed class BlockingPlacementCommand : IRekallAgeStudioContentPlacementCommand
+    {
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public async ValueTask<RekallAgeStudioContentCommandEvidence> ExecuteAsync(
+            RekallAgeStudioContentPlacement request, CancellationToken cancellationToken)
+        {
+            Started.SetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException();
         }
     }
 }

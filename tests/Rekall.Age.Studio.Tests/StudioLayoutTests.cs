@@ -59,6 +59,9 @@ public sealed class StudioLayoutTests
         Assert.Contains("x:Name=\"MoveSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"RotationSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"ScaleSnapEditor\" MinWidth=\"64\"", window, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"Move snap distance\"", window, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"Rotation snap angle\"", window, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"Scale snap increment\"", window, StringComparison.Ordinal);
         Assert.DoesNotContain("<TextBox Width=\"40\" Text=\"{Binding RotationSnap", window, StringComparison.Ordinal);
         Assert.DoesNotContain("<TextBox Width=\"45\" Text=\"{Binding MoveSnap", window, StringComparison.Ordinal);
     }

@@ -373,14 +373,17 @@
                             <ComboBox Width="70" Margin="5,0,0,0" ItemsSource="{Binding TransformSpaces}" SelectedItem="{Binding TransformSpace}" />
                             <TextBlock Text="Move" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="8,0,4,0" />
                             <TextBox x:Name="MoveSnapEditor" MinWidth="64" Padding="8,4"
+                                     AutomationProperties.Name="Move snap distance"
                                      HorizontalContentAlignment="Right"
                                      Text="{Binding MoveSnap, UpdateSourceTrigger=LostFocus}" />
                             <TextBlock Text="°" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="8,0,4,0" />
                             <TextBox x:Name="RotationSnapEditor" MinWidth="64" Padding="8,4"
+                                     AutomationProperties.Name="Rotation snap angle"
                                      HorizontalContentAlignment="Right"
                                      Text="{Binding RotationSnap, UpdateSourceTrigger=LostFocus}" />
                             <TextBlock Text="Scale" Foreground="#9FB0C4" VerticalAlignment="Center" Margin="8,0,4,0" />
                             <TextBox x:Name="ScaleSnapEditor" MinWidth="64" Padding="8,4"
+                                     AutomationProperties.Name="Scale snap increment"
                                      HorizontalContentAlignment="Right"
                                      Text="{Binding ScaleSnap, UpdateSourceTrigger=LostFocus}" />
                         </StackPanel>

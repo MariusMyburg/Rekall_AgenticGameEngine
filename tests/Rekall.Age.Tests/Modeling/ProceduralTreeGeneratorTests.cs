@@ -115,6 +115,19 @@ public sealed class ProceduralTreeGeneratorTests
     }
 
     [Fact]
+    public void TexturedTreeMeshesUseNeutralVertexColorWithoutDoubleTintingMaterials()
+    {
+        var tree = RekallAgeProceduralTreeGenerator.Generate(
+            "oak-color", "Oak color", RekallAgeProceduralTreeSettings.TemperateOak(31));
+
+        foreach (var mesh in new[] { tree.Lods[0].Bark, tree.Lods[0].Foliage })
+        {
+            var colors = Attribute(mesh, "color").Select(ReadFloat4).Distinct().ToArray();
+            Assert.Equal([(1d, 1d, 1d, 1d)], colors);
+        }
+    }
+
+    [Fact]
     public void LodComplexityAndLeafBudgetsDecreaseMonotonically()
     {
         var tree = RekallAgeProceduralTreeGenerator.Generate(
@@ -159,6 +172,9 @@ public sealed class ProceduralTreeGeneratorTests
 
     private static (double X, double Y) ReadFloat2(JsonElement element) =>
         (element[0].GetDouble(), element[1].GetDouble());
+
+    private static (double X, double Y, double Z, double W) ReadFloat4(JsonElement element) =>
+        (element[0].GetDouble(), element[1].GetDouble(), element[2].GetDouble(), element[3].GetDouble());
 
     private static double MaxRadius(IEnumerable<RekallAgeGeometryVector3> points) =>
         points.Select(point => Math.Sqrt(point.X * point.X + point.Z * point.Z)).DefaultIfEmpty().Max();

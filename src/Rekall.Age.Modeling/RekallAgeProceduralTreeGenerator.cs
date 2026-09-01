@@ -151,7 +151,7 @@ public static class RekallAgeProceduralTreeGenerator
     private static RekallAgeMeshAsset BuildBark(string id, string name, IReadOnlyList<Branch> branches,
         RekallAgeProceduralTreeSettings settings, LodRecipe recipe)
     {
-        var mesh = new TreeMeshBuilder(id, name, "Bark", new(0.30, 0.19, 0.105, 1));
+        var mesh = new TreeMeshBuilder(id, name, "Bark", new(1, 1, 1, 1));
         foreach (var branch in branches)
         {
             var rings = new int[branch.Points.Count][];
@@ -196,7 +196,7 @@ public static class RekallAgeProceduralTreeGenerator
     private static RekallAgeMeshAsset BuildFoliage(string id, string name, IReadOnlyList<Branch> branches,
         RekallAgeProceduralTreeSettings settings, LodRecipe recipe, TreeRandom rng, out int cardCount)
     {
-        var mesh = new TreeMeshBuilder(id, name, "Foliage", new(0.19, 0.39, 0.105, 1));
+        var mesh = new TreeMeshBuilder(id, name, "Foliage", new(1, 1, 1, 1));
         var terminals = branches.Where(branch => branch.Generation >= recipe.Generations).ToArray();
         var requested = recipe.Level switch { 0 => settings.NearLeafBudget, 1 => settings.MidLeafBudget, _ => settings.FarLeafBudget };
         cardCount = requested;

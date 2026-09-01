@@ -2,9 +2,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Rekall.Age.Core\Rekall.Age.Core.csproj" />
+    <ProjectReference Include="..\Rekall.Age.Assets\Rekall.Age.Assets.csproj" />
     <ProjectReference Include="..\Rekall.Age.Modeling.Contracts\Rekall.Age.Modeling.Contracts.csproj" />
     <ProjectReference Include="..\Rekall.Age.Modules\Rekall.Age.Modules.csproj" />
     <ProjectReference Include="..\Rekall.Age.World\Rekall.Age.World.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Textures\*.png" />
   </ItemGroup>
 
   <ItemGroup>

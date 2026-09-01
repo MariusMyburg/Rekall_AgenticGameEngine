@@ -2,6 +2,7 @@ using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Transactions;
 using Rekall.Age.Modeling;
 using Rekall.Age.Modeling.Commands;
+using Rekall.Age.Assets;
 using Rekall.Age.World;
 
 namespace Rekall.Age.Tests.Modeling;
@@ -36,6 +37,17 @@ public sealed class CreateProceduralTreeCommandTests
             Assert.Equal(bark.Id, foliage.ParentId);
             Assert.Contains(bark.Components, component => component.Type == "Rekall.LodGroup");
             Assert.Contains(foliage.Components, component => component.Type == "Rekall.LodGroup");
+            var barkMaterial = Assert.Single(bark.Components, component => component.Type == "Rekall.Material");
+            var foliageMaterial = Assert.Single(foliage.Components, component => component.Type == "Rekall.Material");
+            var barkTextureId = barkMaterial.Properties["baseColorTexture"]!.GetValue<string>();
+            var foliageTextureId = foliageMaterial.Properties["baseColorTexture"]!.GetValue<string>();
+            Assert.Equal("#FFFFFF", barkMaterial.Properties["baseColor"]!.GetValue<string>());
+            Assert.Equal("#FFFFFF", foliageMaterial.Properties["baseColor"]!.GetValue<string>());
+            var catalog = await new RekallAgeAssetCatalogStore().LoadAsync(root, default);
+            Assert.Contains(catalog.Assets, asset => asset.Id == barkTextureId && asset.TextureMetadata is not null);
+            Assert.Contains(catalog.Assets, asset => asset.Id == foliageTextureId && asset.TextureMetadata is not null);
+            Assert.All(catalog.Assets.Where(asset => asset.Id == barkTextureId || asset.Id == foliageTextureId),
+                asset => Assert.True(File.Exists(asset.ImportedPath), asset.ImportedPath));
             Assert.All(result.Value.AssetIds, assetId =>
                 Assert.True(File.Exists(new RekallAgeMeshAssetStore().GetMeshPath(root, assetId)), assetId));
         }

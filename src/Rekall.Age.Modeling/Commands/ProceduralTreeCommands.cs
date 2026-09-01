@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Rekall.Age.Core.Commands;
 using Rekall.Age.Core.Persistence;
+using Rekall.Age.Assets;
 using Rekall.Age.Modeling.Contracts;
 using Rekall.Age.World;
 
@@ -18,8 +19,8 @@ public sealed record CreateProceduralTreeRequest(
     double? TrunkRadius = null,
     double? CrownRadius = null,
     int? PrimaryBranchCount = null,
-    string BarkColor = "#4a2f1b",
-    string FoliageColor = "#315f28");
+    string BarkColor = "#FFFFFF",
+    string FoliageColor = "#FFFFFF");
 
 public sealed record CreateProceduralTreeResult(
     string BarkEntityId,
@@ -34,6 +35,7 @@ public sealed class CreateProceduralTreeCommand
 {
     private readonly RekallAgeMeshAssetStore _meshStore = new();
     private readonly RekallAgeSceneStore _sceneStore = new();
+    private readonly RekallAgeAssetCatalogStore _assetStore = new();
 
     public string Name => "rekall.geometry.create_procedural_tree";
 
@@ -73,8 +75,13 @@ public sealed class CreateProceduralTreeCommand
                 context.Transaction.RecordChangedResource(path);
             }
 
-            var bark = CreateEntity(request, tree, foliage: false, parentId: null);
-            var foliage = CreateEntity(request, tree, foliage: true, parentId: bark.Id);
+            var barkTexture = await ImportBuiltInTextureAsync(
+                request.ProjectRoot, "temperate-oak-bark-basecolor.png", "Temperate Oak Bark", context).ConfigureAwait(false);
+            var foliageTexture = await ImportBuiltInTextureAsync(
+                request.ProjectRoot, "temperate-oak-foliage-basecolor.png", "Temperate Oak Foliage", context).ConfigureAwait(false);
+
+            var bark = CreateEntity(request, tree, foliage: false, parentId: null, textureAssetId: barkTexture.Id);
+            var foliage = CreateEntity(request, tree, foliage: true, parentId: bark.Id, textureAssetId: foliageTexture.Id);
             var updated = loaded.Value.AddEntity(bark).AddEntity(foliage);
             var scenePath = _sceneStore.GetScenePath(request.ProjectRoot, request.SceneName);
             context.Transaction.CaptureResourcePreimage(scenePath);
@@ -97,7 +104,8 @@ public sealed class CreateProceduralTreeCommand
         CreateProceduralTreeRequest request,
         RekallAgeGeneratedTree tree,
         bool foliage,
-        string? parentId)
+        string? parentId,
+        string textureAssetId)
     {
         var lods = new JsonArray();
         var previousDistance = 0d;
@@ -136,12 +144,43 @@ public sealed class CreateProceduralTreeCommand
             .AddComponent(RekallAgeComponentDocument.Create("Rekall.Material", new JsonObject
             {
                 ["baseColor"] = foliage ? request.FoliageColor : request.BarkColor,
+                ["baseColorTexture"] = textureAssetId,
                 ["roughnessFactor"] = foliage ? 0.72 : 0.93,
                 ["metallicFactor"] = 0,
                 ["alphaMode"] = foliage ? "mask" : "opaque",
                 ["alphaCutoff"] = foliage ? 0.42 : 0
             }));
         return entity with { ParentId = parentId };
+    }
+
+    private async ValueTask<RekallAgeAssetDocument> ImportBuiltInTextureAsync(
+        string projectRoot,
+        string fileName,
+        string displayName,
+        RekallAgeCommandContext context)
+    {
+        var resourceName = $"Rekall.Age.Modeling.Resources.Textures.{fileName}";
+        await using var resource = typeof(CreateProceduralTreeCommand).Assembly.GetManifestResourceStream(resourceName)
+            ?? throw new InvalidDataException($"Built-in tree texture resource '{resourceName}' was not found.");
+        var stagingDirectory = Path.Combine(Path.GetTempPath(), "rekall-age-tree-textures");
+        Directory.CreateDirectory(stagingDirectory);
+        var stagingPath = Path.Combine(stagingDirectory, fileName);
+        try
+        {
+            await using (var output = File.Create(stagingPath))
+                await resource.CopyToAsync(output, context.CancellationToken).ConfigureAwait(false);
+            var asset = await RekallAgeAssetImporter.ImportAsync(
+                projectRoot, stagingPath, "texture", displayName, context.CancellationToken).ConfigureAwait(false);
+            context.Transaction.CaptureResourcePreimage(_assetStore.GetCatalogPath(projectRoot));
+            await _assetStore.AddOrReplaceAsync(projectRoot, asset, context.CancellationToken).ConfigureAwait(false);
+            context.Transaction.RecordChangedResource(asset.ImportedPath);
+            context.Transaction.RecordChangedResource(_assetStore.GetCatalogPath(projectRoot));
+            return asset;
+        }
+        finally
+        {
+            if (File.Exists(stagingPath)) File.Delete(stagingPath);
+        }
     }
 
     private static string CreateAssetId(string name, int seed)

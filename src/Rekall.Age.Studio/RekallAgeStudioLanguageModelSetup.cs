@@ -14,7 +14,8 @@ internal sealed record RekallAgeStudioLanguageModelSetup(
     string? OpenAiUrl,
     string? KimiUrl,
     DateTimeOffset? LastSuccessfulCheckUtc,
-    int ReadinessVersion)
+    int ReadinessVersion,
+    string? CodexExecutablePath = null)
 {
     public const int CurrentVersion = 1;
     public const int CurrentReadinessVersion = 1;
@@ -29,7 +30,8 @@ internal sealed record RekallAgeStudioLanguageModelSetup(
         null,
         null,
         null,
-        CurrentReadinessVersion);
+        CurrentReadinessVersion,
+        null);
 
     internal static RekallAgeStudioLanguageModelSetup? Normalize(RekallAgeStudioLanguageModelSetup? candidate)
     {
@@ -41,7 +43,8 @@ internal sealed record RekallAgeStudioLanguageModelSetup(
             || !TryNormalizeReasoningEffort(candidate.ReasoningEffort, out var reasoningEffort)
             || !TryNormalizeEndpoint(candidate.OllamaUrl, out var ollamaUrl)
             || !TryNormalizeEndpoint(candidate.OpenAiUrl, out var openAiUrl)
-            || !TryNormalizeEndpoint(candidate.KimiUrl, out var kimiUrl))
+            || !TryNormalizeEndpoint(candidate.KimiUrl, out var kimiUrl)
+            || !TryNormalizeExecutablePath(candidate.CodexExecutablePath, out var codexExecutablePath))
         {
             return null;
         }
@@ -53,7 +56,8 @@ internal sealed record RekallAgeStudioLanguageModelSetup(
             ReasoningEffort = reasoningEffort,
             OllamaUrl = ollamaUrl,
             OpenAiUrl = openAiUrl,
-            KimiUrl = kimiUrl
+            KimiUrl = kimiUrl,
+            CodexExecutablePath = codexExecutablePath
         };
     }
 
@@ -95,6 +99,18 @@ internal sealed record RekallAgeStudioLanguageModelSetup(
         }
 
         return true;
+    }
+
+    private static bool TryNormalizeExecutablePath(string? value, out string? path)
+    {
+        path = value?.Trim();
+        if (string.IsNullOrEmpty(path))
+        {
+            path = null;
+            return true;
+        }
+
+        return Path.IsPathFullyQualified(path);
     }
 }
 

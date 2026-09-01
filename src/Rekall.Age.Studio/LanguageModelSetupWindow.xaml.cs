@@ -16,6 +16,11 @@ internal interface IRekallAgeStudioGgufFilePicker
     string? Pick(Window? owner, string title);
 }
 
+internal interface IRekallAgeStudioCodexExecutablePicker
+{
+    string? Pick(Window? owner, string title);
+}
+
 internal enum RekallAgeStudioLanguageModelSetupWindowOutcome
 {
     Completed,
@@ -30,17 +35,20 @@ public partial class LanguageModelSetupWindow : Window
     private bool _deferRequested;
     private readonly IRekallAgeStudioProviderPageLauncher _providerPageLauncher;
     private readonly IRekallAgeStudioGgufFilePicker _ggufFilePicker;
+    private readonly IRekallAgeStudioCodexExecutablePicker _codexExecutablePicker;
 
     internal LanguageModelSetupWindow(
         Window owner,
         RekallAgeStudioLanguageModelSetupViewModel viewModel,
         IRekallAgeStudioProviderPageLauncher? providerPageLauncher = null,
-        IRekallAgeStudioGgufFilePicker? ggufFilePicker = null)
+        IRekallAgeStudioGgufFilePicker? ggufFilePicker = null,
+        IRekallAgeStudioCodexExecutablePicker? codexExecutablePicker = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
         ViewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _providerPageLauncher = providerPageLauncher ?? SystemProviderPageLauncher.Instance;
         _ggufFilePicker = ggufFilePicker ?? SystemGgufFilePicker.Instance;
+        _codexExecutablePicker = codexExecutablePicker ?? SystemCodexExecutablePicker.Instance;
         Owner = owner;
         DataContext = ViewModel;
         InitializeComponent();
@@ -114,6 +122,28 @@ public partial class LanguageModelSetupWindow : Window
             {
                 Title = title,
                 Filter = "GGUF models (*.gguf)|*.gguf",
+                CheckFileExists = true,
+                Multiselect = false
+            };
+            return dialog.ShowDialog(owner) == true ? dialog.FileName : null;
+        }
+    }
+
+    private void OnLocateCodexClick(object sender, RoutedEventArgs e)
+    {
+        var path = _codexExecutablePicker.Pick(this, "Locate the Codex executable");
+        if (path is not null) ViewModel.CodexExecutablePath = path;
+    }
+
+    private sealed class SystemCodexExecutablePicker : IRekallAgeStudioCodexExecutablePicker
+    {
+        public static SystemCodexExecutablePicker Instance { get; } = new();
+        public string? Pick(Window? owner, string title)
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title = title,
+                Filter = "Codex executable (codex.exe;codex.cmd;codex)|codex.exe;codex.cmd;codex|All files (*.*)|*.*",
                 CheckFileExists = true,
                 Multiselect = false
             };

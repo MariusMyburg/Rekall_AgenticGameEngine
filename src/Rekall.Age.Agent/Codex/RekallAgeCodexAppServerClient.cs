@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Security;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -103,10 +104,10 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
         var executable = !string.IsNullOrWhiteSpace(options.ExecutablePath)
             ? options.ExecutablePath
             : Environment.GetEnvironmentVariable("REKALL_AGE_CODEX_PATH");
-        var startInfo = CreateStartInfo(
-            executable,
-            Environment.GetEnvironmentVariable("PATH"),
-            OperatingSystem.IsWindows());
+        var isWindows = OperatingSystem.IsWindows();
+        var pathEnvironment = BuildEffectivePathEnvironment(isWindows);
+        var startInfo = CreateStartInfo(executable, pathEnvironment, isWindows);
+        startInfo.EnvironmentVariables["PATH"] = pathEnvironment;
 
         IRekallAgeCodexProcess process;
         try
@@ -228,6 +229,47 @@ public sealed partial class RekallAgeCodexAppServerClient : IAsyncDisposable
         }
 
         return null;
+    }
+
+    // A long-running Studio process only ever sees the PATH its parent (Explorer, a service host,
+    // a shortcut) had at launch. Installing Codex afterward updates the registry, not that stale
+    // snapshot, so bare "codex" keeps failing to resolve until Studio restarts. Re-reading the
+    // user/machine PATH from the registry at probe time (the same values `setx`/System Properties
+    // write) picks up an install that happened after Studio started, without guessing an install path.
+    internal static string BuildEffectivePathEnvironment(bool isWindows)
+    {
+        var processPath = Environment.GetEnvironmentVariable("PATH");
+        if (!isWindows) return processPath ?? string.Empty;
+
+        string? userPath = null;
+        string? machinePath = null;
+        try
+        {
+            userPath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User);
+            machinePath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine);
+        }
+        catch (Exception exception) when (exception is PlatformNotSupportedException or SecurityException)
+        {
+            // Registry access can be unavailable in a locked-down environment; the process PATH still works.
+        }
+
+        return MergePathEnvironment(processPath, userPath, machinePath);
+    }
+
+    internal static string MergePathEnvironment(params string?[] sources)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var merged = new List<string>();
+        foreach (var source in sources)
+        {
+            foreach (var directory in (source ?? string.Empty)
+                         .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (seen.Add(directory)) merged.Add(directory);
+            }
+        }
+
+        return string.Join(Path.PathSeparator, merged);
     }
 
     public async Task<RekallAgeCodexAccount> ReadAccountAsync(

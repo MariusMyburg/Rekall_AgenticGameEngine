@@ -384,18 +384,31 @@ internal sealed class RekallAgeLanguageModelReadinessProbe : IRekallAgeLanguageM
         Exception exception,
         List<RekallAgeLanguageModelReadinessCheck> checks)
     {
-        if (providerId == "codex"
-            && exception is RekallAgeLanguageModelProviderException codexFailure
-            && codexFailure.Code == RekallAgeCodexErrorCodes.AuthenticationRequired)
+        if (providerId == "codex" && exception is RekallAgeLanguageModelProviderException codexFailure)
         {
-            return Failure(
-                providerId,
-                RekallAgeCodexErrorCodes.AuthenticationRequired,
-                "Codex authentication is required.",
-                checks,
-                "authentication",
-                "sign-in-codex",
-                canRetry: true);
+            if (codexFailure.Code == RekallAgeCodexErrorCodes.AuthenticationRequired)
+            {
+                return Failure(
+                    providerId,
+                    RekallAgeCodexErrorCodes.AuthenticationRequired,
+                    "Codex authentication is required.",
+                    checks,
+                    "authentication",
+                    "sign-in-codex",
+                    canRetry: true);
+            }
+
+            if (codexFailure.Code == RekallAgeCodexErrorCodes.RuntimeMissing)
+            {
+                return Failure(
+                    providerId,
+                    RekallAgeCodexErrorCodes.RuntimeMissing,
+                    "Codex could not be found on this PC. Locate the Codex executable or install it, then retry.",
+                    checks,
+                    "codex-runtime",
+                    "locate-codex",
+                    canRetry: true);
+            }
         }
 
         var statusCode = StatusCode(exception);
@@ -476,7 +489,8 @@ internal sealed class RekallAgeLanguageModelReadinessProbe : IRekallAgeLanguageM
             OpenAiUrl = settings.OpenAiUrl,
             KimiApiKey = kimiApiKey,
             KimiUrl = settings.KimiUrl,
-            CodexApprovalPolicy = settings.CodexApprovalPolicy
+            CodexApprovalPolicy = settings.CodexApprovalPolicy,
+            CodexExecutablePath = settings.CodexExecutablePath
         };
     }
 

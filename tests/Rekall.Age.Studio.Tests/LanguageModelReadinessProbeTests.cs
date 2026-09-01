@@ -294,6 +294,21 @@ public sealed class LanguageModelReadinessProbeTests
     }
 
     [Fact]
+    public async Task CodexRuntimeMissingReportsALocateCodexRemediationInsteadOfAGenericFailure()
+    {
+        var fixture = new ProbeFixture
+        {
+            ModelFailure = ProviderFailure(RekallAgeCodexErrorCodes.RuntimeMissing, SentinelKey)
+        };
+
+        var result = await fixture.ProbeAsync("codex");
+
+        AssertResult(result, "codex", RekallAgeLanguageModelReadinessState.Blocked,
+            RekallAgeCodexErrorCodes.RuntimeMissing, "locate-codex", canRetry: true);
+        Assert.DoesNotContain(SentinelKey, ResultText(result), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CodexRequiresExactProjectAgentModel()
     {
         var fixture = new ProbeFixture { Models = [new("gpt-other", 0)] };

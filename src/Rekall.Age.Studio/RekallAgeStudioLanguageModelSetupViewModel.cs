@@ -189,6 +189,7 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     private string? _ollamaUrl;
     private string? _openAiUrl;
     private string? _kimiUrl;
+    private string? _codexExecutablePath;
     private RekallAgeLanguageModelReadinessState _readinessState = RekallAgeLanguageModelReadinessState.Blocked;
     private string _readinessCode = "REKALL_ONBOARDING_NOT_CHECKED";
     private string _readinessSummary = "Language-model setup has not been checked.";
@@ -312,6 +313,12 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         set => SetEndpoint(ref _kimiUrl, NormalizeEndpoint(value));
     }
 
+    public string? CodexExecutablePath
+    {
+        get => _codexExecutablePath;
+        set => SetEndpoint(ref _codexExecutablePath, NormalizeEndpoint(value));
+    }
+
     public RekallAgeLanguageModelReadinessState ReadinessState
     {
         get => _readinessState;
@@ -397,10 +404,12 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
                 _ollamaUrl = setup.OllamaUrl;
                 _openAiUrl = setup.OpenAiUrl;
                 _kimiUrl = setup.KimiUrl;
+                _codexExecutablePath = setup.CodexExecutablePath;
                 OnPropertyChanged(nameof(ReasoningEffort));
                 OnPropertyChanged(nameof(OllamaUrl));
                 OnPropertyChanged(nameof(OpenAiUrl));
                 OnPropertyChanged(nameof(KimiUrl));
+                OnPropertyChanged(nameof(CodexExecutablePath));
                 OnProviderSelectionChanged();
             }).ConfigureAwait(false);
         }
@@ -930,7 +939,8 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         OpenAiUrl,
         KimiUrl,
         lastSuccessfulCheckUtc,
-        RekallAgeStudioLanguageModelSetup.CurrentReadinessVersion);
+        RekallAgeStudioLanguageModelSetup.CurrentReadinessVersion,
+        CodexExecutablePath);
 
     private void PublishReadiness(
         RekallAgeLanguageModelReadinessResult result,
@@ -1031,7 +1041,8 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
     {
         OllamaUrl = OllamaUrl,
         OpenAiUrl = OpenAiUrl,
-        KimiUrl = KimiUrl
+        KimiUrl = KimiUrl,
+        CodexExecutablePath = CodexExecutablePath
     };
 
     private RekallAgeLanguageModelProviderSettings RebuildActiveProviderSettings() => new()
@@ -1046,7 +1057,8 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         KimiApiKey = SelectedProviderId == "kimi"
             && _activeCredentialRetention == ActiveCredentialRetention.AppliedSession
                 ? _activeProviderSettings.KimiApiKey
-                : null
+                : null,
+        CodexExecutablePath = CodexExecutablePath
     };
 
     private bool TrySetActiveProviderSettings(
@@ -1072,7 +1084,8 @@ internal sealed class RekallAgeStudioLanguageModelSetupViewModel :
         OpenAiUrl = OpenAiUrl,
         OpenAiApiKey = providerId == "openai" ? credential : null,
         KimiUrl = KimiUrl,
-        KimiApiKey = providerId == "kimi" ? credential : null
+        KimiApiKey = providerId == "kimi" ? credential : null,
+        CodexExecutablePath = CodexExecutablePath
     };
 
     private static bool HasCredential(

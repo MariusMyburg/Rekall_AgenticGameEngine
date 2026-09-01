@@ -176,9 +176,11 @@
       "rekall.age.modeling": {
         "type": "Project",
         "dependencies": {
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
           "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )",
           "Rekall.Age.Modules": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )",
           "SamuelRe.CSG.Sharp": "[1.0.0, )"
         }
       },

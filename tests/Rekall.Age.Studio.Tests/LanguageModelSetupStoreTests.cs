@@ -67,6 +67,31 @@ public sealed class LanguageModelSetupStoreTests
     }
 
     [Fact]
+    public async Task SaveAsyncRoundTripsACodexExecutablePathOverride()
+    {
+        await using var directory = new TemporaryDirectory();
+        var path = directory.File("setup.json");
+        var codexExecutablePath = @"C:\Tools\Codex\codex.exe";
+        var setup = CompletedSetup() with { ProviderId = "codex", CodexExecutablePath = codexExecutablePath };
+        var store = new RekallAgeStudioLanguageModelSetupStore(path);
+
+        await store.SaveAsync(setup, CancellationToken.None);
+        var loaded = await store.LoadAsync(CancellationToken.None);
+
+        Assert.Equal(codexExecutablePath, loaded.CodexExecutablePath);
+    }
+
+    [Fact]
+    public void NormalizeRejectsARelativeCodexExecutablePath()
+    {
+        var setup = CompletedSetup() with { ProviderId = "codex", CodexExecutablePath = "codex.exe" };
+
+        var normalized = RekallAgeStudioLanguageModelSetup.Normalize(setup);
+
+        Assert.Null(normalized);
+    }
+
+    [Fact]
     public async Task SaveAsyncPreservesAnIncompleteDismissalForTheNextLaunch()
     {
         await using var directory = new TemporaryDirectory();

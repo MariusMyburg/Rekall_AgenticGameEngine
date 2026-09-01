@@ -312,7 +312,8 @@ internal sealed class RekallAgeStudioLanguageModelSetupCoordinator
                         OpenAiUrl = setup.OpenAiUrl,
                         OpenAiApiKey = credentials.OpenAi,
                         KimiUrl = setup.KimiUrl,
-                        KimiApiKey = credentials.Kimi
+                        KimiApiKey = credentials.Kimi,
+                        CodexExecutablePath = setup.CodexExecutablePath
                     }),
                 timeout.Token);
         }

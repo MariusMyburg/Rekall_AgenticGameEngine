@@ -10,9 +10,9 @@
       },
       "Microsoft.NET.Sdk.WebAssembly.Pack": {
         "type": "Direct",
-        "requested": "[10.0.11, )",
-        "resolved": "10.0.11",
-        "contentHash": "vI5/681Ld3dnYch2wCH+8cDc3PXIgfaJhjCHTUmCtm2tu92T71iY3shZHM3BeLPDFv9G7Nq/gS5hrlghPG+MXg=="
+        "requested": "[10.0.9, )",
+        "resolved": "10.0.9",
+        "contentHash": "VZrxevxXB2tmpyRKTbvVCNUt3GsJiOvWokwa7G328bQf7rKap9cNHPWrtPzTAWNphL7b6byHclNu1jc4QXv46w=="
       },
       "BepuPhysics": {
         "type": "Transitive",
@@ -188,9 +188,11 @@
       "rekall.age.modeling": {
         "type": "Project",
         "dependencies": {
+          "Rekall.Age.Assets": "[0.1.0-preview.1, )",
           "Rekall.Age.Core": "[0.1.0-preview.1, )",
           "Rekall.Age.Modeling.Contracts": "[0.1.0-preview.1, )",
           "Rekall.Age.Modules": "[0.1.0-preview.1, )",
+          "Rekall.Age.World": "[0.1.0-preview.1, )",
           "SamuelRe.CSG.Sharp": "[1.0.0, )"
         }
       },

@@ -180,6 +180,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
     private string? _sessionOllamaUrl;
     private string? _sessionOpenAiUrl;
     private string? _sessionKimiUrl;
+    private string? _sessionCodexExecutablePath;
     private bool _languageModelSetupAllowsAuthoring = true;
     private bool _localModelRuntimeReady;
     private bool _languageModelSetupBusy;
@@ -2281,6 +2282,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             _sessionOllamaUrl = null;
             _sessionOpenAiUrl = null;
             _sessionKimiUrl = null;
+            _sessionCodexExecutablePath = null;
             OnPropertyChanged(nameof(HasSessionOpenAiCredential));
             OnPropertyChanged(nameof(HasSessionKimiCredential));
             OnPropertyChanged(nameof(OpenAiCredentialSourceLabel));
@@ -4382,6 +4384,7 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             _sessionOllamaUrl = normalized.OllamaUrl;
             _sessionOpenAiUrl = normalized.OpenAiUrl;
             _sessionKimiUrl = normalized.KimiUrl;
+            _sessionCodexExecutablePath = normalized.CodexExecutablePath;
             OnPropertyChanged(nameof(HasSessionOpenAiCredential));
             OnPropertyChanged(nameof(HasSessionKimiCredential));
             OnPropertyChanged(nameof(OpenAiCredentialSourceLabel));
@@ -4730,14 +4733,16 @@ public sealed class RekallAgeStudioViewModel : INotifyPropertyChanged, IAsyncDis
             && _sessionKimiApiKey is null
             && _sessionOllamaUrl is null
             && _sessionOpenAiUrl is null
-            && _sessionKimiUrl is null) return null;
+            && _sessionKimiUrl is null
+            && _sessionCodexExecutablePath is null) return null;
         return new RekallAgeLanguageModelProviderSettings
         {
             OllamaUrl = _sessionOllamaUrl ?? Environment.GetEnvironmentVariable("REKALL_AGE_OLLAMA_URL"),
             OpenAiApiKey = _sessionOpenAiApiKey ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY"),
             OpenAiUrl = _sessionOpenAiUrl ?? Environment.GetEnvironmentVariable("REKALL_AGE_OPENAI_URL"),
             KimiApiKey = _sessionKimiApiKey ?? ReadFirstEnvironmentValue("KIMI_API_KEY", "MOONSHOT_API_KEY"),
-            KimiUrl = _sessionKimiUrl ?? Environment.GetEnvironmentVariable("REKALL_AGE_KIMI_URL")
+            KimiUrl = _sessionKimiUrl ?? Environment.GetEnvironmentVariable("REKALL_AGE_KIMI_URL"),
+            CodexExecutablePath = _sessionCodexExecutablePath ?? Environment.GetEnvironmentVariable("REKALL_AGE_CODEX_PATH")
         };
     }
 

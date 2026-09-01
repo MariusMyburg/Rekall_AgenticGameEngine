@@ -38,6 +38,8 @@ public sealed class RekallAgeLanguageModelProviderSettings
 
     public string? CodexApprovalPolicy { get; init; }
 
+    public string? CodexExecutablePath { get; init; }
+
     public override string ToString() => "Language model provider settings.";
 }
 
@@ -227,6 +229,9 @@ public sealed class RekallAgeLanguageModelProviderCatalog
                 var codexRunner = _codexRunnerFactory?.Invoke()
                     ?? new RekallAgeCodexProjectAgentRunner(
                         RekallAgeCodexMcpConfiguration.Resolve(),
+                        appServerOptions: string.IsNullOrWhiteSpace(settings.CodexExecutablePath)
+                            ? null
+                            : new RekallAgeCodexAppServerOptions { ExecutablePath = settings.CodexExecutablePath },
                         approvalPolicy: approvalPolicy == "never" ? "on-request" : approvalPolicy,
                         approvalCallback: approvalPolicy == "never"
                             ? static (_, _) => ValueTask.FromResult(

@@ -122,6 +122,32 @@ public sealed class CodexAppServerClientTests
     }
 
     [Fact]
+    public void MergePathEnvironmentAppendsNewDirectoriesWithoutDuplicatingExistingOnes()
+    {
+        var processPath = string.Join(Path.PathSeparator, @"C:\already\on\path", @"C:\also\present");
+        var userPath = string.Join(Path.PathSeparator, @"C:\already\on\path", @"C:\newly\installed\codex");
+        var machinePath = @"C:\also\present";
+
+        var merged = RekallAgeCodexAppServerClient.MergePathEnvironment(processPath, userPath, machinePath);
+
+        Assert.Equal(
+            string.Join(
+                Path.PathSeparator,
+                @"C:\already\on\path",
+                @"C:\also\present",
+                @"C:\newly\installed\codex"),
+            merged);
+    }
+
+    [Fact]
+    public void MergePathEnvironmentToleratesNullAndEmptySources()
+    {
+        var merged = RekallAgeCodexAppServerClient.MergePathEnvironment(null, string.Empty, @"C:\only\entry");
+
+        Assert.Equal(@"C:\only\entry", merged);
+    }
+
+    [Fact]
     public async Task EphemeralSmokeThreadCanUseReadOnlySandboxWithoutWritableRootConfiguration()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));

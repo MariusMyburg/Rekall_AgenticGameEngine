@@ -86,10 +86,12 @@ public static class RekallAgeProceduralTreeGenerator
         for (var i = 0; i < primaryCount; i++)
         {
             var rank = (i + 0.45) / primaryCount;
-            var yT = settings.CrownStart + rank * (0.92 - settings.CrownStart);
+            var yT = settings.CrownStart + rank * (0.92 - settings.CrownStart)
+                + rng.Signed(0.035);
+            yT = Math.Clamp(yT, settings.CrownStart, 0.94);
             var azimuth = i * goldenAngle + rng.Signed(settings.Irregularity * 0.7);
             var crownEnvelope = Math.Pow(Math.Sin(Math.PI * Math.Clamp((yT - settings.CrownStart) / (1 - settings.CrownStart), 0.05, 0.95)), 0.55);
-            var length = settings.CrownRadius * (0.62 + crownEnvelope * 0.48) * rng.Range(0.82, 1.14);
+            var length = settings.CrownRadius * (0.76 + crownEnvelope * 0.42) * rng.Range(0.78, 1.18);
             var rise = settings.Height * (0.08 + settings.ApicalDominance * rank * 0.22);
             var start = SamplePolyline(trunkPoints, yT);
             var horizontal = new Vector3((float)Math.Cos(azimuth), 0, (float)Math.Sin(azimuth));
@@ -201,10 +203,17 @@ public static class RekallAgeProceduralTreeGenerator
         for (var i = 0; i < requested; i++)
         {
             var branch = terminals[i % terminals.Length];
-            var t = rng.Range(0.42, 1.03);
+            var t = rng.Range(0.68, 1.03);
             var center = SamplePolyline(branch.Points, Math.Min(1, t));
-            center += new Vector3((float)rng.Signed(0.32), (float)rng.Signed(0.22), (float)rng.Signed(0.32));
-            var size = (float)(settings.Height * rng.Range(0.022, 0.037) * recipe.LeafScale);
+            // The fine twigs are intentionally omitted from the bark mesh. Their leaf clusters
+            // still need to occupy that surrounding volume, rather than trace every visible
+            // terminal branch as a narrow strip.
+            var crownScatter = settings.CrownRadius * rng.Range(0.12, 0.30);
+            center += new Vector3(
+                (float)rng.Signed(crownScatter),
+                (float)rng.Signed(crownScatter * 0.62),
+                (float)rng.Signed(crownScatter));
+            var size = (float)(settings.Height * rng.Range(0.034, 0.054) * recipe.LeafScale);
             var azimuth = (float)rng.Range(0, Math.PI * 2);
             var right = Vector3.Normalize(new Vector3(MathF.Cos(azimuth), 0, MathF.Sin(azimuth)));
             var up = Vector3.Normalize(Vector3.UnitY * (float)rng.Range(0.65, 0.95) + new Vector3(right.Z, 0, -right.X) * (float)rng.Signed(0.32));
@@ -223,21 +232,17 @@ public static class RekallAgeProceduralTreeGenerator
         void AddPlane(Vector3 r, Vector3 u)
         {
             var normal = Vector3.Normalize(Vector3.Cross(r, u));
-            var leafLength = size * 1.35f;
-            var leafWidth = size * 0.72f;
+            var leafLength = size;
+            var leafWidth = size;
             var points = new[]
             {
-                mesh.Add(center - u * leafLength, normal, new(0.5, 1.0)),
-                mesh.Add(center - u * leafLength * 0.28f + r * leafWidth, normal, new(1.0, 0.67)),
-                mesh.Add(center + u * leafLength * 0.42f + r * leafWidth * 0.72f, normal, new(0.86, 0.28)),
-                mesh.Add(center + u * leafLength, normal, new(0.5, 0.0)),
-                mesh.Add(center + u * leafLength * 0.42f - r * leafWidth * 0.72f, normal, new(0.14, 0.28)),
-                mesh.Add(center - u * leafLength * 0.28f - r * leafWidth, normal, new(0.0, 0.67))
+                mesh.Add(center - u * leafLength - r * leafWidth, normal, new(0.0, 1.0)),
+                mesh.Add(center - u * leafLength + r * leafWidth, normal, new(1.0, 1.0)),
+                mesh.Add(center + u * leafLength + r * leafWidth, normal, new(1.0, 0.0)),
+                mesh.Add(center + u * leafLength - r * leafWidth, normal, new(0.0, 0.0))
             };
             mesh.Triangle(points[0], points[1], points[2]);
             mesh.Triangle(points[0], points[2], points[3]);
-            mesh.Triangle(points[0], points[3], points[4]);
-            mesh.Triangle(points[0], points[4], points[5]);
         }
     }
 

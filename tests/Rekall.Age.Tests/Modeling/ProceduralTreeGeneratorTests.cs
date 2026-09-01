@@ -89,10 +89,29 @@ public sealed class ProceduralTreeGeneratorTests
             Assert.InRange(uv.X, 0, 1);
             Assert.InRange(uv.Y, 0, 1);
         });
-        // Two crossed, pointed six-vertex leaf silhouettes per cluster, four triangles each.
-        // They remain recognizably organic even before an alpha atlas is assigned.
-        Assert.Equal(lod.LeafCardCount * 8, lod.Foliage.Topology.FaceIds.Count);
+        // Two crossed rectangular planes preserve the complete alpha-authored texture instead
+        // of cropping and warping it through a second hard-coded leaf silhouette.
+        Assert.Equal(lod.LeafCardCount * 4, lod.Foliage.Topology.FaceIds.Count);
         Assert.True(lod.LeafCardCount >= 180);
+    }
+
+    [Fact]
+    public void OakFoliageOccupiesAnIrregularThreeDimensionalCrownVolume()
+    {
+        var tree = RekallAgeProceduralTreeGenerator.Generate(
+            "oak-volume", "Oak volume", RekallAgeProceduralTreeSettings.TemperateOak(930176));
+        var positions = tree.Lods[0].Foliage.Topology.Positions;
+        var occupiedCells = positions
+            .Select(point => (
+                X: (int)Math.Floor(point.X / 0.75),
+                Y: (int)Math.Floor(point.Y / 0.75),
+                Z: (int)Math.Floor(point.Z / 0.75)))
+            .Distinct()
+            .Count();
+        var zBands = positions.GroupBy(point => (int)Math.Floor(point.Z / 0.75)).Count();
+
+        Assert.True(occupiedCells >= 2_000, $"Foliage occupied only {occupiedCells} crown cells.");
+        Assert.True(zBands >= 15, $"Foliage occupied only {zBands} depth bands.");
     }
 
     [Fact]

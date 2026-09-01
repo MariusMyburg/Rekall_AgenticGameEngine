@@ -203,26 +203,36 @@ public static class RekallAgeProceduralTreeGenerator
         for (var i = 0; i < requested; i++)
         {
             var branch = terminals[i % terminals.Length];
-            var t = rng.Range(0.68, 1.03);
+            // Oak foliage gathers toward twig tips, with some interior growth and deliberate
+            // gaps. A square-uniform distribution makes a procedural tree read as topiary.
+            var t = 0.56 + 0.47 * Math.Sqrt(rng.Unit());
             var center = SamplePolyline(branch.Points, Math.Min(1, t));
             // The fine twigs are intentionally omitted from the bark mesh. Their leaf clusters
             // still need to occupy that surrounding volume, rather than trace every visible
             // terminal branch as a narrow strip.
-            var crownScatter = settings.CrownRadius * rng.Range(0.12, 0.30);
+            var clumpScale = rng.Unit() < 0.62 ? rng.Range(0.12, 0.25) : rng.Range(0.25, 0.40);
+            var crownScatter = settings.CrownRadius * clumpScale;
             center += new Vector3(
                 (float)rng.Signed(crownScatter),
                 (float)rng.Signed(crownScatter * 0.62),
                 (float)rng.Signed(crownScatter));
-            var size = (float)(settings.Height * rng.Range(0.034, 0.054) * recipe.LeafScale);
+            var length = (float)(settings.Height * rng.Range(0.031, 0.060) * recipe.LeafScale);
+            var width = length * (float)rng.Range(0.44, 0.78);
             var azimuth = (float)rng.Range(0, Math.PI * 2);
             var right = Vector3.Normalize(new Vector3(MathF.Cos(azimuth), 0, MathF.Sin(azimuth)));
             var up = Vector3.Normalize(Vector3.UnitY * (float)rng.Range(0.65, 0.95) + new Vector3(right.Z, 0, -right.X) * (float)rng.Signed(0.32));
-            AddCrossedLeafCard(mesh, center, right, up, size);
+            AddCrossedLeafCard(mesh, center, right, up, length, width);
         }
         return mesh.Build();
     }
 
-    private static void AddCrossedLeafCard(TreeMeshBuilder mesh, Vector3 center, Vector3 right, Vector3 up, float size)
+    private static void AddCrossedLeafCard(
+        TreeMeshBuilder mesh,
+        Vector3 center,
+        Vector3 right,
+        Vector3 up,
+        float length,
+        float width)
     {
         AddPlane(right, up);
         var secondRight = Vector3.Normalize(Vector3.Cross(up, right));
@@ -232,14 +242,12 @@ public static class RekallAgeProceduralTreeGenerator
         void AddPlane(Vector3 r, Vector3 u)
         {
             var normal = Vector3.Normalize(Vector3.Cross(r, u));
-            var leafLength = size;
-            var leafWidth = size;
             var points = new[]
             {
-                mesh.Add(center - u * leafLength - r * leafWidth, normal, new(0.0, 1.0)),
-                mesh.Add(center - u * leafLength + r * leafWidth, normal, new(1.0, 1.0)),
-                mesh.Add(center + u * leafLength + r * leafWidth, normal, new(1.0, 0.0)),
-                mesh.Add(center + u * leafLength - r * leafWidth, normal, new(0.0, 0.0))
+                mesh.Add(center - u * length - r * width, normal, new(0.0, 1.0)),
+                mesh.Add(center - u * length + r * width, normal, new(1.0, 1.0)),
+                mesh.Add(center + u * length + r * width, normal, new(1.0, 0.0)),
+                mesh.Add(center + u * length - r * width, normal, new(0.0, 0.0))
             };
             mesh.Triangle(points[0], points[1], points[2]);
             mesh.Triangle(points[0], points[2], points[3]);

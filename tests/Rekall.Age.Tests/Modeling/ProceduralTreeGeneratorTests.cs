@@ -128,6 +128,31 @@ public sealed class ProceduralTreeGeneratorTests
     }
 
     [Fact]
+    public void NearFoliageUsesVariedElongatedLeafClustersInsteadOfRepeatedSquareCrosses()
+    {
+        var tree = RekallAgeProceduralTreeGenerator.Generate(
+            "oak-clusters", "Oak clusters", RekallAgeProceduralTreeSettings.TemperateOak(930176));
+        var positions = tree.Lods[0].Foliage.Topology.Positions;
+        var aspectRatios = new List<double>();
+        var areas = new List<double>();
+
+        // A crossed cluster contributes two four-vertex planes.
+        for (var i = 0; i < positions.Count; i += 8)
+        {
+            var height = Distance(positions[i], positions[i + 3]);
+            var width = Distance(positions[i], positions[i + 1]);
+            aspectRatios.Add(Math.Min(width, height) / Math.Max(width, height));
+            areas.Add(width * height);
+        }
+
+        Assert.All(aspectRatios, ratio => Assert.InRange(ratio, 0.42, 0.82));
+        Assert.True(areas.Max() / areas.Min() >= 3.0,
+            "Foliage clusters need enough scale variation to avoid a stamped procedural silhouette.");
+        Assert.True(aspectRatios.Select(ratio => Math.Round(ratio, 2)).Distinct().Count() >= 8,
+            "Foliage clusters need varied proportions rather than one repeated card shape.");
+    }
+
+    [Fact]
     public void LodComplexityAndLeafBudgetsDecreaseMonotonically()
     {
         var tree = RekallAgeProceduralTreeGenerator.Generate(
@@ -178,6 +203,9 @@ public sealed class ProceduralTreeGeneratorTests
 
     private static double MaxRadius(IEnumerable<RekallAgeGeometryVector3> points) =>
         points.Select(point => Math.Sqrt(point.X * point.X + point.Z * point.Z)).DefaultIfEmpty().Max();
+
+    private static double Distance(RekallAgeGeometryVector3 left, RekallAgeGeometryVector3 right) =>
+        Math.Sqrt(Math.Pow(left.X - right.X, 2) + Math.Pow(left.Y - right.Y, 2) + Math.Pow(left.Z - right.Z, 2));
 
     private static string FindRepositoryRoot([CallerFilePath] string sourceFilePath = "") =>
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(sourceFilePath)!, "..", "..", ".."));
